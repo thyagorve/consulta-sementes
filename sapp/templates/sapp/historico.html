@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Histórico de Consultas{% endblock %}
+
+{% block content %}
+<style>
+    .container { max-width: 800px; margin: auto; padding: 15px; }
+    table { width: 100%; border-collapse: collapse; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { padding: 12px; border-bottom: 1px solid #ddd; text-align: left; }
+    th { background-color: #f2f2f2; }
+    .container{
+        width: 100%;
+        overflow-y: auto;
+    }
+    h2{text-align: center;}
+</style>
+<h2>Histórico de Consultas</h2>
+<div class="container">
+    
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Termo Buscado</th>
+                <th>Usuário</th>
+                <th>Data e Hora</th>
+                <th>Resultados</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in historico %}
+            <tr>
+                <td>{{ item.termo_buscado }}</td>
+                <td>{{ item.usuario.username|default:"N/A" }}</td>
+                <td>{{ item.data_hora|date:"d/m/Y H:i" }}</td>
+                <td>{{ item.resultados_encontrados }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="4">Nenhuma consulta foi realizada ainda.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
