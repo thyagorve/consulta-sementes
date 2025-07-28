@@ -4,192 +4,245 @@
 
 {% block content %}
 <style>
-    /* Estilos Globais */
-    :root {
-        --primary-color: #0d6efd;
-        --secondary-color: #6c757d;
-        --light-bg: #f8f9fa;
-        --border-color: #dee2e6;
-        --card-shadow: 0 4px 8px rgba(0,0,0,0.05);
-        --border-radius: 8px;
-    }
+/* --------------------------- */
+/* VARIÁVEIS DE ESTILO GERAIS */
+/* --------------------------- */
+:root {
+    --primary-color: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --secondary-color: #6c757d;
+    --light-bg: #f8f9fa;
+    --border-color: #dee2e6;
+    --card-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    --border-radius: 8px;
+    --danger-bg: #f8d7da;
+    --danger-text: #721c24;
+    --warning-bg: #fff3cd;
+    --warning-text: #856404;
+    --success-bg: #d4edda;
+    --success-text: #155724;
+}
 
+/* --------------------------- */
+/* CONTAINER PRINCIPAL */
+/* --------------------------- */
+.container {
+    max-width: 850px;
+    margin: auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+/* --------------------------- */
+/* FORMULÁRIO DE BUSCA */
+/* --------------------------- */
+.search-wrapper {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+    margin-bottom: 2rem;
+}
+
+.search-box {
+    display: flex;
+    gap: 10px;
+}
+
+.search-box input[type="text"] {
+    flex-grow: 1;
+    padding: 12px 15px;
+    font-size: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-box input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
+}
+
+.search-box button {
+    flex-shrink: 0;
+    width: 50px;
+    font-size: 1.5rem;
+    border: none;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-box button:hover {
+    background-color: var(--primary-hover);
+}
+
+.search-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 15px;
+    justify-content: center;
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+}
+
+.search-options label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+}
+
+/* --------------------------- */
+/* QR CODE SCANNER */
+/* --------------------------- */
+#qr-reader {
+    width: 100%;
+    border: 2px dashed var(--border-color);
+    margin-bottom: 1.5rem;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    background-color: #fff;
+    padding: 10px;
+}
+
+/* --------------------------- */
+/* RESULTADOS */
+/* --------------------------- */
+.results-section {
+    margin-bottom: 20px;
+}
+.results-section h3 {
+    color: var(--secondary-color);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+}
+
+.item-card {
+    background-color: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: 10px;
+    box-shadow: var(--card-shadow);
+    transition: box-shadow 0.2s;
+    overflow: hidden;
+}
+
+.item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    cursor: pointer;
+    background-color: var(--light-bg);
+}
+
+.item-header:hover {
+    background-color: #e9ecef;
+}
+
+.item-header span {
+    font-weight: bold;
+    color: #333;
+    font-size: 1rem;
+}
+
+.item-details {
+    padding: 15px;
+    border-top: 1px solid var(--border-color);
+    display: none;
+    background-color: #fff;
+}
+
+.item-details p {
+    margin: 8px 0;
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dotted #eee;
+    padding-bottom: 6px;
+    font-size: 0.95rem;
+}
+.item-details p:last-child {
+    border-bottom: none;
+}
+
+.item-details strong {
+    color: var(--secondary-color);
+}
+
+.toggle-btn {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    border: none;
+    background: none;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    transition: transform 0.2s;
+}
+
+/* Acordeão Aberto */
+.item-card.open .toggle-btn {
+    transform: rotate(45deg);
+}
+.item-card.open .item-details {
+    display: block;
+}
+
+/* --------------------------- */
+/* MENSAGENS */
+/* --------------------------- */
+.messages {
+    padding: 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+.messages.warning { background-color: var(--warning-bg); color: var(--warning-text); }
+.messages.error { background-color: var(--danger-bg); color: var(--danger-text); }
+.messages.success { background-color: var(--success-bg); color: var(--success-text); }
+
+/* --------------------------- */
+/* RESPONSIVIDADE */
+/* --------------------------- */
+@media (max-width: 768px) {
     .container {
-        max-width: 800px;
-        margin: auto;
-        padding: 15px;
-    }
-
-    /* Formulário de Busca */
-    .search-wrapper {
-        background-color: #fff;
-        padding: 20px;
-        border-radius: var(--border-radius);
-        box-shadow: var(--card-shadow);
-        margin-bottom: 2rem;
-    }
-    
-    .search-box {
-        display: flex;
-        gap: 10px;
+        padding: 10px;
     }
 
     .search-box input[type="text"] {
-        flex-grow: 1;
-        padding: 12px 15px;
-        font-size: 1rem;
-        border: 1px solid var(--border-color);
-        border-radius: var(--border-radius);
-        transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    .search-box input[type="text"]:focus {
-        outline: none;
-        border-color: var(--primary-color);
-        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25);
-    }
-
-    .search-box button {
-        flex-shrink: 0;
-        width: 50px;
-        font-size: 1.5rem;
-        border: none;
-        background-color: var(--primary-color);
-        color: white;
-        border-radius: var(--border-radius);
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-
-    .search-box button:hover {
-        background-color: #0b5ed7;
+        font-size: 0.95rem;
     }
 
     .search-options {
-        display: flex;
-        gap: 20px;
-        margin-top: 15px;
-        justify-content: center;
-        color: var(--secondary-color);
+        gap: 10px;
+        font-size: 0.85rem;
+    }
+
+    .item-header span {
         font-size: 0.9rem;
     }
-    
-    .search-options label {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        cursor: pointer;
-    }
-
-    /* Leitor de QR Code */
-    #qr-reader {
-        width: 100%;
-        border: 2px dashed var(--border-color);
-        margin-bottom: 1.5rem;
-        border-radius: var(--border-radius);
-        overflow: hidden;
-    }
-
-    /* Seções de Resultados */
-    .results-section {
-        margin-bottom: 20px;
-    }
-    .results-section h3 {
-        color: var(--secondary-color);
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 10px;
-        font-size: 1.2rem;
-    }
-
-    .item-card {
-        background-color: #fff;
-        border: 1px solid var(--border-color);
-        border-radius: var(--border-radius);
-        margin-bottom: 10px;
-        box-shadow: var(--card-shadow);
-        transition: box-shadow 0.2s;
-    }
-
-    .item-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 15px;
-        cursor: pointer;
-        background-color: var(--light-bg);
-    }
-
-    .item-header:hover {
-        background-color: #e9ecef;
-    }
-    
-    .item-header span {
-        font-weight: bold;
-        color: #333;
-    }
-
-    .item-details {
-        padding: 15px;
-        border-top: 1px solid var(--border-color);
-        display: none; /* Inicia fechado */
-    }
-
-    .item-details p {
-        margin: 10px 0;
-        display: flex;
-        justify-content: space-between;
-        border-bottom: 1px dotted #eee;
-        padding-bottom: 8px;
-    }
-    .item-details p:last-child {
-        border-bottom: none;
-    }
-
-    .item-details strong {
-        color: var(--secondary-color);
-    }
-    
-    .toggle-btn {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: var(--primary-color);
-        border: none;
-        background: none;
-        width: 30px;
-        height: 30px;
-        line-height: 30px; /* Alinha o + e - verticalmente */
-        text-align: center;
-        transition: transform 0.2s;
-    }
-
-    /* Animação do botão +/- */
-    .item-card.open .toggle-btn {
-        transform: rotate(45deg);
-    }
-    .item-card.open .item-details {
-        display: block;
-    }
-
-    /* Mensagens de Feedback */
-    .messages {
-        padding: 15px;
-        border-radius: var(--border-radius);
-        margin-bottom: 20px;
-        font-weight: bold;
-    }
-    .messages.warning { background-color: #fff3cd; color: #856404; }
-    .messages.error { background-color: #f8d7da; color: #721c24; }
+}
 
 </style>
 
 <div class="container">
     <h2>Consultar Produto</h2>
     
+    <!-- FORMULÁRIO DE BUSCA -->
     <div class="search-wrapper">
         <form method="POST" id="search-form"> 
             {% csrf_token %}
             <div class="search-box">
-                <input type="text" name="termo_busca" value="{{ request.POST.termo_busca }}" placeholder="Digite Código ou Lote..." required autofocus>
+                <input type="text" name="termo_busca" value="{{ termo_buscado }}" placeholder="Digite Código ou Lote..." required autofocus>
                 <button type="button" id="start-scan-btn">📷</button>
                 <button type="submit" style="display:none;"></button>
             </div>
@@ -203,55 +256,66 @@
                     <input type="radio" name="search_type" value="cadastro" {% if search_type == 'cadastro' %}checked{% endif %}>
                     Apenas Cadastro
                 </label>
+                <label>
+                    <input type="radio" name="search_type" value="lote" {% if search_type == 'lote' %}checked{% endif %}>
+                    Apenas Lote
+                </label>
             </div>
         </form>
     </div>
     
+    <!-- SCANNER QR CODE -->
     <div id="qr-reader" style="display: none;"></div>
 
-    <div id="results-container">
-        {% if messages %}{% for message in messages %}<div class="messages {{ message.tags }}">{{ message }}</div>{% endfor %}{% endif %}
 
-        <!-- SEÇÃO DE RESULTADOS DO CADASTRO -->
-        {% if cadastros_detalhes %}
-        <div class="results-section">
-            <h3>Resultados do Cadastro ({{ cadastros_detalhes|length }})</h3>
-            {% for item in cadastros_detalhes %}
-                <div class="item-card">
-                    <div class="item-header">
-                        <span>Cód: {{ item.cadastro.codigo }} - {{ item.cadastro.descricao|truncatechars:30 }}</span>
-                        <button type="button" class="toggle-btn">+</button>
-                    </div>
-                    <div class="item-details">
-                        {% for detalhe in item.detalhes %}<p><strong>{{ detalhe.label }}:</strong> <span>{{ detalhe.valor }}</span></p>{% endfor %}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
-        {% endif %}
 
-        <!-- SEÇÃO DE RESULTADOS DO LOTE/ESTOQUE -->
-        {% if lotes_detalhes %}
-        <div class="results-section">
-            <h3>Resultados do Lote/Estoque ({{ lotes_detalhes|length }})</h3>
-            {% for item in lotes_detalhes %}
-                <div class="item-card">
-                    <div class="item-header">
-                        <span>Lote {{ item.lote.lote }} em {{ item.lote.endereco }}</span>
-                        <button type="button" class="toggle-btn">+</button>
-                    </div>
-                    <div class="item-details">
-                        {% for detalhe in item.detalhes %}<p><strong>{{ detalhe.label }}:</strong> <span>{{ detalhe.valor }}</span></p>{% endfor %}
-                    </div>
-                </div>
-            {% endfor %}
+{% if resultados %}
+<div class="results-section">
+    <h3>Resultados Encontrados ({{ resultados|length }})</h3>
+    {% for item in resultados %}
+        <div class="item-card">
+            <div class="item-header">
+                {% if item.produto %}
+                    <span>Produto: {{ item.produto.codigo }} - {{ item.produto.descricao|default:"(Sem descrição)" }}</span>
+                {% else %}
+                    <span>Lote: {{ item.lotes.0.obj.lote }} - Endereço: {{ item.lotes.0.obj.endereco|default:"(Sem endereço)" }}</span>
+                {% endif %}
+                <button type="button" class="toggle-btn">+</button>
+            </div>
+            <div class="item-details">
+                {% if item.produto %}
+                    <h4 style="margin-top:0;color:#0d6efd;">Detalhes do Produto</h4>
+                    {% for detalhe in item.detalhes_produto %}
+                        <p><strong>{{ detalhe.label }}:</strong> <span>{{ detalhe.valor }}</span></p>
+                    {% endfor %}
+                {% endif %}
+
+                {% if item.lotes %}
+                    <h4 style="margin:15px 0 10px;color:#198754;">Lotes Relacionados</h4>
+                    {% for lote in item.lotes %}
+                        <div style="border:2px solid {% if lote.destaque %}#0d6efd{% else %}#eee{% endif %};padding:10px;border-radius:6px;margin-bottom:10px;background-color:{% if lote.destaque %}#e9f3ff{% else %}#fff{% endif %};">
+                            <strong>Lote: {{ lote.obj.lote }} - Endereço: {{ lote.obj.endereco|default:"(Não informado)" }}</strong>
+                            <div style="margin-top:8px;">
+                                {% for d in lote.detalhes %}
+                                    <p><strong>{{ d.label }}:</strong> <span>{{ d.valor }}</span></p>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
         </div>
-        {% endif %}
-    </div>
+    {% endfor %}
+</div>
+{% elif termo_buscado %}
+<div class="messages warning">Nenhum resultado encontrado para "{{ termo_buscado }}"</div>
+{% endif %}
+
+
 </div>
 
+<!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     // Lógica do Acordeão (+/-)
@@ -277,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         html5QrCode = new Html5Qrcode("qr-reader");
 
-        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+        const qrCodeSuccessCallback = (decodedText) => {
             searchInput.value = decodedText;
             stopScanning();
             searchForm.submit();
@@ -289,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => {
                 console.warn("Câmera traseira falhou, tentando outra.", err);
                 html5QrCode.start({}, config, qrCodeSuccessCallback)
-                    .catch(err => {
+                    .catch(() => {
                         alert("Não foi possível iniciar a câmera. Verifique as permissões do seu navegador.");
                         stopScanning();
                     });
