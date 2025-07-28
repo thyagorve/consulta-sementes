@@ -5,7 +5,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-sua-chave-secreta-aqui' # Mantenha a sua chave original
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['tiagorve2.pythonanywhere.com','127.0.0.1']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -68,6 +68,7 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- NOSSAS CONFIGURAÇÕES ---
