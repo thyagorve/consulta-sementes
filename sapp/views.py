@@ -62,10 +62,12 @@ def consulta_view(request):
 
         try:
             if '|' in termo:  # QR Code
-                codigo, lote, *_ = [x.strip() for x in termo.split('|')]
-                cadastros = ProdutoCadastro.objects.filter(codigo__iexact=codigo)
-                lotes = EstoqueLote.objects.filter(codigo__iexact=codigo, lote__iexact=lote)
-                lote_filtro_exato = lote
+                partes = [x.strip() for x in termo.split('|') if x.strip()]
+                if len(partes) >= 2:
+                    codigo, lote = partes[0], partes[1]  # Pega só os 2 primeiros
+                    cadastros = ProdutoCadastro.objects.filter(codigo__iexact=codigo)
+                    lotes = EstoqueLote.objects.filter(codigo__iexact=codigo, lote__iexact=lote)
+                    lote_filtro_exato = lote
 
             else:
                 if search_type == 'cadastro':
