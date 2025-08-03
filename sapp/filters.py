@@ -60,10 +60,7 @@ class LoteFilter(django_filters.FilterSet):
     # --- FILTRO DE INTERVALO DE DATAS ---
     # Este filtro cria dois campos de data "de" e "até".
     # O 'name' aqui ('dtvalidade') deve ser o nome exato do campo no seu models.py
-    dtvalidade = django_filters.DateFromToRangeFilter(
-        label="Validade entre",
-        widget=django_filters.widgets.RangeWidget(attrs={'type': 'date'})
-    )
+   
 
     class Meta:
         model = EstoqueLote
@@ -77,7 +74,7 @@ class LoteFilter(django_filters.FilterSet):
         #
         # Vamos deixar apenas 'filial' e 'categoria' para começar.
         
-        fields = ['filial', 'categoria']
+        fields = [ 'categoria', 'tecnologia', 'tratamento']
 
     # Método que define o que a "Busca Rápida" de lotes faz.
     def filtro_geral_lote(self, queryset, name, value):

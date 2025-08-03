@@ -314,23 +314,6 @@ def importar_clipboard_em_lotes_view(request):
 
 
 
-# --- NOVAS VIEWS: Listagem de Produtos e Lotes ---
-@login_required
-def listar_produtos_view(request):
-    
-    """Busca todos os produtos e os exibe em uma página."""
-    produtos = ProdutoCadastro.objects.all().order_by('codigo') # Pega todos os objetos e ordena por código
-    
-    # Pega o nome de todos os campos do modelo para usar como cabeçalho da tabela
-    # Exclui campos de relacionamento e campos internos do Django
-    campos = [field for field in ProdutoCadastro._meta.get_fields() if not field.is_relation and not field.name.startswith('_')]
-
-    context = {
-        'objetos': produtos, # Usando um nome genérico 'objetos' para o template
-        'campos_cabecalho': campos,
-        'titulo_pagina': 'Produtos Cadastrados'
-    }
-    return render(request, 'sapp/listar_dados.html', context)
 
 # sapp/views.py
 

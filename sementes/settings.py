@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     
 ]
 
+AUTO_LOGOUT_DELAY = 180
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -29,6 +30,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'sapp.middleware.AutoLogoutMiddleware',
 ]
 
 ROOT_URLCONF = 'sementes.urls'
