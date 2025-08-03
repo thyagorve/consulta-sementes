@@ -190,9 +190,39 @@ def consulta_view(request):
 
 
 # --- View de Histórico ---
+# seu_app/views.py
+
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from .models import HistoricoConsulta # Certifique-se de importar seu modelo
+
 @login_required
 def historico_view(request):
-    return render(request, 'sapp/historico.html', {'historico': HistoricoConsulta.objects.all()})
+    """
+    Exibe o histórico e garante que apenas os 20 registros mais recentes existam,
+    deletando os mais antigos automaticamente.
+    """
+    
+    # Passo 1: Identificar os IDs dos 20 registros mais recentes que queremos MANTER.
+    # Usamos values_list('pk', flat=True) para pegar apenas os IDs, o que é muito eficiente.
+    ids_para_manter = list(
+        HistoricoConsulta.objects.order_by('-data_consulta').values_list('pk', flat=True)[:20]
+    )
+
+    # Passo 2: Deletar todos os registros CUJOS IDs NÃO ESTÃO na lista para manter.
+    # O método .exclude() cria um QuerySet com todos os outros registros.
+    # Se houver 20 ou menos registros no total, nada será deletado.
+    HistoricoConsulta.objects.exclude(pk__in=ids_para_manter).delete()
+
+    # Passo 3: Agora, buscar os registros restantes (os 20 mais recentes) para exibir no template.
+    # A ordenação garante que eles apareçam do mais novo para o mais antigo.
+    historico_recente = HistoricoConsulta.objects.order_by('-data_consulta')
+
+    # Passo 4: Renderizar o template com os dados já filtrados e limpos.
+    context = {
+        'historico': historico_recente
+    }
+    return render(request, 'sapp/historico.html', context)
 
 # --- View de Configuração (com Formulário de exibição) ---
 @login_required
