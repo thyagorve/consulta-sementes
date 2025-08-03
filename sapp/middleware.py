@@ -10,7 +10,7 @@ class AutoLogoutMiddleware:
     """
     def __init__(self, get_response):
         self.get_response = get_response
-        self.timeout = getattr(settings, 'AUTO_LOGOUT_DELAY', 180)  # default 30min
+        self.timeout = getattr(settings, 'AUTO_LOGOUT_DELAY', 1800)  # default 30min
 
     def __call__(self, request):
         if request.user.is_authenticated:

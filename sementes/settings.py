@@ -21,7 +21,7 @@ INSTALLED_APPS = [
     
 ]
 
-AUTO_LOGOUT_DELAY = 180
+AUTO_LOGOUT_DELAY = 1800
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
