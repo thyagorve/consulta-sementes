@@ -12,9 +12,20 @@ urlpatterns = [
     # URLs de Autenticação
 
 
-    path('login/', auth_views.LoginView.as_view(template_name='sapp/registration/login.html'), name='login'),
-    # A sua view de logout já está ok, mas vamos deixar aqui para consistência
+
+    
+  
+    path(
+        'login/',
+        auth_views.LoginView.as_view(
+            template_name='sapp/registration/login.html',
+            redirect_field_name=None,               # ignora ?next=...
+            redirect_authenticated_user=True,       # quem já tá logado vai direto pro dashboard
+        ),
+        name='login'
+    ),
     path('logout/', views.logout_view, name='logout'),
+    
 
     # Suas outras URLs
     path('', views.dashboard, name='dashboard'), # Dashboard na raiz
@@ -25,3 +36,5 @@ urlpatterns = [
     path('produtos/', views.listar_produtos_view, name='listar_produtos'),
     path('lotes/', views.listar_lotes_view, name='listar_lotes'),
 ]
+
+

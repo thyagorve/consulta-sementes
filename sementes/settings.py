@@ -31,6 +31,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'sapp.middleware.AutoLogoutMiddleware',
+    'sapp.middleware.Smart404FallbackMiddleware',
 ]
 
 ROOT_URLCONF = 'sementes.urls'
@@ -84,16 +85,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # 2. Configurações de Autenticação
 
-LOGOUT_REDIRECT_URL = 'login'
-
-
-# sementes/settings.py
-
-# ... (resto das suas configurações) ...
-
-# Redirecionamento após login e URL da página de login
-LOGIN_REDIRECT_URL = 'sapp:dashboard' # Para onde ir após o login com sucesso
-LOGIN_URL = 'sapp:login'              # Para onde ir se o acesso for negado (@login_required)
+LOGIN_URL = 'sapp:login'             # para @login_required e redirecionamentos
+LOGIN_REDIRECT_URL = 'sapp:dashboard'
+LOGOUT_REDIRECT_URL = 'sapp:login'
+             # Para onde ir se o acesso for negado (@login_required)
 # sementes/settings.py
 
 # ... (suas outras configurações) ...

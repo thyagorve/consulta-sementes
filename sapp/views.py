@@ -384,3 +384,10 @@ def listar_lotes_view(request):
         'linhas_de_dados': linhas_de_dados,
     }
     return render(request, 'sapp/listar_dados.html', context)
+
+
+from django.shortcuts import render
+
+def custom_404_view(request, exception):
+    return render(request, '404.html', status=404)
+
