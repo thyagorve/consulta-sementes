@@ -1,0 +1,57 @@
+{% extends "sapp/base.html" %}
+
+{% block title %}Login - Sementes App{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h3 class="text-center mb-0">Acessar o Sistema</h3>
+            </div>
+            <div class="card-body">
+                
+                <!-- Exibe erros do formulário, como "usuário/senha inválidos" -->
+                {% if form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        Seu nome de usuário e senha não correspondem. Por favor, tente novamente.
+                    </div>
+                {% endif %}
+
+                <!-- Exibe mensagens de outros lugares, como "Você foi deslogado" -->
+                {% if next %}
+                    {% if user.is_authenticated %}
+                    <div class="alert alert-warning" role="alert">
+                      Sua conta não tem acesso a esta página. Para prosseguir,
+                      faça o login com uma conta que tenha permissão.
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info" role="alert">
+                      Por favor, faça o login para ver esta página.
+                    </div>
+                    {% endif %}
+                {% endif %}
+
+                <form method="post" action="{% url 'sapp:login' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                    
+                    <div class="mb-3">
+                        <label for="id_username" class="form-label">Nome de Usuário</label>
+                        <input type="text" name="username" autofocus autocapitalize="none" autocomplete="username" maxlength="150" class="form-control" required id="id_username">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_password" class="form-label">Senha</label>
+                        <input type="password" name="password" autocomplete="current-password" class="form-control" required id="id_password">
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Entrar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

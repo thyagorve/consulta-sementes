@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "sapp/base.html" %}
 
 {% block title %}Consulta de Produto{% endblock %}
 
@@ -235,7 +235,7 @@
 </style>
 
 <div class="container">
-    <h2>Consultar Produto</h2>
+    <h2>Consultar Produto/Lotes</h2>
     
     <!-- FORMULÁRIO DE BUSCA -->
     <div class="search-wrapper">
@@ -254,11 +254,11 @@
                 </label>
                 <label>
                     <input type="radio" name="search_type" value="cadastro" {% if search_type == 'cadastro' %}checked{% endif %}>
-                    Apenas Cadastro
+                    Apenas produto
                 </label>
                 <label>
                     <input type="radio" name="search_type" value="lote" {% if search_type == 'lote' %}checked{% endif %}>
-                    Apenas Lote
+                    Apenas lotes
                 </label>
             </div>
         </form>
@@ -314,11 +314,17 @@
 
 </div>
 
-<!-- SCRIPTS -->
+
+
+<!-- dentro do body, antes do script -->
+<div id="qr-reader" style="display: none;">
+    <button id="qr-close-btn" aria-label="Fechar scanner">&times;</button>
+</div>
+
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Lógica do Acordeão (+/-)
+    // Acordeão (+/-)
     document.querySelectorAll('.item-header').forEach(header => {
         header.addEventListener('click', () => {
             const card = header.closest('.item-card');
@@ -328,36 +334,77 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Lógica do Scanner de QR Code
+    // Elementos principais
     const startScanBtn = document.getElementById('start-scan-btn');
     const qrReaderDiv = document.getElementById('qr-reader');
     const searchInput = document.querySelector('input[name="termo_busca"]');
     const searchForm = document.getElementById('search-form');
+    const qrCloseBtn = document.getElementById('qr-close-btn');
     let html5QrCode = null;
+    let ultimoCodigo = null;
+    let ultimoTimestamp = 0;
+
+    // Função para tocar beep (sem precisar de arquivo)
+    function playBeep() {
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const ctx = new AudioContext();
+            const oscillator = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(1000, ctx.currentTime); // 1kHz
+            gain.gain.setValueAtTime(0, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+
+            oscillator.connect(gain).connect(ctx.destination);
+            oscillator.start();
+            oscillator.stop(ctx.currentTime + 0.16);
+        } catch (e) {
+            console.warn("Falha ao gerar beep via Web Audio API:", e);
+        }
+    }
 
     const startScanning = () => {
         qrReaderDiv.style.display = 'block';
         startScanBtn.textContent = '✖️';
-        
+
         html5QrCode = new Html5Qrcode("qr-reader");
 
         const qrCodeSuccessCallback = (decodedText) => {
+            const agora = Date.now();
+            // evita leituras duplicadas em menos de 1s
+            if (decodedText === ultimoCodigo && (agora - ultimoTimestamp) < 1000) {
+                return;
+            }
+            ultimoCodigo = decodedText;
+            ultimoTimestamp = agora;
+
+            playBeep(); // feedback sonoro
             searchInput.value = decodedText;
-            stopScanning();
-            searchForm.submit();
+
+            // pequena espera pra deixar o beep tocar minimamente antes de submeter
+            setTimeout(() => {
+                stopScanning();
+                searchForm.submit();
+            }, 150);
         };
 
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-        
-        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
-            .catch(err => {
-                console.warn("Câmera traseira falhou, tentando outra.", err);
-                html5QrCode.start({}, config, qrCodeSuccessCallback)
-                    .catch(() => {
-                        alert("Não foi possível iniciar a câmera. Verifique as permissões do seu navegador.");
-                        stopScanning();
-                    });
-            });
+        const config = { fps: 10, qrbox: { width: 300, height: 300 } };
+
+        html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            qrCodeSuccessCallback
+        ).catch(err => {
+            console.warn("Câmera traseira falhou, tentando outra.", err);
+            html5QrCode.start({}, config, qrCodeSuccessCallback)
+                .catch(() => {
+                    alert("Não foi possível iniciar a câmera. Verifique as permissões do seu navegador.");
+                    stopScanning();
+                });
+        });
     };
 
     const stopScanning = () => {
@@ -375,6 +422,12 @@ document.addEventListener('DOMContentLoaded', () => {
             stopScanning();
         }
     });
+
+    // fechar via botão dentro do scanner
+    qrCloseBtn.addEventListener('click', () => {
+        stopScanning();
+    });
 });
 </script>
+
 {% endblock %}

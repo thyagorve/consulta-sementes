@@ -1,0 +1,94 @@
+{% extends "sapp/base.html" %}
+{% load widget_tweaks %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2 class="mb-4">{{ titulo_pagina }}</h2>
+
+    <!-- SEÇÃO DE FILTROS -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header fw-bold">
+            <i class="fas fa-filter"></i> Filtros
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                {% for field in filter.form %}
+                <div class="col-sm-6 col-md-4 col-lg-3">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    {% render_field field class="form-control form-control-sm" %}
+                </div>
+                {% endfor %}
+                <div class="col-12 col-md-auto">
+                    <button class="btn btn-primary btn-sm" type="submit">Aplicar Filtros</button>
+                    <a href="{{ request.path }}" class="btn btn-secondary btn-sm">Limpar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SEÇÃO DA TABELA DE DADOS -->
+    {% if linhas_de_dados %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="mb-0 text-muted">
+                Mostrando <strong>{{ page_obj.start_index }} - {{ page_obj.end_index }}</strong> de <strong>{{ page_obj.paginator.count }}</strong> registro(s).
+            </p>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered table-hover table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        {% for cabecalho in cabecalhos %}
+                            <th scope="col" class="text-nowrap">{{ cabecalho }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas_de_dados %}
+                    <tr>
+                        {% for celula in linha %}
+                            <td class="text-nowrap">{{ celula|default:"---" }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SEÇÃO DE PAGINAÇÃO -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Navegação da página" class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">«</a></li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">«</span></li>
+                {% endif %}
+                {% for i in page_obj.paginator.page_range %}
+                    {% if page_obj.number == i %}
+                        <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
+                    {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ i }}</a></li>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">»</a></li>
+                {% else %}
+                    <li class="page-item disabled"><span class="page-link">»</span></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+    {% else %}
+        <div class="alert alert-warning mt-4" role="alert">
+            <h4 class="alert-heading">Nenhum Registro Encontrado</h4>
+            <p>Não há dados que correspondam aos seus critérios de busca.</p>
+            {% if request.GET %}
+                <hr>
+                <p class="mb-0">Tente <a href="{{ request.path }}" class="alert-link">limpar os filtros</a> para ver todos os registros.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

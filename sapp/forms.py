@@ -3,21 +3,27 @@
 from django import forms
 from .models import ProdutoCadastro, EstoqueLote
 
-class UploadPlanilhaCadastroForm(forms.Form):
-    arquivo_cadastro = forms.FileField(label="Planilha de Cadastro de Produtos (.xlsx)")
-
-class UploadPlanilhaLotesForm(forms.Form):
-    arquivo_lotes = forms.FileField(label="Planilha de Mapa de Endereços/Estoque (.xlsx)")
-
 class ConfiguracaoExibicaoForm(forms.Form):
-    CAMPOS_PRODUTO_CHOICES = [(f.name, f.verbose_name.capitalize()) for f in ProdutoCadastro._meta.get_fields() if not f.is_relation]
-    CAMPOS_LOTE_CHOICES = [(f.name, f.verbose_name.capitalize()) for f in EstoqueLote._meta.get_fields() if not f.is_relation]
-    
+    # Função auxiliar para pegar as escolhas dos campos
+    def _get_field_choices(model):
+        choices = []
+        # Percorre todos os campos do modelo
+        for field in model._meta.get_fields():
+            # Exclui campos de relacionamento e campos internos do Django que não queremos exibir
+            if not field.is_relation and not field.name.startswith('_'):
+                choices.append((field.name, field.verbose_name.title() or field.name.replace('_', ' ').title()))
+        return sorted(choices, key=lambda x: x[1]) # Ordena por nome de exibição
+
     campos_visiveis_produto = forms.MultipleChoiceField(
-        choices=sorted(CAMPOS_PRODUTO_CHOICES), widget=forms.CheckboxSelectMultiple,
-        label="Campos do CADASTRO para Exibir", required=False
+        choices=_get_field_choices(ProdutoCadastro),
+        widget=forms.CheckboxSelectMultiple,
+        label="Campos para exibir de Produtos na Consulta",
+        required=False
     )
+
     campos_visiveis_lote = forms.MultipleChoiceField(
-        choices=sorted(CAMPOS_LOTE_CHOICES), widget=forms.CheckboxSelectMultiple,
-        label="Campos do LOTE/ESTOQUE para Exibir", required=False
+        choices=_get_field_choices(EstoqueLote),
+        widget=forms.CheckboxSelectMultiple,
+        label="Campos para exibir de Lotes na Consulta",
+        required=False
     )

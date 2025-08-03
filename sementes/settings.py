@@ -16,6 +16,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Nosso app principal
     'sapp',
+    'django_filters',
+    'widget_tweaks',
+    
 ]
 
 MIDDLEWARE = [
@@ -41,6 +44,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'sapp.context_processors.app_version_processor',
             ],
         },
     },
@@ -77,6 +81,27 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # 2. Configurações de Autenticação
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'dashboard'
+
 LOGOUT_REDIRECT_URL = 'login'
+
+
+# sementes/settings.py
+
+# ... (resto das suas configurações) ...
+
+# Redirecionamento após login e URL da página de login
+LOGIN_REDIRECT_URL = 'sapp:dashboard' # Para onde ir após o login com sucesso
+LOGIN_URL = 'sapp:login'              # Para onde ir se o acesso for negado (@login_required)
+# sementes/settings.py
+
+# ... (suas outras configurações) ...
+
+# --- CONFIGURAÇÕES DO CELERY ---
+CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Broker (intermediário)
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0' # Onde os resultados são armazenados
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'America/Sao_Paulo' # Use seu fuso horário
+
+APP_VERSION = '1.0.0'
