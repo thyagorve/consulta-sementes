@@ -1,0 +1,163 @@
+{% extends 'sapp/base.html' %}
+
+{% block content %}
+<style>
+    /* --- Estilo Personalizado das Abas --- */
+    .nav-tabs .nav-link {
+        color: #555; /* Cor do texto inativo */
+        background-color: #e9ecef; /* Fundo cinza claro */
+        margin-right: 4px;
+        border: 1px solid #dee2e6;
+        font-weight: 500;
+    }
+    
+    .nav-tabs .nav-link:hover {
+        background-color: #dbe0e5;
+        color: #000;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #198754; /* Verde da marca */
+        background-color: #fff;
+        border-color: #dee2e6 #dee2e6 #fff; /* Borda invisível embaixo */
+        border-top: 4px solid #198754; /* Topo verde forte */
+        font-weight: bold;
+    }
+    
+    .tab-content {
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+</style>
+
+<div class="container mt-4">
+    <h2 class="mb-4 text-success"><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2>
+
+    <div class="row">
+        <!-- 1. Configuração Geral -->
+        <div class="col-md-12 mb-4">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">Geral</div>
+                <div class="card-body">
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="config_geral">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="form-check form-switch fs-5">
+                                {{ form_config.ocultar_esgotados }}
+                            </div>
+                            <label class="form-check-label pt-1">
+                                Ocultar automaticamente lotes com <strong>Saldo 0 (Esgotados)</strong> na tabela de estoque.
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3 btn-sm">Salvar Preferência Geral</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- 2. Cabeçalho das Abas -->
+    <ul class="nav nav-tabs" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="cultivar-tab" data-bs-toggle="tab" data-bs-target="#cultivar" type="button" role="tab">Cultivares</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="peneira-tab" data-bs-toggle="tab" data-bs-target="#peneira" type="button" role="tab">Peneiras</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="categoria-tab" data-bs-toggle="tab" data-bs-target="#categoria" type="button" role="tab">Categorias</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="conferente-tab" data-bs-toggle="tab" data-bs-target="#conferente" type="button" role="tab">Conferentes</button>
+        </li>
+        <!-- ABA NOVA AQUI -->
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tratamento-tab" data-bs-toggle="tab" data-bs-target="#tratamento" type="button" role="tab">Tratamentos</button>
+        </li>
+    </ul>
+
+    <!-- 3. Conteúdo das Abas -->
+    <div class="tab-content p-4 border border-top-0 bg-white rounded-bottom" id="myTabContent">
+        
+        <div class="tab-pane fade show active" id="cultivar" role="tabpanel">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Cultivar" lista=cultivares tipo="cultivar" acao_add="add_cultivar" %}
+        </div>
+        
+        <div class="tab-pane fade" id="peneira" role="tabpanel">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Peneira" lista=peneiras tipo="peneira" acao_add="add_peneira" %}
+        </div>
+        
+        <div class="tab-pane fade" id="categoria" role="tabpanel">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Categoria" lista=categorias tipo="categoria" acao_add="add_categoria" %}
+        </div>
+        
+        <!-- Substitua a DIV da aba conferente por esta -->
+        <div class="tab-pane fade" id="conferente" role="tabpanel">
+            {% if user.is_superuser %}
+                <div class="row">
+                    <div class="col-md-4 border-end">
+                        <h5 class="text-primary mb-3">Novo Conferente (Acesso)</h5>
+                        <form method="POST">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="add_conferente_user">
+                            
+                            <div class="mb-2">
+                                <input type="text" name="username" class="form-control" placeholder="Login (ex: joao.silva)" required>
+                            </div>
+                            <div class="mb-2">
+                                <input type="text" name="first_name" class="form-control" placeholder="Nome Completo" required>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success w-100">Criar Usuário</button>
+                            <small class="text-muted d-block mt-1">* Senha padrão: <strong>conceito</strong></small>
+                        </form>
+                    </div>
+                    <div class="col-md-8 ps-md-4">
+                        <h5 class="text-secondary mb-3">Usuários Conferentes</h5>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for u in usuarios_conferentes %}
+                            <span class="badge bg-light text-dark border fs-6 p-2 d-flex align-items-center gap-2 shadow-sm">
+                                <i class="fas fa-user"></i> {{ u.first_name }} ({{ u.username }})
+                                <form method="POST" style="display:inline;" onsubmit="return confirm('Excluir acesso de {{ u.username }}?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="acao" value="delete_conferente_user">
+                                    <input type="hidden" name="id_item" value="{{ u.id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1 border-0">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                            </span>
+                            {% empty %}
+                            <p class="text-muted">Nenhum conferente cadastrado.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert alert-danger mt-3">
+                    <i class="fas fa-lock"></i> Área restrita a administradores.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- CONTEÚDO NOVO AQUI -->
+        <div class="tab-pane fade" id="tratamento" role="tabpanel">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Novo Tratamento" lista=tratamentos tipo="tratamento" acao_add="add_tratamento" %}
+        </div>
+
+    </div>
+</div>
+
+<!-- Script para garantir que o switch do bootstrap funcione visualmente -->
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const switchInput = document.querySelector('.form-check-input');
+        if(switchInput) {
+            switchInput.classList.add('form-check-input'); 
+            switchInput.style.cursor = 'pointer';
+        }
+    });
+</script>
+{% endblock %}

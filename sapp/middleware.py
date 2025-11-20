@@ -62,3 +62,30 @@ class Smart404FallbackMiddleware:
                 pass  # não encontrou, cai no 404 normal
 
         return response
+
+
+
+from django.shortcuts import redirect
+from django.urls import reverse
+
+class ForcePasswordChangeMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            # Verifica se o usuário tem perfil e se está marcado como primeiro acesso
+            try:
+                if request.user.perfil.primeiro_acesso:
+                    # Evita loop infinito permitindo acesso à página de mudar senha e logout
+                    allowed_urls = [
+                        reverse('sapp:mudar_senha'),
+                        reverse('sapp:logout'),
+                    ]
+                    if request.path not in allowed_urls:
+                        return redirect('sapp:mudar_senha')
+            except:
+                pass # Se não tiver perfil (ex: admin criado via terminal antigo), ignora
+
+        response = self.get_response(request)
+        return response

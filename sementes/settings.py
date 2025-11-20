@@ -32,6 +32,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'sapp.middleware.AutoLogoutMiddleware',
     'sapp.middleware.Smart404FallbackMiddleware',
+    'sapp.middleware.ForcePasswordChangeMiddleware',
 ]
 
 ROOT_URLCONF = 'sementes.urls'

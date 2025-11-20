@@ -1,40 +1,37 @@
-# sapp/urls.py
-
 from django.urls import path
 from . import views
-# Importe as views de autenticação prontas do Django
 from django.contrib.auth import views as auth_views
-#from .views import MeuLoginView
 
 app_name = 'sapp'
 
 urlpatterns = [
-    # URLs de Autenticação
-
-
-
-    
-  
+    # Autenticação
     path(
         'login/',
         auth_views.LoginView.as_view(
             template_name='sapp/registration/login.html',
-            redirect_field_name=None,               # ignora ?next=...
-            redirect_authenticated_user=True,       # quem já tá logado vai direto pro dashboard
+            redirect_authenticated_user=True,
         ),
         name='login'
     ),
     path('logout/', views.logout_view, name='logout'),
+
+    # Tela Inicial (Dashboard)
+    path('', views.dashboard, name='dashboard'),
     
-
-    # Suas outras URLs
-    path('', views.dashboard, name='dashboard'), # Dashboard na raiz
-    path('consulta/', views.consulta_view, name='consulta'),
-    path('historico/', views.historico_view, name='historico'),
-    path('configuracao/', views.configuracao_view, name='configuracao'),
-    path('api/importar-lotes-clipboard/', views.importar_clipboard_em_lotes_view, name='api_importar_lotes_clipboard'),
-    path('produtos/', views.listar_produtos_view, name='listar_produtos'),
-    path('lotes/', views.listar_lotes_view, name='listar_lotes'),
+    # --- CORREÇÃO AQUI ---
+    # Coloquei 'estoque/' para diferenciar da página inicial
+    path('estoque/', views.lista_estoque, name='lista_estoque'), 
+    
+    path('nova-entrada/', views.nova_entrada, name='nova_entrada'),
+    path('transferir/<int:id>/', views.transferir, name='transferir'),
+    path('editar/<int:id>/', views.editar, name='editar'),
+    path('configuracoes/', views.configuracoes, name='configuracoes'),
+    
+    # ...
+    path('historico-geral/', views.historico_geral, name='historico_geral'),
+    path('excluir/<int:id>/', views.excluir_lote, name='excluir_lote'),
+    path('mudar-senha/', views.mudar_senha, name='mudar_senha'),
+    path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
+# ...
 ]
-
-

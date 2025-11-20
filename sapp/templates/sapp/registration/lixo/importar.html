@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Importar (Produtos / Lotes / BASE_DADOS)</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; font-family: monospace; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 4px; font-size: 12px; }
+    .botao { padding: 10px 20px; margin-top: 10px; background: #28a745; color: #fff; border: none; cursor: pointer; }
+    .botao:disabled { background: #888; }
+    #status { margin-top: 10px; }
+    .row { display: grid; gap: 8px; margin-bottom: 12px; }
+    label { font-size: 13px; color: #333; }
+  </style>
+</head>
+<body>
+  <h2>Importar (Produtos / Lotes / BASE_DADOS)</h2>
+
+  <div class="row">
+    <label>Tipo de importação:</label>
+    <select id="tipo_modelo">
+      <option value="cadastro">Produtos</option>
+      <option value="lotes">Mapa de ocupação</option>
+      <option value="base_dados">BASE_DADOS (histórico por lote)</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label>Cabeçalho (cole somente a primeira linha — colunas separadas por TAB):</label>
+    <textarea id="cabecalho" rows="2" placeholder="Ex.: LOTE\tCULTIVAR\tPN\tCAT\tAZ\tENDEREÇO\tENTRADA\tSAÍDA\tORIGEM/DESTINO\tDATA\tCONFERENTE\tESPÉCIE\tEMPRESA\tEMBALAGEM\tPESO\tTRATAMENTO\tLOTE ANTERIOR\tPESO TOTAL"></textarea>
+  </div>
+
+  <div class="row">
+    <label>Linhas de dados (cole do Excel — TAB entre colunas, uma linha por registro):</label>
+    <textarea id="excelInput" rows="12" placeholder="(Ctrl+V) as linhas abaixo do cabeçalho"></textarea>
+  </div>
+
+  <div id="preview"></div>
+
+  <button class="botao" onclick="enviarDados(true)">Importar (Primeiro Lote)</button>
+  <button class="botao" onclick="enviarDados(false)">Importar (Próximo Lote)</button>
+
+  <div id="status"></div>
+
+  <script>
+    let debounceTimeout;
+
+    document.getElementById("excelInput").addEventListener("input", () => {
+      clearTimeout(debounceTimeout);
+      debounceTimeout = setTimeout(processarDados, 250);
+    });
+
+    function processarDados() {
+      const linhas = document.getElementById("excelInput").value.trim()
+        .split("\n").filter(l => l.trim() !== "");
+      const linhasPreview = linhas.slice(0, 100);
+      const previewHTML = linhasPreview.map(l => {
+        const cols = l.split("\t");
+        return `<tr>${cols.map(c => `<td>${c}</td>`).join("")}</tr>`;
+      }).join("");
+      document.getElementById("preview").innerHTML =
+        `<p><strong>Preview das primeiras ${linhasPreview.length} de ${linhas.length} linhas:</strong></p>
+         <table>${previewHTML}</table>`;
+    }
+
+    function enviarDados(isFirst) {
+      const tipo = document.getElementById("tipo_modelo").value;
+      const cabecalho = document.getElementById("cabecalho").value.trim();
+      const dados_lote = document.getElementById("excelInput").value.trim();
+
+      if (!cabecalho || !dados_lote) {
+        alert("Informe o cabeçalho e as linhas de dados.");
+        return;
+      }
+
+      const btns = document.querySelectorAll(".botao");
+      btns.forEach(b => b.disabled = true);
+      document.getElementById("status").textContent = "Enviando dados...";
+
+      const form = new FormData();
+      form.append("tipo_modelo", tipo);
+      form.append("cabecalho", cabecalho);
+      form.append("dados_lote", dados_lote);
+      form.append("is_first_chunk", isFirst ? "true" : "false");
+
+      fetch("/importar/", {
+        method: "POST",
+        headers: { "X-CSRFToken": getCookie("csrftoken") },
+        body: form
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.status === "sucesso") {
+          document.getElementById("status").innerHTML =
+            `<span style="color:green;">Importação concluída: ${d.registros_processados} registros.</span>`;
+        } else {
+          document.getElementById("status").innerHTML =
+            `<span style="color:red;">Erro: ${d.mensagem}</span>`;
+        }
+        btns.forEach(b => b.disabled = false);
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("status").innerHTML =
+          `<span style="color:red;">Erro inesperado.</span>`;
+        btns.forEach(b => b.disabled = false);
+      });
+    }
+
+    function getCookie(name) {
+      const cookieValue = document.cookie.split("; ")
+        .find(row => row.startsWith(name + "="));
+      return cookieValue ? decodeURIComponent(cookieValue.split("=")[1]) : null;
+    }
+  </script>
+</body>
+</html>
