@@ -103,4 +103,4 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'America/Sao_Paulo' # Use seu fuso horário
 
-APP_VERSION = '1.0.0'
+APP_VERSION = '1.0.1'
