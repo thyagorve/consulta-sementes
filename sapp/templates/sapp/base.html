@@ -4,236 +4,497 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{% block title %}Sementes App{% endblock %}</title>
+  <title>{% block title %}Sementes App - Gestão Inteligente{% endblock %}</title>
 
+  <!-- Favicon -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%232f8f4e'/%3E%3Cpath d='M32 42c0 0-4-8-4-14s4-8 4-8 4 4 4 8-4 14-4 14z' fill='%23ffffff'/%3E%3C/svg%3E" />
   
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 
-  <!-- FontAwesome (para ícones) -->
+  <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
-    <!-- Chart.js -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Font Awesome para ícones -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
   <!-- Humanize para formatação -->
   {% load humanize %}
 
   <style>
-
-
-
-
-
-
-
-
-    /* --- Variáveis e Estilos Globais --- */
+    /* --- Variáveis CSS Modernas --- */
     :root {
       --brand-green: #2f8f4e;
-      --brand-dark: #1f2d2a;
-      --light-gray: #f5f7fa;
-      --dark-text: #2e2e2e;
-      --radius-sm: .5rem;
-      --radius-md: .8rem;
+      --brand-green-dark: #267a41;
+      --brand-green-light: #e8f5eb;
+      --brand-dark: #1a2520;
+      --gradient-primary: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-green) 100%);
+      --gradient-secondary: linear-gradient(135deg, var(--brand-green) 0%, #34a853 100%);
+      --light-gray: #f8fafc;
+      --border-light: #e2e8f0;
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+      --shadow-md: 0 8px 25px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.12);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* --- Reset e Base --- */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
 
     body {
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      background-color: var(--light-gray);
-      color: var(--dark-text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: linear-gradient(135deg, var(--light-gray) 0%, #ffffff 100%);
+      color: #2d3748;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      font-weight: 400;
     }
-    
+
+    /* --- Scrollbar Personalizada --- */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--brand-green);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--brand-green-dark);
+    }
+
+    /* --- Layout Principal --- */
     main {
       flex: 1;
       padding-top: 2rem;
       padding-bottom: 2rem;
+      background: transparent;
+      margin-top: 50px; /* Altura da navbar */
     }
 
-    /* --- Componentes Personalizados --- */
-
-    /* Cards */
-    .card {
-      border: none;
-      border-radius: var(--radius-md);
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
-      transition: transform .2s ease-out, box-shadow .2s ease-out;
-    }
-    .card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-    }
-    .card-header {
-      background-color: #fff;
-      border-bottom: 1px solid #dee2e6;
-      font-weight: 600;
+    .container {
+      max-width: 1400px;
     }
 
-    /* Botões */
-    .btn {
-      transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease;
-      border-radius: var(--radius-sm);
-      font-weight: 500;
-    }
-    .btn-primary {
-      background: var(--brand-green);
-      border: none;
-    }
-    .btn-primary:hover {
-      background: #297d45;
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(47, 143, 78, .2);
-    }
-    .btn:focus, .form-control:focus {
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(47, 143, 78, .35);
-    }
-    .btn:active {
-      transform: translateY(0);
-      box-shadow: 0 6px 15px rgba(47, 143, 78, .15);
-    }
-
-    /* Forms */
-    .form-control {
-      border-radius: var(--radius-sm);
-      border: 1px solid #ced4da;
-      transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-    }
-    .form-control:focus {
-      border-color: var(--brand-green);
-    }
-
-    /* --- Navbar --- */
+    /* --- Navbar Premium --- */
     .navbar {
-      background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-green) 80%);
-      box-shadow: 0 8px 24px rgba(47, 143, 78, .15);
-      font-weight: 500;
+      background: var(--gradient-primary);
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 0.75rem 0;
+      position: fixed;
+      padding: auto;
+      top: 10;
+      left: 0;
+      right: 0;
+      z-index: 1030;
     }
+
     .navbar-brand {
       display: flex;
       align-items: center;
-      gap: .5rem;
-      font-size: 1.25rem;
-      letter-spacing: .5px;
+      gap: 0.75rem;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #ffffff !important;
+      padding: 0.5rem 0;
     }
+
+    .seed-sprout {
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+      transition: var(--transition);
+    }
+
+    .navbar-brand:hover .seed-sprout {
+      transform: scale(1.1) rotate(5deg);
+    }
+
     .navbar-toggler {
-      border: none;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: var(--radius-sm);
+      padding: 0.5rem;
+      transition: var(--transition);
     }
+
+    .navbar-toggler:hover {
+      border-color: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
     .navbar-toggler-icon {
-      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.8%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+      background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.9%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2.5' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
     }
-    .navbar-toggler:focus {
-      box-shadow: none;
+
+    /* --- Navegação --- */
+    .navbar-nav {
+      gap: 0.25rem;
     }
 
     .nav-link {
       position: relative;
-      border-radius: 999px;
-      padding: .6rem 1rem;
-      transition: background .25s ease, transform .15s ease;
-      color: #e8f7ee !important;
-      margin: 0 .15rem;
+      border-radius: var(--radius-sm);
+      padding: 0.75rem 1.25rem !important;
+      margin: 0.25rem 0.15rem;
+      font-weight: 500;
       font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.9) !important;
+      transition: var(--transition);
+      border: 1px solid transparent;
     }
+
+    .nav-link::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #ffffff, transparent);
+      transition: var(--transition);
+      transform: translateX(-50%);
+    }
+
     .nav-link:hover {
-      background: rgba(255,255,255,.08);
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-2px);
+      color: #ffffff !important;
+    }
+
+    .nav-link:hover::before {
+      width: 80%;
+    }
+
+    .nav-link.active {
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      color: #ffffff !important;
+    }
+
+    .nav-link.active::before {
+      width: 80%;
+      background: #ffffff;
+    }
+
+    .nav-link i {
+      width: 18px;
+      text-align: center;
+      margin-right: 0.5rem;
+      opacity: 0.9;
+    }
+
+    /* --- Botão Logout --- */
+    .logout-form-button {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-sm);
+      color: rgba(255, 255, 255, 0.9) !important;
+      padding: 0.75rem 1.25rem;
+      width: 100%;
+      text-align: left;
+      transition: var(--transition);
+      font-weight: 500;
+    }
+
+    .logout-form-button:hover {
+      background: rgba(255, 59, 59, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      color: #ffffff !important;
       transform: translateY(-2px);
     }
-    .nav-link.active, .nav-link.active:focus {
-      background: rgba(255,255,255,.15);
-      box-shadow: 0 0 10px rgba(255,255,255,.2);
-      font-weight: 600;
-    }
 
-    .logout-form-button {
-      background: none;
+    /* --- Cards Modernos --- */
+    .card {
       border: none;
-      padding: 0;
-      color: #e8f7ee;
-      width: 100%;
-      text-align: inherit;
-    }
-    .logout-form-button:hover {
-      color: #fff;
-    }
-
-    /* --- Alertas e Footer --- */
-    .alert.fade-out {
-      opacity: 0;
-      transition: opacity .5s ease-out;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      background: #ffffff;
+      transition: var(--transition);
+      overflow: hidden;
+      border: 1px solid var(--border-light);
     }
 
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .card-header {
+      background: linear-gradient(135deg, var(--brand-green) 0%, var(--brand-green-dark) 100%);
+      color: #ffffff;
+      border-bottom: none;
+      padding: 1.25rem 1.5rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    .card-header i {
+      margin-right: 0.5rem;
+      opacity: 0.9;
+    }
+
+    /* --- Botões Premium --- */
+    .btn {
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      transition: var(--transition);
+      border: 2px solid transparent;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: var(--gradient-secondary);
+      border: none;
+      box-shadow: 0 4px 15px rgba(47, 143, 78, 0.3);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(47, 143, 78, 0.4);
+      background: linear-gradient(135deg, var(--brand-green-dark) 0%, #2e8b57 100%);
+    }
+
+    .btn-success {
+      background: var(--gradient-secondary);
+      border: none;
+    }
+
+    .btn-success:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(47, 143, 78, 0.4);
+    }
+
+    .btn:focus, .form-control:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(47, 143, 78, 0.25);
+      border-color: var(--brand-green);
+    }
+
+    /* --- Forms Elegantes --- */
+    .form-control {
+      border-radius: var(--radius-sm);
+      border: 2px solid #e2e8f0;
+      padding: 0.75rem 1rem;
+      font-size: 0.95rem;
+      transition: var(--transition);
+      background: #ffffff;
+    }
+
+    .form-control:focus {
+      border-color: var(--brand-green);
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(47, 143, 78, 0.1);
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 0.5rem;
+    }
+
+    /* --- Alertas Animados --- */
+    .alert {
+      border-radius: var(--radius-md);
+      border: none;
+      box-shadow: var(--shadow-sm);
+      padding: 1rem 1.25rem;
+      font-weight: 500;
+      border-left: 4px solid;
+    }
+
+    .alert-success {
+      background: var(--brand-green-light);
+      color: var(--brand-green-dark);
+      border-left-color: var(--brand-green);
+    }
+
+    .alert-danger {
+      background: #fef2f2;
+      color: #dc2626;
+      border-left-color: #dc2626;
+    }
+
+    .alert-dismissible .btn-close {
+      padding: 0.75rem;
+    }
+
+    /* --- Footer Moderno --- */
     footer {
-      border-top: 1px solid #e0e5eb;
+      background: var(--brand-dark);
+      color: #a0aec0;
+      padding: 2rem 0;
+      margin-top: auto;
+      border-top: 1px solid #2d3748;
     }
 
-    /* --- Responsividade --- */
+    footer small {
+      font-size: 0.875rem;
+    }
+
+    /* --- Action Buttons Responsivos --- */
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      align-items: center;
+    }
+
+    .action-buttons .btn {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    /* --- Responsividade Avançada --- */
+    @media (max-width: 1199.98px) {
+      .container {
+        max-width: 100%;
+        padding: 0 1.5rem;
+      }
+    }
+
     @media (max-width: 991.98px) {
-      .navbar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        z-index: 1030;
-      }
       main {
-        padding-top: 50px;
+        padding-top: 90px;
       }
-      .navbar-nav {
-        text-align: center;
+
+      .navbar-collapse {
+        background: var(--gradient-primary);
+        border-radius: var(--radius-md);
         margin-top: 1rem;
+        padding: 1rem;
+        box-shadow: var(--shadow-lg);
+        border: 1px solid rgba(255, 255, 255, 0.1);
       }
-      .nav-item {
-        margin-bottom: 0.5rem;
+
+      .nav-link {
+        margin: 0.25rem 0;
+        text-align: center;
+        justify-content: center;
       }
+
       .logout-form .d-flex {
+        justify-content: center;
+      }
+
+      .logout-form-button {
+        text-align: center;
         justify-content: center;
       }
     }
 
-    .action-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .75rem;
-      margin-bottom: 1rem;
-      align-items: stretch;
-      justify-content: flex-start;
-    }
     @media (max-width: 767.98px) {
+      .navbar-brand {
+        font-size: 1.2rem;
+      }
+
       .action-buttons {
         flex-direction: column;
-        align-items: center;
       }
+
       .action-buttons .btn {
         width: 100%;
-        max-width: 400px;
+        min-width: auto;
       }
+
+      .card {
+        margin-bottom: 1.5rem;
+      }
+
+      main {
+        padding: 80px 1rem 2rem;
+      }
+    }
+
+    @media (max-width: 575.98px) {
+      :root {
+        --radius-sm: 6px;
+        --radius-md: 10px;
+      }
+
+      .navbar-brand span {
+        font-size: 1.1rem;
+      }
+
+      .btn {
+        padding: 0.875rem 1.25rem;
+        font-size: 0.9rem;
+      }
+
+      .card-header {
+        padding: 1rem 1.25rem;
+        font-size: 1rem;
+      }
+    }
+
+    /* --- Animações e Estados --- */
+    .fade-out {
+      opacity: 0;
+      transition: opacity 0.5s ease-out;
+    }
+
+    /* --- Loading States --- */
+    .loading {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .loading::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+      animation: loading 1.5s infinite;
+    }
+
+    @keyframes loading {
+      0% { left: -100%; }
+      100% { left: 100%; }
     }
   </style>
 </head>
 
 <body>
-  <!-- Navbar -->
+  <!-- Navbar Premium -->
   <nav class="navbar navbar-expand-lg">
-    <div class="container-fluid">
-      <a class="navbar-brand text-white" href="{% url 'sapp:dashboard' %}">
-        <span class="seed-icon">
-          <svg class="seed-sprout" width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="32" cy="32" r="30" fill="rgba(255,255,255,.08)" />
-            <path d="M32 42C32 42 28 34 28 28C28 22 32 18 32 18C32 18 36 22 36 28C36 34 32 42 32 42Z" fill="#ffffff"/>
-            <path d="M26 28C26 28 22 24 20 18C20 18 26 20 30 24C34 28 32 32 32 32C32 32 30 28 26 28Z" fill="#a8e6a1"/>
-            <path d="M38 28C38 28 42 24 44 18C44 18 38 20 34 24C30 28 32 32 32 32C32 32 34 28 38 28Z" fill="#a8e6a1"/>
-          </svg>
-        </span>
+    <div class="container">
+      <a class="navbar-brand" href="{% url 'sapp:dashboard' %}">
+        <svg class="seed-sprout" width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="32" cy="32" r="30" fill="rgba(255,255,255,.12)" />
+          <path d="M32 42C32 42 28 34 28 28C28 22 32 18 32 18C32 18 36 22 36 28C36 34 32 42 32 42Z" fill="#ffffff"/>
+          <path d="M26 28C26 28 22 24 20 18C20 18 26 20 30 24C34 28 32 32 32 32C32 32 30 28 26 28Z" fill="#c6f6d5"/>
+          <path d="M38 28C38 28 42 24 44 18C44 18 38 20 34 24C30 28 32 32 32 32C32 32 34 28 38 28Z" fill="#c6f6d5"/>
+        </svg>
         <span>Sementes App</span>
       </a>
+      
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
         data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false"
         aria-label="Alternar navegação">
@@ -241,46 +502,50 @@
       </button>
 
       <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-        <ul class="navbar-nav mb-2 mb-lg-0">
+        <ul class="navbar-nav">
           {% if user.is_authenticated %}
-            <!-- Link Dashboard -->
+            <!-- Dashboard -->
             <li class="nav-item">
                 <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'sapp:dashboard' %}">
-                    <i class="fa-solid fa-table-columns fa-fw me-2"></i>Dashboard
+                    <i class="fa-solid fa-table-columns"></i>Dashboard
                 </a>
             </li>
             
-            <!-- NOVO LINK: ESTOQUE -->
+            <!-- Estoque -->
             <li class="nav-item">
                 <a class="nav-link {% if request.resolver_match.url_name == 'lista_estoque' %}active{% endif %}" href="{% url 'sapp:lista_estoque' %}">
-                    <i class="fa-solid fa-boxes-stacked fa-fw me-2"></i>Controle de Estoque
+                    <i class="fa-solid fa-boxes-stacked"></i>Controle de Estoque
                 </a>
             </li>
 
+            <!-- Histórico -->
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'sapp:historico_geral' %}"><i class="fa-solid fa-clock-rotate-left me-2"></i>Histórico</a>
+              <a class="nav-link {% if request.resolver_match.url_name == 'historico_geral' %}active{% endif %}" href="{% url 'sapp:historico_geral' %}">
+                <i class="fa-solid fa-clock-rotate-left"></i>Histórico
+              </a>
             </li>
 
-            <!-- ... abaixo do link de Estoque ... -->
+            <!-- Configurações -->
             <li class="nav-item">
                 <a class="nav-link {% if request.resolver_match.url_name == 'configuracoes' %}active{% endif %}" href="{% url 'sapp:configuracoes' %}">
-                    <i class="fa-solid fa-gears fa-fw me-2"></i>Configurações
+                    <i class="fa-solid fa-gears"></i>Configurações
                 </a>
             </li>
             
-            <!-- Botão Sair -->
+            <!-- Sair -->
             <li class="nav-item logout-form">
-              <form action="{% url 'sapp:logout' %}" method="post" class="d-flex align-items-center h-100">
+              <form action="{% url 'sapp:logout' %}" method="post" class="d-flex h-100">
                   {% csrf_token %}
                   <button type="submit" class="logout-form-button nav-link">
-                    <i class="fa-solid fa-right-from-bracket fa-fw me-2"></i>Sair
+                    <i class="fa-solid fa-right-from-bracket"></i>Sair
                   </button>
               </form>
             </li>
           {% else %}
+            <!-- Login -->
             <li class="nav-item">
               <a class="nav-link" href="{% url 'sapp:login' %}">
-                <i class="fa-solid fa-right-to-bracket me-2"></i>Login
+                <i class="fa-solid fa-right-to-bracket"></i>Login
               </a>
             </li>
           {% endif %}
@@ -290,11 +555,19 @@
   </nav>
 
   <!-- Conteúdo Principal -->
-  <main class="container py-md-5 px-3">
+  <main class="container">
     {% if messages %}
       {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show rounded-3 shadow-sm" role="alert">
-          {{ message }}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4" role="alert">
+          <div class="d-flex align-items-center">
+            <i class="fa-solid 
+              {% if message.tags == 'success' %}fa-circle-check
+              {% elif message.tags == 'danger' %}fa-circle-exclamation
+              {% elif message.tags == 'warning' %}fa-triangle-exclamation
+              {% else %}fa-circle-info{% endif %} 
+              me-2"></i>
+            <span>{{ message }}</span>
+          </div>
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
         </div>
       {% endfor %}
@@ -303,12 +576,20 @@
     {% block content %}{% endblock %}
   </main>
 
-  <!-- Rodapé -->
-  <footer class="container-fluid text-center text-muted mt-auto py-3">
-    <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center gap-2">
-      <small>Sementes App | Versão {{ APP_VERSION|default:"1.0" }}</small>
-      <small class="d-none d-sm-inline">|</small>
-      <small>© {% now "Y" %}</small>
+  <!-- Rodapé Premium -->
+  <footer>
+    <div class="container">
+      <div class="d-flex flex-column flex-sm-row justify-content-center align-items-center gap-3">
+        <small class="d-flex align-items-center gap-2">
+          <i class="fa-solid fa-seedling"></i>
+          Sementes App | Versão {{ APP_VERSION|default:"2.0" }}
+        </small>
+        <small class="d-none d-sm-inline opacity-50">•</small>
+        <small class="d-flex align-items-center gap-2">
+          <i class="fa-regular fa-copyright"></i>
+          {% now "Y" %} - Todos os direitos reservados
+        </small>
+      </div>
     </div>
   </footer>
 
@@ -316,17 +597,43 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
-    // Alertas que desaparecem com uma transição suave
+    // Sistema de alertas inteligente
     document.addEventListener('DOMContentLoaded', function () {
       const alerts = document.querySelectorAll('.alert.alert-dismissible');
+      
       alerts.forEach(function (alert) {
+        // Auto-dismiss após 6 segundos
         setTimeout(function () {
-          alert.classList.add('fade-out');
-          alert.addEventListener('transitionend', () => {
-             const bsAlert = new bootstrap.Alert(alert);
-             bsAlert.close();
-          });
-        }, 5000); 
+          if (alert && alert.classList.contains('show')) {
+            alert.classList.add('fade-out');
+            setTimeout(() => {
+              const bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+              bsAlert.close();
+            }, 500);
+          }
+        }, 6000);
+        
+        // Pausa no hover
+        alert.addEventListener('mouseenter', function() {
+          this.style.transition = 'none';
+        });
+        
+        alert.addEventListener('mouseleave', function() {
+          this.style.transition = 'opacity 0.5s ease-out';
+        });
+      });
+
+      // Melhoria de acessibilidade
+      const navLinks = document.querySelectorAll('.nav-link');
+      navLinks.forEach(link => {
+        link.addEventListener('focus', function() {
+          this.style.outline = '2px solid rgba(255, 255, 255, 0.8)';
+          this.style.outlineOffset = '2px';
+        });
+        
+        link.addEventListener('blur', function() {
+          this.style.outline = 'none';
+        });
       });
     });
   </script>
