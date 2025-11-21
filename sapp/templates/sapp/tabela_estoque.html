@@ -1,161 +1,629 @@
 {% extends 'sapp/base.html' %}
+{% load humanize %}
 
 {% block content %}
 <style>
-    .bg-header-custom { background-color: #8B4513; color: white; } 
-    .bg-sub-header { background-color: #D2691E; color: white; font-weight: bold; }
-    .table-hover tbody tr:hover { background-color: #f5f5f5; }
-    .badge-bag { background-color: #2E8B57; } 
-    .badge-sc { background-color: #A0522D; }
+
+    :root {
+        --primary-brown: #8B4513;
+        --secondary-brown: #D2691E;
+        --success-green: #2E8B57;
+        --warning-orange: #A0522D;
+        --light-beige: #fff8dc;
+        --hover-gray: #f8f9fa;
+    }
+
+    .page-title {
+        background: linear-gradient(135deg, var(--primary-brown), #a05a2b);
+        color: white;
+        padding: 20px 15px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
+    }
+
+    .table-responsive {
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        /* 🔥 SCROLL HORIZONTAL */
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Forçar scroll em mobile */
+    .table-responsive table {
+        min-width: 1000px;
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    .bg-sub-header { 
+        background: linear-gradient(135deg, var(--secondary-brown), #da7c34);
+        color: white;
+        font-weight: bold;
+        border: none;
+    }
+    
+    .badge-bag { 
+        background: linear-gradient(135deg, var(--success-green), #3cb371);
+        color: white;
+        padding: 0.4em 0.8em;
+        border-radius: 20px;
+        font-size: 0.75em;
+    }
+    
+    .badge-sc { 
+        background: linear-gradient(135deg, var(--warning-orange), #b5651d);
+        color: white;
+        padding: 0.4em 0.8em;
+        border-radius: 20px;
+        font-size: 0.75em;
+    }
     
     .history-box {
-        background-color: #fff8dc; 
-        border-left: 5px solid #8B4513;
+        background: linear-gradient(135deg, #fffaf0, var(--light-beige));
+        border-left: 4px solid var(--primary-brown);
         padding: 15px;
-        margin: 10px;
-        box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+        margin: 10px 0;
+        border-radius: 0 10px 10px 0;
+        box-shadow: 0 4px 12px rgba(139, 69, 19, 0.1);
+    }
+
+    .card-total {
+        border: none;
+        border-radius: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.3s ease;
+        height: 100%;
+    }
+
+    .card-total:hover {
+        transform: translateY(-5px);
+    }
+
+    .btn-success-custom {
+        background: linear-gradient(135deg, var(--success-green), #3cb371);
+        border: none;
+        border-radius: 10px;
+        padding: 12px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+    }
+
+    .btn-success-custom:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(46, 139, 87, 0.3);
+    }
+
+    .status-available {
+        color: var(--success-green);
+        font-weight: 700;
+        padding: 4px 8px;
+        background: rgba(46, 139, 87, 0.1);
+        border-radius: 20px;
+        font-size: 0.8em;
+    }
+
+    .status-depleted {
+        color: #dc3545;
+        font-weight: 700;
+        padding: 4px 8px;
+        background: rgba(220, 53, 69, 0.1);
+        border-radius: 20px;
+        font-size: 0.8em;
+    }
+
+    .collapse-toggle {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        border: none;
+        border-radius: 8px;
+        padding: 6px 10px;
+        transition: all 0.3s ease;
+        font-size: 0.8rem;
+    }
+
+    .action-buttons .btn {
+        border-radius: 8px;
+        margin: 2px;
+        transition: all 0.3s ease;
+        font-size: 0.85rem;
+    }
+
+    .pagination-controls {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 10px;
+        margin-top: 15px;
+    }
+
+    /* 📱 RESPONSIVIDADE AVANÇADA */
+    @media (max-width: 768px) {
+        .container-fluid {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        
+        .page-title {
+            padding: 15px 10px;
+            margin-bottom: 15px;
+        }
+        
+        .page-title h1 {
+            font-size: 1.4rem;
+        }
+        
+        .page-title p {
+            font-size: 0.85rem;
+        }
+        
+        /* Cards em linha única no mobile */
+        .row.justify-content-center {
+            justify-content: space-between !important;
+        }
+        
+        .col-md-5 {
+            flex: 0 0 48%;
+            max-width: 48%;
+        }
+        
+        .card-total {
+            margin-bottom: 10px;
+        }
+        
+        .card-total .card-body {
+            padding: 15px 10px;
+        }
+        
+        .card-total .fa-3x {
+            font-size: 2em;
+        }
+        
+        .card-total h3 {
+            font-size: 1.3rem;
+        }
+
+        /* Barra de ações empilhada */
+        .action-bar {
+            flex-direction: column;
+            gap: 12px;
+            padding: 15px;
+        }
+        
+        .btn-success-custom {
+            width: 100%;
+            margin-bottom: 5px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+        }
+        
+        .search-form {
+            width: 100%;
+        }
+        
+        .input-group {
+            width: 100%;
+        }
+
+        /* Controles de paginação */
+        .pagination-controls {
+            flex-direction: column;
+            gap: 10px;
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .pagination-controls .d-flex {
+            justify-content: center;
+        }
+
+        /* Tabela mobile */
+        .table-responsive {
+            font-size: 0.75rem;
+            border: 1px solid #dee2e6;
+        }
+        
+        .table-responsive table {
+            min-width: 900px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.4rem;
+            white-space: nowrap;
+        }
+        
+        .badge {
+            font-size: 0.65rem;
+            padding: 0.25em 0.5em;
+        }
+        
+        /* Ajustes específicos para colunas */
+        .table th:nth-child(1), .table td:nth-child(1) { width: 50px; } /* Ações */
+        .table th:nth-child(2), .table td:nth-child(2) { width: 80px; } /* Lote */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 90px; } /* Cultivar */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 50px; } /* PN */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 60px; } /* CAT */
+        .table th:nth-child(6), .table td:nth-child(6) { width: 80px; } /* Tratamento */
+        .table th:nth-child(7), .table td:nth-child(7) { width: 70px; } /* Peso Unit */
+        .table th:nth-child(8), .table td:nth-child(8) { width: 80px; } /* Endereço */
+        .table th:nth-child(9), .table td:nth-child(9) { width: 60px; } /* Saldo */
+        .table th:nth-child(10), .table td:nth-child(10) { width: 60px; } /* Emb */
+        .table th:nth-child(11), .table td:nth-child(11) { width: 80px; } /* Peso Total */
+        .table th:nth-child(12), .table td:nth-child(12) { width: 80px; } /* Status */
+
+        /* History box responsivo */
+        .history-box .row {
+            flex-direction: column;
+        }
+        
+        .history-box .col-md-4 {
+            border-right: none;
+            border-bottom: 1px solid #dee2e6;
+            padding-right: 0;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .history-box .col-md-8 {
+            padding-left: 0;
+        }
+        
+        .action-buttons .btn {
+            font-size: 0.8rem;
+            padding: 6px 10px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .container-fluid {
+            padding-left: 5px;
+            padding-right: 5px;
+        }
+        
+        .page-title {
+            padding: 12px 8px;
+        }
+        
+        .page-title h1 {
+            font-size: 1.2rem;
+        }
+        
+        .col-md-5 {
+            flex: 0 0 48%;
+            max-width: 48%;
+        }
+        
+        .card-total .card-body {
+            padding: 12px 8px;
+        }
+        
+        .card-total h3 {
+            font-size: 1.1rem;
+        }
+
+        .table-responsive {
+            font-size: 0.7rem;
+            margin-left: -5px;
+            margin-right: -5px;
+        }
+        
+        .table-responsive table {
+            min-width: 850px;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.3rem;
+        }
+
+        /* Indicador de scroll */
+        .table-responsive::after {
+            content: "← Arraste para ver mais colunas →";
+            display: block;
+            text-align: center;
+            padding: 8px;
+            background: #f8f9fa;
+            color: #6c757d;
+            font-size: 0.7rem;
+            border-top: 1px solid #dee2e6;
+        }
+
+        /* Paginação mobile */
+        .pagination {
+            flex-wrap: wrap;
+        }
+        
+        .page-link {
+            padding: 0.3rem 0.5rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    @media (max-width: 400px) {
+        .col-md-5 {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        
+        .card-total {
+            margin-bottom: 8px;
+        }
+        
+        .btn-success-custom {
+            font-size: 0.85rem;
+            padding: 8px 12px;
+        }
+        
+        .table-responsive {
+            font-size: 0.65rem;
+        }
     }
 </style>
 
 <div class="container-fluid mt-4">
     
-    <div class="row mb-3 text-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-header-custom">TOTAL EM BAGS</div>
-                <div class="card-body"><h3>{{ total_bag }} <small>bags</small></h3></div>
+    <!-- Título com Destaque -->
+    <div class="page-title text-center">
+        <h1 class="mb-2"><i class="fas fa-boxes me-3"></i>CONTROLE DE ESTOQUE</h1>
+        <p class="mb-0 opacity-75">Gerencie todos os lotes e movimentações do armazém</p>
+    </div>
+
+    <!-- Apenas 2 Cards Essenciais -->
+    <div class="row mb-4 justify-content-center">
+        <div class="col-md-5 col-lg-4 mb-3">
+            <div class="card card-total border-success">
+                <div class="card-body text-center p-4">
+                    <div class="text-success mb-3">
+                        <i class="fas fa-pallet fa-3x"></i>
+                    </div>
+                    <h3 class="text-success">{{ total_bag|intcomma }} BGS</h3>
+                </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-header-custom">
-                    TOTAL EM SACOS (CONVERTIDO) <br>
-                    <small style="font-weight: normal; font-size: 0.7em;"></small>
-                </div>
-                <div class="card-body">
-                    <h3>{{ total_sc }} <small>sc</small></h3>
+        <div class="col-md-5 col-lg-4 mb-3">
+            <div class="card card-total border-warning">
+                <div class="card-body text-center p-4">
+                    <div class="text-warning mb-3">
+                        <i class="fas fa-box fa-3x"></i>
+                    </div>
+                    <h3 class="text-warning">{{ total_sc|intcomma }} SC</h3>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="d-flex justify-content-between mb-3 align-items-end">
-        <button class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#modalNovaEntrada">
-            <i class="fas fa-plus-circle"></i> NOVA ENTRADA
+    <!-- Barra de Ações Responsiva -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center mb-4 p-3 rounded action-bar" style="background: linear-gradient(135deg, #f8f9fa, #e9ecef);">
+        <button class="btn btn-success-custom mb-2 mb-md-0" data-bs-toggle="modal" data-bs-target="#modalNovaEntrada">
+            <i class="fas fa-plus-circle me-2"></i> NOVA ENTRADA
         </button>
         
-        <form class="d-flex" method="GET">
-            <input class="form-control me-2" type="search" name="busca" placeholder="Lote, Cultivar..." value="{{ request.GET.busca }}">
-            <button class="btn btn-outline-dark" type="submit">Pesquisar</button>
+        <form class="d-flex search-form" method="GET">
+            <div class="input-group">
+                <input class="form-control rounded-start" type="search" name="busca" placeholder="🔍 Lote, Cultivar, Endereço..." value="{{ request.GET.busca }}">
+                <button class="btn btn-outline-dark rounded-end" type="submit">Pesquisar</button>
+            </div>
         </form>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-bordered table-sm text-center align-middle">
-            <thead class="bg-sub-header">
-                <tr>
-                    <th style="width: 50px;">+</th>
-                    <th>LOTE</th>
-                    <th>CULTIVAR</th>
-                    <th>PN</th>
-                    <th>CAT</th>
-                    <th>ENDEREÇO</th>
-                    <th>SALDO</th>
-                    <th>EMB.</th>
-                    <th>PESO TOTAL</th>
-                    <th>STATUS</th>
-                </tr>
-            </thead>
-            <tbody>
+    <!-- Controles de Paginação -->
+    <div class="d-flex justify-content-between align-items-center mb-3 pagination-controls">
+        <div class="d-flex align-items-center">
+            <span class="me-2 text-muted">Mostrar:</span>
+            <select class="form-select form-select-sm" style="width: auto;" onchange="location = this.value;">
+                <option value="?page=1&pagina_by=10{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}" {% if request.GET.pagina_by == '10' %}selected{% endif %}>10 itens</option>
+                <option value="?page=1&pagina_by=25{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}" {% if request.GET.pagina_by == '25' %}selected{% endif %}>25 itens</option>
+                <option value="?page=1&pagina_by=50{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}" {% if request.GET.pagina_by == '50' %}selected{% endif %}>50 itens</option>
+                <option value="?page=1&pagina_by=100{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}" {% if request.GET.pagina_by == '100' %}selected{% endif %}>100 itens</option>
+            </select>
+        </div>
+        
+
+    </div>
+
+
+
+    <!-- Tabela Principal -->
+    <!-- Tabela Responsiva -->
+<div class="table-responsive">
+    <table class="table table-bordered table-hover table-sm text-center align-middle mb-0">
+        <thead>
+            <tr style="background: linear-gradient(135deg, #2c3e50, #4a6491); color: white;">
+                <th style="width: 60px;" class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-cogs me-1"></i>AÇÕES
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-boxes me-1"></i>LOTE
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-seedling me-1"></i>CULTIVAR
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-hashtag me-1"></i>PN
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-tag me-1"></i>CAT
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-spa me-1"></i>TRATAMENTO
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-weight me-1"></i>PESO UNIT.
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-map-marker-alt me-1"></i>ENDEREÇO
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-balance-scale me-1"></i>SALDO
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-cube me-1"></i>EMB.
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-weight-hanging me-1"></i>PESO TOTAL
+                </th>
+                <th class="text-uppercase fw-bold small py-3">
+                    <i class="fas fa-circle me-1"></i>STATUS
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Seu conteúdo da tabela aqui -->
+
                 {% for item in itens %}
                 <tr>
                     <td>
-                        <button class="btn btn-sm btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ item.id }}">
-                            <i class="fas fa-plus"></i>
+                        <button class="btn btn-sm collapse-toggle text-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ item.id }}">
+                            <i class="fas fa-chevron-down"></i>
                         </button>
                     </td>
-                    <td class="fw-bold">{{ item.lote }}</td>
-                    <td>{{ item.cultivar.nome }}</td>
-                    <td>{{ item.peneira.nome }}</td>
-                    <td>{{ item.categoria.nome }}</td>
-                    <td>{{ item.endereco }}</td>
-                    <td class="fs-5">{{ item.saldo }}</td>
+                    <td class="fw-bold text-primary">{{ item.lote }}</td>
                     <td>
-                        {% if item.embalagem == 'BAG' %}
-                            <span class="badge badge-bag">BAG</span>
+                        <span class="badge bg-light text-dark border">{{ item.cultivar.nome }}</span>
+                    </td>
+                    <td>{{ item.peneira.nome }}</td>
+                    <td>
+                        <span class="badge bg-info text-dark">{{ item.categoria.nome }}</span>
+                    </td>
+                    <td>
+                        {% if item.tratamento %}
+                            <span class="badge bg-secondary">{{ item.tratamento.nome }}</span>
                         {% else %}
-                            <span class="badge badge-sc">SC</span>
+                            <span class="badge bg-light text-muted border">Sem Trat.</span>
                         {% endif %}
                     </td>
-                    <td>{{ item.peso_total }} kg</td>
+                    <td>
+                        <strong>{{ item.peso_unitario|floatformat:2 }} kg</strong>
+                    </td>
+                    <td>
+                        <span class="badge bg-dark">{{ item.endereco }}</span>
+                    </td>
+                    <td class="fs-6 fw-bold">
+                        {{ item.saldo|intcomma }}
+                    </td>
+                    <td>
+                        {% if item.embalagem == 'BAG' %}
+                            <span class="badge-bag">
+                                <i class="fas fa-pallet me-1"></i>BAG
+                            </span>
+                        {% else %}
+                            <span class="badge-sc">
+                                <i class="fas fa-box me-1"></i>SC
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-bold text-success">
+                        {{ item.peso_total|floatformat:0|intcomma }} kg
+                    </td>
                     <td>
                         {% if item.saldo > 0 %}
-                            <span class="text-success fw-bold">Disponível</span>
+                            <span class="status-available">
+                                <i class="fas fa-check-circle me-1"></i>Disponível
+                            </span>
                         {% else %}
-                            <span class="text-danger fw-bold">Esgotado</span>
+                            <span class="status-depleted">
+                                <i class="fas fa-times-circle me-1"></i>Esgotado
+                            </span>
                         {% endif %}
                     </td>
                 </tr>
 
+                <!-- Linha Expandida com Detalhes -->
                 <tr class="collapse" id="collapse{{ item.id }}">
-                    <td colspan="10" class="p-0">
-                        <div class="history-box text-start">
+                    <td colspan="12" class="p-0 border-0">
+                        <div class="history-box">
                             <div class="row">
-                                <div class="col-md-4 border-end">
-                                    <h5 class="text-primary">Ações e Detalhes</h5>
+                                <div class="col-md-4 border-end pe-3">
+                                    <h5 class="text-primary mb-3">
+                                        <i class="fas fa-tools me-2"></i>Ações e Detalhes
+                                    </h5>
                                     
-                                    <div class="d-grid gap-2 mb-3">
-                                        <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#modalTransferir{{ item.id }}">
-                                            <i class="fas fa-exchange-alt"></i> Transferir Endereço
+                                    <div class="action-buttons mb-3">
+                                        <button class="btn btn-warning btn-sm w-100 mb-2" data-bs-toggle="modal" data-bs-target="#modalTransferir{{ item.id }}">
+                                            <i class="fas fa-exchange-alt me-1"></i> Transferir Endereço
                                         </button>
-                                        <button class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
-                                            <i class="fas fa-edit"></i> Editar Dados
+                                        <button class="btn btn-info btn-sm w-100 mb-2" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
+                                            <i class="fas fa-edit me-1"></i> Editar Dados
+                                        </button>
+                                        <button class="btn btn-danger btn-sm w-100" onclick="if(confirm('⚠️ ATENÇÃO: Excluir lote {{ item.lote }} permanentemente?')) { document.getElementById('form-excluir-{{ item.id }}').submit(); }">
+                                            <i class="fas fa-trash me-1"></i> Excluir Lote
                                         </button>
                                     </div>
-                                    
-                                    <button class="btn btn-danger btn-sm" onclick="if(confirm('ATENÇÃO: Tem certeza que deseja excluir este lote PERMANENTEMENTE? O histórico será mantido.')) { document.getElementById('form-excluir-{{ item.id }}').submit(); }">
-                                        <i class="fas fa-trash"></i> Excluir Lote
-                                    </button>
 
                                     <form id="form-excluir-{{ item.id }}" action="{% url 'sapp:excluir_lote' item.id %}" method="POST" style="display:none;">
                                         {% csrf_token %}
                                     </form>
                                     
                                     <hr>
-                                    <ul class="list-unstyled small">
-                                        <li><strong>Empresa:</strong> {{ item.empresa }}</li>
-                                        <li><strong>Tratamento:</strong> {{ item.tratamento.nome|default:"Sem Tratamento" }}</li>
-                                        <!-- Aqui mostramos o nome do usuário conferente (pode ser first_name ou username) -->
-                                        <li><strong>Conferente (Último):</strong> {{ item.conferente.first_name|default:item.conferente.username }}</li>
-                                        <li><strong>Observação:</strong> {{ item.observacao|default:"--" }}</li>
-                                        <li><strong>Origem/Destino:</strong> {{ item.origem_destino }}</li>
-                                    </ul>
+                                    <div class="item-details">
+                                        <h6 class="text-secondary mb-2">Informações do Lote</h6>
+                                        <div class="small">
+                                            <div class="mb-1">
+                                                <strong><i class="fas fa-building me-1"></i>Empresa:</strong><br>
+                                                {{ item.empresa }}
+                                            </div>
+                                            <div class="mb-1">
+                                                <strong><i class="fas fa-user me-1"></i>Conferente:</strong><br>
+                                                {{ item.conferente.first_name|default:item.conferente.username }}
+                                            </div>
+                                            <div class="mb-1">
+                                                <strong><i class="fas fa-map-marker-alt me-1"></i>Origem/Destino:</strong><br>
+                                                {{ item.origem_destino }}
+                                            </div>
+                                            <div class="mb-1">
+                                                <strong><i class="fas fa-sticky-note me-1"></i>Observação:</strong><br>
+                                                {{ item.observacao|default:"--" }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <div class="col-md-8">
-                                    <h5 class="text-secondary"><i class="fas fa-history"></i> Histórico</h5>
-                                    <table class="table table-striped table-sm bg-white border rounded">
-                                        <thead>
-                                            <tr>
-                                                <th>Data</th>
-                                                <th>Usuário</th>
-                                                <th>Tipo</th>
-                                                <th>Descrição</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for h in item.historico.all %}
-                                            <tr>
-                                                <td>{{ h.data_hora|date:"d/m/Y H:i" }}</td>
-                                                <td>{{ h.usuario.username|default:"Sistema" }}</td>
-                                                <td><span class="badge bg-info text-dark">{{ h.tipo }}</span></td>
-                                                <td>{{ h.descricao|safe }}</td> 
-                                            </tr>
-                                            {% empty %}
-                                            <tr><td colspan="4" class="text-center text-muted">Nenhum histórico registrado.</td></tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
+                                    <h5 class="text-secondary mb-3">
+                                        <i class="fas fa-history me-2"></i> Histórico de Movimentações
+                                    </h5>
+                                    <div class="table-responsive" style="max-height: 300px;">
+                                        <table class="table table-sm table-hover bg-white border rounded">
+                                            <thead class="bg-light">
+                                                <tr>
+                                                    <th>Data/Hora</th>
+                                                    <th>Usuário</th>
+                                                    <th>Tipo</th>
+                                                    <th>Descrição</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for h in item.historico.all %}
+                                                <tr>
+                                                    <td class="small">{{ h.data_hora|date:"d/m/Y H:i" }}</td>
+                                                    <td class="small">
+                                                        <span class="badge bg-primary">{{ h.usuario.username|default:"Sistema" }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge 
+                                                            {% if 'Entrada' in h.tipo %}bg-success
+                                                            {% elif 'Saída' in h.tipo %}bg-danger
+                                                            {% elif 'Transferência' in h.tipo %}bg-warning
+                                                            {% elif 'Edição' in h.tipo %}bg-info
+                                                            {% else %}bg-secondary{% endif %}">
+                                                            {{ h.tipo }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="small">{{ h.descricao|safe }}</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr>
+                                                    <td colspan="4" class="text-center text-muted py-3">
+                                                        <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                                        Nenhum histórico registrado
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -168,20 +636,33 @@
                         <form method="POST" action="{% url 'sapp:transferir' item.id %}">
                             {% csrf_token %}
                             <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Transferir: {{ item.lote }}</h5>
+                                <div class="modal-header bg-warning text-dark">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-exchange-alt me-2"></i>Transferir Lote
+                                    </h5>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <p>Endereço Atual: <strong>{{ item.endereco }}</strong></p>
-                                    <p>Saldo: <strong>{{ item.saldo }}</strong></p>
-                                    <label class="form-label">Quantidade:</label>
-                                    <input type="number" name="quantidade" class="form-control mb-2" max="{{ item.saldo }}" required>
-                                    <label class="form-label">Novo Endereço:</label>
-                                    <input type="text" name="novo_endereco" class="form-control" required>
+                                    <div class="alert alert-info">
+                                        <strong>{{ item.lote }}</strong> - Saldo: <strong>{{ item.saldo }}</strong><br>
+                                        Endereço atual: <strong>{{ item.endereco }}</strong>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Quantidade:</label>
+                                        <input type="number" name="quantidade" class="form-control" 
+                                               max="{{ item.saldo }}" min="1" required 
+                                               placeholder="Máx: {{ item.saldo }}">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Novo Endereço:</label>
+                                        <input type="text" name="novo_endereco" class="form-control" 
+                                               required placeholder="Ex: R01 LN12 P02">
+                                    </div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="submit" class="btn btn-primary">Confirmar</button>
+                                    <button type="submit" class="btn btn-warning w-100">
+                                        <i class="fas fa-paper-plane me-2"></i>Confirmar Transferência
+                                    </button>
                                 </div>
                             </div>
                         </form>
@@ -194,39 +675,41 @@
                         <form method="POST" action="{% url 'sapp:editar' item.id %}">
                             {% csrf_token %}
                             <div class="modal-content">
-                                <div class="modal-header bg-secondary text-white">
-                                    <h5 class="modal-title">Edição Completa: {{ item.lote }}</h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                <div class="modal-header bg-info text-white">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-edit me-2"></i>Editar Lote: {{ item.lote }}
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <div class="row">
-                                        <div class="col-md-6 mb-2">
-                                            <label class="form-label">Lote</label>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Lote</label>
                                             <input type="text" name="lote" class="form-control" value="{{ item.lote }}">
                                         </div>
-                                        <div class="col-md-6 mb-2">
-                                            <label class="form-label">Endereço</label>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Endereço</label>
                                             <input type="text" name="endereco" class="form-control" value="{{ item.endereco }}">
                                         </div>
                                         
-                                        <div class="col-md-4 mb-2">
-                                            <label class="form-label">Cultivar</label>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold">Cultivar</label>
                                             <select name="cultivar" class="form-select">
                                                 {% for c in all_cultivares %}
                                                     <option value="{{ c.id }}" {% if item.cultivar.id == c.id %}selected{% endif %}>{{ c.nome }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
-                                        <div class="col-md-4 mb-2">
-                                            <label class="form-label">Peneira</label>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold">Peneira</label>
                                             <select name="peneira" class="form-select">
                                                 {% for p in all_peneiras %}
                                                     <option value="{{ p.id }}" {% if item.peneira.id == p.id %}selected{% endif %}>{{ p.nome }}</option>
                                                 {% endfor %}
                                             </select>
                                         </div>
-                                        <div class="col-md-4 mb-2">
-                                            <label class="form-label">Categoria</label>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold">Categoria</label>
                                             <select name="categoria" class="form-select">
                                                 {% for cat in all_categorias %}
                                                     <option value="{{ cat.id }}" {% if item.categoria.id == cat.id %}selected{% endif %}>{{ cat.nome }}</option>
@@ -234,35 +717,8 @@
                                             </select>
                                         </div>
 
-                                        <div class="col-md-6 mb-2">
-                                            <label class="form-label">Empresa</label>
-                                            <input type="text" name="empresa" class="form-control" value="{{ item.empresa }}">
-                                        </div>
-                                        <div class="col-md-6 mb-2">
-                                            <label class="form-label">Origem/Destino</label>
-                                            <input type="text" name="origem_destino" class="form-control" value="{{ item.origem_destino }}">
-                                        </div>
-
-                                        <div class="col-md-3 mb-2">
-                                            <label class="form-label">Peso Unit.</label>
-                                            <input type="number" step="0.01" name="peso_unitario" class="form-control" value="{{ item.peso_unitario|stringformat:'.2f' }}">
-                                        </div>
-                                        <div class="col-md-3 mb-2">
-                                            <label class="form-label">Embalagem</label>
-                                            <select name="embalagem" class="form-select">
-                                                <option value="BAG" {% if item.embalagem == 'BAG' %}selected{% endif %}>BAG</option>
-                                                <option value="SC" {% if item.embalagem == 'SC' %}selected{% endif %}>SC</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-md-2 mb-2">
-                                            <label class="form-label">AZ</label>
-                                            <input type="text" name="az" class="form-control" value="{{ item.az|default:'' }}">
-                                        </div>
-                                        
-                                        <!-- REMOVIDO O CAMPO CONFERENTE (POIS É AUTOMÁTICO AGORA) -->
-
-                                        <div class="col-md-6 mb-2">
-                                            <label class="form-label">Tratamento</label>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Tratamento</label>
                                             <select name="tratamento" class="form-select">
                                                 <option value="">Sem Tratamento</option>
                                                 {% for t in all_tratamentos %}
@@ -270,14 +726,42 @@
                                                 {% endfor %}
                                             </select>
                                         </div>
-                                        <div class="col-md-12 mb-2">
-                                            <label class="form-label">Observação</label>
-                                            <textarea name="observacao" class="form-control" rows="1">{{ item.observacao|default:'' }}</textarea>
+                                        <div class="col-md-3">
+                                            <label class="form-label fw-bold">Peso Unit. (kg)</label>
+                                            <input type="number" step="0.01" name="peso_unitario" class="form-control" value="{{ item.peso_unitario|stringformat:'.2f' }}">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label fw-bold">Embalagem</label>
+                                            <select name="embalagem" class="form-select">
+                                                <option value="BAG" {% if item.embalagem == 'BAG' %}selected{% endif %}>BAG</option>
+                                                <option value="SC" {% if item.embalagem == 'SC' %}selected{% endif %}>SC</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Empresa</label>
+                                            <input type="text" name="empresa" class="form-control" value="{{ item.empresa }}">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">Origem/Destino</label>
+                                            <input type="text" name="origem_destino" class="form-control" value="{{ item.origem_destino }}">
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold">AZ</label>
+                                            <input type="text" name="az" class="form-control" value="{{ item.az|default:'' }}">
+                                        </div>
+                                        
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold">Observação</label>
+                                            <textarea name="observacao" class="form-control" rows="2">{{ item.observacao|default:'' }}</textarea>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="modal-footer">
-                                    <button type="submit" class="btn btn-success">Salvar Alterações</button>
+                                    <button type="submit" class="btn btn-success w-100">
+                                        <i class="fas fa-save me-2"></i>Salvar Alterações
+                                    </button>
                                 </div>
                             </div>
                         </form>
@@ -288,6 +772,47 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Paginação -->
+    {% if itens.has_other_pages %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if itens.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="First">
+                    <span aria-hidden="true">&laquo;&laquo;</span>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ itens.previous_page_number }}{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>
+            {% endif %}
+
+            {% for num in itens.paginator.page_range %}
+                {% if itens.number == num %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > itens.number|add:'-3' and num < itens.number|add:'3' %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}">{{ num }}</a></li>
+                {% endif %}
+            {% endfor %}
+
+            {% if itens.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ itens.next_page_number }}{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ itens.paginator.num_pages }}{% if request.GET.busca %}&busca={{ request.GET.busca }}{% endif %}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Last">
+                    <span aria-hidden="true">&raquo;&raquo;</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
 
 <!-- Modal Nova Entrada -->
@@ -297,13 +822,15 @@
             {% csrf_token %}
             <div class="modal-content">
                 <div class="modal-header bg-header-custom">
-                    <h5 class="modal-title">Nova Entrada de Estoque</h5>
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus-circle me-2"></i>Nova Entrada de Estoque
+                    </h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="row">
+                    <div class="row g-3">
                         {% for field in form_entrada %}
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-6">
                             <label class="form-label fw-bold small">{{ field.label }}</label>
                             {{ field }} 
                             {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
@@ -312,7 +839,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-success w-100">REGISTRAR ENTRADA</button>
+                    <button type="submit" class="btn btn-success-custom w-100 py-2">
+                        <i class="fas fa-check-circle me-2"></i>REGISTRAR ENTRADA
+                    </button>
                 </div>
             </div>
         </form>
@@ -320,21 +849,27 @@
 </div>
 
 <script>
-    // Estilização automática dos campos
-    document.querySelectorAll('#modalNovaEntrada input').forEach(el => el.classList.add('form-control'));
-    document.querySelectorAll('#modalNovaEntrada select').forEach(el => el.classList.add('form-select'));
-    document.querySelectorAll('#modalNovaEntrada textarea').forEach(el => el.classList.add('form-control'));
-
-    // Script de Preenchimento Automático
+    // Estilização automática dos campos - CORRIGIDO
     document.addEventListener("DOMContentLoaded", function() {
+        // Estilizar campos do modal
+        const modal = document.getElementById('modalNovaEntrada');
+        if (modal) {
+            modal.addEventListener('show.bs.modal', function() {
+                setTimeout(function() {
+                    document.querySelectorAll('#modalNovaEntrada input').forEach(el => el.classList.add('form-control'));
+                    document.querySelectorAll('#modalNovaEntrada select').forEach(el => el.classList.add('form-select'));
+                    document.querySelectorAll('#modalNovaEntrada textarea').forEach(el => el.classList.add('form-control'));
+                }, 100);
+            });
+        }
+
+        // Script de Preenchimento Automático
         const campoLote = document.getElementById('id_lote');
-        
         if (campoLote) {
             campoLote.addEventListener('blur', function() {
                 const loteDigitado = campoLote.value;
                 
                 if (loteDigitado) {
-                    // USA A URL DINÂMICA DO DJANGO PARA EVITAR ERRO 404
                     const urlApi = "{% url 'sapp:api_buscar_dados_lote' %}?lote=" + encodeURIComponent(loteDigitado);
 
                     fetch(urlApi)
@@ -345,23 +880,23 @@
                         .then(data => {
                             if (data.encontrado) {
                                 // Preenche os selects (IDs)
-                                document.getElementById('id_cultivar').value = data.cultivar;
-                                document.getElementById('id_peneira').value = data.peneira;
-                                document.getElementById('id_categoria').value = data.categoria;
+                                if (document.getElementById('id_cultivar')) document.getElementById('id_cultivar').value = data.cultivar;
+                                if (document.getElementById('id_peneira')) document.getElementById('id_peneira').value = data.peneira;
+                                if (document.getElementById('id_categoria')) document.getElementById('id_categoria').value = data.categoria;
                                 
                                 const campoTrat = document.getElementById('id_tratamento');
                                 if(campoTrat) campoTrat.value = data.tratamento;
 
                                 // Preenche os textos
-                                document.getElementById('id_endereco').value = data.endereco;
-                                document.getElementById('id_empresa').value = data.empresa;
-                                document.getElementById('id_origem_destino').value = data.origem_destino;
-                                document.getElementById('id_peso_unitario').value = data.peso_unitario;
-                                document.getElementById('id_embalagem').value = data.embalagem;
-                                document.getElementById('id_az').value = data.az;
-                                document.getElementById('id_observacao').value = data.observacao;
+                                if (document.getElementById('id_endereco')) document.getElementById('id_endereco').value = data.endereco;
+                                if (document.getElementById('id_empresa')) document.getElementById('id_empresa').value = data.empresa;
+                                if (document.getElementById('id_origem_destino')) document.getElementById('id_origem_destino').value = data.origem_destino;
+                                if (document.getElementById('id_peso_unitario')) document.getElementById('id_peso_unitario').value = data.peso_unitario;
+                                if (document.getElementById('id_embalagem')) document.getElementById('id_embalagem').value = data.embalagem;
+                                if (document.getElementById('id_az')) document.getElementById('id_az').value = data.az;
+                                if (document.getElementById('id_observacao')) document.getElementById('id_observacao').value = data.observacao;
                                 
-                                // Feedback visual (Borda verde)
+                                // Feedback visual
                                 campoLote.classList.add('is-valid');
                                 setTimeout(() => campoLote.classList.remove('is-valid'), 2000);
                             }
@@ -370,6 +905,16 @@
                 }
             });
         }
+
+        // Animação para os cards
+        document.querySelectorAll('.card-total').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px)';
+            });
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
     });
 </script>
 {% endblock %}

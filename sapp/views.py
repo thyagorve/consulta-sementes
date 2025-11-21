@@ -1,28 +1,116 @@
-from django.shortcuts import render, redirect
+# Django imports
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum
+from django.db.models import Q, Sum, Count
 from django.contrib import messages
-from .models import Estoque, HistoricoMovimentacao
-from .forms import NovaEntradaForm, TransferenciaForm, EdicaoForm
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum
-from django.contrib import messages
-from .models import Estoque, HistoricoMovimentacao, Configuracao, Cultivar, Peneira, Categoria
-from .forms import NovaEntradaForm, ConfiguracaoForm, CultivarForm, PeneiraForm, CategoriaForm
-from decimal import Decimal, InvalidOperation # <--- Adicione isso no topo
 from django.http import JsonResponse
+from django.utils import timezone
+from django.core.paginator import Paginator
+from django.contrib.auth.models import User
+from django.contrib.auth import update_session_auth_hash
+
+# Python imports
+from decimal import Decimal, InvalidOperation
+from datetime import timedelta
+import random
+
+# App imports
+from .models import (
+    Estoque, HistoricoMovimentacao, Configuracao, Cultivar, 
+    Peneira, Categoria, Tratamento, PerfilUsuario
+)
+from .forms import (
+    NovaEntradaForm, ConfiguracaoForm, CultivarForm, PeneiraForm, 
+    CategoriaForm, TratamentoForm, NovoConferenteUserForm, MudarSenhaForm
+)
+
 
 @login_required
 def dashboard(request):
     """
-    Renderiza a tela inicial. 
-    Como removemos os modelos, não passamos nenhum contexto de dados.
+    Dashboard com métricas, gráficos e KPIs baseados em dados reais
     """
-    return render(request, 'sapp/dashboard.html') 
+    # Métricas Principais - DADOS REAIS
+    total_itens = Estoque.objects.count()
+    itens_ativos = Estoque.objects.filter(saldo__gt=0).count()
+    itens_esgotados = total_itens - itens_ativos
+    
+    # Cálculo de totais convertidos - DADOS REAIS
+    total_bag = Estoque.objects.filter(embalagem='BAG', saldo__gt=0).aggregate(
+        total=Sum('saldo'))['total'] or 0
+    total_sc = Estoque.objects.filter(embalagem='SC', saldo__gt=0).aggregate(
+        total=Sum('saldo'))['total'] or 0
+    total_sc_convertido = (total_bag * 25) + total_sc
+    
+    # Peso total em estoque - DADOS REAIS
+    peso_total = Estoque.objects.filter(saldo__gt=0).aggregate(
+        total=Sum('peso_total'))['total'] or Decimal('0.00')
+    
+    # Movimentação do mês - DADOS REAIS
+    hoje = timezone.now()
+    inicio_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    movimentacao_mes = HistoricoMovimentacao.objects.filter(
+        data_hora__gte=inicio_mes
+    ).count()
+    
+    # Top cultivares - DADOS REAIS
+    top_cultivares = list(Estoque.objects.filter(saldo__gt=0).values(
+        'cultivar__nome'
+    ).annotate(
+        total_saldo=Sum('saldo')
+    ).order_by('-total_saldo')[:10])  # Top 10
+    
+    # Distribuição por categoria - DADOS REAIS
+    categorias_distribuicao = list(Estoque.objects.filter(saldo__gt=0).values(
+        'categoria__nome'
+    ).annotate(
+        total=Sum('saldo')
+    ).order_by('-total')[:10])  # Top 10
+    
+    # NOVO: Capacidade por Armazém - DADOS REAIS
+    # Extrai o número do armazém do campo endereco (ex: "R01 LN12 P02" -> armazém "01")
+    from django.db.models import CharField
+    from django.db.models.functions import Substr
+    
+    capacidade_armazem = list(Estoque.objects.filter(
+        saldo__gt=0
+    ).annotate(
+        armazem_num=Substr('endereco', 2, 2, output_field=CharField())
+    ).values(
+        'armazem_num'
+    ).annotate(
+        total_sc=Sum('saldo'),
+        total_lotes=Count('id'),
+        peso_total=Sum('peso_total')
+    ).order_by('armazem_num'))
+    
+    # NOVO: Movimentação Recente - DADOS REAIS
+    movimentacao_recente = list(HistoricoMovimentacao.objects.select_related(
+        'estoque', 'usuario'
+    ).order_by('-data_hora')[:10])
+    
+    context = {
+        # Métricas Principais
+        'total_sc_convertido': total_sc_convertido,
+        'total_bag': total_bag,
+        'total_sc': total_sc,
+        'peso_total': peso_total,
+        'itens_ativos': itens_ativos,
+        'itens_esgotados': itens_esgotados,
+        'movimentacao_mes': movimentacao_mes,
+        
+        # Gráficos
+        'top_cultivares': top_cultivares,
+        'categorias_distribuicao': categorias_distribuicao,
+        
+        # Novos dados
+        'capacidade_armazem': capacidade_armazem,
+        'movimentacao_recente': movimentacao_recente,
+    }
+    
+    return render(request, 'sapp/dashboard.html', context)
 
 def logout_view(request):
     """
@@ -35,18 +123,7 @@ def logout_view(request):
 
 
 #########################################################################
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum
-from django.contrib import messages
-from django.core.paginator import Paginator
-from django.contrib.auth.models import User
-from django.contrib.auth import update_session_auth_hash
 
-# --- IMPORTAÇÃO CORRIGIDA (Sem Conferente) ---
-from .models import Estoque, HistoricoMovimentacao, Configuracao, Cultivar, Peneira, Categoria, Tratamento, PerfilUsuario
-from .forms import (NovaEntradaForm, ConfiguracaoForm, CultivarForm, PeneiraForm, CategoriaForm, 
-                    TratamentoForm, NovoConferenteUserForm, MudarSenhaForm)
 
 @login_required
 def mudar_senha(request):

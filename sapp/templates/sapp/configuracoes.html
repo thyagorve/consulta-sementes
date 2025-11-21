@@ -3,146 +3,267 @@
 {% block content %}
 <style>
     /* --- Estilo Personalizado das Abas --- */
+    .nav-tabs {
+        border-bottom: 2px solid #dee2e6;
+    }
+    
     .nav-tabs .nav-link {
-        color: #555; /* Cor do texto inativo */
-        background-color: #e9ecef; /* Fundo cinza claro */
+        color: #495057;
+        background-color: #f1f3f5;
         margin-right: 4px;
-        border: 1px solid #dee2e6;
+        border: 1px solid #ced4da;
+        border-bottom: none;
+        border-radius: 8px 8px 0 0;
         font-weight: 500;
+        padding: 12px 20px;
+        transition: all 0.3s ease;
     }
     
     .nav-tabs .nav-link:hover {
-        background-color: #dbe0e5;
+        background-color: #e9ecef;
         color: #000;
+        border-color: #adb5bd;
+        transform: translateY(-2px);
     }
 
     .nav-tabs .nav-link.active {
-        color: #198754; /* Verde da marca */
-        background-color: #fff;
-        border-color: #dee2e6 #dee2e6 #fff; /* Borda invisível embaixo */
-        border-top: 4px solid #198754; /* Topo verde forte */
-        font-weight: bold;
+        color: #fff;
+        background-color: #198754;
+        border-color: #198754 #198754 #fff;
+        border-top: 3px solid #146c43;
+        font-weight: 600;
+        box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+    }
+
+    .nav-tabs .nav-link.active:hover {
+        background-color: #157347;
+        color: #fff;
+        border-color: #146c43 #146c43 #fff;
     }
     
     .tab-content {
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border-radius: 0 0 8px 8px;
+    }
+
+    /* --- Cards e Header --- */
+    .card {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .card-header {
+        font-weight: 600;
+        font-size: 1.1rem;
+        padding: 15px 20px;
+    }
+
+    /* --- Switch Personalizado --- */
+    .form-check-input:checked {
+        background-color: #198754;
+        border-color: #198754;
+    }
+
+    .form-check-input {
+        width: 3em;
+        height: 1.5em;
+    }
+
+    /* --- Badges e Elementos Interativos --- */
+    .badge {
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .badge:hover {
+        transform: scale(1.02);
+    }
+
+    /* --- Botões --- */
+    .btn {
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+        transform: translateY(-1px);
+    }
+
+    /* --- Ícones nas abas --- */
+    .nav-tabs .nav-link i {
+        opacity: 0.8;
+    }
+
+    .nav-tabs .nav-link.active i {
+        opacity: 1;
+        color: #fff;
     }
 </style>
 
 <div class="container mt-4">
-    <h2 class="mb-4 text-success"><i class="fa-solid fa-gear"></i> Configurações do Sistema</h2>
+    <!-- Header Principal -->
+    <div class="d-flex align-items-center mb-4">
+        <div class="bg-success rounded-circle p-3 me-3">
+            <i class="fa-solid fa-gear fa-lg text-white"></i>
+        </div>
+        <div>
+            <h2 class="mb-1 text-success fw-bold">Configurações do Sistema</h2>
+            <p class="text-muted mb-0">Gerencie as configurações e cadastros do sistema</p>
+        </div>
+    </div>
 
+    <!-- 1. Configuração Geral -->
     <div class="row">
-        <!-- 1. Configuração Geral -->
         <div class="col-md-12 mb-4">
             <div class="card border-success">
-                <div class="card-header bg-success text-white">Geral</div>
+                <div class="card-header bg-success text-white d-flex align-items-center">
+                    <i class="fa-solid fa-sliders me-2"></i>
+                    Configurações Gerais
+                </div>
                 <div class="card-body">
                     <form method="POST">
                         {% csrf_token %}
                         <input type="hidden" name="acao" value="config_geral">
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded">
                             <div class="form-check form-switch fs-5">
                                 {{ form_config.ocultar_esgotados }}
                             </div>
-                            <label class="form-check-label pt-1">
-                                Ocultar automaticamente lotes com <strong>Saldo 0 (Esgotados)</strong> na tabela de estoque.
-                            </label>
+                            <div>
+                                <label class="form-check-label fw-medium">
+                                    Ocultar automaticamente lotes com <strong class="text-danger">Saldo 0 (Esgotados)</strong>
+                                </label>
+                                <small class="text-muted d-block mt-1">
+                                    Quando ativado, os lotes esgotados não serão exibidos na tabela de estoque
+                                </small>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary mt-3 btn-sm">Salvar Preferência Geral</button>
+                        <button type="submit" class="btn btn-success mt-3 px-4">
+                            <i class="fa-solid fa-floppy-disk me-2"></i>Salvar Preferência
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <hr>
+    <hr class="my-4">
 
-    <!-- 2. Cabeçalho das Abas -->
-    <ul class="nav nav-tabs" id="myTab" role="tablist">
+    <!-- 2. Sistema de Abas -->
+    <ul class="nav nav-tabs" id="configTabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="cultivar-tab" data-bs-toggle="tab" data-bs-target="#cultivar" type="button" role="tab">Cultivares</button>
+            <button class="nav-link active" id="cultivar-tab" data-bs-toggle="tab" data-bs-target="#cultivar" type="button" role="tab">
+                <i class="fa-solid fa-seedling me-2"></i>Cultivares
+            </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="peneira-tab" data-bs-toggle="tab" data-bs-target="#peneira" type="button" role="tab">Peneiras</button>
+            <button class="nav-link" id="peneira-tab" data-bs-toggle="tab" data-bs-target="#peneira" type="button" role="tab">
+                <i class="fa-solid fa-filter me-2"></i>Peneiras
+            </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="categoria-tab" data-bs-toggle="tab" data-bs-target="#categoria" type="button" role="tab">Categorias</button>
+            <button class="nav-link" id="categoria-tab" data-bs-toggle="tab" data-bs-target="#categoria" type="button" role="tab">
+                <i class="fa-solid fa-tags me-2"></i>Categorias
+            </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="conferente-tab" data-bs-toggle="tab" data-bs-target="#conferente" type="button" role="tab">Conferentes</button>
+            <button class="nav-link" id="conferente-tab" data-bs-toggle="tab" data-bs-target="#conferente" type="button" role="tab">
+                <i class="fa-solid fa-user-check me-2"></i>Conferentes
+            </button>
         </li>
-        <!-- ABA NOVA AQUI -->
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tratamento-tab" data-bs-toggle="tab" data-bs-target="#tratamento" type="button" role="tab">Tratamentos</button>
+            <button class="nav-link" id="tratamento-tab" data-bs-toggle="tab" data-bs-target="#tratamento" type="button" role="tab">
+                <i class="fa-solid fa-flask me-2"></i>Tratamentos
+            </button>
         </li>
     </ul>
 
     <!-- 3. Conteúdo das Abas -->
-    <div class="tab-content p-4 border border-top-0 bg-white rounded-bottom" id="myTabContent">
+    <div class="tab-content p-4 border border-top-0 bg-white rounded-bottom" id="configTabsContent">
         
+        <!-- Aba Cultivares -->
         <div class="tab-pane fade show active" id="cultivar" role="tabpanel">
             {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Cultivar" lista=cultivares tipo="cultivar" acao_add="add_cultivar" %}
         </div>
         
+        <!-- Aba Peneiras -->
         <div class="tab-pane fade" id="peneira" role="tabpanel">
             {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Peneira" lista=peneiras tipo="peneira" acao_add="add_peneira" %}
         </div>
         
+        <!-- Aba Categorias -->
         <div class="tab-pane fade" id="categoria" role="tabpanel">
             {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Categoria" lista=categorias tipo="categoria" acao_add="add_categoria" %}
         </div>
         
-        <!-- Substitua a DIV da aba conferente por esta -->
+        <!-- Aba Conferentes -->
         <div class="tab-pane fade" id="conferente" role="tabpanel">
             {% if user.is_superuser %}
                 <div class="row">
-                    <div class="col-md-4 border-end">
-                        <h5 class="text-primary mb-3">Novo Conferente (Acesso)</h5>
+                    <div class="col-md-4 border-end pe-md-4">
+                        <h5 class="text-primary mb-3 d-flex align-items-center">
+                            <i class="fa-solid fa-user-plus me-2"></i>Novo Conferente
+                        </h5>
                         <form method="POST">
                             {% csrf_token %}
                             <input type="hidden" name="acao" value="add_conferente_user">
                             
-                            <div class="mb-2">
-                                <input type="text" name="username" class="form-control" placeholder="Login (ex: joao.silva)" required>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Login</label>
+                                <input type="text" name="username" class="form-control" placeholder="ex: joao.silva" required>
                             </div>
-                            <div class="mb-2">
-                                <input type="text" name="first_name" class="form-control" placeholder="Nome Completo" required>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Nome Completo</label>
+                                <input type="text" name="first_name" class="form-control" placeholder="Nome do conferente" required>
                             </div>
                             
-                            <button type="submit" class="btn btn-success w-100">Criar Usuário</button>
-                            <small class="text-muted d-block mt-1">* Senha padrão: <strong>conceito</strong></small>
+                            <button type="submit" class="btn btn-success w-100 py-2">
+                                <i class="fa-solid fa-user-plus me-2"></i>Criar Usuário
+                            </button>
+                            <small class="text-muted d-block mt-2 text-center">
+                                <i class="fa-solid fa-key me-1"></i>Senha padrão: <strong>conceito</strong>
+                            </small>
                         </form>
                     </div>
                     <div class="col-md-8 ps-md-4">
-                        <h5 class="text-secondary mb-3">Usuários Conferentes</h5>
-                        <div class="d-flex flex-wrap gap-2">
+                        <h5 class="text-secondary mb-3 d-flex align-items-center">
+                            <i class="fa-solid fa-users me-2"></i>Usuários Conferentes
+                        </h5>
+                        <div class="d-flex flex-wrap gap-3">
                             {% for u in usuarios_conferentes %}
-                            <span class="badge bg-light text-dark border fs-6 p-2 d-flex align-items-center gap-2 shadow-sm">
-                                <i class="fas fa-user"></i> {{ u.first_name }} ({{ u.username }})
+                            <div class="badge bg-light text-dark border fs-6 p-3 d-flex align-items-center gap-2 shadow-sm">
+                                <i class="fas fa-user text-primary"></i> 
+                                <div>
+                                    <div class="fw-medium">{{ u.first_name }}</div>
+                                    <small class="text-muted">{{ u.username }}</small>
+                                </div>
                                 <form method="POST" style="display:inline;" onsubmit="return confirm('Excluir acesso de {{ u.username }}?');">
                                     {% csrf_token %}
                                     <input type="hidden" name="acao" value="delete_conferente_user">
                                     <input type="hidden" name="id_item" value="{{ u.id }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1 border-0">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1 border-0 ms-2">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </form>
-                            </span>
+                            </div>
                             {% empty %}
-                            <p class="text-muted">Nenhum conferente cadastrado.</p>
+                            <div class="text-center w-100 py-4">
+                                <i class="fa-solid fa-users-slash fa-2x text-muted mb-2"></i>
+                                <p class="text-muted">Nenhum conferente cadastrado.</p>
+                            </div>
                             {% endfor %}
                         </div>
                     </div>
                 </div>
             {% else %}
-                <div class="alert alert-danger mt-3">
-                    <i class="fas fa-lock"></i> Área restrita a administradores.
+                <div class="alert alert-danger mt-3 d-flex align-items-center">
+                    <i class="fas fa-lock me-2"></i> Área restrita a administradores do sistema.
                 </div>
             {% endif %}
         </div>
 
-        <!-- CONTEÚDO NOVO AQUI -->
+        <!-- Aba Tratamentos -->
         <div class="tab-pane fade" id="tratamento" role="tabpanel">
             {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Novo Tratamento" lista=tratamentos tipo="tratamento" acao_add="add_tratamento" %}
         </div>
@@ -150,14 +271,30 @@
     </div>
 </div>
 
-<!-- Script para garantir que o switch do bootstrap funcione visualmente -->
+<!-- Script para melhorar a interação -->
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Melhora a aparência do switch
         const switchInput = document.querySelector('.form-check-input');
         if(switchInput) {
             switchInput.classList.add('form-check-input'); 
             switchInput.style.cursor = 'pointer';
         }
+
+        // Adiciona efeito hover nas abas
+        const navLinks = document.querySelectorAll('.nav-tabs .nav-link');
+        navLinks.forEach(link => {
+            link.addEventListener('mouseenter', function() {
+                if (!this.classList.contains('active')) {
+                    this.style.transform = 'translateY(-2px)';
+                }
+            });
+            link.addEventListener('mouseleave', function() {
+                if (!this.classList.contains('active')) {
+                    this.style.transform = 'translateY(0)';
+                }
+            });
+        });
     });
 </script>
 {% endblock %}

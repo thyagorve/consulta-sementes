@@ -1,57 +1,348 @@
 {% extends 'sapp/base.html' %}
+{% load humanize %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="text-secondary mb-4"><i class="fas fa-history"></i> Histórico Geral do Sistema</h2>
+<style>
+
+    :root {
+        --primary-brown: #8B4513;
+        --secondary-brown: #D2691E;
+        --success-green: #2E8B57;
+        --warning-orange: #A0522D;
+        --light-beige: #fff8dc;
+        --hover-gray: #f8f9fa;
+    }
+
+    .page-title {
+        background: linear-gradient(135deg, var(--primary-brown), #a05a2b);
+        color: white;
+        padding: 20px 15px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
+    }
+
+
+    .page-title-historic {
+        background: linear-gradient(135deg, var(--primary-brown), #a05a2b);
+        
+        padding: 20px 15px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 6px 20px rgba(44, 62, 80, 0.3);
+        border-left: 5px solid #e74c3c;
+    }
+
+    .table-responsive {
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        /* 🔥 CORREÇÃO: Adicionar scroll horizontal */
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Scroll suave no mobile */
+    }
+
+    /* Garantir que a tabela tenha largura mínima para forçar o scroll */
+    .table-responsive table {
+        min-width: 700px; /* Largura mínima para forçar scroll em mobile */
+        width: 100%;
+        margin-bottom: 0;
+    }
+
+    .bg-sub-header { 
+        background: linear-gradient(135deg, #2c3e50, #34495e);
+        color: white;
+        font-weight: bold;
+        border: none;
+        text-align: center;
+    }
+
+    .badge-entrada { background: linear-gradient(135deg, #28a745, #20c997); }
+    .badge-saida { background: linear-gradient(135deg, #dc3545, #e83e8c); }
+    .badge-transferencia { background: linear-gradient(135deg, #ffc107, #fd7e14); }
+    .badge-edicao { background: linear-gradient(135deg, #17a2b8, #6f42c1); }
+    .badge-exclusao { background: linear-gradient(135deg, #6c757d, #495057); }
+
+    .pagination-controls {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        margin-top: 20px;
+    }
+
+    /* RESPONSIVIDADE PARA CELULAR */
+    @media (max-width: 768px) {
+        .page-title-historic {
+            padding: 15px 10px;
+            margin-bottom: 15px;
+        }
+        
+        .page-title-historic h1 {
+            font-size: 1.5rem;
+        }
+        
+        .page-title-historic p {
+            font-size: 0.9rem;
+        }
+        
+        .pagination-controls {
+            flex-direction: column;
+            gap: 10px;
+            text-align: center;
+        }
+        
+        .table-responsive {
+            font-size: 0.8rem;
+            /* 🔥 Scroll mais visível no mobile */
+            border: 1px solid #dee2e6;
+        }
+        
+        .table-responsive table {
+            min-width: 650px; /* Ajuste para mobile */
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.5rem;
+            white-space: nowrap; /* Impede quebra de linha */
+        }
+        
+        .badge {
+            font-size: 0.7rem;
+            padding: 0.3em 0.6em;
+        }
+        
+        /* Esconder colunas menos importantes no mobile */
+        .mobile-hidden {
+            display: none;
+        }
+        
+        .mobile-visible {
+            display: table-cell;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .container-fluid {
+            padding-left: 5px;
+            padding-right: 5px;
+        }
+        
+        .table-responsive {
+            font-size: 0.75rem;
+            margin-left: -5px;
+            margin-right: -5px;
+        }
+        
+        .table-responsive table {
+            min-width: 600px; /* Menor largura para celulares muito pequenos */
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.3rem;
+        }
+        
+        /* Layout vertical para informações compactas */
+        .mobile-compact {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .mobile-compact .badge {
+            align-self: center;
+        }
+
+        /* Indicador visual de que tem scroll */
+        .table-responsive::after {
+            content: "← Arraste →";
+            display: block;
+            text-align: center;
+            padding: 5px;
+            background: #f8f9fa;
+            color: #6c757d;
+            font-size: 0.7rem;
+            border-top: 1px solid #dee2e6;
+        }
+    }
+</style>
+
+<div class="container-fluid mt-3">
     
-    <div class="table-responsive bg-white p-3 rounded shadow-sm">
-        <table class="table table-striped table-hover">
-            <thead class="table-dark">
-                <tr>
-                    <th>Data/Hora</th>
-                    <th>Ref. Lote</th>
-                    <th>Usuário</th>
-                    <th>Ação</th>
-                    <th>Detalhes</th>
+
+
+     <div class="page-title text-center">
+        <h1 class="mb-2"><i class="fas fa-boxes me-3"></i>REGISTRO HISTÓRICO</h1>
+        <p class="mb-0 opacity-75">Auditoria completa de todas as movimentações.</p>
+    </div>
+
+    <!-- Controles de Paginação Responsivos -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 p-3 rounded pagination-controls">
+        <div class="text-muted mb-2 mb-md-0 text-center text-md-start">
+            <i class="fas fa-list me-1"></i>
+            <strong>{{ page_obj.start_index }} - {{ page_obj.end_index }}</strong> de 
+            <strong>{{ page_obj.paginator.count|intcomma }}</strong>
+        </div>
+        
+        <div class="d-flex align-items-center">
+            <span class="me-2 text-muted d-none d-md-block">Itens por página:</span>
+            <span class="me-2 text-muted d-md-none">Mostrar:</span>
+            <select class="form-select form-select-sm" style="width: auto;" onchange="location = this.value;">
+                <option value="?page=1&pagina_by=20" {% if request.GET.pagina_by == '20' or not request.GET.pagina_by %}selected{% endif %}>20</option>
+                <option value="?page=1&pagina_by=50" {% if request.GET.pagina_by == '50' %}selected{% endif %}>50</option>
+                <option value="?page=1&pagina_by=100" {% if request.GET.pagina_by == '100' %}selected{% endif %}>100</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Tabela Responsiva COM SCROLL -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover table-sm align-middle mb-0">
+            <thead>
+                <tr style="background: linear-gradient(135deg, #2c3e50, #4a6491); color: white;">
+                    <th style="width: 120px; min-width: 120px;" class="text-center text-uppercase fw-bold small py-3">
+                        <i class="fas fa-clock me-1"></i>DATA/HORA
+                    </th>
+                    <th style="min-width: 150px;" class="text-center text-uppercase fw-bold small py-3">
+                        <i class="fas fa-boxes me-1"></i>LOTE
+                    </th>
+                    <th style="min-width: 120px;" class="text-center text-uppercase fw-bold small py-3 d-md-table-cell">
+                        <i class="fas fa-user-circle me-1"></i>USUÁRIO
+                    </th>
+                    <th style="width: 110px; min-width: 110px;" class="text-center text-uppercase fw-bold small py-3">
+                        <i class="fas fa-exchange-alt me-1"></i>TIPO
+                    </th>
+                    <th style="min-width: 200px;" class="text-center text-uppercase fw-bold small py-3 d-md-table-cell">
+                        <i class="fas fa-file-alt me-1"></i>DETALHES
+                    </th>
                 </tr>
             </thead>
             <tbody>
                 {% for h in page_obj %}
                 <tr>
-                    <td style="white-space: nowrap;">{{ h.data_hora|date:"d/m/Y H:i" }}</td>
-                    <td class="fw-bold">
+                    <td class="fw-bold text-center" style="white-space: nowrap;">
+                        <small>{{ h.data_hora|date:"d/m/Y" }}</small><br>
+                        <small class="text-muted">{{ h.data_hora|date:"H:i" }}</small>
+                    </td>
+                    <td class="text-center">
                         {% if h.estoque %}
-                            {{ h.estoque.lote }} ({{ h.estoque.endereco }})
+                            <span class="badge bg-dark">{{ h.estoque.lote }}</span>
+                            <small class="text-muted d-none d-sm-block">{{ h.estoque.endereco }}</small>
                         {% else %}
-                            <span class="text-danger">{{ h.lote_ref }}</span>
+                            <span class="badge bg-danger">{{ h.lote_ref }}</span>
                         {% endif %}
                     </td>
-                    <td>{{ h.usuario.username }}</td>
-                    <td><span class="badge bg-primary">{{ h.tipo }}</span></td>
-                    <td>{{ h.descricao|safe }}</td>
+                    <td class="text-center d-md-table-cell">
+                        <span class="badge bg-primary">
+                            <i class="fas fa-user me-1"></i>{{ h.usuario.username|default:"Sistema" }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        {% if 'Entrada' in h.tipo %}
+                            <span class="badge badge-entrada text-white">
+                                <i class="fas fa-plus me-1"></i>Entrada
+                            </span>
+                        {% elif 'Saída' in h.tipo %}
+                            <span class="badge badge-saida text-white">
+                                <i class="fas fa-minus me-1"></i>Saída
+                            </span>
+                        {% elif 'Transferência' in h.tipo %}
+                            <span class="badge badge-transferencia text-white">
+                                <i class="fas fa-exchange-alt me-1"></i>Transf.
+                            </span>
+                        {% elif 'Edição' in h.tipo %}
+                            <span class="badge badge-edicao text-white">
+                                <i class="fas fa-edit me-1"></i>Edição
+                            </span>
+                        {% elif 'EXCLUSÃO' in h.tipo %}
+                            <span class="badge badge-exclusao text-white">
+                                <i class="fas fa-trash me-1"></i>Exclusão
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ h.tipo|truncatechars:10 }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="small text-center d-md-table-cell">
+                        {{ h.descricao|safe|truncatechars:50 }}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-4">
+                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                        <p class="text-muted mb-0">Nenhum registro no histórico</p>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <!-- Paginação -->
-    <div class="mt-3">
-        <span class="step-links">
+    <!-- Resto do código de paginação permanece igual -->
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Page navigation" class="mt-3">
+        <ul class="pagination justify-content-center flex-wrap">
             {% if page_obj.has_previous %}
-                <a class="btn btn-outline-secondary btn-sm" href="?page=1">&laquo; Primeira</a>
-                <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="First">
+                    <span class="d-none d-sm-inline">&laquo;&laquo;</span>
+                    <span class="d-sm-none">⏮</span>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Previous">
+                    <span class="d-none d-sm-inline">&laquo;</span>
+                    <span class="d-sm-none">◀</span>
+                </a>
+            </li>
             {% endif %}
 
-            <span class="current mx-2">
-                Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
-            </span>
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <li class="page-item active">
+                    <span class="page-link">{{ num }}</span>
+                </li>
+                {% elif num > page_obj.number|add:'-2' and num < page_obj.number|add:'2' %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ num }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}">{{ num }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
 
             {% if page_obj.has_next %}
-                <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.next_page_number }}">Próxima</a>
-                <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.paginator.num_pages }}">Última &raquo;</a>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Next">
+                    <span class="d-none d-sm-inline">&raquo;</span>
+                    <span class="d-sm-none">▶</span>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Last">
+                    <span class="d-none d-sm-inline">&raquo;&raquo;</span>
+                    <span class="d-sm-none">⏭</span>
+                </a>
+            </li>
             {% endif %}
-        </span>
-    </div>
+        </ul>
+    </nav>
+    {% endif %}
 </div>
+
+<script>
+    // Adicionar indicador de scroll para mobile
+    document.addEventListener('DOMContentLoaded', function() {
+        const tableResponsive = document.querySelector('.table-responsive');
+        const isMobile = window.innerWidth < 768;
+        
+        if (isMobile && tableResponsive) {
+            // Mostrar que tem conteúdo para o lado
+            setTimeout(() => {
+                tableResponsive.scrollLeft = 10;
+                setTimeout(() => {
+                    tableResponsive.scrollLeft = 0;
+                }, 500);
+            }, 1000);
+        }
+    });
+</script>
 {% endblock %}

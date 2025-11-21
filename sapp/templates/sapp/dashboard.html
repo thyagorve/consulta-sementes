@@ -1,17 +1,459 @@
 {% extends "sapp/base.html" %}
-
+{% load humanize %}
 
 {% block title %}Dashboard - Sementes App{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="p-5 mb-4 bg-light rounded-3">
-        <div class="container-fluid py-5">
-            <h1 class="display-5 fw-bold">Bem-vindo, {{ user.username }}!</h1>
-            <p class="col-md-8 fs-4">Use a barra de navegação acima para acessar as funcionalidades.</p>
-            
-            
+<div class="container-fluid mt-4">
+    <!-- Cabeçalho -->
+ 
+      <div class="page-title text-center">
+        <h1 class="mb-2"><i class="fas fa-boxes me-3"></i>Dashboard</h1>
+        <p class="mb-0 opacity-75">Bem-vindo, {{ user.username }}! Visão geral do estoque.</p>
+    </div>
+
+
+    
+
+    <!-- KPIs Cards -->
+    <div class="row mb-4">
+        <!-- Total SC Convertido -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2" style="border-left-color: var(--brand-green) !important;">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: var(--brand-green);">
+                                Total Estoque (sc)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ total_sc_convertido|intcomma }}
+                            </div>
+                            <div class="text-xs text-muted">
+                                {{ total_bag }} bgs + {{ total_sc }} sc
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-boxes fa-2x" style="color: var(--brand-green);"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Peso Total -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Peso Total (Kg)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ peso_total|floatformat:0|intcomma }}
+                            </div>
+                            <div class="text-xs text-muted">Em estoque</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-weight fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lotes Ativos -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Lotes Ativos
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ itens_ativos }}
+                            </div>
+                            <div class="text-xs text-muted">Esgotados: {{ itens_esgotados }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clipboard-list fa-2x text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Movimentação -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                Movimentação (Mês)
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                {{ movimentacao_mes }}
+                            </div>
+                            <div class="text-xs text-muted">Registros este mês</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exchange-alt fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos com Dados Reais -->
+    <div class="row">
+        <!-- Top Cultivares -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4" style="border-radius: var(--radius-md);">
+                <div class="card-header py-3" style="background: linear-gradient(135deg, var(--brand-green), #3aa55c); border-radius: var(--radius-md) var(--radius-md) 0 0;">
+                    <h6 class="m-0 font-weight-bold text-white">
+                        <i class="fas fa-seedling mr-2"></i>Top Cultivares
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div style="height: 250px; position: relative;">
+                        <canvas id="cultivarChart"></canvas>
+                    </div>
+                    <div class="mt-3" id="cultivarLegend" style="max-height: 80px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Distribuição por Categoria -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4" style="border-radius: var(--radius-md);">
+                <div class="card-header py-3" style="background: linear-gradient(135deg, var(--brand-dark), #2a3d38); border-radius: var(--radius-md) var(--radius-md) 0 0;">
+                    <h6 class="m-0 font-weight-bold text-white">
+                        <i class="fas fa-tags mr-2"></i>Distribuição por Categoria
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div style="height: 250px; position: relative;">
+                        <canvas id="categoriaChart"></canvas>
+                    </div>
+                    <div class="mt-3" id="categoriaLegend" style="max-height: 80px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NOVA SEÇÃO: Capacidade por Armazém com Dados Reais -->
+    <div class="row">
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4" style="border-radius: var(--radius-md);">
+                <div class="card-header py-3" style="background: linear-gradient(135deg, #FFCE56, #FFB347); border-radius: var(--radius-md) var(--radius-md) 0 0;">
+                    <h6 class="m-0 font-weight-bold text-white">
+                        <i class="fas fa-warehouse mr-2"></i>Ocupação por Armazém
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if capacidade_armazem %}
+                    <div style="height: 300px; position: relative;">
+                        <canvas id="armazemChart"></canvas>
+                    </div>
+                    <div class="mt-3" id="armazemLegend" style="max-height: 80px; overflow-y: auto;"></div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-warehouse fa-3x mb-3"></i>
+                        <p>Nenhum dado de armazém disponível</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- NOVA SEÇÃO: Movimentação Recente com Dados Reais -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="card shadow mb-4" style="border-radius: var(--radius-md);">
+                <div class="card-header py-3" style="background: linear-gradient(135deg, #36A2EB, #4BC0C0); border-radius: var(--radius-md) var(--radius-md) 0 0;">
+                    <h6 class="m-0 font-weight-bold text-white">
+                        <i class="fas fa-history mr-2"></i>Movimentação Recente
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Data/Hora</th>
+                                    <th>Tipo</th>
+                                    <th>Lote</th>
+                                    <th>Usuário</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mov in movimentacao_recente %}
+                                <tr>
+                                    <td><small>{{ mov.data_hora|date:"d/m H:i" }}</small></td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if 'Entrada' in mov.tipo %}badge-success
+                                            {% elif 'Saída' in mov.tipo %}badge-danger
+                                            {% elif 'Transferência' in mov.tipo %}badge-warning
+                                            {% elif 'Edição' in mov.tipo %}badge-info
+                                            {% else %}badge-secondary{% endif %}">
+                                            {{ mov.tipo }}
+                                        </span>
+                                    </td>
+                                    <td><small>{{ mov.lote_ref|default:"--" }}</small></td>
+                                    <td><small>{{ mov.usuario.username|default:"Sistema" }}</small></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Nenhuma movimentação recente</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações Rápidas -->
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow mb-4" style="border-radius: var(--radius-md);">
+                <div class="card-header py-3" style="background: var(--light-gray);">
+                    <h6 class="m-0 font-weight-bold" style="color: var(--brand-dark);">
+                        <i class="fas fa-bolt mr-2"></i>Ações Rápidas
+                    </h6>
+                </div>
+                <div class="card-body text-center">
+                    <a href="{% url 'sapp:lista_estoque' %}" class="btn btn-success btn-icon-split mr-3 mb-2">
+                        <span class="icon text-white-50"><i class="fas fa-boxes"></i></span>
+                        <span class="text">Ver Estoque</span>
+                    </a>
+                    <a href="{% url 'sapp:nova_entrada' %}" class="btn btn-primary btn-icon-split mr-3 mb-2">
+                        <span class="icon text-white-50"><i class="fas fa-plus"></i></span>
+                        <span class="text">Nova Entrada</span>
+                    </a>
+                    <a href="{% url 'sapp:configuracoes' %}" class="btn btn-dark btn-icon-split mb-2">
+                        <span class="icon text-white-50"><i class="fas fa-cog"></i></span>
+                        <span class="text">Configurações</span>
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Paleta de cores expandida
+    const themeColors = [
+        '#2f8f4e', '#1f2d2a', '#36A2EB', '#FFCE56', '#4BC0C0',
+        '#9966FF', '#FF6384', '#FF9F40', '#8AC926', '#6A4C93',
+        '#1982C4', '#8AC926', '#FF595E', '#6A4C93', '#1982C4',
+        '#FFCA3A', '#8AC926', '#6A4C93', '#1982C4', '#FF595E'
+    ];
+
+    // Função para criar legenda customizada
+    function createCustomLegend(chartId, labels, values, colors, suffix = '') {
+        const legendContainer = document.getElementById(chartId + 'Legend');
+        let html = '<div class="d-flex flex-wrap justify-content-center">';
+        
+        labels.forEach((label, index) => {
+            if (index < 8) { // Mostrar apenas top 8 na legenda
+                const total = values.reduce((a, b) => a + b, 0);
+                const percentage = total > 0 ? ((values[index] / total) * 100).toFixed(1) : 0;
+                html += `
+                    <div class="legend-item m-1 p-1 small" style="border-left: 3px solid ${colors[index]}; padding-left: 8px;">
+                        <strong>${label}</strong><br>
+                        <span class="text-muted">${values[index].toLocaleString('pt-BR')}${suffix} (${percentage}%)</span>
+                    </div>
+                `;
+            }
+        });
+        
+        if (labels.length > 8) {
+            html += `<div class="w-100 text-center mt-1"><small class="text-muted">+${labels.length - 8} outros</small></div>`;
+        }
+        
+        html += '</div>';
+        legendContainer.innerHTML = html;
+    }
+
+    // Gráfico de Cultivares
+    const cultivarLabels = [{% for item in top_cultivares %}'{{ item.cultivar__nome }}',{% endfor %}];
+    const cultivarValues = [{% for item in top_cultivares %}{{ item.total_saldo }},{% endfor %}];
+    
+    const ctx1 = document.getElementById('cultivarChart');
+    if (ctx1 && cultivarLabels.length > 0) {
+        new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+                labels: cultivarLabels,
+                datasets: [{
+                    data: cultivarValues,
+                    backgroundColor: themeColors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                                return `${context.label}: ${context.raw.toLocaleString('pt-BR')} bgs (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        createCustomLegend('cultivar', cultivarLabels, cultivarValues, themeColors, ' bgs');
+    }
+
+    // Gráfico de Categorias
+    const categoriaLabels = [{% for item in categorias_distribuicao %}'{{ item.categoria__nome }}',{% endfor %}];
+    const categoriaValues = [{% for item in categorias_distribuicao %}{{ item.total }},{% endfor %}];
+    
+    const ctx2 = document.getElementById('categoriaChart');
+    if (ctx2 && categoriaLabels.length > 0) {
+        new Chart(ctx2, {
+            type: 'pie',
+            data: {
+                labels: categoriaLabels,
+                datasets: [{
+                    data: categoriaValues,
+                    backgroundColor: themeColors,
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? ((context.raw / total) * 100).toFixed(1) : 0;
+                                return `${context.label}: ${context.raw.toLocaleString('pt-BR')} bgs (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        createCustomLegend('categoria', categoriaLabels, categoriaValues, themeColors, ' bgs');
+    }
+
+    // Gráfico de Armazém com Dados Reais
+    const armazemLabels = [{% for item in capacidade_armazem %}'Armazém {{ item.armazem_num }}',{% endfor %}];
+    const armazemValues = [{% for item in capacidade_armazem %}{{ item.total_sc }},{% endfor %}];
+    const armazemLotes = [{% for item in capacidade_armazem %}{{ item.total_lotes }},{% endfor %}];
+    
+    const ctx3 = document.getElementById('armazemChart');
+    if (ctx3 && armazemLabels.length > 0) {
+        new Chart(ctx3, {
+            type: 'bar',
+            data: {
+                labels: armazemLabels,
+                datasets: [{
+                    label: 'Volume (bgs)',
+                    data: armazemValues,
+                    backgroundColor: themeColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const index = context.dataIndex;
+                                return `Volume: ${context.raw.toLocaleString('pt-BR')} bgs (${armazemLotes[index]} lotes)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Volume (bgs)'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Legenda para armazém
+        const armazemLegend = document.getElementById('armazemLegend');
+        let armazemHtml = '<div class="d-flex flex-wrap justify-content-center">';
+        armazemLabels.forEach((label, index) => {
+            armazemHtml += `
+                <div class="legend-item m-1 p-1 small" style="border-left: 3px solid ${themeColors[index]}; padding-left: 8px;">
+                    <strong>${label}</strong><br>
+                    <span class="text-muted">${armazemValues[index].toLocaleString('pt-BR')} bgs (${armazemLotes[index]} lotes)</span>
+                </div>
+            `;
+        });
+        armazemLegend.innerHTML = armazemHtml + '</div>';
+    }
+});
+</script>
+
+<style>
+.legend-item {
+    background: white;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    min-width: 120px;
+}
+
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+    :root {
+        --primary-brown: #8B4513;
+        --secondary-brown: #D2691E;
+        --success-green: #2E8B57;
+        --warning-orange: #A0522D;
+        --light-beige: #fff8dc;
+        --hover-gray: #f8f9fa;
+    }
+
+    .page-title {
+        background: linear-gradient(135deg, var(--primary-brown), #a05a2b);
+        color: white;
+        padding: 20px 15px;
+        border-radius: 15px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
+    }
+
+</style>
 {% endblock %}
