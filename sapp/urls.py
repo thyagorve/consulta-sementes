@@ -33,5 +33,19 @@ urlpatterns = [
     path('excluir/<int:id>/', views.excluir_lote, name='excluir_lote'),
     path('mudar-senha/', views.mudar_senha, name='mudar_senha'),
     path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
+    
+    
+    path('gestao-estoque/', views.gestao_estoque, name='gestao_estoque'),
+    path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
+    path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
+    path('importar-estoque/', views.importar_estoque, name='importar_estoque'),
+    
+
+    path('gestao-estoque/', views.gestao_estoque, name='gestao_estoque'),
+    path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
+    path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
+    path('importar-estoque/', views.importar_estoque, name='importar_estoque'),
+    path('aprovar-importacao/', views.aprovar_importacao, name='aprovar_importacao'),
+
 # ...
 ]

@@ -1,0 +1,886 @@
+<!-- templates/sapp/gestao_estoque.html -->
+{% extends 'sapp/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<style>
+    /* Estilos para a tabela avançada */
+    .table-advanced {
+        font-size: 0.875rem;
+    }
+    
+    .table-advanced th {
+        background: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
+        color: white;
+        font-weight: 600;
+        border: none;
+        padding: 12px 8px;
+    }
+    
+    .table-advanced td {
+        padding: 10px 8px;
+        vertical-align: middle;
+        border-color: #e9ecef;
+    }
+    
+    .badge-saldo {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+    
+    .btn-export {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+    }
+    
+    .btn-import {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+    }
+    
+    .btn-print {
+        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+    }
+    
+    .stats-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .table-container {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+
+    /* Adicionar ao CSS existente */
+    .modal-xl {
+        max-width: 90%;
+    }
+
+    .table-responsive {
+        border-radius: 8px;
+    }
+
+    .modification-check {
+        cursor: pointer;
+    }
+
+    .badge {
+        font-size: 0.75em;
+    }
+
+    .alert {
+        border-radius: 8px;
+        border: none;
+    }
+
+    .alert-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .alert-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .alert-danger {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .alert-info {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="text-success fw-bold mb-1">
+                <i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque
+            </h2>
+            <p class="text-muted mb-0">Controle completo do estoque atual</p>
+        </div>
+    </div>
+
+    <!-- Cards de Estatísticas -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="d-flex align-items-center">
+                    <div class="bg-success rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-boxes-stacked text-white"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 text-success">{{ total_itens|intcomma }}</h4>
+                        <small class="text-muted">Itens em Estoque</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-weight-scale text-white"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 text-primary">{{ total_saldo|intcomma }}</h4>
+                        <small class="text-muted">Total de Sacos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stats-card">
+                <div class="d-flex align-items-center">
+                    <div class="bg-info rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-list-check text-white"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 text-info">{{ estoque.count }}</h4>
+                        <small class="text-muted">Lotes Ativos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botões de Ação -->
+    <div class="action-buttons">
+        <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="fa-solid fa-download me-2"></i>Exportar
+        </button>
+        
+        <button class="btn btn-import" data-bs-toggle="modal" data-bs-target="#importModal">
+            <i class="fa-solid fa-upload me-2"></i>Importar
+        </button>
+        
+        <button class="btn btn-print" onclick="window.print()">
+            <i class="fa-solid fa-print me-2"></i>Imprimir
+        </button>
+        
+        <div class="ms-auto">
+            <div class="input-group" style="max-width: 300px;">
+                <span class="input-group-text bg-light border-end-0">
+                    <i class="fa-solid fa-search text-muted"></i>
+                </span>
+                <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Buscar...">
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Estoque -->
+    <div class="table-container">
+        <div class="table-responsive">
+            <table class="table table-advanced table-hover mb-0" id="estoqueTable">
+                <thead>
+                    <tr>
+                        <th>Lote</th>
+                        <th>Cultivar</th>
+                        <th>Peneira</th>
+                        <th>Categoria</th>
+                        <th>Endereço</th>
+                        <th>Saldo</th>
+                        <th>Peso Unit.</th>
+                        <th>Peso Total</th>
+                        <th>Tratamento</th>
+                        <th>Embalagem</th>
+                        <th>Conferente</th>
+                        <th>Data Entrada</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in estoque %}
+                    <tr>
+                        <td>
+                            <span class="fw-bold text-primary">{{ item.lote }}</span>
+                            {% if item.lote_anterior %}
+                            <br><small class="text-muted">Ant: {{ item.lote_anterior }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.cultivar.nome }}</td>
+                        <td>{{ item.peneira.nome }}</td>
+                        <td>{{ item.categoria.nome }}</td>
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
+                        </td>
+                        <td>
+                            <span class="badge badge-saldo {% if item.saldo > 100 %}bg-success{% else %}bg-warning{% endif %}">
+                                {{ item.saldo|intcomma }}
+                            </span>
+                        </td>
+                        <td>{{ item.peso_unitario }} kg</td>
+                        <td>
+                            <strong>{{ item.peso_total|floatformat:2 }} kg</strong>
+                        </td>
+                        <td>
+                            {% if item.tratamento %}
+                                <span class="badge bg-info">{{ item.tratamento.nome }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Sem Trat.</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {% if item.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">
+                                {{ item.get_embalagem_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <small>{{ item.conferente.first_name }}</small>
+                        </td>
+                        <td>
+                            <small>{{ item.data_entrada|date:"d/m/Y" }}</small>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="12" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
+                            Nenhum item encontrado em estoque
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Exportar -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-download me-2"></i>Exportar Dados
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">Escolha o formato para exportação:</p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success">
+                        <i class="fa-solid fa-file-excel me-2"></i>Exportar para Excel
+                    </a>
+                    <a href="{% url 'sapp:exportar_estoque_pdf' %}" class="btn btn-danger">
+                        <i class="fa-solid fa-file-pdf me-2"></i>Exportar para PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Importar -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-upload me-2"></i>Importar Dados
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-medium">Selecione o arquivo Excel</label>
+                        <input type="file" class="form-control" name="excel_file" accept=".xlsx, .xls" required>
+                        <div class="form-text">
+                            Formatos suportados: .xlsx, .xls
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fa-solid fa-circle-info me-2"></i>
+                        O arquivo será validado antes da importação.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="previewImport()">
+                    <i class="fa-solid fa-eye me-2"></i>Pré-visualizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Pré-visualização -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-eye me-2"></i>Pré-visualização da Importação
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent">
+                    <!-- Conteúdo será carregado via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="proceedToApproval()">
+                    <i class="fa-solid fa-check me-2"></i>Continuar para Aprovação
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Aprovação -->
+<div class="modal fade" id="approvalModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-shield-check me-2"></i>Aprovar Modificações
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="approvalContent">
+                    <!-- Conteúdo será carregado via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="submitApproval()">
+                    <i class="fa-solid fa-check-double me-2"></i>Aprovar Modificações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// === VARIÁVEIS GLOBAIS ===
+let currentImportData = null;
+let selectedModifications = new Set();
+
+// === FUNÇÕES UTILITÁRIAS ===
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+    `;
+    
+    document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.container-fluid').firstChild);
+    
+    setTimeout(() => {
+        if (alertDiv.parentElement) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// === FUNÇÕES DE MODAL ===
+function showBootstrapModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        const bootstrapModal = new bootstrap.Modal(modal);
+        bootstrapModal.show();
+    }
+}
+
+function hideBootstrapModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        const bootstrapModal = bootstrap.Modal.getInstance(modal);
+        bootstrapModal.hide();
+    }
+}
+
+// === FUNÇÕES DE SELEÇÃO ===
+function toggleAllNew(checked) {
+    document.querySelectorAll('.modification-check[data-type="new"]').forEach(checkbox => {
+        checkbox.checked = checked;
+        const key = `${checkbox.dataset.type}_${checkbox.dataset.index}`;
+        if (checked) {
+            selectedModifications.add(key);
+        } else {
+            selectedModifications.delete(key);
+        }
+    });
+}
+
+function toggleAllUpdates(checked) {
+    document.querySelectorAll('.modification-check[data-type="update"]').forEach(checkbox => {
+        checkbox.checked = checked;
+        const key = `${checkbox.dataset.type}_${checkbox.dataset.index}`;
+        if (checked) {
+            selectedModifications.add(key);
+        } else {
+            selectedModifications.delete(key);
+        }
+    });
+}
+
+// === FUNÇÕES PRINCIPAIS ===
+
+// 1. Função de pré-visualizar importação
+async function previewImport() {
+    const form = document.getElementById('importForm');
+    const formData = new FormData(form);
+    const fileInput = form.querySelector('input[type="file"]');
+    
+    if (!fileInput.files.length) {
+        showAlert('Selecione um arquivo para importar.', 'warning');
+        return;
+    }
+    
+    selectedModifications = new Set();
+    
+    const importBtn = document.querySelector('#importModal .btn-primary');
+    const originalText = importBtn.innerHTML;
+    importBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Processando...';
+    importBtn.disabled = true;
+    
+    try {
+        const response = await fetch('{% url "sapp:importar_estoque" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentImportData = data;
+            showPreviewModal(data);
+            hideBootstrapModal('importModal');
+        } else {
+            showAlert('Erro: ' + data.error, 'danger');
+        }
+    } catch (error) {
+        showAlert('Erro ao processar arquivo: ' + error.message, 'danger');
+    } finally {
+        importBtn.innerHTML = originalText;
+        importBtn.disabled = false;
+    }
+}
+
+// 2. Mostrar pré-visualização
+function showPreviewModal(data) {
+    const content = document.getElementById('previewContent');
+    
+    let html = `
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h4 class="text-success">${data.comparacao.resumo.novos}</h4>
+                        <small>Novos Lotes</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h4 class="text-warning">${data.comparacao.resumo.atualizados}</h4>
+                        <small>Atualizações</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h4 class="text-info">${data.comparacao.resumo.iguais}</h4>
+                        <small>Sem Alteração</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (data.comparacao.resumo.iguais > 0) {
+        html += `
+            <div class="alert alert-info">
+                <i class="fa-solid fa-circle-info me-2"></i>
+                <strong>${data.comparacao.resumo.iguais} itens</strong> estão idênticos ao estoque atual e não serão processados.
+            </div>
+        `;
+    }
+    
+    // NOVOS LOTES
+    if (data.comparacao.novos_lotes.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-success">
+                    <i class="fa-solid fa-plus me-2"></i>Novos Lotes (${data.comparacao.novos_lotes.length})
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-success">
+                            <tr>
+                                <th><input type="checkbox" id="selectAllNew" checked onchange="toggleAllNew(this.checked)"></th>
+                                <th>Lote</th>
+                                <th>Endereço</th>
+                                <th>Quantidade</th>
+                                <th>Cultivar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        data.comparacao.novos_lotes.forEach((item, index) => {
+            selectedModifications.add(`new_${index}`);
+            html += `
+                <tr>
+                    <td><input type="checkbox" class="modification-check" data-type="new" data-index="${index}" checked></td>
+                    <td><strong>${item.lote}</strong></td>
+                    <td>${item.endereco}</td>
+                    <td><span class="badge bg-success">${item.dados.quantidade}</span></td>
+                    <td>${item.dados.cultivar_id}</td>
+                </tr>
+            `;
+        });
+        
+        html += `</tbody></table></div>`;
+    } else {
+        html += `<div class="alert alert-info">Nenhum novo lote encontrado.</div>`;
+    }
+    
+    // ATUALIZAÇÕES
+    if (data.comparacao.lotes_alterados.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-warning">
+                    <i class="fa-solid fa-pen-to-square me-2"></i>Lotes para Atualizar (${data.comparacao.lotes_alterados.length})
+                </h6>
+                <div class="alert alert-warning">
+                    <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                    <strong>Atenção:</strong> Os dados do banco serão SOBRESCRITOS pelos dados do arquivo.
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead class="table-warning">
+                            <tr>
+                                <th><input type="checkbox" id="selectAllUpdates" checked onchange="toggleAllUpdates(this.checked)"></th>
+                                <th>Lote</th>
+                                <th>Endereço</th>
+                                <th>Quantidade</th>
+                                <th>Cultivar</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+        
+        data.comparacao.lotes_alterados.forEach((item, index) => {
+            selectedModifications.add(`update_${index}`);
+            html += `
+                <tr>
+                    <td><input type="checkbox" class="modification-check" data-type="update" data-index="${index}" checked></td>
+                    <td><strong>${item.lote}</strong></td>
+                    <td>${item.endereco}</td>
+                    <td>
+                        <span class="badge bg-secondary">${item.dados_atuais.saldo}</span> 
+                        → 
+                        <span class="badge bg-success">${item.dados_novos.quantidade}</span>
+                    </td>
+                    <td>${item.dados_novos.cultivar_id}</td>
+                    <td><span class="badge bg-warning">SOBRESCREVER</span></td>
+                </tr>
+            `;
+        });
+        
+        html += `</tbody></table></div>`;
+    } else {
+        html += `<div class="alert alert-info">Nenhum lote para atualizar encontrado.</div>`;
+    }
+    
+    content.innerHTML = html;
+    showBootstrapModal('previewModal');
+}
+
+// 3. Continuar para aprovação
+function proceedToApproval() {
+    if (selectedModifications.size === 0) {
+        showAlert('Selecione pelo menos uma modificação para aprovar.', 'warning');
+        return;
+    }
+    
+    showApprovalModal();
+    hideBootstrapModal('previewModal');
+}
+
+// 4. Mostrar modal de aprovação
+function showApprovalModal() {
+    const content = document.getElementById('approvalContent');
+    
+    const newCount = Array.from(selectedModifications).filter(key => key.startsWith('new_')).length;
+    const updateCount = Array.from(selectedModifications).filter(key => key.startsWith('update_')).length;
+    
+    content.innerHTML = `
+        <div class="alert alert-info">
+            <h6><i class="fa-solid fa-info-circle me-2"></i>Resumo das Modificações</h6>
+            <div class="row text-center mt-2">
+                <div class="col-6">
+                    <h4 class="text-success">${newCount}</h4>
+                    <small>Novos Lotes</small>
+                </div>
+                <div class="col-6">
+                    <h4 class="text-warning">${updateCount}</h4>
+                    <small>Atualizações</small>
+                </div>
+            </div>
+        </div>
+        <div class="alert alert-warning">
+            <i class="fa-solid fa-triangle-exclamation me-2"></i>
+            <strong>Atenção:</strong> Os dados selecionados serão aplicados diretamente no banco de dados.
+        </div>
+    `;
+    
+    showBootstrapModal('approvalModal');
+}
+
+// 5. Submeter aprovação
+async function submitApproval() {
+    const modifications = [];
+    
+    selectedModifications.forEach(key => {
+        const [type, index] = key.split('_');
+        
+        if (type === 'new' && currentImportData.comparacao.novos_lotes[index]) {
+            const item = currentImportData.comparacao.novos_lotes[index];
+            modifications.push({
+                tipo: 'novo',
+                lote: item.lote,
+                endereco: item.endereco,
+                quantidade: item.dados.quantidade,
+                cultivar_id: item.dados.cultivar_id,
+                peneira_id: item.dados.peneira_id,
+                categoria_id: item.dados.categoria_id,
+                tratamento_id: item.dados.tratamento_id,
+                embalagem: item.dados.embalagem,
+                peso_unitario: item.dados.peso_unitario,
+                empresa: item.dados.empresa,
+                az: item.dados.az,
+                cultura: item.dados.cultura
+            });
+            
+        } else if (type === 'update' && currentImportData.comparacao.lotes_alterados[index]) {
+            const item = currentImportData.comparacao.lotes_alterados[index];
+            modifications.push({
+                tipo: 'atualizar',
+                lote: item.lote,
+                endereco: item.endereco,
+                quantidade: item.dados_novos.quantidade,
+                cultivar_id: item.dados_novos.cultivar_id,
+                peneira_id: item.dados_novos.peneira_id,
+                categoria_id: item.dados_novos.categoria_id,
+                tratamento_id: item.dados_novos.tratamento_id,
+                embalagem: item.dados_novos.embalagem,
+                peso_unitario: item.dados_novos.peso_unitario,
+                empresa: item.dados_novos.empresa,
+                az: item.dados_novos.az,
+                cultura: item.dados_novos.cultura
+            });
+        }
+    });
+    
+    const approveBtn = document.querySelector('#approvalModal .btn-success');
+    const originalText = approveBtn.innerHTML;
+    approveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Processando...';
+    approveBtn.disabled = true;
+    
+    try {
+        const response = await fetch('{% url "sapp:aprovar_importacao" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                modificacoes: modifications
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert(data.message, 'success');
+            hideBootstrapModal('approvalModal');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showAlert('Erro: ' + data.error, 'danger');
+        }
+    } catch (error) {
+        showAlert('Erro ao aprovar modificações: ' + error.message, 'danger');
+    } finally {
+        approveBtn.innerHTML = originalText;
+        approveBtn.disabled = false;
+    }
+}
+
+// === FUNÇÕES DE BUSCA E INTERAÇÃO ===
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('modification-check')) {
+        const key = `${e.target.dataset.type}_${e.target.dataset.index}`;
+        if (e.target.checked) {
+            selectedModifications.add(key);
+        } else {
+            selectedModifications.delete(key);
+        }
+    }
+});
+
+// Busca na tabela
+document.getElementById('searchInput').addEventListener('keyup', function() {
+    const value = this.value.toLowerCase();
+    const rows = document.querySelectorAll('#estoqueTable tbody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(value) ? '' : 'none';
+    });
+});
+
+// Adicione esta função de seleção para lotes duplicados
+function toggleAllDuplicados(checked) {
+    document.querySelectorAll('.modification-check[data-type="duplicado"]').forEach(checkbox => {
+        checkbox.checked = checked;
+        const key = `${checkbox.dataset.type}_${checkbox.dataset.index}`;
+        if (checked) selectedModifications.add(key);
+        else selectedModifications.delete(key);
+    });
+}
+
+// Na função showPreviewModal, adicione esta seção APÓS as atualizações:
+if (data.comparacao.lotes_duplicados && data.comparacao.lotes_duplicados.length > 0) {
+    html += `
+        <div class="mb-3">
+            <h6 class="text-danger">
+                <i class="fa-solid fa-object-group me-2"></i>Lotes para Consolidar (${data.comparacao.lotes_duplicados.length})
+            </h6>
+            <div class="alert alert-danger">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                <strong>Atenção:</strong> Estes lotes existem em múltiplos endereços e serão consolidados em um único.
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-danger">
+                        <tr>
+                            <th><input type="checkbox" id="selectAllDuplicados" checked onchange="toggleAllDuplicados(this.checked)"></th>
+                            <th>Lote</th>
+                            <th>Novo Endereço</th>
+                            <th>Endereços Atuais</th>
+                            <th>Saldo Total</th>
+                            <th>Nova Qtd</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+    
+    data.comparacao.lotes_duplicados.forEach((item, index) => {
+        selectedModifications.add(`duplicado_${index}`);
+        html += `
+            <tr>
+                <td><input type="checkbox" class="modification-check" data-type="duplicado" data-index="${index}" checked></td>
+                <td><strong>${item.lote}</strong></td>
+                <td><span class="badge bg-primary">${item.novo_endereco}</span></td>
+                <td>
+                    ${item.enderecos_atuais.map(e => `<span class="badge bg-secondary me-1">${e}</span>`).join('')}
+                </td>
+                <td><span class="badge bg-warning">${item.saldo_total_atual}</span></td>
+                <td><span class="badge bg-success">${item.nova_quantidade}</span></td>
+                <td><span class="badge bg-danger">CONSOLIDAR</span></td>
+            </tr>
+        `;
+    });
+    
+    html += `</tbody></table></div>`;
+}
+
+// Na função submitApproval, adicione este caso:
+else if (type === 'duplicado' && currentImportData.comparacao.lotes_duplicados[index]) {
+    const item = currentImportData.comparacao.lotes_duplicados[index];
+    modifications.push({
+        tipo: 'consolidar',
+        lote: item.lote,
+        endereco: item.novo_endereco,
+        quantidade: item.nova_quantidade,
+        cultivar_id: item.dados_novos.cultivar_id,
+        peneira_id: item.dados_novos.peneira_id,
+        categoria_id: item.dados_novos.categoria_id,
+        tratamento_id: item.dados_novos.tratamento_id,
+        embalagem: item.dados_novos.embalagem,
+        peso_unitario: item.dados_novos.peso_unitario,
+        empresa: item.dados_novos.empresa,
+        az: item.dados_novos.az,
+        cultura: item.dados_novos.cultura
+    });
+}
+
+// Atualize a função showApprovalModal para incluir duplicados:
+const duplicadoCount = Array.from(selectedModifications).filter(key => key.startsWith('duplicado_')).length;
+
+// No resumo, adicione:
+html += `
+    <div class="col-4">
+        <h4 class="text-danger">${duplicadoCount}</h4>
+        <small>Consolidações</small>
+    </div>
+`;
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar tooltips do Bootstrap se existirem
+    if (typeof bootstrap !== 'undefined') {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+});
+</script>
+{% endblock %}
