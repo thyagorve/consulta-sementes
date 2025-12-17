@@ -78,7 +78,19 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# settings.py
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Em produção, configure também:
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+
+
+
+
 
 # --- NOSSAS CONFIGURAÇÕES ---
 # 1. Configuração para Media Files (Uploads do usuário)
@@ -93,7 +105,8 @@ LOGOUT_REDIRECT_URL = 'sapp:login'
              # Para onde ir se o acesso for negado (@login_required)
 # sementes/settings.py
 
-# ... (suas outras configurações) ...
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # --- CONFIGURAÇÕES DO CELERY ---
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # Broker (intermediário)
