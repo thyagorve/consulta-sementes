@@ -2212,6 +2212,7 @@ def transferir(request, id):
                         entrada=qtd,
                         saida=0,
                         saldo=qtd,
+                        cliente=item_origem.cliente, 
                         origem_destino=f"Transf. de {item_origem.endereco}",
                         conferente=request.user,
                         especie=item_origem.especie,
@@ -2241,7 +2242,7 @@ def nova_entrada(request):
                     novo_obj = form.save(commit=False)
                     novo_obj.conferente = request.user
                     novo_obj.especie = request.POST.get('especie', 'SOJA')
-                    
+                    novo_obj.cliente = request.POST.get('cliente', '')  # NOVO
                     lote_existente = Estoque.objects.filter(
                         lote=novo_obj.lote,
                         endereco=novo_obj.endereco,
@@ -2421,139 +2422,173 @@ def limpar_cache_importacao(request):
 
 ############################################################################
 
+# NO VIEWS.PY - CORRIGIR A FUNÇÃO editar COMPLETAMENTE:
+
 @login_required
 def editar(request, id):
+    """Edita um lote existente - VERSÃO CORRIGIDA"""
     item = get_object_or_404(Estoque, id=id)
     
     if request.method == 'POST':
         try:
-            # 1. CAPTURA O ESTADO ANTIGO (Para comparação)
-            antigo_lote = item.lote
-            antigo_endereco = item.endereco
-            antigo_empresa = item.empresa
-            antigo_od = item.origem_destino
-            antigo_peso = item.peso_unitario
-            antigo_emb = item.embalagem
-            antigo_az = item.az or ""
-            antigo_obs = item.observacao or ""
-            
-            # Para FKs, pegamos o NOME para ficar legível no histórico
-            antigo_cultivar = item.cultivar.nome
-            antigo_peneira = item.peneira.nome
-            antigo_categoria = item.categoria.nome
-            antigo_conferente = item.conferente.username # ou .first_name
-            antigo_tratamento = item.tratamento.nome if item.tratamento else "Sem Tratamento"
+            with transaction.atomic():
+                # 1. CAPTURA O ESTADO ANTIGO (Para histórico)
+                antigo = {
+                    'lote': item.lote,
+                    'endereco': item.endereco,
+                    'empresa': item.empresa or "",
+                    'origem_destino': item.origem_destino or "",
+                    'peso_unitario': item.peso_unitario,
+                    'embalagem': item.embalagem,
+                    'az': item.az or "",
+                    'observacao': item.observacao or "",
+                    'cliente': item.cliente or "",  # NOVO CAMPO
+                    'cultivar': item.cultivar.nome if item.cultivar else "",
+                    'peneira': item.peneira.nome if item.peneira else "",
+                    'categoria': item.categoria.nome if item.categoria else "",
+                    'conferente': item.conferente.username,
+                    'tratamento': item.tratamento.nome if item.tratamento else "Sem Tratamento",
+                    'produto': item.produto or "",  # Campo produto
+                }
 
-            # 2. CAPTURA OS NOVOS VALORES DO FORMULÁRIO
-            novo_lote = request.POST.get('lote')
-            novo_endereco = request.POST.get('endereco')
-            novo_empresa = request.POST.get('empresa')
-            novo_od = request.POST.get('origem_destino')
-            novo_emb = request.POST.get('embalagem')
-            novo_az = request.POST.get('az')
-            novo_obs = request.POST.get('observacao')
-
-            # Tratamento do Peso (Blindagem contra erro de formatação)
-            peso_raw = request.POST.get('peso_unitario', '0')
-            if peso_raw.count('.') > 1:
-                partes = peso_raw.split('.')
-                peso_raw = f"{partes[0]}.{partes[1]}"
-            novo_peso = Decimal(peso_raw.replace(',', '.'))
-
-            # Busca os Objetos Novos (FKs)
-            obj_cultivar = get_object_or_404(Cultivar, id=request.POST.get('cultivar'))
-            obj_peneira = get_object_or_404(Peneira, id=request.POST.get('peneira'))
-            obj_categoria = get_object_or_404(Categoria, id=request.POST.get('categoria'))
-            
-            # Tratamento é opcional
-            tid = request.POST.get('tratamento')
-            if tid:
-                obj_tratamento = get_object_or_404(Tratamento, id=tid)
-                nome_novo_tratamento = obj_tratamento.nome
-            else:
-                obj_tratamento = None
-                nome_novo_tratamento = "Sem Tratamento"
-
-            # 3. COMPARAÇÃO E MONTAGEM DO LOG
-            mudancas = []
-
-            if antigo_lote != novo_lote: 
-                mudancas.append(f"Lote: {antigo_lote} -> <b>{novo_lote}</b>")
-            
-            if antigo_endereco != novo_endereco: 
-                mudancas.append(f"Endereço: {antigo_endereco} -> <b>{novo_endereco}</b>")
-            
-            if antigo_cultivar != obj_cultivar.nome:
-                mudancas.append(f"Cultivar: {antigo_cultivar} -> <b>{obj_cultivar.nome}</b>")
-            
-            if antigo_peneira != obj_peneira.nome:
-                mudancas.append(f"Peneira: {antigo_peneira} -> <b>{obj_peneira.nome}</b>")
-            
-            if antigo_categoria != obj_categoria.nome:
-                mudancas.append(f"Categoria: {antigo_categoria} -> <b>{obj_categoria.nome}</b>")
-
-            if antigo_tratamento != nome_novo_tratamento:
-                mudancas.append(f"Tratamento: {antigo_tratamento} -> <b>{nome_novo_tratamento}</b>")
-
-            if antigo_peso != novo_peso:
-                mudancas.append(f"Peso: {antigo_peso} -> <b>{novo_peso}</b>")
-            
-            if antigo_emb != novo_emb:
-                mudancas.append(f"Emb: {antigo_emb} -> <b>{novo_emb}</b>")
+                # 2. CAPTURA OS NOVOS VALORES
+                novo_lote = request.POST.get('lote', '').strip()
+                novo_endereco = request.POST.get('endereco', '').strip()
+                novo_empresa = request.POST.get('empresa', '').strip()
+                novo_origem_destino = request.POST.get('origem_destino', '').strip()
+                novo_produto = request.POST.get('produto', '').strip()
+                novo_cliente = request.POST.get('cliente', '').strip()  # NOVO CAMPO
                 
-            if antigo_empresa != novo_empresa:
-                mudancas.append(f"Empresa alterada.")
+                # Tratamento do peso
+                peso_raw = request.POST.get('peso_unitario', '0')
+                try:
+                    # Substituir vírgula por ponto
+                    peso_raw = str(peso_raw).replace(',', '.')
+                    # Se tiver mais de um ponto, pegar apenas o primeiro
+                    if peso_raw.count('.') > 1:
+                        partes = peso_raw.split('.')
+                        peso_raw = f"{partes[0]}.{''.join(partes[1:])}"
+                    novo_peso = Decimal(peso_raw)
+                except (InvalidOperation, ValueError):
+                    novo_peso = Decimal('0.00')
+                
+                novo_emb = request.POST.get('embalagem', 'BAG')
+                novo_az = request.POST.get('az', '').strip()
+                novo_obs = request.POST.get('observacao', '').strip()
+                novo_especie = request.POST.get('especie', 'SOJA').strip()
 
-            if antigo_od != novo_od:
-                mudancas.append(f"Origem/Dest alterado.")
+                # 3. BUSCAR OBJETOS RELACIONADOS
+                try:
+                    obj_cultivar = get_object_or_404(Cultivar, id=request.POST.get('cultivar'))
+                except:
+                    obj_cultivar = item.cultivar
+                    
+                try:
+                    obj_peneira = get_object_or_404(Peneira, id=request.POST.get('peneira'))
+                except:
+                    obj_peneira = item.peneira
+                    
+                try:
+                    obj_categoria = get_object_or_404(Categoria, id=request.POST.get('categoria'))
+                except:
+                    obj_categoria = item.categoria
+                
+                # Tratamento é opcional
+                tratamento_id = request.POST.get('tratamento')
+                if tratamento_id:
+                    try:
+                        obj_tratamento = get_object_or_404(Tratamento, id=tratamento_id)
+                    except:
+                        obj_tratamento = item.tratamento
+                else:
+                    obj_tratamento = None
 
-            if antigo_obs != novo_obs:
-                mudancas.append("Observação alterada.")
+                # 4. COMPARAÇÃO DETALHADA
+                mudancas = []
+                
+                # Comparar cada campo
+                campos_para_comparar = [
+                    ('lote', 'Lote', antigo['lote'], novo_lote),
+                    ('endereco', 'Endereço', antigo['endereco'], novo_endereco),
+                    ('empresa', 'Empresa', antigo['empresa'], novo_empresa),
+                    ('origem_destino', 'Origem/Destino', antigo['origem_destino'], novo_origem_destino),
+                    ('produto', 'Produto', antigo['produto'], novo_produto),
+                    ('cliente', 'Cliente', antigo['cliente'], novo_cliente),  # NOVO
+                    ('peso_unitario', 'Peso Unitário', antigo['peso_unitario'], novo_peso),
+                    ('embalagem', 'Embalagem', antigo['embalagem'], novo_emb),
+                    ('az', 'AZ', antigo['az'], novo_az),
+                    ('observacao', 'Observação', antigo['observacao'], novo_obs),
+                    ('cultivar', 'Cultivar', antigo['cultivar'], obj_cultivar.nome if obj_cultivar else ''),
+                    ('peneira', 'Peneira', antigo['peneira'], obj_peneira.nome if obj_peneira else ''),
+                    ('categoria', 'Categoria', antigo['categoria'], obj_categoria.nome if obj_categoria else ''),
+                    ('tratamento', 'Tratamento', antigo['tratamento'], obj_tratamento.nome if obj_tratamento else 'Sem Tratamento'),
+                ]
+                
+                for campo_nome, label, valor_antigo, valor_novo in campos_para_comparar:
+                    if str(valor_antigo or '') != str(valor_novo or ''):
+                        mudancas.append(f"{label}: {valor_antigo} → <b>{valor_novo}</b>")
 
-            # 4. ATUALIZA O OBJETO E SALVA
-            item.lote = novo_lote
-            item.endereco = novo_endereco
-            item.empresa = novo_empresa
-            item.origem_destino = novo_od
-            item.peso_unitario = novo_peso
-            item.embalagem = novo_emb
-            item.az = novo_az
-            item.observacao = novo_obs
-            
-            item.cultivar = obj_cultivar
-            item.peneira = obj_peneira
-            item.categoria = obj_categoria
-            item.tratamento = obj_tratamento
-            
-            # Atualiza quem editou por último
-            item.conferente = request.user 
-            
-            item.save()
+                # 5. ATUALIZAR O OBJETO
+                item.lote = novo_lote
+                item.endereco = novo_endereco
+                item.empresa = novo_empresa
+                item.origem_destino = novo_origem_destino
+                item.produto = novo_produto
+                item.cliente = novo_cliente  # NOVO
+                item.peso_unitario = novo_peso
+                item.embalagem = novo_emb
+                item.az = novo_az
+                item.observacao = novo_obs
+                item.especie = novo_especie
+                
+                item.cultivar = obj_cultivar
+                item.peneira = obj_peneira
+                item.categoria = obj_categoria
+                item.tratamento = obj_tratamento
+                item.conferente = request.user
+                
+                # 6. SALVAR E RECALCULAR
+                item.save()  # Isso vai recalcular saldo e peso_total automaticamente
 
-            # 5. GRAVA O HISTÓRICO
-            if mudancas:
-                desc = "<br>".join(mudancas)
-                HistoricoMovimentacao.objects.create(
-                    estoque=item, 
-                    usuario=request.user, 
-                    tipo='Edição', 
-                    descricao=f"Alterações:<br>{desc}"
-                )
-            else:
-                # Se o usuário abriu o modal e clicou salvar sem mudar nada
-                HistoricoMovimentacao.objects.create(
-                    estoque=item, 
-                    usuario=request.user, 
-                    tipo='Edição', 
-                    descricao="Salvo sem alterações visíveis."
-                )
+                # 7. REGISTRAR HISTÓRICO
+                if mudancas:
+                    descricao_html = "<br>".join(mudancas)
+                    HistoricoMovimentacao.objects.create(
+                        estoque=item,
+                        usuario=request.user,
+                        tipo='Edição de Lote',
+                        descricao=f"<b>EDIÇÃO REALIZADA:</b><br>{descricao_html}"
+                    )
+                else:
+                    HistoricoMovimentacao.objects.create(
+                        estoque=item,
+                        usuario=request.user,
+                        tipo='Edição (Sem mudanças)',
+                        descricao="Salvo sem alterações visíveis."
+                    )
 
-            messages.success(request, "Lote editado com sucesso.")
+                messages.success(request, f"✅ Lote {item.lote} atualizado com sucesso!")
+                
+                # Redirecionar de volta para a lista de estoque
+                return redirect('sapp:lista_estoque')
+                
         except Exception as e:
-            messages.error(request, f"Erro ao editar: {e}")
-
-    return redirect('sapp:lista_estoque')
-
+            print(f"❌ ERRO NA EDIÇÃO: {e}")
+            import traceback
+            print(f"🔍 Traceback: {traceback.format_exc()}")
+            messages.error(request, f"❌ Erro ao editar lote: {str(e)}")
+            return redirect('sapp:lista_estoque')
+    
+    else:
+        # GET request - mostrar formulário de edição
+        # Vamos redirecionar para a página principal e abrir o modal via JS
+        # Na prática, você pode criar uma view separada para o formulário ou usar AJAX
+        
+        # Para simplificar, vamos redirecionar com uma flag para abrir o modal
+        return redirect(f"{reverse('sapp:lista_estoque')}?editar={id}")
+    
+    
+    
 @login_required
 def excluir_lote(request, id):
     item = get_object_or_404(Estoque, id=id)

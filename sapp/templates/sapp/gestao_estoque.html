@@ -177,6 +177,21 @@
         z-index: 5;
     }
     
+    /* Cliente badge */
+    .badge-cliente {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+        color: white;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        margin-top: 2px;
+        display: inline-block;
+    }
+    
+    /* Status badges */
+    .badge-status-ativo { background: #198754; }
+    .badge-status-esgotado { background: #dc3545; }
+    .badge-status-bloqueado { background: #6c757d; }
+    
     /* Loader para importação */
     .import-loader {
         display: none;
@@ -203,6 +218,14 @@
         width: 3rem;
         height: 3rem;
     }
+    
+    /* Empresa badge */
+    .badge-empresa {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+    }
 </style>
 
 <div class="container-fluid py-4">
@@ -214,60 +237,81 @@
             </h2>
             <p class="text-muted mb-0">Controle completo do estoque atual</p>
         </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary">{{ estoque.paginator.count|intcomma }} itens</span>
+            <span class="badge bg-success">{{ total_sc|intcomma }} SC total</span>
+        </div>
     </div>
 
     <!-- Cards de Estatísticas -->
-<!-- ATUALIZE OS CARDS DE ESTATÍSTICAS -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="stats-card">
-            <div class="d-flex align-items-center">
-                <div class="bg-success rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-layer-group text-white"></i>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex align-items-center">
+                    <div class="bg-success rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-layer-group text-white"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 text-success">{{ total_itens|intcomma }}</h4>
+                        <small class="text-muted">Lotes Ativos</small>
+                    </div>
                 </div>
-                <div>
-                    <h4 class="mb-0 text-success">{{ total_itens|intcomma }}</h4>
-                    <small class="text-muted">Lotes Ativos</small>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex align-items-center">
+                    <div class="bg-info rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-weight-hanging text-white"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 text-info">{{ total_sc|intcomma }}</h4>
+                        <small class="text-muted">Equivalente SC</small>
+                        <br>
+                        <small class="text-muted">
+                            ({{ total_bags|intcomma }} BAG × 25 + {{ total_sc_fisico|intcomma }} SC)
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex align-items-center">
+                    <div class="bg-warning rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-box text-white"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 text-warning">{{ total_bags|intcomma }}</h4>
+                        <small class="text-muted">Unidades BAG</small>
+                        <br>
+                        <small class="text-muted">
+                            ({{ total_sc_fisico|intcomma }} unidades SC)
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stats-card">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary rounded-circle p-3 me-3">
+                        <i class="fa-solid fa-users text-white"></i>
+                    </div>
+                    <div>
+                        <h4 class="mb-0 text-primary">{{ clientes_unicos|default:"0" }}</h4>
+                        <small class="text-muted">Clientes Únicos</small>
+                        <br>
+                        <small class="text-muted">Com lotes ativos</small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="stats-card">
-            <div class="d-flex align-items-center">
-                <div class="bg-info rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-weight-hanging text-white"></i>
-                </div>
-                <div>
-                    <h4 class="mb-0 text-info">{{ total_sc|intcomma }}</h4>
-                    <small class="text-muted">Equivalente SC</small>
-                    <br>
-                    <small class="text-muted">
-                        ({{ total_bags|intcomma }} BAG × 25 + {{ total_sc_fisico|intcomma }} SC)
-                    </small>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="stats-card">
-            <div class="d-flex align-items-center">
-                <div class="bg-warning rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-box text-white"></i>
-                </div>
-                <div>
-                    <h4 class="mb-0 text-warning">{{ total_bags|intcomma }}</h4>
-                    <small class="text-muted">Unidades BAG</small>
-                    <br>
-                    <small class="text-muted">
-                        ({{ total_sc_fisico|intcomma }} unidades SC)
-                    </small>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
     <!-- Botões de Ação -->
     <div class="action-buttons">
         <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
@@ -285,7 +329,7 @@
         <div class="ms-auto search-container">
             <i class="fa-solid fa-search search-icon"></i>
             <input type="text" id="searchInput" class="form-control search-input" 
-                   placeholder="Buscar por lote, cultivar, endereço..." 
+                   placeholder="Buscar por lote, cultivar, cliente, endereço..." 
                    value="{{ busca }}">
         </div>
     </div>
@@ -297,7 +341,7 @@
                 <thead>
                     <tr>
                         <th>Lote</th>
-                        <th>Produto</th>
+                        <th>Produto / Cliente</th>
                         <th>Cultivar</th>
                         <th>Peneira</th>
                         <th>Categoria</th>
@@ -307,14 +351,15 @@
                         <th>Peso Total (kg)</th>
                         <th>Tratamento</th>
                         <th>Embalagem</th>
-                        <th>AZ</th>
+                        <th>Cliente</th>
+                        <th>Empresa</th>
+                        <th>Status</th>
                         <th>Conferente</th>
-                        <th>Data Entrada</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in estoque %}
-                    <tr>
+                    <tr onclick="window.location.href='{% url 'sapp:lista_estoque' %}?busca={{ item.lote }}'" style="cursor: pointer;">
                         <td>
                             <span class="fw-bold text-primary">{{ item.lote }}</span>
                             {% if item.lote_anterior %}
@@ -322,10 +367,9 @@
                             {% endif %}
                         </td>
                         <td>
+                            <div class="fw-bold">{{ item.cultivar.nome }}</div>
                             {% if item.produto %}
                             <span class="badge bg-dark">{{ item.produto }}</span>
-                            {% else %}
-                            <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         <td>{{ item.cultivar.nome }}</td>
@@ -333,9 +377,12 @@
                         <td>{{ item.categoria.nome }}</td>
                         <td>
                             <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
+                            {% if item.az %}
+                            <br><small class="text-muted">AZ: {{ item.az }}</small>
+                            {% endif %}
                         </td>
                         <td>
-                            <span class="badge badge-saldo {% if item.saldo > 100 %}bg-success{% else %}bg-warning{% endif %}">
+                            <span class="badge badge-saldo {% if item.saldo > 100 %}bg-success{% elif item.saldo > 0 %}bg-warning{% else %}bg-danger{% endif %}">
                                 {{ item.saldo|intcomma }}
                             </span>
                         </td>
@@ -345,7 +392,7 @@
                         </td>
                         <td>
                             {% if item.tratamento %}
-                                <span class="badge bg-info">{{ item.tratamento.nome }}</span>
+                                <span class="badge bg-info">{{ item.tratamento.nome|truncatechars:10 }}</span>
                             {% else %}
                                 <span class="badge bg-secondary">Sem Trat.</span>
                             {% endif %}
@@ -356,28 +403,39 @@
                             </span>
                         </td>
                         <td>
-                            {% if item.az %}
-                                {% with az_limpo=item.az|stringformat:"s" %}
-                                    {% if ".0" in az_limpo %}
-                                        <span class="badge bg-info text-dark">{{ az_limpo|slice:":-2" }}</span>
-                                    {% else %}
-                                        <span class="badge bg-info text-dark">{{ item.az }}</span>
-                                    {% endif %}
-                                {% endwith %}
+                            {% if item.cliente %}
+                                <span class="badge badge-cliente" title="{{ item.cliente }}">
+                                    <i class="fas fa-user-tag me-1"></i>{{ item.cliente|truncatechars:15 }}
+                                </span>
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         <td>
-                            <small>{{ item.conferente.first_name }}</small>
+                            {% if item.empresa %}
+                                <span class="badge badge-empresa">{{ item.empresa|truncatechars:15 }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
                         </td>
                         <td>
-                            <small>{{ item.data_entrada|date:"d/m/Y" }}</small>
+                            {% if item.status == 'ATIVO' %}
+                                <span class="badge badge-status-ativo">{{ item.status }}</span>
+                            {% elif item.status == 'ESGOTADO' %}
+                                <span class="badge badge-status-esgotado">{{ item.status }}</span>
+                            {% elif item.status == 'BLOQUEADO' %}
+                                <span class="badge badge-status-bloqueado">{{ item.status }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ item.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ item.conferente.first_name|default:item.conferente.username }}</small>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="14" class="text-center py-4 text-muted">
+                        <td colspan="15" class="text-center py-4 text-muted">
                             <i class="fa-solid fa-inbox fa-2x mb-2 d-block"></i>
                             Nenhum item encontrado em estoque
                         </td>
@@ -475,7 +533,7 @@
 
 <!-- Modais -->
 <div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">
@@ -485,19 +543,38 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted mb-3">Escolha o formato para exportação:</p>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success">
-                        <i class="fa-solid fa-file-excel me-2"></i>Exportar para Excel
-                    </a>
-                    <a href="{% url 'sapp:exportar_estoque_pdf' %}" class="btn btn-danger">
-                        <i class="fa-solid fa-file-pdf me-2"></i>Exportar para PDF
-                    </a>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card h-100 border-success">
+                            <div class="card-body text-center">
+                                <i class="fa-solid fa-file-excel fa-3x text-success mb-3"></i>
+                                <h5 class="card-title">Exportar para Excel</h5>
+                                <p class="card-text text-muted small">Exporta todos os dados com formatação completa</p>
+                                <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success w-100">
+                                    <i class="fa-solid fa-download me-2"></i>Baixar Excel
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100 border-danger">
+                            <div class="card-body text-center">
+                                <i class="fa-solid fa-file-pdf fa-3x text-danger mb-3"></i>
+                                <h5 class="card-title">Exportar para PDF</h5>
+                                <p class="card-text text-muted small">Relatório formatado para impressão</p>
+                                <a href="{% url 'sapp:exportar_estoque_pdf' %}" class="btn btn-danger w-100">
+                                    <i class="fa-solid fa-download me-2"></i>Baixar PDF
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="mt-3">
-                    <small class="text-muted">
+                    <div class="alert alert-info">
                         <i class="fa-solid fa-circle-info me-1"></i>
-                        A planilha exportada contém todos os campos necessários para reimportação.
-                    </small>
+                        <strong>Inclui todos os campos:</strong> Lote, Produto, Cultivar, Peneira, Categoria, Endereço, Saldo, 
+                        Peso Unitário, Peso Total, Tratamento, Embalagem, Cliente, Empresa, AZ, Status, Conferente, Data Entrada, Observações.
+                    </div>
                 </div>
             </div>
         </div>
@@ -505,7 +582,7 @@
 </div>
 
 <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">
@@ -516,15 +593,36 @@
             <div class="modal-body">
                 <form id="importForm" enctype="multipart/form-data">
                     {% csrf_token %}
-                    <div class="mb-3">
+                    <div class="mb-4">
                         <label class="form-label fw-medium">Selecione o arquivo Excel</label>
-                        <input type="file" class="form-control" name="excel_file" accept=".xlsx, .xls" required>
-                        <div class="form-text">Use a planilha exportada deste sistema para garantir compatibilidade</div>
+                        <div class="input-group">
+                            <input type="file" class="form-control" name="excel_file" accept=".xlsx, .xls" required>
+                            <button class="btn btn-outline-primary" type="button" onclick="document.getElementById('downloadTemplate').click()">
+                                <i class="fa-solid fa-file-download me-1"></i>Template
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Use a planilha exportada deste sistema ou 
+                            <a href="#" onclick="document.getElementById('downloadTemplate').click()">baixe o template</a>
+                        </div>
+                        <a id="downloadTemplate" href="{% url 'sapp:exportar_estoque_excel' %}" style="display: none;"></a>
                     </div>
+                    
                     <div class="alert alert-info">
                         <i class="fa-solid fa-lightbulb me-2"></i>
-                        <strong>Modo Incremental:</strong> Os lotes existentes serão atualizados e novos lotes serão criados. 
-                        Nenhum lote será removido do sistema.
+                        <strong>Modo Incremental:</strong> 
+                        <ul class="mb-0 mt-1">
+                            <li>Novos lotes serão criados</li>
+                            <li>Lotes existentes serão atualizados</li>
+                            <li>Nenhum lote será removido do sistema</li>
+                            <li>O campo <strong>cliente</strong> será mantido nas transferências</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                        <strong>Importante:</strong> Certifique-se de que a planilha contenha as colunas necessárias, 
+                        incluindo o novo campo <strong>Cliente</strong>.
                     </div>
                 </form>
             </div>
@@ -616,7 +714,7 @@ function updatePageSize(pageSize) {
     window.location.href = currentUrl.toString();
 }
 
-// Função para remover .0 de números
+// Função para limpar decimal
 function limparDecimal(valor) {
     if (valor === null || valor === undefined || valor === '') return '';
     
@@ -672,18 +770,18 @@ function setupSearch() {
 
 // Utilitários
 function showAlert(message, type) {
-    // Remover alertas existentes
     const existingAlerts = document.querySelectorAll('.alert-dismissible');
     existingAlerts.forEach(alert => alert.remove());
     
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3 z-3`;
+    alertDiv.style.minWidth = '400px';
     alertDiv.innerHTML = `
         ${message}
         <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
     `;
     
-    document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.container-fluid').firstChild);
+    document.body.appendChild(alertDiv);
     
     setTimeout(() => {
         if (alertDiv.parentElement) alertDiv.remove();
@@ -778,27 +876,35 @@ function showPreviewModal(data) {
     const content = document.getElementById('previewContent');
     let html = `
         <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card bg-light">
+            <div class="col-md-3">
+                <div class="card bg-light border-success">
                     <div class="card-body text-center">
                         <h4 class="text-success">${data.comparacao.resumo.novos}</h4>
                         <small>Novos Lotes</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card bg-light">
+            <div class="col-md-3">
+                <div class="card bg-light border-warning">
                     <div class="card-body text-center">
                         <h4 class="text-warning">${data.comparacao.resumo.atualizados}</h4>
                         <small>Atualizações</small>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card bg-light">
+            <div class="col-md-3">
+                <div class="card bg-light border-info">
                     <div class="card-body text-center">
                         <h4 class="text-info">${data.comparacao.resumo.iguais}</h4>
                         <small>Sem Alteração</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h4 class="text-primary">${data.processed_count}</h4>
+                        <small>Total Processado</small>
                     </div>
                 </div>
             </div>
@@ -824,12 +930,12 @@ function showPreviewModal(data) {
                         <tr>
                             <th width="40"><input type="checkbox" id="selectAllNew" checked onchange="toggleAll(this.checked, 'new')"></th>
                             <th>Lote</th>
-                            <th>Produto</th>
+                            <th>Cliente</th>
                             <th>Cultivar</th>
                             <th>Peneira</th>
                             <th>Endereço</th>
                             <th>Saldo</th>
-                            <th>AZ</th>
+                            <th>Embalagem</th>
                         </tr>
                     </thead>
                     <tbody>`;
@@ -840,12 +946,12 @@ function showPreviewModal(data) {
                 <tr>
                     <td><input type="checkbox" class="modification-check" data-type="new" data-index="${index}" checked></td>
                     <td><strong class="text-primary">${item.lote}</strong></td>
-                    <td>${item.dados.produto || ''}</td>
+                    <td><span class="badge bg-purple text-white">${item.dados.cliente || ''}</span></td>
                     <td>${item.dados.cultivar || ''}</td>
                     <td>${item.dados.peneira || ''}</td>
                     <td><span class="badge bg-light text-dark border">${item.endereco}</span></td>
                     <td><span class="badge bg-success">${item.dados.saldo || 0}</span></td>
-                    <td><span class="badge bg-info">${limparDecimal(item.dados.az) || ''}</span></td>
+                    <td><span class="badge ${item.dados.embalagem === 'BAG' ? 'bg-primary' : 'bg-secondary'}">${item.dados.embalagem || 'BAG'}</span></td>
                 </tr>`;
         });
         
@@ -865,30 +971,55 @@ function showPreviewModal(data) {
                         <tr>
                             <th width="40"><input type="checkbox" id="selectAllUpdates" checked onchange="toggleAll(this.checked, 'update')"></th>
                             <th>Lote</th>
+                            <th>Cliente</th>
                             <th>Endereço</th>
                             <th>Saldo Antigo → Novo</th>
                             <th>AZ</th>
-                            <th>Ação</th>
+                            <th>Mudanças</th>
                         </tr>
                     </thead>
                     <tbody>`;
         
         data.comparacao.lotes_alterados.forEach((item, index) => {
             selectedModifications.add(`update_${index}`);
+            const clienteNovo = item.dados_novos.cliente || '';
+            const clienteAntigo = item.dados_atuais.cliente || '';
+            const clienteDiferente = clienteNovo !== clienteAntigo && clienteNovo !== '';
+            
             html += `
                 <tr>
                     <td><input type="checkbox" class="modification-check" data-type="update" data-index="${index}" checked></td>
                     <td><strong class="text-primary">${item.lote}</strong></td>
-                    <td><span class="badge bg-light text-dark border">${item.endereco}</span>
-                        ${item.endereco_original ? `<br><small class="text-muted">Ant: ${item.endereco_original}</small>` : ''}</td>
+                    <td>
+                        ${clienteDiferente ? 
+                            `<div>
+                                <span class="badge bg-secondary">${clienteAntigo || 'Nenhum'}</span> 
+                                <i class="fa-solid fa-arrow-right mx-1 text-muted"></i>
+                                <span class="badge bg-purple text-white">${clienteNovo}</span>
+                            </div>` : 
+                            `<span class="badge bg-purple text-white">${clienteNovo || 'Nenhum'}</span>`
+                        }
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark border">${item.endereco}</span>
+                        ${item.endereco_original && item.endereco_original !== item.endereco ? 
+                            `<br><small class="text-muted">Ant: ${item.endereco_original}</small>` : ''}
+                    </td>
                     <td>
                         <span class="badge bg-secondary">${item.dados_atuais.saldo || 0}</span> 
                         <i class="fa-solid fa-arrow-right mx-2 text-muted"></i>
                         <span class="badge bg-success">${item.dados_novos.saldo || 0}</span>
                     </td>
-                    <td><span class="badge bg-info">${limparDecimal(item.dados_novos.az) || ''}</span>
-                        ${item.az_original ? `<br><small class="text-muted">Ant: ${limparDecimal(item.az_original)}</small>` : ''}</td>
-                    <td><span class="badge bg-warning">ATUALIZAR</span></td>
+                    <td>
+                        <span class="badge bg-info">${limparDecimal(item.dados_novos.az) || ''}</span>
+                        ${item.az_original && item.az_original !== item.dados_novos.az ? 
+                            `<br><small class="text-muted">Ant: ${limparDecimal(item.az_original)}</small>` : ''}
+                    </td>
+                    <td>
+                        <span class="badge bg-warning" title="${item.divergencias ? item.divergencias.join(', ') : ''}">
+                            ${item.divergencias ? item.divergencias.length : 0} mudanças
+                        </span>
+                    </td>
                 </tr>`;
         });
         
@@ -936,8 +1067,18 @@ function proceedToApproval() {
         <div class="alert alert-info">
             <h6><i class="fa-solid fa-info-circle me-2"></i>Resumo das Modificações</h6>
             <div class="row text-center mt-3">
-                <div class="col-6"><h4 class="text-success">${newCount}</h4><small>Novos Lotes</small></div>
-                <div class="col-6"><h4 class="text-warning">${updateCount}</h4><small>Atualizações</small></div>
+                <div class="col-6">
+                    <div class="p-3 bg-success bg-opacity-10 rounded">
+                        <h4 class="text-success">${newCount}</h4>
+                        <small>Novos Lotes</small>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-warning bg-opacity-10 rounded">
+                        <h4 class="text-warning">${updateCount}</h4>
+                        <small>Atualizações</small>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="alert alert-warning">
@@ -989,6 +1130,7 @@ async function submitApproval() {
                 ...item.dados, 
                 lote: item.lote, 
                 endereco: item.endereco,
+                cliente: item.dados.cliente || '', // INCLUIR CLIENTE
                 cultivar_id: item.dados.cultivar_id,
                 peneira_id: item.dados.peneira_id, 
                 categoria_id: item.dados.categoria_id,
@@ -1001,6 +1143,7 @@ async function submitApproval() {
                 ...item.dados_novos, 
                 lote: item.lote, 
                 endereco: item.endereco,
+                cliente: item.dados_novos.cliente || '', // INCLUIR CLIENTE
                 dados_atuais: item.dados_atuais
             });
         }
@@ -1106,42 +1249,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-
-
-
-document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".toggle-collapse").forEach(btn => {
-        btn.addEventListener("click", function () {
-            const targetId = this.getAttribute("data-bs-target");
-            const target = document.querySelector(targetId);
-            const icon = this.querySelector("i");
-
-            // Fecha todos os outros
-            document.querySelectorAll(".collapse.show").forEach(open => {
-                if (open !== target) {
-                    bootstrap.Collapse.getOrCreateInstance(open).hide();
-                    const btnIcon = document.querySelector(
-                        `[data-bs-target="#${open.id}"] i`
-                    );
-                    if (btnIcon) btnIcon.classList.remove("rotate");
-                }
-            });
-
-            // Toggle do atual
-            const instance = bootstrap.Collapse.getOrCreateInstance(target);
-            if (target.classList.contains("show")) {
-                instance.hide();
-                icon.classList.remove("rotate");
-            } else {
-                instance.show();
-                icon.classList.add("rotate");
-            }
-        });
-    });
-});
-
-
-
 // Garantir que as funções estejam disponíveis globalmente
 window.updatePageSize = updatePageSize;
 window.performSearch = performSearch;
@@ -1149,6 +1256,13 @@ window.previewImport = previewImport;
 window.proceedToApproval = proceedToApproval;
 window.submitApproval = submitApproval;
 window.toggleAll = toggleAll;
+window.showAlert = showAlert;
 
 </script>
+
+<style>
+    .bg-purple {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%) !important;
+    }
+</style>
 {% endblock %}
