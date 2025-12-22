@@ -1,4 +1,3 @@
-
 import environ
 import os
 from pathlib import Path
@@ -13,10 +12,10 @@ environ.Env.read_env()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: não exponha isso em produção!
-SECRET_KEY = env('DJANGO_SECRET_KEY', default='sua-chave-secreta-provisoria-aqui')
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-sua-chave-secreta-provisoria-aqui')
 
 # SECURITY WARNING: não execute com debug ativado em produção!
-DEBUG = env.bool('DJANGO_DEBUG', default=False)
+DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1', 'tiagorve2.pythonanywhere.com'])
 
@@ -34,17 +33,15 @@ INSTALLED_APPS = [
     'django_filters',
     'widget_tweaks',
     
+    # Celery
+    'django_celery_results',
+    
     # Nossa aplicação
     'sapp',
-    
-    # Performance e monitoramento (opcional)
-    # 'django_prometheus',
 ]
 
 # ========== MIDDLEWARE ==========
 MIDDLEWARE = [
-    # 'django_prometheus.middleware.PrometheusBeforeMiddleware',  # Se usar Prometheus
-    
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Para servir arquivos estáticos em produção
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -58,8 +55,6 @@ MIDDLEWARE = [
     'sapp.middleware.AutoLogoutMiddleware',
     'sapp.middleware.Smart404FallbackMiddleware',
     'sapp.middleware.ForcePasswordChangeMiddleware',
-    
-    # 'django_prometheus.middleware.PrometheusAfterMiddleware',  # Se usar Prometheus
 ]
 
 # ========== AUTO LOGOUT ==========
@@ -88,9 +83,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'sementes.wsgi.application'
 
 # ========== BANCO DE DADOS POSTGRESQL ==========
-# CONFIGURAÇÃO PARA PRODUÇÃO (Easypanel)
-# ========== BANCO DE DADOS POSTGRESQL ==========
-# CONFIGURAÇÃO SIMPLIFICADA QUE SEMPRE FUNCIONA
+# CONFIGURAÇÃO SIMPLIFICADA
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -99,20 +92,25 @@ DATABASES = {
         'PASSWORD': env('DATABASE_PASSWORD', default=''),
         'HOST': env('DATABASE_HOST', default='localhost'),
         'PORT': env('DATABASE_PORT', default='5432'),
-        # Remova completamente a seção OPTIONS por enquanto
-        # 'OPTIONS': {},
+        # Configurações otimizadas
+        'CONN_MAX_AGE': 60,  # Conexões persistentes por 60 segundos
+        'CONN_HEALTH_CHECKS': True,
     }
 }
 
+# Fallback para SQLite se PostgreSQL não estiver disponível
+if not env.bool('USE_POSTGRESQL', default=True):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # ========== VALIDAÇÕES DE SENHA ==========
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-        'OPTIONS': {
-            'user_attributes': ('username', 'email', 'first_name'),
-            'max_similarity': 0.7,
-        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
@@ -155,7 +153,8 @@ LOGIN_URL = 'sapp:login'
 LOGIN_REDIRECT_URL = 'sapp:dashboard'
 LOGOUT_REDIRECT_URL = 'sapp:login'
 
-# Configurações de sessão
+# Configurações de sessão (usando banco de dados para evitar problemas com Redis)
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # IMPORTANTE: Usando DB em vez de cache
 SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=1209600)  # 2 semanas
 SESSION_EXPIRE_AT_BROWSER_CLOSE = env.bool('SESSION_EXPIRE_AT_BROWSER_CLOSE', default=False)
 SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=not DEBUG)
@@ -183,9 +182,9 @@ if not DEBUG:
     X_FRAME_OPTIONS = 'DENY'
 
 # ========== CELERY (TAREFAS ASSÍNCRONAS) ==========
-# Configuração para usar PostgreSQL como backend do Celery
-CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='django-db')  # Usa o próprio PostgreSQL
+# Configuração simplificada - usando banco de dados como backend
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='django://')  # Usa Django como broker
+CELERY_RESULT_BACKEND = 'django-db'  # Usa o próprio PostgreSQL para resultados
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -193,10 +192,27 @@ CELERY_TIMEZONE = 'America/Sao_Paulo'
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutos
 CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60  # 25 minutos
+CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=True)  # Executa sincrono se True
+CELERY_TASK_EAGER_PROPAGATES = True
 
-
+# ========== CACHE ==========
+# Cache simples usando memória local (evita problemas com Redis)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'sementes-cache',
+        'TIMEOUT': 300,  # 5 minutos
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+        }
+    }
+}
 
 # ========== LOGGING ==========
+# Cria diretório de logs se não existir
+LOG_DIR = BASE_DIR / 'logs'
+LOG_DIR.mkdir(exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -209,6 +225,11 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
+        'django.server': {
+            '()': 'django.utils.log.ServerFormatter',
+            'format': '[{server_time}] {message}',
+            'style': '{',
+        }
     },
     'handlers': {
         'console': {
@@ -217,21 +238,43 @@ LOGGING = {
         },
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': BASE_DIR / 'logs' / 'django.log',
+            'filename': LOG_DIR / 'django.log',
             'maxBytes': 1024 * 1024 * 5,  # 5 MB
             'backupCount': 5,
             'formatter': 'verbose',
         },
+        'error_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_DIR / 'errors.log',
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+            'level': 'ERROR',
+        },
+        'django.server': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'django.server',
+        },
     },
     'loggers': {
         'django': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'file', 'error_file'],
             'level': env('DJANGO_LOG_LEVEL', default='INFO'),
-            'propagate': True,
+            'propagate': False,
+        },
+        'django.server': {
+            'handlers': ['django.server'],
+            'level': 'INFO',
+            'propagate': False,
         },
         'sapp': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console', 'file', 'error_file'],
             'level': env('APP_LOG_LEVEL', default='DEBUG'),
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console', 'file', 'error_file'],
+            'level': env('CELERY_LOG_LEVEL', default='INFO'),
             'propagate': False,
         },
     },
@@ -247,22 +290,6 @@ APP_VERSION = '1.0.1'
 MAX_UPLOAD_SIZE = env.int('MAX_UPLOAD_SIZE', default=10485760)  # 10MB
 ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp']
 
-# ========== CACHE ==========
-# Configuração de cache para produção (opcional)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': env('REDIS_URL', default='redis://localhost:6379/1'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
-    }
-}
-
-# Cache de sessão (se quiser usar Redis para sessões também)
-SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
-SESSION_CACHE_ALIAS = 'default'
-
 # ========== CONFIGURAÇÕES PARA EASYPANEL ==========
 # O Easypanel pode injetar variáveis específicas
 EASYPANEL = env.bool('EASYPANEL', default=False)
@@ -273,5 +300,38 @@ if EASYPANEL:
     STATIC_ROOT = env('STATIC_ROOT', default=STATIC_ROOT)
     MEDIA_ROOT = env('MEDIA_ROOT', default=MEDIA_ROOT)
     
-    # Logs no formato que o Easypanel espera
-    LOGGING['handlers']['console']['class'] = 'logging.StreamHandler'
+    # Força HTTPS em produção
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # Configurações de banco de dados específicas do Easypanel
+    if env('DATABASE_URL', default=None):
+        # Converte DATABASE_URL para configuração do Django
+        DATABASES['default'] = env.db('DATABASE_URL')
+    
+    # Configurações de Redis se disponível
+    if env('REDIS_URL', default=None):
+        try:
+            CACHES['default'] = {
+                'BACKEND': 'django_redis.cache.RedisCache',
+                'LOCATION': env('REDIS_URL'),
+                'OPTIONS': {
+                    'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                    'CONNECTION_POOL_KWARGS': {
+                        'max_connections': 50,
+                    }
+                },
+                'KEY_PREFIX': 'sementes',
+            }
+            # Opcional: usar Redis para sessões se estiver funcionando
+            # SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+            # SESSION_CACHE_ALIAS = 'default'
+            
+            # Configurar Celery com Redis se disponível
+            CELERY_BROKER_URL = env('REDIS_URL')
+            CELERY_RESULT_BACKEND = env('REDIS_URL')
+            CELERY_TASK_ALWAYS_EAGER = False
+        except Exception as e:
+            print(f"Redis não configurado: {e}")
+            # Mantém configurações locais se Redis falhar
+
