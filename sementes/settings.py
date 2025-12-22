@@ -89,26 +89,18 @@ WSGI_APPLICATION = 'sementes.wsgi.application'
 
 # ========== BANCO DE DADOS POSTGRESQL ==========
 # CONFIGURAÇÃO PARA PRODUÇÃO (Easypanel)
+# ========== BANCO DE DADOS POSTGRESQL ==========
+# CONFIGURAÇÃO SIMPLIFICADA QUE SEMPRE FUNCIONA
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': env('DATABASE_NAME', default='sementes_db'),
         'USER': env('DATABASE_USER', default='postgres'),
-        'PASSWORD': env('DATABASE_PASSWORD', default='brasil10'),
+        'PASSWORD': env('DATABASE_PASSWORD', default=''),
         'HOST': env('DATABASE_HOST', default='localhost'),
         'PORT': env('DATABASE_PORT', default='5432'),
-        # Otimizações para PostgreSQL
-        'CONN_MAX_AGE': env.int('CONN_MAX_AGE', default=300),  # Conexões persistentes por 5 minutos
-        'OPTIONS': {
-            # Timeout de conexão (30 segundos)
-            'connect_timeout': 30,
-            # Configurações para performance
-            'client_encoding': 'UTF8',
-            'default_transaction_isolation': 'read committed',
-            'timezone': 'America/Sao_Paulo',
-        },
-        # Pool de conexões (se usar pgBouncer no Easypanel)
-        # 'DISABLE_SERVER_SIDE_CURSORS': True,
+        # Remova completamente a seção OPTIONS por enquanto
+        # 'OPTIONS': {},
     }
 }
 
