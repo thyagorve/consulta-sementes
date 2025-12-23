@@ -48,9 +48,11 @@ class Configuracao(models.Model):
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
 
+# No models.py, atualize o modelo Estoque:
+
 class Estoque(models.Model):
     lote = models.CharField(max_length=50)
-    produto = models.CharField(max_length=100, blank=True, null=True)
+    produto = models.CharField(max_length=100, blank=True, null=True, default='')
     cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT)
     peneira = models.ForeignKey(Peneira, on_delete=models.PROTECT)
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
@@ -60,21 +62,22 @@ class Estoque(models.Model):
     saida = models.IntegerField(default=0)
     saldo = models.IntegerField(default=0)
     conferente = models.ForeignKey(User, on_delete=models.PROTECT)
-    origem_destino = models.CharField(max_length=255, blank=True, null=True)
+    origem_destino = models.CharField(max_length=255, blank=True, null=True, default='')
     data_entrada = models.DateTimeField(auto_now_add=True)
     data_ultima_saida = models.DateTimeField(null=True, blank=True)
     data_ultima_movimentacao = models.DateTimeField(auto_now=True)
     especie = models.CharField(max_length=50, default='SOJA')
-    empresa = models.CharField(max_length=100, blank=True, null=True)
+    empresa = models.CharField(max_length=100, blank=True, null=True, default='')
     embalagem = models.CharField(max_length=10, choices=[('SC', 'Saco'), ('BAG', 'Big Bag')], default='BAG')
-    peso_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    peso_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    az = models.CharField(max_length=20, blank=True, null=True)
-    observacao = models.TextField(blank=True, null=True)
+    peso_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    peso_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+    az = models.CharField(max_length=20, blank=True, null=True, default='')
+    observacao = models.TextField(blank=True, null=True, default='')
     cliente = models.CharField(
         max_length=255, 
         blank=True, 
         null=True,
+        default='',
         verbose_name="Cliente/Dono do Bag"
     )
     status = models.CharField(max_length=20, 
@@ -97,48 +100,12 @@ class Estoque(models.Model):
         
         # Calcular peso total
         if self.peso_unitario and self.saldo:
-            self.peso_total = Decimal(self.saldo) * Decimal(self.peso_unitario)
+            try:
+                self.peso_total = Decimal(str(self.saldo)) * Decimal(str(self.peso_unitario))
+            except:
+                self.peso_total = Decimal('0.00')
         
         super().save(*args, **kwargs)
-    
-    def registrar_saida(self, quantidade, destino, usuario, observacao=''):
-        """Método para registrar saída de forma controlada"""
-        if quantidade <= 0:
-            raise ValueError("Quantidade deve ser maior que zero")
-        
-        if quantidade > self.saldo:
-            raise ValueError(f"Saldo insuficiente. Disponível: {self.saldo}")
-        
-        # Salvar estado anterior
-        saldo_anterior = self.saldo
-        
-        # Atualizar
-        self.saida += quantidade
-        self.saldo = self.entrada - self.saida
-        self.data_ultima_saida = timezone.now()
-        
-        # Recalcular peso
-        if self.peso_unitario:
-            self.peso_total = Decimal(self.saldo) * Decimal(self.peso_unitario)
-        
-        self.save()
-        
-        # Registrar histórico
-        HistoricoMovimentacao.objects.create(
-            estoque=self,
-            usuario=usuario,
-            tipo='Saída Controlada',
-            descricao=(
-                f"<b>SAÍDA SISTEMÁTICA</b><br>"
-                f"<b>Quantidade:</b> {quantidade}<br>"
-                f"<b>Destino:</b> {destino}<br>"
-                f"<b>Saldo anterior:</b> {saldo_anterior}<br>"
-                f"<b>Novo saldo:</b> {self.saldo}<br>"
-                f"<b>Observação:</b> {observacao}"
-            )
-        )
-        
-        return self
     
     def __str__(self):
         return f"{self.lote} - {self.cultivar.nome} ({self.saldo} unidades)"

@@ -2234,58 +2234,208 @@ def transferir(request, id):
 
 @login_required
 def nova_entrada(request):
+    """Registra uma nova entrada no estoque - VERSÃO SIMPLIFICADA E CORRIGIDA"""
     if request.method == 'POST':
-        form = NovaEntradaForm(request.POST, request.FILES)
-        if form.is_valid():
+        try:
+            print("🔔 [NOVA ENTRADA] Iniciando processamento...")
+            
+            # Captura dos dados básicos
+            lote = request.POST.get('lote', '').strip()
+            produto = request.POST.get('produto', '').strip()
+            endereco = request.POST.get('endereco', '').strip().upper()
+            quantidade = request.POST.get('entrada', '0').strip()
+            especie = request.POST.get('especie', 'SOJA').strip()
+            cliente = request.POST.get('cliente', '').strip()
+            
+            # Validações básicas
+            erros = []
+            if not lote:
+                erros.append("O número do lote é obrigatório.")
+            if not endereco:
+                erros.append("O endereço é obrigatório.")
+            
             try:
-                with transaction.atomic():
-                    novo_obj = form.save(commit=False)
-                    novo_obj.conferente = request.user
-                    novo_obj.especie = request.POST.get('especie', 'SOJA')
-                    novo_obj.cliente = request.POST.get('cliente', '')  # NOVO
-                    lote_existente = Estoque.objects.filter(
-                        lote=novo_obj.lote,
-                        endereco=novo_obj.endereco,
-                        cultivar=novo_obj.cultivar,
-                        peneira=novo_obj.peneira,
-                        categoria=novo_obj.categoria,
-                        tratamento=novo_obj.tratamento
-                    ).first()
-
-                    historico = None
-                    if lote_existente:
-                        lote_existente.entrada += novo_obj.entrada
-                        lote_existente.conferente = request.user
-                        lote_existente.save() # Recalcula saldo e peso no save() do model
-                        
-                        historico = HistoricoMovimentacao.objects.create(
-                            estoque=lote_existente,
-                            usuario=request.user,
-                            tipo='Entrada (Soma)',
-                            descricao=f"Adicionado <b>{novo_obj.entrada}</b> unid. (Saldo anterior: {lote_existente.saldo - novo_obj.entrada})"
+                quantidade_int = int(quantidade)
+                if quantidade_int <= 0:
+                    erros.append("A quantidade deve ser maior que zero.")
+            except ValueError:
+                erros.append("Quantidade inválida.")
+            
+            # Validar objetos relacionados
+            try:
+                cultivar_id = request.POST.get('cultivar')
+                if not cultivar_id:
+                    erros.append("O cultivar é obrigatório.")
+                else:
+                    cultivar = Cultivar.objects.get(id=cultivar_id)
+            except (ValueError, Cultivar.DoesNotExist):
+                erros.append("Cultivar inválido.")
+            
+            try:
+                peneira_id = request.POST.get('peneira')
+                if not peneira_id:
+                    erros.append("A peneira é obrigatória.")
+                else:
+                    peneira = Peneira.objects.get(id=peneira_id)
+            except (ValueError, Peneira.DoesNotExist):
+                erros.append("Peneira inválida.")
+            
+            try:
+                categoria_id = request.POST.get('categoria')
+                if not categoria_id:
+                    erros.append("A categoria é obrigatória.")
+                else:
+                    categoria = Categoria.objects.get(id=categoria_id)
+            except (ValueError, Categoria.DoesNotExist):
+                erros.append("Categoria inválida.")
+            
+            # Tratamento é opcional
+            tratamento_id = request.POST.get('tratamento')
+            tratamento = None
+            if tratamento_id:
+                try:
+                    tratamento = Tratamento.objects.get(id=tratamento_id)
+                except (ValueError, Tratamento.DoesNotExist):
+                    pass  # Tratamento é opcional, não é erro
+            
+            # Processar peso unitário
+            peso_raw = request.POST.get('peso_unitario', '0')
+            try:
+                peso_raw = str(peso_raw).replace(',', '.')
+                peso_unitario = Decimal(peso_raw)
+            except (InvalidOperation, ValueError):
+                peso_unitario = Decimal('0.00')
+            
+            # Outros campos
+            empresa = request.POST.get('empresa', '').strip()
+            origem_destino = request.POST.get('origem_destino', '').strip()
+            az = request.POST.get('az', '').strip()
+            observacao = request.POST.get('observacao', '').strip()
+            embalagem = request.POST.get('embalagem', 'BAG').strip()
+            
+            # Se houver erros, mostrar todos
+            if erros:
+                for erro in erros:
+                    messages.error(request, f"❌ {erro}")
+                return redirect('sapp:lista_estoque')
+            
+            # Verificar se já existe lote com mesmo endereço
+            lote_existente = Estoque.objects.filter(
+                lote=lote,
+                endereco=endereco,
+                cultivar=cultivar
+            ).first()
+            
+            with transaction.atomic():
+                historico = None
+                
+                if lote_existente:
+                    print(f"✅ [NOVA ENTRADA] Lote existente encontrado: {lote}")
+                    # Somar à entrada existente
+                    entrada_anterior = lote_existente.entrada
+                    saldo_anterior = lote_existente.saldo
+                    
+                    lote_existente.entrada += quantidade_int
+                    lote_existente.conferente = request.user
+                    
+                    # Atualizar outros campos se fornecidos
+                    if empresa:
+                        lote_existente.empresa = empresa
+                    if produto:
+                        lote_existente.produto = produto
+                    if cliente:
+                        lote_existente.cliente = cliente
+                    if peso_unitario > 0:
+                        lote_existente.peso_unitario = peso_unitario
+                    if origem_destino:
+                        lote_existente.origem_destino = origem_destino
+                    if az:
+                        lote_existente.az = az
+                    if observacao:
+                        if lote_existente.observacao:
+                            lote_existente.observacao += f"\n\n[ENTRADA ADICIONAL {timezone.now().strftime('%d/%m/%Y %H:%M')}]: {observacao}"
+                        else:
+                            lote_existente.observacao = f"[ENTRADA ADICIONAL {timezone.now().strftime('%d/%m/%Y %H:%M')}]: {observacao}"
+                    
+                    # Salvar para recalcular saldo automaticamente
+                    lote_existente.save()
+                    
+                    # Criar histórico
+                    historico = HistoricoMovimentacao.objects.create(
+                        estoque=lote_existente,
+                        usuario=request.user,
+                        tipo='Entrada (Adição)',
+                        descricao=(
+                            f"<b>ENTRADA ADICIONAL</b><br>"
+                            f"<b>Quantidade adicionada:</b> {quantidade_int}<br>"
+                            f"<b>Entrada anterior:</b> {entrada_anterior}<br>"
+                            f"<b>Saldo anterior:</b> {saldo_anterior}<br>"
+                            f"<b>Novo saldo:</b> {lote_existente.saldo}<br>"
+                            f"<b>Produto:</b> {produto or 'Não informado'}<br>"
+                            f"<b>Observação:</b> {observacao or 'Nenhuma'}"
                         )
-                        msg = f"✅ Entrada somada ao lote existente!"
-                    else:
-                        novo_obj.save()
-                        historico = HistoricoMovimentacao.objects.create(
-                            estoque=novo_obj,
-                            usuario=request.user,
-                            tipo='Entrada Inicial',
-                            descricao=f"Entrada inicial de <b>{novo_obj.entrada}</b> unid."
+                    )
+                    
+                    msg = f"✅ {quantidade_int} unidades adicionadas ao lote existente {lote}!"
+                    
+                else:
+                    print(f"✅ [NOVA ENTRADA] Criando novo lote: {lote}")
+                    # Criar novo lote
+                    novo_item = Estoque.objects.create(
+                        lote=lote,
+                        produto=produto,
+                        cultivar=cultivar,
+                        peneira=peneira,
+                        categoria=categoria,
+                        tratamento=tratamento,
+                        endereco=endereco,
+                        entrada=quantidade_int,
+                        saida=0,
+                        saldo=quantidade_int,  # Será recalculado no save()
+                        conferente=request.user,
+                        origem_destino=origem_destino,
+                        especie=especie,
+                        empresa=empresa,
+                        embalagem=embalagem,
+                        peso_unitario=peso_unitario,
+                        az=az,
+                        cliente=cliente,
+                        observacao=observacao or f"Criado via sistema em {timezone.now().strftime('%d/%m/%Y %H:%M')}"
+                    )
+                    
+                    # Criar histórico
+                    historico = HistoricoMovimentacao.objects.create(
+                        estoque=novo_item,
+                        usuario=request.user,
+                        tipo='Entrada (Novo)',
+                        descricao=(
+                            f"<b>NOVO LOTE CRIADO</b><br>"
+                            f"<b>Quantidade inicial:</b> {quantidade_int}<br>"
+                            f"<b>Endereço:</b> {endereco}<br>"
+                            f"<b>Produto:</b> {produto or 'Não informado'}<br>"
+                            f"<b>Cliente:</b> {cliente or 'Não informado'}<br>"
+                            f"<b>Observação:</b> {observacao or 'Nenhuma'}"
                         )
-                        msg = f"✅ Novo lote criado!"
-
-                    # SALVAR MÚLTIPLAS FOTOS
-                    fotos = request.FILES.getlist('fotos') # Nome do input deve ser 'fotos'
-                    for f in fotos:
-                        FotoMovimentacao.objects.create(historico=historico, arquivo=f)
-
-                    messages.success(request, msg)
-
-            except Exception as e:
-                messages.error(request, f"❌ Erro: {str(e)}")
-        else:
-            messages.error(request, "❌ Formulário inválido.")
+                    )
+                    
+                    msg = f"✅ Novo lote {lote} criado com {quantidade_int} unidades!"
+                
+                # Salvar fotos se houver
+                fotos = request.FILES.getlist('fotos')
+                if fotos and historico:
+                    for foto in fotos:
+                        FotoMovimentacao.objects.create(historico=historico, arquivo=foto)
+                        print(f"📸 Foto salva: {foto.name}")
+                
+                messages.success(request, msg)
+                print(f"✅ [NOVA ENTRADA] Concluído: {msg}")
+                
+        except Exception as e:
+            print(f"❌ [NOVA ENTRADA] Erro: {e}")
+            import traceback
+            print(f"🔍 Traceback: {traceback.format_exc()}")
+            messages.error(request, f"❌ Erro ao processar entrada: {str(e)}")
+    
     return redirect('sapp:lista_estoque')
 
 from django.db import transaction

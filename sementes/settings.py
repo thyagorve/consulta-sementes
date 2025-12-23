@@ -89,7 +89,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': env('DATABASE_NAME', default='sementes_db'),
         'USER': env('DATABASE_USER', default='postgres'),
-        'PASSWORD': env('DATABASE_PASSWORD', default=''),
+        'PASSWORD': env('DATABASE_PASSWORD', default='brasil10'),
         'HOST': env('DATABASE_HOST', default='localhost'),
         'PORT': env('DATABASE_PORT', default='5432'),
         # Configurações otimizadas

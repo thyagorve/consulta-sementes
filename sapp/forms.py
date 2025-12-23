@@ -1,60 +1,228 @@
+# forms.py
 from django import forms
-from .models import Estoque, Cultivar, Peneira, Categoria, Configuracao, Tratamento
+from django.core.exceptions import ValidationError
+from .models import Estoque, Cultivar, Peneira, Categoria, Tratamento, Configuracao
+from decimal import Decimal, InvalidOperation
 from django.contrib.auth.models import User
 
-# --- Entrada ---
 class NovaEntradaForm(forms.ModelForm):
     class Meta:
         model = Estoque
-        exclude = ['saida', 'saldo', 'peso_total', 'historico', 'conferente']
+        fields = [
+            'lote', 'produto', 'cultivar', 'peneira', 'categoria', 
+            'tratamento', 'endereco', 'entrada', 'embalagem', 
+            'peso_unitario', 'empresa', 'origem_destino', 'az',
+            'cliente', 'observacao'
+        ]
         widgets = {
-            'data_entrada': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'observacao': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+            'lote': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ex: ABC12345',
+                'required': True
+            }),
+            'produto': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Descrição do produto'
+            }),
+            'endereco': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Ex: P-01-02-03',
+                'required': True
+            }),
+            'entrada': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 1,
+                'required': True
+            }),
+            'peso_unitario': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '0.00'
+            }),
+            'empresa': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da empresa'
+            }),
+            'origem_destino': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Origem/Destino'
+            }),
+            'az': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Número do armazém'
+            }),
+            'cliente': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Cliente/Dono do bag'
+            }),
+            'observacao': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Observações importantes...'
+            }),
+            'cultivar': forms.Select(attrs={
+                'class': 'form-control',
+                'required': True
+            }),
+            'peneira': forms.Select(attrs={
+                'class': 'form-control',
+                'required': True
+            }),
+            'categoria': forms.Select(attrs={
+                'class': 'form-control',
+                'required': True
+            }),
+            'tratamento': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'embalagem': forms.Select(attrs={
+                'class': 'form-control'
+            }),
         }
+    
+    def clean_lote(self):
+        lote = self.cleaned_data.get('lote', '').strip()
+        if not lote:
+            raise ValidationError("O número do lote é obrigatório.")
+        return lote
+    
+    def clean_endereco(self):
+        endereco = self.cleaned_data.get('endereco', '').strip().upper()
+        if not endereco:
+            raise ValidationError("O endereço é obrigatório.")
+        return endereco
+    
+    def clean_entrada(self):
+        entrada = self.cleaned_data.get('entrada', 0)
+        if entrada <= 0:
+            raise ValidationError("A quantidade deve ser maior que zero.")
+        return entrada
+    
+    def clean_peso_unitario(self):
+        peso = self.cleaned_data.get('peso_unitario')
+        if peso:
+            try:
+                if isinstance(peso, str):
+                    peso = peso.replace(',', '.')
+                return Decimal(str(peso))
+            except (InvalidOperation, ValueError):
+                return Decimal('0.00')
+        return Decimal('0.00')
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        
+        # Verificar se já existe lote com mesmo endereço e cultivar
+        lote = cleaned_data.get('lote')
+        endereco = cleaned_data.get('endereco')
+        cultivar = cleaned_data.get('cultivar')
+        
+        if lote and endereco and cultivar:
+            existe = Estoque.objects.filter(
+                lote=lote,
+                endereco=endereco,
+                cultivar=cultivar
+            ).exists()
+            
+            if existe and not self.instance.pk:  # Só valida para novos
+                raise ValidationError(
+                    f"Já existe um lote '{lote}' no endereço '{endereco}' com o mesmo cultivar."
+                )
+        
+        return cleaned_data
 
 class ConfiguracaoForm(forms.ModelForm):
     class Meta:
         model = Configuracao
         fields = ['ocultar_esgotados']
-        widgets = {'ocultar_esgotados': forms.CheckboxInput(attrs={'class': 'form-check-input'})}
+        widgets = {
+            'ocultar_esgotados': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
 
-# --- Cadastros Auxiliares ---
 class CultivarForm(forms.ModelForm):
-    class Meta: model = Cultivar; fields = '__all__'
+    class Meta:
+        model = Cultivar
+        fields = ['nome']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome do cultivar',
+                'required': True
+            }),
+        }
 
 class PeneiraForm(forms.ModelForm):
-    class Meta: model = Peneira; fields = '__all__'
+    class Meta:
+        model = Peneira
+        fields = ['nome']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da peneira',
+                'required': True
+            }),
+        }
 
 class CategoriaForm(forms.ModelForm):
-    class Meta: model = Categoria; fields = '__all__'
+    class Meta:
+        model = Categoria
+        fields = ['nome']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome da categoria',
+                'required': True
+            }),
+        }
 
 class TratamentoForm(forms.ModelForm):
-    class Meta: model = Tratamento; fields = '__all__'
+    class Meta:
+        model = Tratamento
+        fields = ['nome']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome do tratamento',
+                'required': True
+            }),
+        }
 
-# --- Form para Adicionar Usuário (Login) ---
 class NovoConferenteUserForm(forms.Form):
-    username = forms.CharField(max_length=150, label="Login", widget=forms.TextInput(attrs={'class': 'form-control'}))
-    first_name = forms.CharField(max_length=150, label="Nome Completo", required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'usuarioconferente',
+            'required': True
+        })
+    )
+    first_name = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Nome do Conferente',
+            'required': True
+        })
+    )
 
-# --- Senha ---
 class MudarSenhaForm(forms.Form):
-    nova_senha = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}), label="Nova Senha")
-    confirmar_senha = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}), label="Confirmar Senha")
-
+    senha_atual = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        required=False
+    )
+    nova_senha = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+        min_length=8
+    )
+    confirmar_senha = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control'})
+    )
+    
     def clean(self):
         cleaned_data = super().clean()
-        s1 = cleaned_data.get("nova_senha")
-        s2 = cleaned_data.get("confirmar_senha")
-        if s1 and s2 and s1 != s2:
-            raise forms.ValidationError("As senhas não conferem.")
+        nova_senha = cleaned_data.get('nova_senha')
+        confirmar_senha = cleaned_data.get('confirmar_senha')
+        
+        if nova_senha != confirmar_senha:
+            raise forms.ValidationError("As senhas não coincidem.")
+        
         return cleaned_data
-
-# --- Ações ---
-class TransferenciaForm(forms.Form):
-    quantidade = forms.IntegerField(min_value=1, label="Quantidade")
-    novo_endereco = forms.CharField(max_length=50, label="Novo Endereço")
-
-class EdicaoForm(forms.ModelForm):
-    class Meta:
-        model = Estoque
-        fields = '__all__'
