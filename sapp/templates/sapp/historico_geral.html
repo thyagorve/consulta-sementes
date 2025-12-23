@@ -1,348 +1,585 @@
+<!-- sapp/templates/sapp/historico_geral.html -->
 {% extends 'sapp/base.html' %}
 {% load humanize %}
 
 {% block content %}
-<style>
 
+<!-- Bibliotecas Necessárias -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<style>
     :root {
         --primary-brown: #8B4513;
         --secondary-brown: #D2691E;
-        --success-green: #2E8B57;
-        --warning-orange: #A0522D;
-        --light-beige: #fff8dc;
-        --hover-gray: #f8f9fa;
+        --header-bg: linear-gradient(135deg, #2c3e50, #34495e);
+        --accent-color: #e67e22; /* Laranja suave */
     }
 
+    /* --- 1. Título e Card --- */
     .page-title {
-        background: linear-gradient(135deg, var(--primary-brown), #a05a2b);
-        color: white;
-        padding: 20px 15px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(139, 69, 19, 0.2);
-    }
-
-
-    .page-title-historic {
-        background: linear-gradient(135deg, var(--primary-brown), #a05a2b);
-        
-        padding: 20px 15px;
-        border-radius: 15px;
-        margin-bottom: 20px;
-        box-shadow: 0 6px 20px rgba(44, 62, 80, 0.3);
-        border-left: 5px solid #e74c3c;
-    }
-
-    .table-responsive {
-        border-radius: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        /* 🔥 CORREÇÃO: Adicionar scroll horizontal */
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch; /* Scroll suave no mobile */
-    }
-
-    /* Garantir que a tabela tenha largura mínima para forçar o scroll */
-    .table-responsive table {
-        min-width: 700px; /* Largura mínima para forçar scroll em mobile */
-        width: 100%;
-        margin-bottom: 0;
-    }
-
-    .bg-sub-header { 
-        background: linear-gradient(135deg, #2c3e50, #34495e);
-        color: white;
-        font-weight: bold;
-        border: none;
-        text-align: center;
-    }
-
-    .badge-entrada { background: linear-gradient(135deg, #28a745, #20c997); }
-    .badge-saida { background: linear-gradient(135deg, #dc3545, #e83e8c); }
-    .badge-transferencia { background: linear-gradient(135deg, #ffc107, #fd7e14); }
-    .badge-edicao { background: linear-gradient(135deg, #17a2b8, #6f42c1); }
-    .badge-exclusao { background: linear-gradient(135deg, #6c757d, #495057); }
-
-    .pagination-controls {
-        background: #f8f9fa;
+        background: white;
+        color: #333;
         padding: 15px;
         border-radius: 10px;
-        margin-top: 20px;
+        margin-bottom: 20px;
+        border-left: 5px solid var(--primary-brown);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
     }
 
-    /* RESPONSIVIDADE PARA CELULAR */
+    .page-title h1 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+        color: var(--primary-brown);
+    }
+
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    /* --- 2. Customização do DataTables (Paginação e Busca) --- */
+    .dataTables_wrapper {
+        padding: 0;
+    }
+
+    /* Barra de busca no topo */
+    .dataTables_filter {
+        padding: 15px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #eee;
+        margin-bottom: 0 !important;
+        text-align: right;
+    }
+
+    .dataTables_filter input {
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        padding: 6px 15px;
+        width: 250px;
+        transition: all 0.3s;
+        outline: none;
+    }
+
+    .dataTables_filter input:focus {
+        border-color: var(--primary-brown);
+        box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
+    }
+
+    /* Rodapé (Paginação e Info) */
+    .dt-footer-wrapper {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-top: 1px solid #eee;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .dataTables_info {
+        padding-top: 0 !important;
+        font-size: 0.85rem;
+        color: #666;
+    }
+
+    .dataTables_paginate .pagination {
+        margin: 0 !important;
+    }
+
+    .page-item.active .page-link {
+        background-color: var(--primary-brown) !important;
+        border-color: var(--primary-brown) !important;
+    }
+
+    .page-link {
+        color: var(--primary-brown);
+        border-radius: 4px;
+        margin: 0 2px;
+        border: none;
+        font-size: 0.85rem;
+    }
+
+    /* --- 3. Tabela e Cabeçalhos --- */
+    #tabelaHistorico {
+        margin: 0 !important;
+        width: 100% !important;
+        border-collapse: collapse;
+    }
+
+    #tabelaHistorico thead th {
+        background: var(--header-bg) !important;
+        color: white !important;
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 0 !important; /* Padding zero para o container interno controlar */
+        border: none;
+        height: 55px;
+        vertical-align: middle;
+    }
+
+    /* Container clicável do header */
+    .filter-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        height: 100%;
+        padding: 0 15px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .filter-header:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+
+    .filter-icon {
+        background: rgba(255,255,255,0.15);
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        font-size: 10px;
+        margin-left: 8px;
+    }
+
+    .filter-icon.active {
+        background: var(--accent-color);
+        color: white;
+        box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    }
+
+    #tabelaHistorico tbody td {
+        padding: 12px 15px;
+        font-size: 0.9rem;
+        vertical-align: middle;
+        border-bottom: 1px solid #f1f1f1;
+    }
+
+    /* --- 4. Menu Dropdown de Filtro (Estilo APP) --- */
+    .excel-filter-dropdown {
+        position: absolute;
+        z-index: 10000;
+        background: white;
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        width: 280px;
+        display: none;
+        font-family: 'Segoe UI', sans-serif;
+        overflow: hidden;
+        animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .excel-filter-header {
+        background: #f1f3f5;
+        padding: 10px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .filter-search-box {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+
+    .excel-filter-content {
+        max-height: 250px;
+        overflow-y: auto;
+        padding: 5px 0;
+    }
+
+    .filter-checkbox-item {
+        padding: 8px 15px;
+        transition: background 0.1s;
+    }
+
+    .filter-checkbox-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .filter-checkbox-item label {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        cursor: pointer;
+        font-size: 0.9rem;
+        color: #495057;
+        margin: 0;
+    }
+
+    .filter-checkbox-item input {
+        margin-right: 10px;
+        width: 16px;
+        height: 16px;
+        accent-color: var(--primary-brown);
+    }
+
+    .filter-buttons {
+        padding: 12px;
+        background: white;
+        border-top: 1px solid #f1f1f1;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+
+    .filter-buttons button {
+        font-size: 0.85rem;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+
+    /* --- 5. Mobile & Badges --- */
     @media (max-width: 768px) {
-        .page-title-historic {
-            padding: 15px 10px;
-            margin-bottom: 15px;
+        .page-title { flex-direction: column; text-align: center; gap: 10px; }
+        .dataTables_filter { text-align: center; }
+        .dataTables_filter input { width: 100%; }
+        .dt-footer-wrapper { justify-content: center; text-align: center; }
+        
+        .excel-filter-dropdown {
+            width: 90vw; /* Ocupa quase toda a tela no celular */
+            max-width: 350px;
         }
         
-        .page-title-historic h1 {
-            font-size: 1.5rem;
-        }
-        
-        .page-title-historic p {
-            font-size: 0.9rem;
-        }
-        
-        .pagination-controls {
-            flex-direction: column;
-            gap: 10px;
-            text-align: center;
-        }
-        
-        .table-responsive {
-            font-size: 0.8rem;
-            /* 🔥 Scroll mais visível no mobile */
-            border: 1px solid #dee2e6;
-        }
-        
-        .table-responsive table {
-            min-width: 650px; /* Ajuste para mobile */
-        }
-        
-        .table th,
-        .table td {
-            padding: 0.5rem;
-            white-space: nowrap; /* Impede quebra de linha */
-        }
-        
-        .badge {
-            font-size: 0.7rem;
-            padding: 0.3em 0.6em;
-        }
-        
-        /* Esconder colunas menos importantes no mobile */
-        .mobile-hidden {
-            display: none;
-        }
-        
-        .mobile-visible {
-            display: table-cell;
-        }
+        #tabelaHistorico thead th { font-size: 0.75rem; height: 50px; }
+        .filter-header { padding: 0 8px; }
     }
 
-    @media (max-width: 576px) {
-        .container-fluid {
-            padding-left: 5px;
-            padding-right: 5px;
-        }
-        
-        .table-responsive {
-            font-size: 0.75rem;
-            margin-left: -5px;
-            margin-right: -5px;
-        }
-        
-        .table-responsive table {
-            min-width: 600px; /* Menor largura para celulares muito pequenos */
-        }
-        
-        .table th,
-        .table td {
-            padding: 0.3rem;
-        }
-        
-        /* Layout vertical para informações compactas */
-        .mobile-compact {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        
-        .mobile-compact .badge {
-            align-self: center;
-        }
+    /* Cores das Badges */
+    .badge { font-weight: 500; letter-spacing: 0.5px; padding: 6px 10px; }
+    .badge-entrada { background-color: #27ae60; }
+    .badge-saida { background-color: #c0392b; }
+    .badge-transferencia { background-color: #f39c12; color: white; }
+    .badge-edicao { background-color: #2980b9; }
+    .badge-exclusao { background-color: #7f8c8d; }
 
-        /* Indicador visual de que tem scroll */
-        .table-responsive::after {
-            content: "← Arraste →";
-            display: block;
-            text-align: center;
-            padding: 5px;
-            background: #f8f9fa;
-            color: #6c757d;
-            font-size: 0.7rem;
-            border-top: 1px solid #dee2e6;
-        }
+    /* Overlay */
+    #filter-overlay {
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        z-index: 9999; display: none; background: rgba(0,0,0,0.05);
+        backdrop-filter: blur(2px); /* Efeito borrado chique */
     }
 </style>
 
-<div class="container-fluid mt-3">
+<div class="container-fluid mt-3 mb-5">
     
-
-
-     <div class="page-title text-center">
-        <h1 class="mb-2"><i class="fas fa-boxes me-3"></i>REGISTRO HISTÓRICO</h1>
-        <p class="mb-0 opacity-75">Auditoria completa de todas as movimentações.</p>
-    </div>
-
-    <!-- Controles de Paginação Responsivos -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-3 p-3 rounded pagination-controls">
-        <div class="text-muted mb-2 mb-md-0 text-center text-md-start">
-            <i class="fas fa-list me-1"></i>
-            <strong>{{ page_obj.start_index }} - {{ page_obj.end_index }}</strong> de 
-            <strong>{{ page_obj.paginator.count|intcomma }}</strong>
+    <!-- Título da Página -->
+    <div class="page-title">
+        <div>
+            <h1><i class="fas fa-history me-2"></i>Histórico Geral</h1>
+            <small class="text-muted">Gerencie e rastreie todas as movimentações</small>
         </div>
-        
-        <div class="d-flex align-items-center">
-            <span class="me-2 text-muted d-none d-md-block">Itens por página:</span>
-            <span class="me-2 text-muted d-md-none">Mostrar:</span>
-            <select class="form-select form-select-sm" style="width: auto;" onchange="location = this.value;">
-                <option value="?page=1&pagina_by=20" {% if request.GET.pagina_by == '20' or not request.GET.pagina_by %}selected{% endif %}>20</option>
-                <option value="?page=1&pagina_by=50" {% if request.GET.pagina_by == '50' %}selected{% endif %}>50</option>
-                <option value="?page=1&pagina_by=100" {% if request.GET.pagina_by == '100' %}selected{% endif %}>100</option>
-            </select>
+        <div class="d-none d-md-block">
+            <span class="badge bg-secondary"><i class="fas fa-filter me-1"></i>Filtros Avançados Ativos</span>
         </div>
     </div>
 
-    <!-- Tabela Responsiva COM SCROLL -->
-    <div class="table-responsive">
-        <table class="table table-bordered table-hover table-sm align-middle mb-0">
-            <thead>
-                <tr style="background: linear-gradient(135deg, #2c3e50, #4a6491); color: white;">
-                    <th style="width: 120px; min-width: 120px;" class="text-center text-uppercase fw-bold small py-3">
-                        <i class="fas fa-clock me-1"></i>DATA/HORA
-                    </th>
-                    <th style="min-width: 150px;" class="text-center text-uppercase fw-bold small py-3">
-                        <i class="fas fa-boxes me-1"></i>LOTE
-                    </th>
-                    <th style="min-width: 120px;" class="text-center text-uppercase fw-bold small py-3 d-md-table-cell">
-                        <i class="fas fa-user-circle me-1"></i>USUÁRIO
-                    </th>
-                    <th style="width: 110px; min-width: 110px;" class="text-center text-uppercase fw-bold small py-3">
-                        <i class="fas fa-exchange-alt me-1"></i>TIPO
-                    </th>
-                    <th style="min-width: 200px;" class="text-center text-uppercase fw-bold small py-3 d-md-table-cell">
-                        <i class="fas fa-file-alt me-1"></i>DETALHES
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for h in page_obj %}
-                <tr>
-                    <td class="fw-bold text-center" style="white-space: nowrap;">
-                        <small>{{ h.data_hora|date:"d/m/Y" }}</small><br>
-                        <small class="text-muted">{{ h.data_hora|date:"H:i" }}</small>
-                    </td>
-                    <td class="text-center">
-                        {% if h.estoque %}
-                            <span class="badge bg-dark">{{ h.estoque.lote }}</span>
-                            <small class="text-muted d-none d-sm-block">{{ h.estoque.endereco }}</small>
-                        {% else %}
-                            <span class="badge bg-danger">{{ h.lote_ref }}</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-center d-md-table-cell">
-                        <span class="badge bg-primary">
-                            <i class="fas fa-user me-1"></i>{{ h.usuario.username|default:"Sistema" }}
-                        </span>
-                    </td>
-                    <td class="text-center">
-                        {% if 'Entrada' in h.tipo %}
-                            <span class="badge badge-entrada text-white">
-                                <i class="fas fa-plus me-1"></i>Entrada
-                            </span>
-                        {% elif 'Saída' in h.tipo %}
-                            <span class="badge badge-saida text-white">
-                                <i class="fas fa-minus me-1"></i>Saída
-                            </span>
-                        {% elif 'Transferência' in h.tipo %}
-                            <span class="badge badge-transferencia text-white">
-                                <i class="fas fa-exchange-alt me-1"></i>Transf.
-                            </span>
-                        {% elif 'Edição' in h.tipo %}
-                            <span class="badge badge-edicao text-white">
-                                <i class="fas fa-edit me-1"></i>Edição
-                            </span>
-                        {% elif 'EXCLUSÃO' in h.tipo %}
-                            <span class="badge badge-exclusao text-white">
-                                <i class="fas fa-trash me-1"></i>Exclusão
-                            </span>
-                        {% else %}
-                            <span class="badge bg-secondary">{{ h.tipo|truncatechars:10 }}</span>
-                        {% endif %}
-                    </td>
-                    <td class="small text-center d-md-table-cell">
-                        {{ h.descricao|safe|truncatechars:50 }}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5" class="text-center py-4">
-                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
-                        <p class="text-muted mb-0">Nenhum registro no histórico</p>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <!-- Tabela Card -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table id="tabelaHistorico" class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 15%;">
+                                <div class="filter-header" data-column="0">
+                                    <span>DATA/HORA</span>
+                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
+                                </div>
+                            </th>
+                            <th style="width: 15%;">
+                                <div class="filter-header" data-column="1">
+                                    <span>LOTE</span>
+                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
+                                </div>
+                            </th>
+                            <th style="width: 20%;">
+                                <div class="filter-header" data-column="2">
+                                    <span>USUÁRIO</span>
+                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
+                                </div>
+                            </th>
+                            <th style="width: 15%;">
+                                <div class="filter-header" data-column="3">
+                                    <span>TIPO</span>
+                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
+                                </div>
+                            </th>
+                            <th style="width: 35%;">
+                                <div class="filter-header" data-column="4">
+                                    <span>DETALHES</span>
+                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in historico_lista %}
+                        <tr>
+                            <td class="text-center" data-sort="{{ h.data_hora|date:'YmdHis' }}">
+                                <div class="fw-bold text-dark">{{ h.data_hora|date:"d/m/Y" }}</div>
+                                <div class="text-muted small">{{ h.data_hora|date:"H:i" }}</div>
+                            </td>
+                            <td class="text-center">
+                                {% if h.estoque %}
+                                    <span class="badge bg-dark rounded-pill">{{ h.estoque.lote }}</span>
+                                {% else %}
+                                    <span class="badge bg-danger rounded-pill">{{ h.lote_ref }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center text-primary fw-bold">
+                                {{ h.usuario.username|default:"Sistema" }}
+                            </td>
+                            <td class="text-center">
+                                {% if 'Entrada' in h.tipo %}
+                                    <span class="badge badge-entrada rounded-1">ENTRADA</span>
+                                {% elif 'Saída' in h.tipo %}
+                                    <span class="badge badge-saida rounded-1">SAÍDA</span>
+                                {% elif 'Transferência' in h.tipo %}
+                                    <span class="badge badge-transferencia rounded-1">TRANSF.</span>
+                                {% elif 'Edição' in h.tipo %}
+                                    <span class="badge badge-edicao rounded-1">EDIÇÃO</span>
+                                {% elif 'EXCLUSÃO' in h.tipo %}
+                                    <span class="badge badge-exclusao rounded-1">EXCLUSÃO</span>
+                                {% else %}
+                                    <span class="badge bg-secondary rounded-1">{{ h.tipo|upper }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted small">
+                                {{ h.descricao|safe|truncatechars:90 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Rodapé Personalizado (Será preenchido pelo JS) -->
+            <div id="custom-footer" class="dt-footer-wrapper"></div>
+        </div>
     </div>
-
-    <!-- Resto do código de paginação permanece igual -->
-    {% if page_obj.has_other_pages %}
-    <nav aria-label="Page navigation" class="mt-3">
-        <ul class="pagination justify-content-center flex-wrap">
-            {% if page_obj.has_previous %}
-            <li class="page-item">
-                <a class="page-link" href="?page=1{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="First">
-                    <span class="d-none d-sm-inline">&laquo;&laquo;</span>
-                    <span class="d-sm-none">⏮</span>
-                </a>
-            </li>
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Previous">
-                    <span class="d-none d-sm-inline">&laquo;</span>
-                    <span class="d-sm-none">◀</span>
-                </a>
-            </li>
-            {% endif %}
-
-            {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                <li class="page-item active">
-                    <span class="page-link">{{ num }}</span>
-                </li>
-                {% elif num > page_obj.number|add:'-2' and num < page_obj.number|add:'2' %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ num }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}">{{ num }}</a>
-                </li>
-                {% endif %}
-            {% endfor %}
-
-            {% if page_obj.has_next %}
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Next">
-                    <span class="d-none d-sm-inline">&raquo;</span>
-                    <span class="d-sm-none">▶</span>
-                </a>
-            </li>
-            <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.pagina_by %}&pagina_by={{ request.GET.pagina_by }}{% endif %}" aria-label="Last">
-                    <span class="d-none d-sm-inline">&raquo;&raquo;</span>
-                    <span class="d-sm-none">⏭</span>
-                </a>
-            </li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
 
+<div id="filter-overlay"></div>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+
 <script>
-    // Adicionar indicador de scroll para mobile
-    document.addEventListener('DOMContentLoaded', function() {
-        const tableResponsive = document.querySelector('.table-responsive');
-        const isMobile = window.innerWidth < 768;
+$(document).ready(function() {
+    
+    // 1. Configuração e Inicialização do DataTable
+    var table = $('#tabelaHistorico').DataTable({
+        language: {
+            url: "//cdn.datatables.net/plug-ins/1.13.4/i18n/pt-BR.json",
+            search: "",
+            searchPlaceholder: "Pesquisar em tudo..."
+        },
+        order: [[0, 'desc']],
+        autoWidth: false,
+        // DOM customizado: 
+        // f = filter (busca) no topo
+        // t = table (tabela)
+        // i = info (mostrando 1 de 10...)
+        // p = pagination
+        dom: '<"top"f>rt<"bottom"ip><"clear">',
         
-        if (isMobile && tableResponsive) {
-            // Mostrar que tem conteúdo para o lado
-            setTimeout(() => {
-                tableResponsive.scrollLeft = 10;
-                setTimeout(() => {
-                    tableResponsive.scrollLeft = 0;
-                }, 500);
-            }, 1000);
+        // Mover elementos para o nosso rodapé customizado após desenhar
+        drawCallback: function() {
+            var footer = $('#custom-footer');
+            $('.dataTables_info').detach().appendTo(footer);
+            $('.dataTables_paginate').detach().appendTo(footer);
         }
     });
+
+    // 2. Função Helper: Limpar HTML para texto puro
+    function stripHtml(html) {
+        if (!html) return "";
+        let tmp = document.createElement("DIV");
+        tmp.innerHTML = html.replace(/<br\s*\/?>/gi, " ");
+        return (tmp.textContent || tmp.innerText || "").trim();
+    }
+
+    // 3. Abrir Filtro ao Clicar no Header
+    $(document).on('click', '.filter-header', function(e) {
+        e.stopPropagation();
+        
+        var $header = $(this);
+        var colIndex = $header.data('column');
+        
+        // Fecha anteriores
+        $('.excel-filter-dropdown').remove();
+        $('#filter-overlay').fadeIn(200);
+
+        // Coletar dados únicos da coluna
+        var column = table.column(colIndex);
+        var uniqueData = new Set();
+        column.data().each(function (d) {
+            var val = stripHtml(d);
+            if (val) uniqueData.add(val);
+        });
+        
+        var sortedData = Array.from(uniqueData).sort();
+        
+        // Verificar status atual (para marcar checkboxes)
+        var currentSearch = column.search();
+        
+        // HTML do Menu
+        var dropdownHtml = `
+            <div class="excel-filter-dropdown" data-col="${colIndex}">
+                <div class="excel-filter-header">
+                    <input type="text" class="filter-search-box" placeholder="Filtrar nesta lista...">
+                </div>
+                <div class="excel-filter-content">
+                    <ul class="list-unstyled m-0">
+                        <li class="filter-checkbox-item">
+                            <label class="fw-bold text-primary">
+                                <input type="checkbox" class="select-all" checked> (Selecionar Tudo)
+                            </label>
+                        </li>
+        `;
+
+        sortedData.forEach(function(val) {
+            // Lógica simples de checagem
+            var isChecked = true;
+            if (currentSearch) {
+                try {
+                    // Remove regex anchors para testar
+                    var regex = new RegExp(currentSearch);
+                    if (!regex.test(val)) isChecked = false;
+                } catch(err) { isChecked = false; }
+            }
+
+            dropdownHtml += `
+                <li class="filter-checkbox-item">
+                    <label>
+                        <input type="checkbox" class="val-checkbox" value="${val}" ${isChecked ? 'checked' : ''}>
+                        <span>${val}</span>
+                    </label>
+                </li>`;
+        });
+
+        dropdownHtml += `
+                    </ul>
+                </div>
+                <div class="filter-buttons">
+                    <button class="btn btn-light btn-sm close-filter text-muted">Cancelar</button>
+                    <button class="btn btn-primary btn-sm apply-filter px-3">Aplicar</button>
+                    <button class="btn btn-outline-danger btn-sm clear-filter" title="Limpar Filtro"><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        `;
+
+        $('body').append(dropdownHtml);
+
+        // Posicionamento Inteligente
+        var offset = $header.offset();
+        var dropdown = $('.excel-filter-dropdown');
+        var top = offset.top + $header.outerHeight() + 8;
+        var left = offset.left;
+        var screenWidth = $(window).width();
+
+        // Ajustes para Mobile/Tela pequena
+        if (screenWidth < 768) {
+            left = (screenWidth - dropdown.outerWidth()) / 2; // Centraliza no mobile
+        } else if (left + 280 > screenWidth) {
+            left = screenWidth - 300; // Alinha à direita se sair da tela no PC
+        }
+
+        dropdown.css({ top: top, left: left }).show();
+        dropdown.find('.filter-search-box').focus();
+    });
+
+    // 4. Lógica de Interação do Filtro
+    
+    // Busca dentro do filtro
+    $(document).on('keyup', '.filter-search-box', function() {
+        var term = $(this).val().toLowerCase();
+        $('.excel-filter-content li:not(:first)').each(function() {
+            var text = $(this).text().toLowerCase();
+            $(this).toggle(text.indexOf(term) > -1);
+        });
+    });
+
+    // Checkbox "Selecionar Tudo"
+    $(document).on('change', '.select-all', function() {
+        var checked = $(this).prop('checked');
+        $(this).closest('.excel-filter-dropdown').find('.val-checkbox:visible').prop('checked', checked);
+    });
+
+    // Botão Aplicar
+    $(document).on('click', '.apply-filter', function() {
+        var dropdown = $(this).closest('.excel-filter-dropdown');
+        var colIndex = dropdown.data('col');
+        var checkedValues = [];
+        
+        dropdown.find('.val-checkbox:checked').each(function() {
+            // Escape regex chars
+            var val = $(this).val().replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+            checkedValues.push(val);
+        });
+
+        var searchString = '';
+        var $icon = $(`.filter-header[data-column="${colIndex}"] .filter-icon`);
+        
+        // Verifica se marcou tudo (sem filtro) ou algum específico
+        var totalVisible = dropdown.find('.val-checkbox').length;
+        
+        if (checkedValues.length > 0 && checkedValues.length < totalVisible) {
+            searchString = '^(' + checkedValues.join('|') + ')$';
+            $icon.addClass('active');
+        } else if (checkedValues.length === 0) {
+            searchString = '^$'; // Nada encontrado
+            $icon.addClass('active');
+        } else {
+            searchString = ''; // Tudo
+            $icon.removeClass('active');
+        }
+
+        table.column(colIndex).search(searchString, true, false).draw();
+        closeFilters();
+    });
+
+    // Botão Limpar
+    $(document).on('click', '.clear-filter', function() {
+        var colIndex = $(this).closest('.excel-filter-dropdown').data('col');
+        table.column(colIndex).search('').draw();
+        $(`.filter-header[data-column="${colIndex}"] .filter-icon`).removeClass('active');
+        closeFilters();
+    });
+
+    // Fechar
+    function closeFilters() {
+        $('.excel-filter-dropdown').fadeOut(100, function(){ $(this).remove(); });
+        $('#filter-overlay').fadeOut(200);
+    }
+
+    $('.close-filter, #filter-overlay').on('click', closeFilters);
+});
 </script>
 {% endblock %}

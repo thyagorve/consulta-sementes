@@ -999,7 +999,7 @@ def importar_estoque(request):
                         'origem_destino': str(row.get(mapping.get('Origem/Destino', ''), '')).strip(),
                         'empresa': str(row.get(mapping.get('Empresa', ''), '')).strip(),
                         'especie': str(row.get(mapping.get('Espécie', ''), 'SOJA')).strip(),
-                        'lote_anterior': str(row.get(mapping.get('Lote Anterior', ''), '')).strip(),
+                       
                         'observacao': str(row.get(mapping.get('Observação', ''), '')).strip()
                     }
                     
@@ -1615,7 +1615,7 @@ def aprovar_importacao(request):
                                     peso_total=peso_total,
                                     az=mod.get('az', ''),
                                     observacao=f"Criado via importação em {timezone.now().strftime('%d/%m/%Y')}",
-                                    lote_anterior=mod.get('lote_anterior', '')
+                                    
                                 )
                                 
                                 # Registrar histórico
@@ -1683,7 +1683,7 @@ def aprovar_importacao(request):
                             item.origem_destino = mod.get('origem_destino', '')
                             item.especie = mod.get('especie', 'SOJA')
                             item.embalagem = mod.get('embalagem', 'BAG')
-                            item.lote_anterior = mod.get('lote_anterior', '')
+                          
                             
                             # Atualizar FKs
                             if mod.get('cultivar_id'):
@@ -2842,12 +2842,23 @@ def configuracoes(request):
     return render(request, 'sapp/configuracoes.html', context)
 
 
+# views.py - mantenha como estava
 @login_required
 def historico_geral(request):
-    lista = HistoricoMovimentacao.objects.all().order_by('-data_hora')
-    paginator = Paginator(lista, 50)
-    page_obj = paginator.get_page(request.GET.get('page'))
-    return render(request, 'sapp/historico_geral.html', {'page_obj': page_obj})
+    """Histórico completo para DataTables"""
+    historico_completo = HistoricoMovimentacao.objects.all().select_related(
+        'estoque', 'usuario'
+    ).order_by('-data_hora')
+    
+    context = {
+        'historico_lista': historico_completo,
+    }
+    
+    return render(request, 'sapp/historico_geral.html', context)
+
+
+
+
 
 # Adicione isso no TOPO junto com os outros imports
 
@@ -2902,7 +2913,6 @@ def exportar_excel(request):
             'Origem/Destino': item.origem_destino,
             'Empresa': item.empresa,
             'Espécie': item.especie,
-            'Lote Anterior': item.lote_anterior or '',
             'Observação': item.observacao or ''
         })
     
