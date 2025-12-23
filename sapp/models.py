@@ -142,3 +142,93 @@ class FotoMovimentacao(models.Model):
 
     def __str__(self):
         return f"Foto de {self.historico}"
+    
+    
+    
+    
+    
+    
+    
+# --- Sistema de Empenho/Rascunho ---
+class EmpenhoStatus(models.Model):
+    """Status de um empenho (rascunho, pendente, confirmado, cancelado)"""
+    nome = models.CharField(max_length=50, unique=True)
+    descricao = models.TextField(blank=True, null=True)
+    
+    def __str__(self): return self.nome
+
+class Empenho(models.Model):
+    """Registro de empenho (rascunho de movimentação)"""
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+    status = models.ForeignKey(EmpenhoStatus, on_delete=models.PROTECT, default=1)  # 1 = Rascunho
+    tipo_movimentacao = models.CharField(max_length=20, choices=[
+        ('EXPEDICAO', 'Expedição'),
+        ('TRANSFERENCIA', 'Transferência'),
+        ('EDICAO', 'Edição'),
+        ('ENTRADA', 'Entrada'),
+    ], default='EXPEDICAO')
+    observacao = models.TextField(blank=True, null=True)
+    
+    # Campos para expedição
+    numero_carga = models.CharField(max_length=50, blank=True, null=True)
+    motorista = models.CharField(max_length=100, blank=True, null=True)
+    placa = models.CharField(max_length=20, blank=True, null=True)
+    cliente = models.CharField(max_length=255, blank=True, null=True)
+    ordem_entrega = models.CharField(max_length=50, blank=True, null=True)
+    
+    class Meta:
+        ordering = ['-data_criacao']
+    
+    def __str__(self):
+        return f"Empenho #{self.id} - {self.usuario.username} - {self.get_tipo_movimentacao_display()}"
+    
+    @property
+    def total_itens(self):
+        return self.itens.count()
+    
+    @property
+    def saldo_afetado(self):
+        return sum(item.quantidade for item in self.itens.all())
+
+class ItemEmpenho(models.Model):
+    """Itens de um empenho"""
+    empenho = models.ForeignKey(Empenho, on_delete=models.CASCADE, related_name='itens')
+    estoque = models.ForeignKey(Estoque, on_delete=models.CASCADE, related_name='empenhos')
+    quantidade = models.IntegerField(default=0)  # Quantidade empenhada
+    endereco_origem = models.CharField(max_length=20)  # Endereço original
+    endereco_destino = models.CharField(max_length=20, blank=True, null=True)  # Para transferências
+    observacao = models.CharField(max_length=255, blank=True, null=True)
+    
+    # Cópia dos dados do estoque no momento do empenho
+    lote = models.CharField(max_length=50)
+    cultivar = models.CharField(max_length=100)
+    peneira = models.CharField(max_length=50)
+    categoria = models.CharField(max_length=50)
+    saldo_anterior = models.IntegerField(default=0)
+    
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-data_criacao']
+        unique_together = ['empenho', 'estoque']  # Evita duplicações no mesmo empenho
+    
+    def __str__(self):
+        return f"{self.lote} - {self.quantidade} unidades"
+    
+    def save(self, *args, **kwargs):
+        # Ao salvar, copia os dados atuais do estoque
+        if self.estoque and not self.lote:
+            self.lote = self.estoque.lote
+            self.cultivar = self.estoque.cultivar.nome if self.estoque.cultivar else ''
+            self.peneira = self.estoque.peneira.nome if self.estoque.peneira else ''
+            self.categoria = self.estoque.categoria.nome if self.estoque.categoria else ''
+            self.saldo_anterior = self.estoque.saldo
+            self.endereco_origem = self.estoque.endereco
+        super().save(*args, **kwargs)
+    
+    @property
+    def saldo_disponivel(self):
+        """Saldo disponível após o empenho"""
+        return self.estoque.saldo - self.quantidade

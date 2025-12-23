@@ -1,0 +1,996 @@
+{% extends 'sapp/base.html' %}
+{% load static humanize %}
+
+{% block content %}
+<style>
+    /* ESTILOS DA TABELA EXCEL-LIKE */
+    .table-empenho {
+        font-size: 0.8rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .table-empenho th {
+        background: #f8f9fa;
+        color: #2c3e50;
+        font-weight: 600;
+        border: 1px solid #dee2e6;
+        padding: 8px 6px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-empenho td {
+        padding: 6px 4px;
+        border: 1px solid #e9ecef;
+        vertical-align: middle;
+    }
+    
+    .filtro-header {
+        background: #e3f2fd !important;
+    }
+    
+    .filtro-input {
+        width: 100%;
+        padding: 4px 6px;
+        font-size: 0.75rem;
+        border: 1px solid #ced4da;
+        border-radius: 3px;
+        background: white;
+    }
+    
+    .filtro-input:focus {
+        outline: none;
+        border-color: #80bdff;
+        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
+    }
+    
+    /* BADGES DE STATUS */
+    .badge-saldo-total { background: #2f8f4e; color: white; }
+    .badge-empenhado { background: #f39c12; color: white; }
+    .badge-disponivel { background: #3498db; color: white; }
+    .badge-saldo-zero { background: #e74c3c; color: white; }
+    
+    .badge-nome-empenho {
+        background: #9b59b6;
+        color: white;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        margin: 1px;
+        cursor: pointer;
+        display: inline-block;
+    }
+    
+    /* FORMULÁRIO FLUTUANTE */
+    .form-flutuante {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        z-index: 1050;
+        width: 400px;
+        padding: 20px;
+        display: none;
+    }
+    
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1040;
+        display: none;
+    }
+    
+    /* BARRA DE AÇÕES */
+    .acao-bar {
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .btn-acao {
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+    
+    .btn-acao-transferir { background: #17a2b8; color: white; }
+    .btn-acao-expedir { background: #28a745; color: white; }
+    .btn-acao-editar { background: #ffc107; color: black; }
+    .btn-acao-excluir { background: #dc3545; color: white; }
+    
+    .btn-acao:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    
+    /* CHECKBOX ESTILIZADO */
+    .checkbox-empenho {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    
+    /* PAGINAÇÃO */
+    .paginacao-empenho {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 6px;
+        border: 1px solid #dee2e6;
+    }
+    
+    /* SCROLL PERSONALIZADO */
+    .table-container {
+        max-height: 600px;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+    
+    .table-container::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    .table-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    
+    .table-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    /* CARDS DE RESUMO */
+    .card-resumo {
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        transition: transform 0.3s;
+    }
+    
+    .card-resumo:hover {
+        transform: translateY(-5px);
+    }
+    
+    /* BARRA DE FILTROS RÁPIDOS */
+    .filtro-rapido {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <!-- HEADER COM RESUMO -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="text-primary fw-bold mb-1">
+                        <i class="fas fa-table me-2"></i>Planilha de Empenho
+                    </h2>
+                    <p class="text-muted mb-0">
+                        Sistema de rascunho - Empenhe lotes antes de movimentar
+                    </p>
+                </div>
+                <div class="d-flex gap-3">
+                    <span class="badge bg-primary fs-6">{{ total_lotes|intcomma }} lotes</span>
+                    <span class="badge bg-success fs-6">{{ total_saldo|intcomma }} unidades</span>
+                    <span class="badge bg-info fs-6">{{ total_sc_convertido|intcomma }} SC</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BARRA DE FILTROS RÁPIDOS -->
+    <div class="filtro-rapido">
+        <form method="get" class="row g-2">
+            <div class="col-md-2">
+                <input type="text" name="filtro_lote" class="form-control form-control-sm" 
+                       placeholder="Filtrar Lote" value="{{ filtro_lote }}">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="filtro_cultivar" class="form-control form-control-sm" 
+                       placeholder="Filtrar Cultivar" value="{{ filtro_cultivar }}">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="filtro_endereco" class="form-control form-control-sm" 
+                       placeholder="Filtrar Endereço" value="{{ filtro_endereco }}">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="filtro_cliente" class="form-control form-control-sm" 
+                       placeholder="Filtrar Cliente" value="{{ filtro_cliente }}">
+            </div>
+            <div class="col-md-2">
+                <input type="text" name="filtro_peneira" class="form-control form-control-sm" 
+                       placeholder="Filtrar Peneira" value="{{ filtro_peneira }}">
+            </div>
+            <div class="col-md-2">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                        <i class="fas fa-filter me-1"></i>Filtrar
+                    </button>
+                    <a href="?" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+        
+        <!-- BUSCA GERAL -->
+        <div class="mt-3">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light">
+                    <i class="fas fa-search text-muted"></i>
+                </span>
+                <input type="text" class="form-control" id="buscaGeral" 
+                       placeholder="Busca em todas as colunas (como Excel)..." value="{{ busca }}">
+                <button class="btn btn-outline-primary" type="button" onclick="realizarBusca()">
+                    Buscar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BARRA DE AÇÕES EM LOTE -->
+    <div class="acao-bar mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-acao btn-acao-transferir" onclick="abrirFormAcao('transferir')">
+                        <i class="fas fa-exchange-alt me-2"></i>Transferir Selecionados
+                    </button>
+                    <button class="btn btn-acao btn-acao-expedir" onclick="abrirFormAcao('expedir')">
+                        <i class="fas fa-truck me-2"></i>Expedir Selecionados
+                    </button>
+                    <button class="btn btn-acao btn-acao-editar" onclick="abrirFormAcao('editar')">
+                        <i class="fas fa-edit me-2"></i>Editar Campos
+                    </button>
+                    <button class="btn btn-acao btn-acao-excluir" onclick="abrirFormAcao('excluir')">
+                        <i class="fas fa-trash me-2"></i>Excluir Empenhos
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="modoSelecao" onchange="alternarModoSelecao()">
+                    <label class="form-check-label text-white" for="modoSelecao">
+                        Modo Seleção Múltipla
+                    </label>
+                </div>
+                <small class="text-light">Selecione vários lotes para ações em lote</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARDS DE RESUMO -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card card-resumo border-primary">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-boxes text-primary fs-3"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 text-primary">{{ total_lotes|intcomma }}</h4>
+                            <small class="text-muted">Lotes Ativos</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card card-resumo border-success">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-success bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-weight text-success fs-3"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 text-success">{{ total_saldo|intcomma }}</h4>
+                            <small class="text-muted">Unidades Totais</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card card-resumo border-info">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-info bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-layer-group text-info fs-3"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 text-info">{{ total_sc_convertido|intcomma }}</h4>
+                            <small class="text-muted">Equivalente SC</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card card-resumo border-warning">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-warning bg-opacity-10 rounded-circle p-3 me-3">
+                            <i class="fas fa-clipboard-list text-warning fs-3"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 text-warning">{{ todos_empenhos.count }}</h4>
+                            <small class="text-muted">Empenhos Ativos</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABELA PRINCIPAL -->
+    <div class="table-container">
+        <table class="table table-empenho table-hover table-striped mb-0">
+            <thead>
+                <tr>
+                    <th width="40">
+                        <input type="checkbox" id="selectAll" onchange="selecionarTodos(this.checked)">
+                    </th>
+                    <th>LOTE</th>
+                    <th>CULTIVAR</th>
+                    <th>PENEIRA</th>
+                    <th>CATEGORIA</th>
+                    <th>ENDEREÇO</th>
+                    <th>SALDO TOTAL</th>
+                    <th>EMPENHADO</th>
+                    <th>DISPONÍVEL</th>
+                    <th>NOMES DOS EMPENHOS</th>
+                    <th>CLIENTE</th>
+                    <th>EMBALAGEM</th>
+                    <th>AÇÕES</th>
+                </tr>
+                
+                <!-- LINHA DE FILTROS -->
+                <tr class="filtro-header">
+                    <td></td>
+                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(1, this.value)"></td>
+                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(2, this.value)"></td>
+                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(3, this.value)"></td>
+                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(4, this.value)"></td>
+                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(5, this.value)"></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(9, this.value)"></td>
+                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(10, this.value)"></td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </thead>
+            <tbody id="tabelaCorpo">
+                {% for item in lotes %}
+                <tr id="lote-{{ item.lote.id }}" data-lote-id="{{ item.lote.id }}">
+                    <td>
+                        <input type="checkbox" class="checkbox-empenho lote-selecionado" 
+                               data-lote-id="{{ item.lote.id }}">
+                    </td>
+                    <td>
+                        <strong class="text-primary">{{ item.lote.lote }}</strong>
+                        {% if item.lote.produto %}
+                        <br><small class="text-muted">{{ item.lote.produto }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ item.lote.cultivar.nome }}</td>
+                    <td>{{ item.lote.peneira.nome }}</td>
+                    <td>{{ item.lote.categoria.nome }}</td>
+                    <td>
+                        <span class="badge bg-light text-dark border">{{ item.lote.endereco }}</span>
+                        {% if item.lote.az %}
+                        <br><small class="text-muted">AZ: {{ item.lote.az }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge badge-saldo-total">{{ item.saldo_total|intcomma }}</span>
+                    </td>
+                    <td>
+                        {% if item.empenhado > 0 %}
+                        <span class="badge badge-empenhado">{{ item.empenhado|intcomma }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.disponivel > 0 %}
+                        <span class="badge badge-disponivel">{{ item.disponivel|intcomma }}</span>
+                        {% else %}
+                        <span class="badge badge-saldo-zero">ESGOTADO</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.empenhos %}
+                            {% for emp in item.empenhos %}
+                            <span class="badge badge-nome-empenho" 
+                                  title="Quantidade: {{ emp.quantidade }} - {{ emp.observacao|default:'Sem observação' }}"
+                                  onclick="filtrarPorEmpenho('{{ emp.empenho.observacao }}')">
+                                {{ emp.empenho.observacao|truncatechars:20 }}
+                            </span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-muted">Nenhum empenho</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.lote.cliente %}
+                        <span class="badge bg-purple text-white">{{ item.lote.cliente|truncatechars:15 }}</span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge {% if item.lote.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">
+                            {{ item.lote.get_embalagem_display }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            {% if item.disponivel > 0 %}
+                            <button class="btn btn-sm btn-success" 
+                                    onclick="abrirFormEmpenho({{ item.lote.id }}, {{ item.disponivel }})"
+                                    title="Empenhar unidades">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            {% endif %}
+                            
+                            {% if item.empenhado > 0 %}
+                            <button class="btn btn-sm btn-warning" 
+                                    onclick="verEmpenhosLote({{ item.lote.id }})"
+                                    title="Ver empenhos deste lote">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            {% endif %}
+                            
+                            <button class="btn btn-sm btn-info" 
+                                    onclick="detalhesLote({{ item.lote.id }})"
+                                    title="Detalhes do lote">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="13" class="text-center py-4 text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
+                        Nenhum lote encontrado
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- PAGINAÇÃO -->
+    {% if estoque.paginator.num_pages > 1 %}
+    <div class="paginacao-empenho mt-3">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <small class="text-muted">
+                    Mostrando {{ estoque.start_index }} - {{ estoque.end_index }} de {{ estoque.paginator.count }} lotes
+                </small>
+            </div>
+            <div class="col-md-4">
+                <nav aria-label="Paginação">
+                    <ul class="pagination pagination-sm justify-content-center mb-0">
+                        {% if estoque.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ estoque.previous_page_number }}{{ url_filtros }}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        {% for num in estoque.paginator.page_range %}
+                            {% if num >= estoque.number|add:-2 and num <= estoque.number|add:2 %}
+                            <li class="page-item {% if num == estoque.number %}active{% endif %}">
+                                <a class="page-link" href="?page={{ num }}{{ url_filtros }}">{{ num }}</a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if estoque.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ estoque.next_page_number }}{{ url_filtros }}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="input-group input-group-sm" style="width: 150px;">
+                    <span class="input-group-text">Por página:</span>
+                    <select class="form-select" onchange="atualizarItensPorPagina(this.value)">
+                        {% for size in page_sizes %}
+                        <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- LISTA DE EMPENHOS ATIVOS -->
+    <div class="card mt-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">
+                <i class="fas fa-clipboard-list me-2"></i>
+                Empenhos Ativos ({{ todos_empenhos.count }})
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for emp in todos_empenhos %}
+                <div class="col-md-3 mb-3">
+                    <div class="card border-start border-{% cycle 'primary' 'success' 'warning' 'info' 'danger' %} border-3">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ emp.observacao|truncatechars:25 }}</h6>
+                                    <small class="text-muted">
+                                        {{ emp.itens.count }} itens • 
+                                        {{ emp.saldo_afetado }} unidades
+                                    </small>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick="filtrarPorEmpenho('{{ emp.observacao }}')">
+                                        <i class="fas fa-filter"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="excluirEmpenho({{ emp.id }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center py-3 text-muted">
+                    <i class="fas fa-clipboard fa-2x mb-2"></i>
+                    <p>Nenhum empenho ativo</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- OVERLAY -->
+<div class="overlay" id="overlay" onclick="fecharForm()"></div>
+
+<!-- FORMULÁRIO PARA EMPENHAR LOTE -->
+<div class="form-flutuante" id="formEmpenho">
+    <div class="card border-primary">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-plus-circle me-2"></i>
+                Empenhar Lote
+            </h5>
+        </div>
+        <div class="card-body">
+            <form id="formEmpenhar" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="empenhar_lote" value="1">
+                <input type="hidden" id="loteIdEmpenho" name="lote_id">
+                
+                <div class="mb-3">
+                    <label class="form-label">Lote</label>
+                    <input type="text" class="form-control" id="loteInfo" readonly>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Saldo Disponível</label>
+                    <input type="text" class="form-control" id="saldoDisponivel" readonly>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Quantidade a Empenhar</label>
+                    {{ form_empenho.quantidade }}
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Nome do Empenho</label>
+                    {{ form_empenho.nome_empenho }}
+                    <small class="text-muted">
+                        Ex: Carga TS1, Transferência P1, Expedição Cliente X
+                    </small>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Observação</label>
+                    {{ form_empenho.observacao }}
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="fas fa-save me-2"></i>Salvar Empenho
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="fecharForm()">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- FORMULÁRIO PARA AÇÕES EM LOTE -->
+<div class="form-flutuante" id="formAcao" style="width: 500px;">
+    <div class="card border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="fas fa-cogs me-2"></i>
+                Ações em Lote
+            </h5>
+        </div>
+        <div class="card-body">
+            <form id="formAcoes" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="acao_empenho" value="1">
+                
+                <div class="mb-3">
+                    <label class="form-label">Ação</label>
+                    {{ form_acoes.acao }}
+                </div>
+                
+                <div id="campoEndereco" class="mb-3" style="display: none;">
+                    <label class="form-label">Endereço Destino</label>
+                    {{ form_acoes.endereco_destino }}
+                </div>
+                
+                <div id="campoEdicao" class="mb-3" style="display: none;">
+                    <label class="form-label">Novo Valor</label>
+                    <input type="text" class="form-control" placeholder="Digite o novo valor...">
+                </div>
+                
+                <div class="mb-3" id="campoConfirmacao" style="display: none;">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Esta ação é irreversível. Marque a confirmação para continuar.
+                    </div>
+                    {{ form_acoes.confirmar }}
+                    <label class="form-check-label ms-2">Confirmo que desejo executar esta ação</label>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Lotes selecionados: <span id="contadorSelecionados">0</span></strong>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-warning flex-grow-1">
+                        <i class="fas fa-play me-2"></i>Executar Ação
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="fecharForm()">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE DETALHES -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Detalhes do Lote</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="corpoDetalhes">
+                <!-- Conteúdo carregado via JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+// VARIÁVEIS GLOBAIS
+let lotesSelecionados = new Set();
+let modoSelecaoMultipla = false;
+
+// FUNÇÕES PRINCIPAIS
+
+function abrirFormEmpenho(loteId, saldoDisponivel) {
+    // Buscar informações do lote
+    const loteRow = document.querySelector(`tr[data-lote-id="${loteId}"]`);
+    const loteNumero = loteRow.querySelector('td:nth-child(2) strong').textContent;
+    const cultivar = loteRow.querySelector('td:nth-child(3)').textContent;
+    
+    // Preencher formulário
+    document.getElementById('loteIdEmpenho').value = loteId;
+    document.getElementById('loteInfo').value = `${loteNumero} - ${cultivar}`;
+    document.getElementById('saldoDisponivel').value = saldoDisponivel;
+    
+    // Mostrar formulário
+    document.getElementById('formEmpenho').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+}
+
+function abrirFormAcao(acao) {
+    const quantidadeSelecionados = lotesSelecionados.size;
+    if (quantidadeSelecionados === 0) {
+        alert('Selecione pelo menos um lote para executar ações em lote.');
+        return;
+    }
+    
+    document.getElementById('contadorSelecionados').textContent = quantidadeSelecionados;
+    document.getElementById('formAcao').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+    
+    // Mostrar campos específicos da ação
+    mostrarCampoAcao(acao);
+}
+
+function mostrarCampoAcao(acao) {
+    document.getElementById('campoEndereco').style.display = 'none';
+    document.getElementById('campoEdicao').style.display = 'none';
+    document.getElementById('campoConfirmacao').style.display = 'none';
+    
+    if (acao === 'transferir') {
+        document.getElementById('campoEndereco').style.display = 'block';
+    } else if (acao === 'editar') {
+        document.getElementById('campoEdicao').style.display = 'block';
+    } else if (acao === 'excluir' || acao === 'expedir') {
+        document.getElementById('campoConfirmacao').style.display = 'block';
+    }
+}
+
+function fecharForm() {
+    document.getElementById('formEmpenho').style.display = 'none';
+    document.getElementById('formAcao').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+}
+
+// FILTROS
+
+function filtrarColuna(colIndex, valor) {
+    const tabela = document.getElementById('tabelaCorpo');
+    const linhas = tabela.getElementsByTagName('tr');
+    
+    for (let i = 0; i < linhas.length; i++) {
+        const celula = linhas[i].getElementsByTagName('td')[colIndex];
+        if (celula) {
+            const texto = celula.textContent || celula.innerText;
+            if (texto.toUpperCase().indexOf(valor.toUpperCase()) > -1) {
+                linhas[i].style.display = '';
+            } else {
+                linhas[i].style.display = 'none';
+            }
+        }
+    }
+}
+
+function filtrarPorEmpenho(nomeEmpenho) {
+    // Adicionar filtro na URL e recarregar
+    const url = new URL(window.location.href);
+    url.searchParams.set('busca', nomeEmpenho);
+    window.location.href = url.toString();
+}
+
+function realizarBusca() {
+    const busca = document.getElementById('buscaGeral').value;
+    const url = new URL(window.location.href);
+    
+    if (busca) {
+        url.searchParams.set('busca', busca);
+    } else {
+        url.searchParams.delete('busca');
+    }
+    
+    window.location.href = url.toString();
+}
+
+// SELEÇÃO
+
+function alternarModoSelecao() {
+    modoSelecaoMultipla = !modoSelecaoMultipla;
+    const checkboxes = document.querySelectorAll('.lote-selecionado');
+    
+    if (!modoSelecaoMultipla) {
+        // Desmarcar todos se sair do modo seleção
+        checkboxes.forEach(cb => cb.checked = false);
+        lotesSelecionados.clear();
+    }
+}
+
+function selecionarTodos(selecionar) {
+    const checkboxes = document.querySelectorAll('.lote-selecionado');
+    checkboxes.forEach(cb => {
+        cb.checked = selecionar;
+        const loteId = cb.dataset.loteId;
+        if (selecionar) {
+            lotesSelecionados.add(loteId);
+        } else {
+            lotesSelecionados.delete(loteId);
+        }
+    });
+}
+
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('lote-selecionado')) {
+        const loteId = e.target.dataset.loteId;
+        if (e.target.checked) {
+            lotesSelecionados.add(loteId);
+        } else {
+            lotesSelecionados.delete(loteId);
+        }
+    }
+});
+
+// AÇÕES
+
+// CÓDIGO NOVO (Colocar no lugar)
+function excluirEmpenho(empenhoId) {
+    if (confirm('Tem certeza que deseja excluir este empenho? Todos os itens serão liberados.')) {
+        // Cria um formulário invisível e submete
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = window.location.href; // Posta para a mesma página
+        
+        // Token CSRF
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        // Identificador da ação
+        const acaoInput = document.createElement('input');
+        acaoInput.type = 'hidden';
+        acaoInput.name = 'excluir_empenho';
+        acaoInput.value = '1';
+        form.appendChild(acaoInput);
+        
+        // ID do empenho
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'empenho_id';
+        idInput.value = empenhoId;
+        form.appendChild(idInput);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+function detalhesLote(loteId) {
+    fetch(`/api/buscar-dados-lote/?item_id=${loteId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.encontrado) {
+                const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
+                document.getElementById('corpoDetalhes').innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Lote:</strong> ${data.lote}</p>
+                            <p><strong>Cultivar:</strong> ${data.cultivar_nome}</p>
+                            <p><strong>Peneira:</strong> ${data.peneira_nome}</p>
+                            <p><strong>Endereço:</strong> ${data.endereco}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Cliente:</strong> ${data.cliente || 'Não informado'}</p>
+                            <p><strong>Empresa:</strong> ${data.empresa || 'Não informado'}</p>
+                            <p><strong>Embalagem:</strong> ${data.embalagem}</p>
+                            <p><strong>Saldo:</strong> ${data.saldo}</p>
+                        </div>
+                    </div>
+                `;
+                modal.show();
+            }
+        });
+}
+
+function verEmpenhosLote(loteId) {
+    // Implementar visualização dos empenhos deste lote específico
+    alert('Funcionalidade em desenvolvimento...');
+}
+
+// UTILITÁRIOS
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function atualizarItensPorPagina(valor) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('page_size', valor);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// INICIALIZAÇÃO
+document.addEventListener('DOMContentLoaded', function() {
+    // Adicionar eventos aos filtros
+    document.querySelectorAll('.filtro-input').forEach(input => {
+        input.addEventListener('input', function(e) {
+            filtrarColuna(e.target.parentElement.cellIndex, e.target.value);
+        });
+    });
+});
+
+// EXPORTAR FUNÇÕES PARA USO GLOBAL
+window.abrirFormEmpenho = abrirFormEmpenho;
+window.abrirFormAcao = abrirFormAcao;
+window.fecharForm = fecharForm;
+window.filtrarColuna = filtrarColuna;
+window.filtrarPorEmpenho = filtrarPorEmpenho;
+window.realizarBusca = realizarBusca;
+window.alternarModoSelecao = alternarModoSelecao;
+window.selecionarTodos = selecionarTodos;
+window.excluirEmpenho = excluirEmpenho;
+window.detalhesLote = detalhesLote;
+window.verEmpenhosLote = verEmpenhosLote;
+window.mostrarCampoAcao = mostrarCampoAcao;
+window.atualizarItensPorPagina = atualizarItensPorPagina;
+</script>
+
+<!-- CSS ADICIONAL PARA RESPONSIVIDADE -->
+<style>
+@media (max-width: 768px) {
+    .table-container {
+        max-height: 400px;
+    }
+    
+    .table-empenho {
+        font-size: 0.7rem;
+    }
+    
+    .acao-bar .d-flex {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .btn-acao {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+}
+</style>
+{% endblock %}
+{% endblock %}

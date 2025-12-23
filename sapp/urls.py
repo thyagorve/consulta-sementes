@@ -53,6 +53,16 @@ urlpatterns = [
     # --- Debug ---
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
     path('limpar-cache-importacao/', views.limpar_cache_importacao, name='limpar_cache_importacao'),
+    
+    
+    
+    
+    
+    path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
+    
+        # --- Sistema de Empenho/Rascunho ---
+    path('empenho/', views.pagina_rascunho, name='pagina_rascunho'),
+    
 ]
 
 if settings.DEBUG:

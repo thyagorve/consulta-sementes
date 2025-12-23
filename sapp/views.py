@@ -40,7 +40,13 @@ from django.db import transaction
 import tempfile
 import os
 
-
+# No início de views.py, com os outros imports de models
+from .models import (
+    Estoque, HistoricoMovimentacao, Configuracao, Cultivar, 
+    Peneira, Categoria, Tratamento, PerfilUsuario,
+    # Adicione estes:
+    Empenho, ItemEmpenho, EmpenhoStatus
+)
 
 
 
@@ -3247,3 +3253,130 @@ def api_ultimas_movimentacoes(request):
         'success': True,
         'movimentacoes': data
     })
+    
+    
+    
+    
+# No sapp/views.py
+
+# --- COLOQUE ISSO NO TOPO DO ARQUIVO SE AINDA NÃO TIVER ---
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.db.models import Q, Sum
+from django.core.paginator import Paginator
+from django.contrib import messages
+from .models import Empenho, EmpenhoStatus, ItemEmpenho, Estoque
+from django import forms
+import json
+
+# --- VIEW CORRIGIDA (COLE ALINHADA À ESQUERDA) ---
+@login_required
+def pagina_rascunho(request):
+    mensagem = ''
+    
+    # Definição dos Forms
+    class EmpenhoLoteForm(forms.Form):
+        lote_id = forms.IntegerField(widget=forms.HiddenInput())
+        quantidade = forms.IntegerField(min_value=1, widget=forms.NumberInput(attrs={'class': 'form-control'}))
+        nome_empenho = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control'}))
+        observacao = forms.CharField(required=False, widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
+    
+    class AcoesEmpenhoForm(forms.Form):
+        acao = forms.ChoiceField(
+            choices=[('transferir', 'Transferir'), ('expedir', 'Expedir'), ('editar', 'Editar'), ('excluir', 'Excluir')],
+            widget=forms.Select(attrs={'class': 'form-control'})
+        )
+        endereco_destino = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
+        confirmar = forms.BooleanField(required=False, widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
+
+    # Lógica POST
+    if request.method == 'POST':
+        # 1. Empenhar
+        if 'empenhar_lote' in request.POST:
+            lote_id = request.POST.get('lote_id')
+            quantidade = int(request.POST.get('quantidade', 0))
+            nome_empenho = request.POST.get('nome_empenho', '').strip()
+            observacao = request.POST.get('observacao', '')
+            
+            try:
+                lote = Estoque.objects.get(id=lote_id)
+                status_rascunho, _ = EmpenhoStatus.objects.get_or_create(nome='Rascunho')
+                empenho, _ = Empenho.objects.get_or_create(
+                    usuario=request.user, 
+                    status=status_rascunho, 
+                    observacao=nome_empenho,
+                    defaults={'tipo_movimentacao': 'EXPEDICAO'}
+                )
+                ItemEmpenho.objects.create(
+                    empenho=empenho, estoque=lote, quantidade=quantidade,
+                    endereco_origem=lote.endereco, observacao=observacao
+                )
+                messages.success(request, "Lote empenhado com sucesso!")
+                return redirect('sapp:pagina_rascunho')
+            except Exception as e:
+                messages.error(request, f"Erro: {str(e)}")
+
+        # 2. Excluir (Corrigido para aceitar o POST da mesma página)
+        elif 'excluir_empenho' in request.POST:
+            empenho_id = request.POST.get('empenho_id')
+            try:
+                Empenho.objects.filter(id=empenho_id, usuario=request.user).delete()
+                messages.success(request, "Empenho excluído!")
+                return redirect('sapp:pagina_rascunho')
+            except Exception as e:
+                messages.error(request, "Erro ao excluir.")
+
+    # Lógica GET (Filtros e Paginação)
+    estoque_query = Estoque.objects.filter(saldo__gt=0).order_by('endereco')
+    
+    filtro_lote = request.GET.get('filtro_lote', '')
+    busca = request.GET.get('busca', '')
+    
+    if filtro_lote: estoque_query = estoque_query.filter(lote__icontains=filtro_lote)
+    if busca:
+        # Busca por nome de empenho ou dados do lote
+        ids_por_empenho = ItemEmpenho.objects.filter(empenho__observacao__icontains=busca).values_list('estoque_id', flat=True)
+        estoque_query = estoque_query.filter(Q(lote__icontains=busca) | Q(id__in=ids_por_empenho))
+
+    # Paginação
+    paginator = Paginator(estoque_query, int(request.GET.get('page_size', 25)))
+    estoque_page = paginator.get_page(request.GET.get('page', 1))
+
+    # Montagem dos dados
+    lotes_com_empenho = []
+    # Otimização simples para evitar N+1 queries
+    itens_empenhados = ItemEmpenho.objects.filter(
+        estoque__in=estoque_page, 
+        empenho__status__nome='Rascunho'
+    ).select_related('empenho')
+
+    for item in estoque_page:
+        meus_itens = [i for i in itens_empenhados if i.estoque_id == item.id]
+        qtd_emp = sum(i.quantidade for i in meus_itens)
+        lotes_com_empenho.append({
+            'lote': item,
+            'saldo_total': item.saldo,
+            'empenhado': qtd_emp,
+            'disponivel': item.saldo - qtd_emp,
+            'empenhos': meus_itens
+        })
+
+    # Contexto
+    params = request.GET.copy()
+    if 'page' in params: del params['page']
+    
+    context = {
+        'lotes': lotes_com_empenho,
+        'estoque': estoque_page,
+        'todos_empenhos': Empenho.objects.filter(usuario=request.user, status__nome='Rascunho'),
+        'form_empenho': EmpenhoLoteForm(),
+        'form_acoes': AcoesEmpenhoForm(),
+        'url_filtros': '&' + params.urlencode() if params else '',
+        'filtro_lote': filtro_lote,
+        'busca': busca,
+        'total_lotes': estoque_query.count(),
+        'total_saldo': estoque_query.aggregate(Sum('saldo'))['saldo__sum'] or 0,
+    }
+    
+    return render(request, 'sapp/pagina_rascunho.html', context)
