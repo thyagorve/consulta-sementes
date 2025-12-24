@@ -1,0 +1,148 @@
+<!-- Modais -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-download me-2"></i>Exportar Dados
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">Escolha o formato para exportação:</p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card h-100 border-success">
+                            <div class="card-body text-center">
+                                <i class="fa-solid fa-file-excel fa-3x text-success mb-3"></i>
+                                <h5 class="card-title">Exportar para Excel</h5>
+                                <p class="card-text text-muted small">Exporta todos os dados com formatação completa</p>
+                                <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success w-100">
+                                    <i class="fa-solid fa-download me-2"></i>Baixar Excel
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100 border-danger">
+                            <div class="card-body text-center">
+                                <i class="fa-solid fa-file-pdf fa-3x text-danger mb-3"></i>
+                                <h5 class="card-title">Exportar para PDF</h5>
+                                <p class="card-text text-muted small">Relatório formatado para impressão</p>
+                                <a href="{% url 'sapp:exportar_estoque_pdf' %}" class="btn btn-danger w-100">
+                                    <i class="fa-solid fa-download me-2"></i>Baixar PDF
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="alert alert-info">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        <strong>Inclui todos os campos:</strong> Lote, Produto, Cultivar, Peneira, Categoria, Endereço, Saldo, 
+                        Peso Unitário, Peso Total, Tratamento, Embalagem, Cliente, Empresa, AZ, Status, Conferente, Data Entrada, Observações.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-upload me-2"></i>Importar Dados
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importForm" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="form-label fw-medium">Selecione o arquivo Excel</label>
+                        <div class="input-group">
+                            <input type="file" class="form-control" name="excel_file" accept=".xlsx, .xls" required>
+                            <button class="btn btn-outline-primary" type="button" onclick="document.getElementById('downloadTemplate').click()">
+                                <i class="fa-solid fa-file-download me-1"></i>Template
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            Use a planilha exportada deste sistema ou 
+                            <a href="#" onclick="document.getElementById('downloadTemplate').click()">baixe o template</a>
+                        </div>
+                        <a id="downloadTemplate" href="{% url 'sapp:exportar_estoque_excel' %}" style="display: none;"></a>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fa-solid fa-lightbulb me-2"></i>
+                        <strong>Modo Incremental:</strong> 
+                        <ul class="mb-0 mt-1">
+                            <li>Novos lotes serão criados</li>
+                            <li>Lotes existentes serão atualizados</li>
+                            <li>Nenhum lote será removido do sistema</li>
+                            <li>O campo <strong>cliente</strong> será mantido nas transferências</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
+                        <strong>Importante:</strong> Certifique-se de que a planilha contenha as colunas necessárias, 
+                        incluindo o novo campo <strong>Cliente</strong>.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="previewImport()">
+                    <i class="fa-solid fa-eye me-2"></i>Pré-visualizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-eye me-2"></i>Pré-visualização da Importação
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="proceedToApproval()">
+                    <i class="fa-solid fa-check me-2"></i>Continuar para Aprovação
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="approvalModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fa-solid fa-shield-check me-2"></i>Aprovar Modificações
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="approvalContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="submitApproval()" id="approveButton">
+                    <i class="fa-solid fa-check-double me-2"></i>Aprovar Modificações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
