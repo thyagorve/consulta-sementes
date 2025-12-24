@@ -839,14 +839,17 @@ def dashboard(request):
     ).order_by('-total')[:10])
     
     capacidade_armazem = list(Estoque.objects.filter(
-        saldo__gt=0
+        saldo__gt=0,
+        az__isnull=False  # Filtra apenas itens com AZ definido
+    ).exclude(
+        az=''  # Remove valores vazios
     ).values(
-        'endereco'
+        'az'  # ✅ CORRETO: agora usa o campo AZ
     ).annotate(
         total_sc=Sum('saldo'),
         total_lotes=Count('id'),
         peso_total=Sum('peso_total')
-    ).order_by('endereco'))
+    ).order_by('az'))  # Ordena por AZ
     
     movimentacao_recente = list(HistoricoMovimentacao.objects.select_related(
         'estoque', 'usuario'
@@ -3381,3 +3384,4 @@ def pagina_rascunho(request):
     
 
     return render(request, 'sapp/pagina_rascunho.html', context)
+
