@@ -875,6 +875,8 @@ def dashboard(request):
 
 # CORREÇÃO NO VIEWS.PY - Na função gestao_estoque:
 
+# No views.py, na função gestao_estoque, adicione após os cálculos de totais:
+
 @login_required
 def gestao_estoque(request):
     """Gestão de estoque com paginação e busca"""
@@ -892,7 +894,8 @@ def gestao_estoque(request):
             Q(endereco__icontains=busca) |
             Q(peneira__nome__icontains=busca) |
             Q(tratamento__nome__icontains=busca) |
-            Q(produto__icontains=busca)
+            Q(produto__icontains=busca) |
+            Q(cliente__icontains=busca)  # Adicione cliente na busca
         )
     
     # Configuração de paginação
@@ -922,7 +925,6 @@ def gestao_estoque(request):
     total_sc_units = sacos.aggregate(total=Sum('saldo'))['total'] or 0
     
     # 🔥 CORREÇÃO: 1 BAG = 25 SC (CONVERSÃO)
-    # Se temos 100 unidades BAG, isso equivale a 100 * 25 = 2500 SC
     total_bags_em_sc = total_bags_units * 25
     
     # Total geral em SC (BAG convertido + SC físico)
@@ -931,6 +933,14 @@ def gestao_estoque(request):
     # Total geral de unidades (todas embalagens)
     total_unidades = estoque_query.aggregate(total=Sum('saldo'))['total'] or 0
     
+    # 🔥 CORREÇÃO: Calcular clientes únicos
+    # Primeiro, pegue todos os clientes não nulos e não vazios
+    clientes_com_estoque = estoque_query.exclude(
+        Q(cliente__isnull=True) | Q(cliente='')
+    ).values_list('cliente', flat=True).distinct()
+    
+    clientes_unicos = len(clientes_com_estoque)
+    
     context = {
         'estoque': estoque_page,
         'total_itens': total_itens,
@@ -938,6 +948,7 @@ def gestao_estoque(request):
         'total_sc': total_geral_sc,  # Total em Sacos (com conversão)
         'total_bags': total_bags_units,  # Unidades de BAG
         'total_sc_fisico': total_sc_units,  # Unidades de SC físico
+        'clientes_unicos': clientes_unicos,  # 🔥 ADICIONADO
         'page_sizes': [10, 25, 50, 100],
         'busca': busca,
     }
@@ -3384,4 +3395,5 @@ def pagina_rascunho(request):
     
 
     return render(request, 'sapp/pagina_rascunho.html', context)
+
 
