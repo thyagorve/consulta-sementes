@@ -876,7 +876,6 @@ def dashboard(request):
 # CORREÇÃO NO VIEWS.PY - Na função gestao_estoque:
 
 # No views.py, na função gestao_estoque, adicione após os cálculos de totais:
-
 @login_required
 def gestao_estoque(request):
     """Gestão de estoque com paginação e busca"""
@@ -895,7 +894,10 @@ def gestao_estoque(request):
             Q(peneira__nome__icontains=busca) |
             Q(tratamento__nome__icontains=busca) |
             Q(produto__icontains=busca) |
-            Q(cliente__icontains=busca)  # Adicione cliente na busca
+            Q(cliente__icontains=busca) |
+            Q(empresa__icontains=busca) |
+            Q(especie__icontains=busca) |
+            Q(categoria__nome__icontains=busca)
         )
     
     # Configuração de paginação
@@ -934,25 +936,31 @@ def gestao_estoque(request):
     total_unidades = estoque_query.aggregate(total=Sum('saldo'))['total'] or 0
     
     # 🔥 CORREÇÃO: Calcular clientes únicos
-    # Primeiro, pegue todos os clientes não nulos e não vazios
     clientes_com_estoque = estoque_query.exclude(
         Q(cliente__isnull=True) | Q(cliente='')
     ).values_list('cliente', flat=True).distinct()
     
     clientes_unicos = len(clientes_com_estoque)
     
+    # Para debug - lista de clientes
+    clientes_lista = list(clientes_com_estoque)[:20]  # Limitar para debug
+    
     context = {
         'estoque': estoque_page,
         'total_itens': total_itens,
-        'total_saldo': total_unidades,  # Unidades totais
-        'total_sc': total_geral_sc,  # Total em Sacos (com conversão)
-        'total_bags': total_bags_units,  # Unidades de BAG
-        'total_sc_fisico': total_sc_units,  # Unidades de SC físico
-        'clientes_unicos': clientes_unicos,  # 🔥 ADICIONADO
+        'total_saldo': total_unidades,
+        'total_sc': total_geral_sc,
+        'total_bags': total_bags_units,
+        'total_sc_fisico': total_sc_units,
+        'clientes_unicos': clientes_unicos,
+        'clientes_lista': clientes_lista,
         'page_sizes': [10, 25, 50, 100],
+        'page_size': page_size,
         'busca': busca,
+        'debug_mode': True,  # Para ajudar no debug
     }
     return render(request, 'sapp/gestao_estoque.html', context)
+
 @login_required
 def importar_estoque(request):
     """Importação de estoque COMPLETA - todos os campos igual à exportação"""
