@@ -833,7 +833,7 @@ def dashboard(request):
     ).order_by('-total_saldo')[:10])
     
     categorias_distribuicao = list(Estoque.objects.filter(saldo__gt=0).values(
-        'categoria__nome'
+        'peneira__nome'  # Alterado de categoria__nome para peneira__nome
     ).annotate(
         total=Sum('saldo')
     ).order_by('-total')[:10])
@@ -3379,4 +3379,5 @@ def pagina_rascunho(request):
         'total_saldo': estoque_query.aggregate(Sum('saldo'))['saldo__sum'] or 0,
     }
     
+
     return render(request, 'sapp/pagina_rascunho.html', context)
