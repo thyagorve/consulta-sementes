@@ -340,8 +340,8 @@
             <table class="table table-advanced table-hover mb-0" id="estoqueTable">
                 <thead>
                     <tr>
+                        <th>AZ</th>
                         <th>Lote</th>
-                        <th>Produto / Cliente</th>
                         <th>Cultivar</th>
                         <th>Peneira</th>
                         <th>Categoria</th>
@@ -349,6 +349,7 @@
                         <th>Saldo</th>
                         <th>Peso Unit. (kg)</th>
                         <th>Peso Total (kg)</th>
+                        <th>Especie</th>
                         <th>Tratamento</th>
                         <th>Embalagem</th>
                         <th>Cliente</th>
@@ -361,17 +362,17 @@
                     {% for item in estoque %}
                     <tr onclick="window.location.href='{% url 'sapp:lista_estoque' %}?busca={{ item.lote }}'" style="cursor: pointer;">
                         <td>
+                            {% if item.az %}
+                            <br><small class="text-muted">{{ item.az }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
                             <span class="fw-bold text-primary">{{ item.lote }}</span>
                             {% if item.lote_anterior %}
                             <br><small class="text-muted">Ant: {{ item.lote_anterior }}</small>
                             {% endif %}
                         </td>
-                        <td>
-                            <div class="fw-bold">{{ item.cultivar.nome }}</div>
-                            {% if item.produto %}
-                            <span class="badge bg-dark">{{ item.produto }}</span>
-                            {% endif %}
-                        </td>
+                     
                         <td>{{ item.cultivar.nome }}</td>
                         <td>{{ item.peneira.nome }}</td>
                         <td>{{ item.categoria.nome }}</td>
@@ -390,6 +391,12 @@
                         <td>
                             <strong>{{ item.peso_total|floatformat:2 }} kg</strong>
                         </td>
+
+
+
+                        <td>{{ item.especie.nome }}</td>
+
+                        
                         <td>
                             {% if item.tratamento %}
                                 <span class="badge bg-info">{{ item.tratamento.nome|truncatechars:10 }}</span>
@@ -1265,4 +1272,5 @@ window.showAlert = showAlert;
         background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%) !important;
     }
 </style>
+
 {% endblock %}
