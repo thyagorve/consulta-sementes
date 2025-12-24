@@ -11,7 +11,7 @@
         <p class="mb-0 text-muted">Bem-vindo, {{ user.username }}! Visão geral em tempo real</p>
     </div>
 
-    <!-- KPIs Cards - Reorganizados -->
+    <!-- KPIs Cards -->
     <div class="row mb-4">
         <!-- Total Estoque -->
         <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
@@ -264,12 +264,10 @@
                         <a href="{% url 'sapp:configuracoes' %}" class="btn btn-dark btn-sm px-3">
                             <i class="fas fa-cog me-1"></i>Configurações
                         </a>
-                        <a href="{% url 'sapp:importar_estoque' %}" class="btn btn-warning btn-sm px-3">
+                        <!-- Botão de importar comentado até você ter a URL configurada -->
+                        <!-- <a href="{% url 'sapp:importar_estoque' %}" class="btn btn-warning btn-sm px-3">
                             <i class="fas fa-file-import me-1"></i>Importar
-                        </a>
-                        <a href="{% url 'sapp:exportar_excel' %}" class="btn btn-info btn-sm px-3">
-                            <i class="fas fa-file-excel me-1"></i>Exportar
-                        </a>
+                        </a> -->
                     </div>
                 </div>
             </div>
@@ -368,22 +366,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             options: {
                 ...commonChartOptions,
-                cutout: '65%',
-                plugins: {
-                    ...commonChartOptions.plugins,
-                    tooltip: {
-                        ...commonChartOptions.plugins.tooltip,
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.raw || 0;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                                return `${label}: ${value.toLocaleString('pt-BR')} bgs (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
+                cutout: '65%'
             }
         });
         createCustomLegend('cultivar', cultivarLabels, cultivarValues, themeColors.slice(0, cultivarLabels.length), ' bgs');
@@ -406,24 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     borderColor: '#fff'
                 }]
             },
-            options: {
-                ...commonChartOptions,
-                plugins: {
-                    ...commonChartOptions.plugins,
-                    tooltip: {
-                        ...commonChartOptions.plugins.tooltip,
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.raw || 0;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                                return `${label}: ${value.toLocaleString('pt-BR')} bgs (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
+            options: commonChartOptions
         });
         createCustomLegend('peneira', peneiraLabels, peneiraValues, themeColors.slice(0, peneiraLabels.length), ' bgs');
     }
@@ -530,7 +496,6 @@ window.addEventListener('resize', function() {
 </script>
 
 <style>
-/* Estilos otimizados */
 .page-title {
     background: linear-gradient(135deg, #2f8f4e, #1f2d2a);
     color: white;
@@ -560,7 +525,6 @@ window.addEventListener('resize', function() {
     padding: 1rem;
 }
 
-/* Ajustes para mobile */
 @media (max-width: 768px) {
     .page-title {
         padding: 1rem;
@@ -585,7 +549,6 @@ window.addEventListener('resize', function() {
     }
 }
 
-/* Scrollbar customizada */
 .table-responsive::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -605,26 +568,12 @@ window.addEventListener('resize', function() {
     background: #a8a8a8;
 }
 
-/* Legendas com scroll */
-#cultivarLegend, #peneiraLegend, #armazemLegend {
-    scrollbar-width: thin;
-    scrollbar-color: #c1c1c1 #f1f1f1;
-}
-
-#cultivarLegend::-webkit-scrollbar,
-#peneiraLegend::-webkit-scrollbar,
-#armazemLegend::-webkit-scrollbar {
-    width: 4px;
-}
-
-/* Badges compactos */
 .badge {
     font-size: 0.7rem;
     padding: 0.25rem 0.5rem;
     font-weight: 500;
 }
 
-/* Tabela compacta */
 .table-sm th,
 .table-sm td {
     padding: 0.5rem 0.75rem;
@@ -641,17 +590,10 @@ window.addEventListener('resize', function() {
     border-bottom: 2px solid #dee2e6;
 }
 
-/* Hover das linhas da tabela */
 .table-hover tbody tr:hover {
     background-color: rgba(47, 143, 78, 0.05);
 }
 
-/* Ícones dos cards KPI */
-.fa-pallet, .fa-weight-hanging, .fa-box-open, .fa-exchange-alt {
-    opacity: 0.7;
-}
-
-/* Responsividade das colunas KPI */
 @media (max-width: 576px) {
     .col-md-6 .card-body .h4 {
         font-size: 1.25rem;
