@@ -295,6 +295,7 @@
             </div>
         </div>
         
+        <!-- No cards de estatísticas, modifique o card de clientes: -->
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="d-flex align-items-center">
@@ -306,10 +307,21 @@
                         <small class="text-muted">Clientes Únicos</small>
                         <br>
                         <small class="text-muted">Com lotes ativos</small>
+                        <!-- Adicione para debug -->
+                        {% if debug_mode %}
+                        <br>
+                        <small class="text-muted" style="font-size: 0.7rem;">
+                            {% for cliente in clientes_lista|slice:":5" %}
+                                {{ cliente }}<br>
+                            {% endfor %}
+                            {% if clientes_lista|length > 5 %}...{% endif %}
+                        </small>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
+        
     </div>
 
     <!-- Botões de Ação -->
@@ -368,9 +380,7 @@
                         </td>
                         <td>
                             <span class="fw-bold text-primary">{{ item.lote }}</span>
-                            {% if item.lote_anterior %}
-                            <br><small class="text-muted">Ant: {{ item.lote_anterior }}</small>
-                            {% endif %}
+         
                         </td>
                      
                         <td>{{ item.cultivar.nome }}</td>
@@ -378,9 +388,7 @@
                         <td>{{ item.categoria.nome }}</td>
                         <td>
                             <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
-                            {% if item.az %}
-                            <br><small class="text-muted">AZ: {{ item.az }}</small>
-                            {% endif %}
+                         
                         </td>
                         <td>
                             <span class="badge badge-saldo {% if item.saldo > 100 %}bg-success{% elif item.saldo > 0 %}bg-warning{% else %}bg-danger{% endif %}">
@@ -394,7 +402,7 @@
 
 
 
-                        <td>{{ item.especie.nome }}</td>
+                        <td>{{ item.especie }}</td>
 
                         
                         <td>
@@ -1274,3 +1282,4 @@ window.showAlert = showAlert;
 </style>
 
 {% endblock %}
+
