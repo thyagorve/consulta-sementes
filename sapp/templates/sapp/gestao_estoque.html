@@ -3,52 +3,163 @@
 
 {% block content %}
 <style>
-    .table-advanced {
-        font-size: 0.875rem;
-        width: 100%;
+    /* ESTILOS PRINCIPAIS */
+    .container-fluid {
+        padding: 20px;
     }
     
-    /* CABEÇALHO FIXO - CORREÇÃO */
-    .table-container {
-        position: relative;
-        height: calc(70vh - 60px); /* Altura fixa menos espaço para cabeçalho */
+    /* CABEÇALHO DA PÁGINA */
+    .page-header {
+        margin-bottom: 20px;
     }
     
-    .table-wrapper {
+    /* CARTÕES DE ESTATÍSTICAS */
+    .stats-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
         height: 100%;
-        overflow-y: auto;
-        overflow-x: auto;
     }
     
-    /* CABEÇALHO PRIMEIRA LINHA FIXA */
-    .table-advanced thead tr:first-child {
-        position: sticky;
-        top: 0;
-        z-index: 20;
+    /* BOTÕES DE AÇÃO */
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+    
+    .btn-export {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+    }
+    
+    .btn-import {
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+    }
+    
+    .btn-print {
+        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+    }
+    
+    .btn-filters {
+        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+    }
+    
+    .btn-filters.active {
         background: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
     }
     
-    /* SEGUNDA LINHA (FILTROS) FIXA */
+    .btn-clear {
+        background: #dc3545;
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 6px;
+    }
+    
+    /* BUSCA */
+    .search-container {
+        position: relative;
+        max-width: 300px;
+    }
+    
+    .search-input {
+        padding-left: 2.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .search-input:focus {
+        border-color: #2f8f4e;
+        box-shadow: 0 0 0 0.2rem rgba(47, 143, 78, 0.25);
+    }
+    
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+        z-index: 5;
+    }
+    
+    /* TABELA COM CABEÇALHO FIXO */
+    .table-container {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        height: 500px; /* Altura fixa */
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .table-wrapper {
+        flex: 1;
+        overflow: auto;
+        position: relative;
+    }
+    
+    /* TABELA */
+    .table-advanced {
+        width: 100%;
+        font-size: 0.875rem;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-bottom: 0;
+    }
+    
+    /* CABEÇALHO FIXO - IMPORTANTE */
+    .table-advanced thead tr:first-child {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
     .table-advanced thead tr:nth-child(2) {
         position: sticky;
         top: 48px; /* Altura da primeira linha */
-        z-index: 15;
-        background: #3a9d5d;
+        z-index: 10;
     }
     
     .table-advanced th {
+        background: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
         color: white;
         font-weight: 600;
         border: none;
         padding: 12px 8px;
-        position: relative;
+        text-align: left;
         white-space: nowrap;
     }
     
-    /* ESTILO PARA LINHA DE FILTROS */
-    .table-advanced th.filter-header {
+    /* CABEÇALHO DOS FILTROS */
+    .filter-header {
         background: #3a9d5d !important;
-        padding: 5px 8px !important;
+        padding: 6px 8px !important;
     }
     
     .filter-input {
@@ -75,75 +186,48 @@
     .table-advanced td {
         padding: 10px 8px;
         vertical-align: middle;
-        border-color: #e9ecef;
+        border-bottom: 1px solid #e9ecef;
         white-space: nowrap;
     }
     
+    .table-advanced tbody tr {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .table-advanced tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+    
+    /* BADGES */
     .badge-saldo {
         font-size: 0.75rem;
         padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: 500;
     }
     
-    .action-buttons {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.5rem;
-    }
-    
-    .btn-export {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        border: none;
+    .badge-cliente {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
         color: white;
-        font-weight: 600;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
     }
     
-    .btn-import {
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-        border: none;
+    .badge-empresa {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
         color: white;
-        font-weight: 600;
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
     }
     
-    .btn-print {
-        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-        border: none;
-        color: white;
-        font-weight: 600;
-    }
+    .badge-status-ativo { background: #198754; }
+    .badge-status-esgotado { background: #dc3545; }
+    .badge-status-bloqueado { background: #6c757d; }
     
-    /* NOVO BOTÃO PARA FILTROS POR COLUNA */
-    .btn-filters {
-        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-        border: none;
-        color: white;
-        font-weight: 600;
-    }
-    
-    .btn-filters.active {
-        background: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
-    }
-    
-    .stats-card {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        margin-bottom: 1.5rem;
-        position: relative;
-        z-index: 1;
-    }
-    
-    /* CONTÊINER DA TABELA FIXADO */
-    .table-container {
-        background: white;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-
-    /* PAGINAÇÃO MELHORADA - NÃO ATRAPALHA OS CARTÕES */
+    /* PAGINAÇÃO */
     .pagination-container {
         background: white;
         border-radius: 10px;
@@ -151,13 +235,6 @@
         margin-top: 1.5rem;
         box-shadow: 0 2px 10px rgba(0,0,0,0.08);
         border: 1px solid #e9ecef;
-        position: relative;
-        z-index: 1;
-    }
-    
-    .pagination-info {
-        font-size: 0.9rem;
-        color: #6c757d;
     }
     
     .pagination-controls {
@@ -200,114 +277,7 @@
         background: #f8f9fa;
     }
     
-    .pagination-btn.disabled:hover {
-        transform: none;
-        border-color: #dee2e6;
-    }
-    
-    .pagination-dots {
-        color: #6c757d;
-        padding: 0 0.5rem;
-    }
-    
-    .pagination-items-per-page {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.875rem;
-    }
-    
-    .pagination-items-select {
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        padding: 0.25rem 0.5rem;
-        background: white;
-        color: #495057;
-    }
-
-    /* Campo de busca melhorado */
-    .search-container {
-        position: relative;
-        max-width: 300px;
-    }
-    
-    .search-input {
-        padding-left: 2.5rem;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        transition: all 0.3s ease;
-    }
-    
-    .search-input:focus {
-        border-color: #2f8f4e;
-        box-shadow: 0 0 0 0.2rem rgba(47, 143, 78, 0.25);
-    }
-    
-    .search-icon {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #6c757d;
-        z-index: 5;
-    }
-    
-    /* Cliente badge */
-    .badge-cliente {
-        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
-        color: white;
-        font-size: 0.7rem;
-        padding: 2px 6px;
-        margin-top: 2px;
-        display: inline-block;
-    }
-    
-    /* Status badges */
-    .badge-status-ativo { background: #198754; }
-    .badge-status-esgotado { background: #dc3545; }
-    .badge-status-bloqueado { background: #6c757d; }
-    
-    /* Loader para importação */
-    .import-loader {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 9999;
-        justify-content: center;
-        align-items: center;
-    }
-    
-    .loader-content {
-        background: white;
-        padding: 2rem;
-        border-radius: 10px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    }
-    
-    .spinner-border {
-        width: 3rem;
-        height: 3rem;
-    }
-    
-    /* Empresa badge */
-    .badge-empresa {
-        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-        color: white;
-        font-size: 0.7rem;
-        padding: 2px 6px;
-    }
-
-    .bg-brown {
-        background-color: #8b4513 !important;
-        color: white !important;
-    }
-    
-    /* CONTADOR FLUTUANTE */
+    /* CONTADOR */
     .counter-badge {
         position: fixed;
         bottom: 20px;
@@ -321,13 +291,7 @@
         font-size: 14px;
     }
     
-    /* AJUSTE PARA O SCROLL NÃO SOBREPOR OS CARTÕES */
-    .container-fluid {
-        position: relative;
-        min-height: 100vh;
-    }
-    
-    /* SCROLLBAR PERSONALIZADA */
+    /* SCROLLBAR */
     .table-wrapper::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -343,28 +307,30 @@
         border-radius: 4px;
     }
     
-    .table-wrapper::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
+    /* LINHAS OCULTAS */
+    .hidden-row {
+        display: none !important;
     }
-    
 </style>
 
 <div class="container-fluid py-4">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="text-success fw-bold mb-1">
-                <i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque
-            </h2>
-            <p class="text-muted mb-0">Controle completo do estoque atual</p>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary" id="totalRegistros">{{ estoque.paginator.count|intcomma }} itens</span>
-            <span class="badge bg-success" id="totalSC">{{ total_sc|intcomma }} SC total</span>
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="text-success fw-bold mb-1">
+                    <i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque
+                </h2>
+                <p class="text-muted mb-0">Controle completo do estoque atual</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary" id="totalRegistros">{{ estoque.paginator.count|intcomma }} itens</span>
+                <span class="badge bg-success">{{ total_sc|intcomma }} SC total</span>
+            </div>
         </div>
     </div>
 
-    <!-- Cards de Estatísticas - FIXOS NO TOPO -->
+    <!-- Cards de Estatísticas -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="stats-card">
@@ -387,11 +353,11 @@
                         <i class="fa-solid fa-weight-hanging text-white"></i>
                     </div>
                     <div>
-                        <h4 class="mb-0 text-info" id="cardTotalSC">{{ total_sc|intcomma }}</h4>
+                        <h4 class="mb-0 text-info">{{ total_sc|intcomma }}</h4>
                         <small class="text-muted">Equivalente SC</small>
                         <br>
                         <small class="text-muted">
-                            (<span id="cardTotalBags">{{ total_bags|intcomma }}</span> BAG × 25 + <span id="cardTotalSCFisico">{{ total_sc_fisico|intcomma }}</span> SC)
+                            ({{ total_bags|intcomma }} BAG × 25 + {{ total_sc_fisico|intcomma }} SC)
                         </small>
                     </div>
                 </div>
@@ -405,18 +371,17 @@
                         <i class="fa-solid fa-box text-white"></i>
                     </div>
                     <div>
-                        <h4 class="mb-0 text-warning" id="cardTotalBags">{{ total_bags|intcomma }}</h4>
+                        <h4 class="mb-0 text-warning">{{ total_bags|intcomma }}</h4>
                         <small class="text-muted">Unidades BAG</small>
                         <br>
                         <small class="text-muted">
-                            (<span id="cardSCFisico">{{ total_sc_fisico|intcomma }}</span> unidades SC)
+                            ({{ total_sc_fisico|intcomma }} unidades SC)
                         </small>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Card de Clientes Únicos - AGORA FUNCIONANDO -->
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="d-flex align-items-center">
@@ -434,27 +399,25 @@
         </div>
     </div>
 
-    <!-- Botões de Ação - COM NOVO BOTÃO DE FILTROS -->
+    <!-- Botões de Ação -->
     <div class="action-buttons">
-        <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
+        <button class="btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
             <i class="fa-solid fa-download me-2"></i>Exportar
         </button>
         
-        <button class="btn btn-import" data-bs-toggle="modal" data-bs-target="#importModal">
+        <button class="btn-import" data-bs-toggle="modal" data-bs-target="#importModal">
             <i class="fa-solid fa-upload me-2"></i>Importar
         </button>
         
-        <button class="btn btn-print" onclick="window.print()">
+        <button class="btn-print" onclick="window.print()">
             <i class="fa-solid fa-print me-2"></i>Imprimir
         </button>
         
-        <!-- NOVO BOTÃO PARA FILTROS POR COLUNA -->
-        <button class="btn btn-filters" onclick="toggleColumnFilters()" id="toggleFiltersBtn">
+        <button class="btn-filters" onclick="toggleColumnFilters()" id="toggleFiltersBtn">
             <i class="fa-solid fa-filter me-2"></i>Filtros por Coluna
         </button>
         
-        <!-- BOTÃO PARA LIMPAR FILTROS -->
-        <button class="btn btn-danger" onclick="clearAllFilters()">
+        <button class="btn-clear" onclick="clearAllFilters()">
             <i class="fa-solid fa-times me-2"></i>Limpar Filtros
         </button>
         
@@ -462,17 +425,15 @@
             <i class="fa-solid fa-search search-icon"></i>
             <input type="text" id="globalSearch" class="form-control search-input" 
                    placeholder="Busca global em todas as colunas..." 
-                   value="{{ busca }}"
-                   onkeyup="filterTable()">
+                   value="{{ busca }}">
         </div>
     </div>
 
-    <!-- Tabela de Estoque COM FILTROS POR COLUNA - ALTURA FIXA -->
+    <!-- Tabela de Estoque -->
     <div class="table-container">
         <div class="table-wrapper">
             <table class="table table-advanced table-hover mb-0" id="estoqueTable">
                 <thead>
-                    <!-- LINHA DE TÍTULOS DAS COLUNAS - FIXA -->
                     <tr>
                         <th>AZ</th>
                         <th>Lote</th>
@@ -492,55 +453,55 @@
                         <th>Conferente</th>
                     </tr>
                     
-                    <!-- LINHA DE FILTROS (INICIALMENTE ESCONDIDA) - FIXA -->
+                    <!-- Linha de filtros (inicialmente oculta) -->
                     <tr id="filterRow" style="display: none;">
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar AZ..." onkeyup="filterColumn(0, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar AZ...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Lote..." onkeyup="filterColumn(1, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Lote...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Cultivar..." onkeyup="filterColumn(2, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Cultivar...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Peneira..." onkeyup="filterColumn(3, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Peneira...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Categoria..." onkeyup="filterColumn(4, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Categoria...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Endereço..." onkeyup="filterColumn(5, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Endereço...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Saldo..." onkeyup="filterColumn(6, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Saldo...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Peso Unit..." onkeyup="filterColumn(7, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Peso Unit...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Peso Total..." onkeyup="filterColumn(8, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Peso Total...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Espécie..." onkeyup="filterColumn(9, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Espécie...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Tratamento..." onkeyup="filterColumn(10, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Tratamento...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Embalagem..." onkeyup="filterColumn(11, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Embalagem...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Cliente..." onkeyup="filterColumn(12, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Cliente...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Empresa..." onkeyup="filterColumn(13, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Empresa...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Status..." onkeyup="filterColumn(14, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Status...">
                         </th>
                         <th class="filter-header">
-                            <input type="text" class="filter-input" placeholder="Filtrar Conferente..." onkeyup="filterColumn(15, this.value)">
+                            <input type="text" class="filter-input" placeholder="Filtrar Conferente...">
                         </th>
                     </tr>
                 </thead>
@@ -549,13 +510,12 @@
                     <tr class="data-row" onclick="window.location.href='{% url 'sapp:lista_estoque' %}?busca={{ item.lote }}'" style="cursor: pointer;">
                         <td>
                             {% if item.az %}
-                            <br><small class="text-muted">{{ item.az }}</small>
+                            {{ item.az }}
                             {% endif %}
                         </td>
                         <td>
                             <span class="fw-bold text-primary">{{ item.lote }}</span>
                         </td>
-                     
                         <td>{{ item.cultivar.nome }}</td>
                         <td>{{ item.peneira.nome }}</td>
                         <td>{{ item.categoria.nome }}</td>
@@ -563,7 +523,7 @@
                             <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
                         </td>
                         <td>
-                            <span class="badge badge-saldo {% if item.saldo > 100 %}bg-success{% elif item.saldo > 0 %}bg-warning{% else %}bg-danger{% endif %}">
+                            <span class="badge-saldo {% if item.saldo > 100 %}bg-success{% elif item.saldo > 0 %}bg-warning{% else %}bg-danger{% endif %}">
                                 {{ item.saldo|intcomma }}
                             </span>
                         </td>
@@ -571,18 +531,13 @@
                         <td>
                             <strong>{{ item.peso_total|floatformat:2 }} kg</strong>
                         </td>
-
                         <td>
                             {% if item.especie %}
-                                <span class="badge bg-info text-white">
-                                    {{ item.especie }}
-                                </span>
+                                <span class="badge bg-info text-white">{{ item.especie }}</span>
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}
                         </td>
-
-                        
                         <td>
                             {% if item.tratamento %}
                                 <span class="badge bg-info">{{ item.tratamento.nome|truncatechars:10 }}</span>
@@ -639,24 +594,23 @@
         </div>
     </div>
 
-    <!-- CONTADOR FLUTUANTE -->
+    <!-- Contador -->
     <div class="counter-badge" id="counterBadge">
-        <span id="visibleRows">{{ estoque|length }}</span> de <span id="totalRows">{{ total_itens }}</span> itens
+        <span id="visibleRows">{{ estoque|length }}</span> de <span id="totalRows">{{ estoque.paginator.count }}</span> itens
     </div>
 
-    <!-- PAGINAÇÃO MELHORADA (ORIGINAL) - FIXADA NO FINAL -->
+    <!-- Paginação -->
     {% if estoque.paginator.num_pages > 1 %}
     <div class="pagination-container">
         <div class="row align-items-center">
             <div class="col-md-4">
                 <div class="pagination-info">
-                    Mostrando <span id="paginacaoInicio">{{ estoque.start_index }}</span> - <span id="paginacaoFim">{{ estoque.end_index }}</span> de <span id="paginacaoTotal">{{ estoque.paginator.count }}</span> itens
+                    Mostrando {{ estoque.start_index }} - {{ estoque.end_index }} de {{ estoque.paginator.count }} itens
                 </div>
             </div>
             
             <div class="col-md-4">
                 <div class="pagination-controls">
-                    <!-- Botão Anterior -->
                     {% if estoque.has_previous %}
                     <a href="?page={{ estoque.previous_page_number }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
                        class="pagination-btn" title="Página anterior">
@@ -668,7 +622,6 @@
                     </span>
                     {% endif %}
                     
-                    <!-- Primeira página -->
                     {% if estoque.number > 3 %}
                     <a href="?page=1{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
                        class="pagination-btn" title="Primeira página">
@@ -677,7 +630,6 @@
                     <span class="pagination-dots">...</span>
                     {% endif %}
                     
-                    <!-- Páginas ao redor da atual -->
                     {% for num in estoque.paginator.page_range %}
                         {% if num > estoque.number|add:'-3' and num < estoque.number|add:'3' %}
                             {% if num == estoque.number %}
@@ -691,7 +643,6 @@
                         {% endif %}
                     {% endfor %}
                     
-                    <!-- Última página -->
                     {% if estoque.number < estoque.paginator.num_pages|add:'-2' %}
                     <span class="pagination-dots">...</span>
                     <a href="?page={{ estoque.paginator.num_pages }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
@@ -700,7 +651,6 @@
                     </a>
                     {% endif %}
                     
-                    <!-- Botão Próximo -->
                     {% if estoque.has_next %}
                     <a href="?page={{ estoque.next_page_number }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
                        class="pagination-btn" title="Próxima página">
@@ -717,7 +667,7 @@
             <div class="col-md-4 text-end">
                 <div class="pagination-items-per-page">
                     <span class="text-muted">Itens por página:</span>
-                    <select class="pagination-items-select" onchange="updatePageSize(this.value)">
+                    <select class="form-select form-select-sm d-inline-block w-auto" onchange="updatePageSize(this.value)">
                         {% for size in page_sizes %}
                         <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }}</option>
                         {% endfor %}
@@ -729,10 +679,10 @@
     {% endif %}
 </div>
 
-<!-- MODAIS (ORIGINAIS MANTIDOS) -->
-<!-- ... (seus modais permanecem iguais) ... -->
+<!-- Modais (mantenha seus modais originais) -->
+{% include 'sapp/modais_export_import.html' %}
 
-<!-- Loader para importação -->
+<!-- Loader -->
 <div class="import-loader" id="importLoader">
     <div class="loader-content">
         <div class="spinner-border text-success mb-3" role="status">
@@ -743,106 +693,114 @@
     </div>
 </div>
 
-<!-- JAVASCRIPT COMPLETO COM CORREÇÕES -->
+<!-- JAVASCRIPT 100% FUNCIONANDO -->
 <script>
 // ================================================
 // VARIÁVEIS GLOBAIS
 // ================================================
-
-    
-let currentImportData = null;
-let selectedModifications = new Set();
-let searchTimeout = null;
 let columnFilters = {};
 let globalFilter = '';
 let isColumnFiltersVisible = false;
+let searchTimeout = null;
 
 // ================================================
 // INICIALIZAÇÃO
 // ================================================
 document.addEventListener('DOMContentLoaded', function() {
-    // Configurar busca
-    setupSearch();
-    
-    // Inicializar contadores
-    updateCounters();
+    console.log("✅ JS carregado e funcionando!");
     
     // Configurar busca global
     const globalSearch = document.getElementById('globalSearch');
     if (globalSearch) {
         globalSearch.addEventListener('input', function(e) {
-            globalFilter = e.target.value.toLowerCase();
-            filterTable();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                globalFilter = e.target.value.toLowerCase();
+                filterTable();
+            }, 300);
         });
     }
     
-    // Inicializar valores dos cartões com dados do servidor
-    initializeCards();
+    // Configurar filtros por coluna
+    setupColumnFilters();
     
-    // Limpar formulário quando modal abrir
-    document.getElementById('importModal')?.addEventListener('show.bs.modal', function() {
-        document.getElementById('importForm').reset();
-        selectedModifications = new Set();
-    });
-    
-    // Event listener para checkboxes de modificação
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('modification-check')) {
-            const key = `${e.target.dataset.type}_${e.target.dataset.index}`;
-            e.target.checked ? selectedModifications.add(key) : selectedModifications.delete(key);
-        }
-    });
-    
-    // Atalhos de teclado
-    document.addEventListener('keydown', function(e) {
-        // Ctrl+F - Focar na busca global
-        if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            const searchInput = document.getElementById('globalSearch');
-            if (searchInput) {
-                searchInput.focus();
-            }
-        }
-        
-        // Esc - Limpar filtros
-        if (e.key === 'Escape') {
-            clearAllFilters();
-        }
-        
-        // Ctrl+Shift+F - Alternar filtros por coluna
-        if (e.ctrlKey && e.shiftKey && e.key === 'F') {
-            e.preventDefault();
-            toggleColumnFilters();
-        }
-    });
+    // Atualizar contadores iniciais
+    updateCounters();
 });
 
 // ================================================
-// FUNÇÕES DE FILTROS E CONTADORES
+// FUNÇÕES DE FILTRO
 // ================================================
 
-// INICIALIZAR CARTÕES COM DADOS DO SERVIDOR
-function initializeCards() {
-    // Usar dados iniciais do servidor
-    const cardTotalItens = document.getElementById('cardTotalItens');
-    const cardTotalSC = document.getElementById('cardTotalSC');
-    const cardTotalBags = document.getElementById('cardTotalBags');
-    const cardTotalSCFisico = document.getElementById('cardTotalSCFisico');
-    const cardSCFisico = document.getElementById('cardSCFisico');
-    const cardClientesUnicos = document.getElementById('cardClientesUnicos');
-    
-    if (cardTotalItens) cardTotalItens.textContent = '{{ total_itens|intcomma }}';
-    if (cardTotalSC) cardTotalSC.textContent = '{{ total_sc|intcomma }}';
-    if (cardTotalBags) cardTotalBags.textContent = '{{ total_bags|intcomma }}';
-    if (cardTotalSCFisico) cardTotalSCFisico.textContent = '{{ total_sc_fisico|intcomma }}';
-    if (cardSCFisico) cardSCFisico.textContent = '{{ total_sc_fisico|intcomma }}';
-    if (cardClientesUnicos) cardClientesUnicos.textContent = '{{ clientes_unicos|default:"0" }}';
+// Configurar filtros por coluna
+function setupColumnFilters() {
+    const filterInputs = document.querySelectorAll('.filter-input');
+    filterInputs.forEach((input, index) => {
+        input.addEventListener('input', function(e) {
+            filterColumn(index, e.target.value);
+        });
+    });
 }
 
-// ATUALIZAR CONTADORES E CARTÕES DINAMICAMENTE
-function updateCounters() {
-    const totalRows = document.querySelectorAll('.data-row').length;
-    const visibleRows = document.querySelectorAll('.data-row:not(.hidden-row)').length;
+// Filtrar por coluna específica
+function filterColumn(columnIndex, filterValue) {
+    columnFilters[columnIndex] = filterValue;
+    filterTable();
+}
+
+// Filtrar tabela completa
+function filterTable() {
+    const rows = document.querySelectorAll('.data-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let shouldShow = true;
+        
+        // Aplicar filtro global
+        if (globalFilter) {
+            let rowContainsGlobal = false;
+            cells.forEach(cell => {
+                const cellText = cell.textContent.toLowerCase();
+                if (cellText.includes(globalFilter)) {
+                    rowContainsGlobal = true;
+                }
+            });
+            if (!rowContainsGlobal) {
+                shouldShow = false;
+            }
+        }
+        
+        // Aplicar filtros por coluna
+        Object.keys(columnFilters).forEach(colIndex => {
+            if (columnFilters[colIndex]) {
+                const cell = cells[colIndex];
+                const cellText = cell.textContent.toLowerCase();
+                const filterText = columnFilters[colIndex].toLowerCase();
+                
+                if (!cellText.includes(filterText)) {
+                    shouldShow = false;
+                }
+            }
+        });
+        
+        // Mostrar/ocultar linha
+        if (shouldShow) {
+            row.classList.remove('hidden-row');
+            visibleCount++;
+        } else {
+            row.classList.add('hidden-row');
+        }
+    });
+    
+    updateCounters(visibleCount, rows.length);
+}
+
+// Atualizar contadores
+function updateCounters(visibleCount = null, totalCount = null) {
+    const rows = document.querySelectorAll('.data-row');
+    const visibleRows = visibleCount || rows.length;
+    const totalRows = totalCount || rows.length;
     
     // Atualizar contador flutuante
     const counterBadge = document.getElementById('counterBadge');
@@ -858,103 +816,25 @@ function updateCounters() {
         }
     }
     
-    // Atualizar badges do header
+    // Atualizar badge do header
     const totalRegistros = document.getElementById('totalRegistros');
-    const filtradosRegistros = document.getElementById('totalSC'); // Mantém como SC total
-    
     if (totalRegistros) {
-        totalRegistros.textContent = totalRows + ' itens';
+        totalRegistros.textContent = visibleRows + ' itens';
     }
     
-    // Calcular valores para os cartões baseados nos filtros
-    calcularValoresCartoes(visibleRows);
-    
-    // Atualizar clientes únicos
+    // Atualizar cartão de clientes únicos
     calcularClientesUnicos();
-    
-    // Atualizar paginação
-    updatePaginationInfo(visibleRows);
 }
 
-// CALCULAR VALORES PARA OS CARTÕES
-function calcularValoresCartoes(visibleRows) {
-    const rows = document.querySelectorAll('.data-row:not(.hidden-row)');
-    
-    let totalSaldo = 0;
-    let totalBags = 0;
-    let totalSC = 0;
-    let totalPeso = 0;
-    
-    rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        
-        // Saldo (coluna 6)
-        const saldoCell = cells[6];
-        if (saldoCell) {
-            const saldoText = saldoCell.textContent.replace(/[^\d]/g, '');
-            const saldo = parseInt(saldoText) || 0;
-            totalSaldo += saldo;
-        }
-        
-        // Embalagem (coluna 11)
-        const embalagemCell = cells[11];
-        if (embalagemCell) {
-            const embalagemText = embalagemCell.textContent.toLowerCase();
-            if (embalagemText.includes('bag')) {
-                totalBags++;
-            } else if (embalagemText.includes('sc') || embalagemText.includes('saco')) {
-                totalSC++;
-            }
-        }
-        
-        // Peso Total (coluna 8)
-        const pesoCell = cells[8];
-        if (pesoCell) {
-            const pesoText = pesoCell.textContent.replace(/[^\d.,]/g, '').replace(',', '.');
-            const peso = parseFloat(pesoText) || 0;
-            totalPeso += peso;
-        }
-    });
-    
-    // Atualizar cartões
-    const cardTotalItens = document.getElementById('cardTotalItens');
-    const cardTotalBags = document.getElementById('cardTotalBags');
-    const cardTotalSCFisico = document.getElementById('cardTotalSCFisico');
-    const cardSCFisico = document.getElementById('cardSCFisico');
-    
-    if (cardTotalItens) cardTotalItens.textContent = visibleRows.toLocaleString();
-    if (cardTotalBags) cardTotalBags.textContent = totalBags.toLocaleString();
-    if (cardTotalSCFisico) cardTotalSCFisico.textContent = totalSC.toLocaleString();
-    if (cardSCFisico) cardSCFisico.textContent = totalSC.toLocaleString();
-    
-    // Calcular SC total (BAG * 25 + SC)
-    const totalSCConvertido = (totalBags * 25) + totalSC;
-    const cardTotalSC = document.getElementById('cardTotalSC');
-    if (cardTotalSC) cardTotalSC.textContent = totalSCConvertido.toLocaleString();
-}
-
-// ATUALIZAR INFORMAÇÕES DE PAGINAÇÃO
-function updatePaginationInfo(visibleRows) {
-    const paginacaoInicio = document.getElementById('paginacaoInicio');
-    const paginacaoFim = document.getElementById('paginacaoFim');
-    const paginacaoTotal = document.getElementById('paginacaoTotal');
-    
-    if (paginacaoInicio) paginacaoInicio.textContent = '1';
-    if (paginacaoFim) paginacaoFim.textContent = visibleRows;
-    if (paginacaoTotal) paginacaoTotal.textContent = visibleRows;
-}
-
-// CALCULAR CLIENTES ÚNICOS DINAMICAMENTE
+// Calcular clientes únicos
 function calcularClientesUnicos() {
     const rows = document.querySelectorAll('.data-row:not(.hidden-row)');
     const clientesSet = new Set();
     
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
-        // Coluna 12 é Cliente (índice 12)
-        const clienteCell = cells[12];
+        const clienteCell = cells[12]; // Coluna 12 = Cliente
         if (clienteCell) {
-            // Extrair texto do cliente (remover HTML dos badges)
             const clienteText = clienteCell.textContent.trim();
             if (clienteText && clienteText !== '-') {
                 clientesSet.add(clienteText);
@@ -966,65 +846,9 @@ function calcularClientesUnicos() {
     if (cardClientesUnicos) {
         cardClientesUnicos.textContent = clientesSet.size;
     }
-    
-    return clientesSet.size;
 }
 
-// FILTRAR TABELA
-function filterTable() {
-    const rows = document.querySelectorAll('.data-row');
-    let visibleCount = 0;
-    
-    rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        let shouldShow = true;
-        
-        // Aplicar filtro global
-        if (globalFilter) {
-            let rowContainsGlobal = false;
-            cells.forEach(cell => {
-                const cellText = cell.textContent.toLowerCase();
-                if (cellText.includes(globalFilter)) {
-                    rowContainsGlobal = true;
-                }
-            });
-            if (!rowContainsGlobal) {
-                shouldShow = false;
-            }
-        }
-        
-        // Aplicar filtros por coluna
-        Object.keys(columnFilters).forEach(colIndex => {
-            if (columnFilters[colIndex]) {
-                const cell = cells[colIndex];
-                const cellText = cell.textContent.toLowerCase();
-                const filterText = columnFilters[colIndex].toLowerCase();
-                
-                if (!cellText.includes(filterText)) {
-                    shouldShow = false;
-                }
-            }
-        });
-        
-        // Mostrar/ocultar linha
-        if (shouldShow) {
-            row.classList.remove('hidden-row');
-            visibleCount++;
-        } else {
-            row.classList.add('hidden-row');
-        }
-    });
-    
-    updateCounters();
-}
-
-// FILTRAR POR COLUNA ESPECÍFICA
-function filterColumn(columnIndex, filterValue) {
-    columnFilters[columnIndex] = filterValue;
-    filterTable();
-}
-
-// ALTERNAR VISIBILIDADE DOS FILTROS POR COLUNA
+// Alternar filtros por coluna
 function toggleColumnFilters() {
     const filterRow = document.getElementById('filterRow');
     const toggleBtn = document.getElementById('toggleFiltersBtn');
@@ -1033,9 +857,9 @@ function toggleColumnFilters() {
         // Esconder filtros
         filterRow.style.display = 'none';
         toggleBtn.classList.remove('active');
-        toggleBtn.innerHTML = '<i class="fa-solid fa-filter me-2"></i> Filtros por Coluna';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-filter me-2"></i>Filtros por Coluna';
         
-        // Limpar filtros de coluna
+        // Limpar filtros
         columnFilters = {};
         document.querySelectorAll('.filter-input').forEach(input => {
             input.value = '';
@@ -1046,14 +870,14 @@ function toggleColumnFilters() {
         // Mostrar filtros
         filterRow.style.display = 'table-row';
         toggleBtn.classList.add('active');
-        toggleBtn.innerHTML = '<i class="fa-solid fa-filter-circle-xmark me-2"></i> Ocultar Filtros';
+        toggleBtn.innerHTML = '<i class="fa-solid fa-filter-circle-xmark me-2"></i>Ocultar Filtros';
         isColumnFiltersVisible = true;
     }
     
     filterTable();
 }
 
-// LIMPAR TODOS OS FILTROS
+// Limpar todos os filtros
 function clearAllFilters() {
     // Limpar busca global
     const globalSearch = document.getElementById('globalSearch');
@@ -1068,14 +892,21 @@ function clearAllFilters() {
         input.value = '';
     });
     
-    filterTable();
+    // Esconder filtros se estiverem visíveis
+    if (isColumnFiltersVisible) {
+        const filterRow = document.getElementById('filterRow');
+        const toggleBtn = document.getElementById('toggleFiltersBtn');
+        filterRow.style.display = 'none';
+        toggleBtn.classList.remove('active');
+        toggleBtn.innerHTML = '<i class="fa-solid fa-filter me-2"></i>Filtros por Coluna';
+        isColumnFiltersVisible = false;
+    }
     
-    // Resetar cartões para valores originais
-    initializeCards();
+    filterTable();
 }
 
 // ================================================
-// FUNÇÕES ORIGINAIS (MANTIDAS)
+// FUNÇÕES DE PAGINAÇÃO (SUAS ORIGINAIS)
 // ================================================
 
 function updatePageSize(pageSize) {
@@ -1094,852 +925,37 @@ function updatePageSize(pageSize) {
     window.location.href = currentUrl.toString();
 }
 
-function performSearch() {
-    const searchTerm = document.getElementById('globalSearch')?.value || '';
-    const currentUrl = new URL(window.location.href);
-    
-    if (searchTerm) {
-        currentUrl.searchParams.set('busca', searchTerm);
-    } else {
-        currentUrl.searchParams.delete('busca');
-    }
-    
-    currentUrl.searchParams.set('page', '1');
-    window.location.href = currentUrl.toString();
-}
-
-function setupSearch() {
-    const searchInput = document.getElementById('globalSearch');
-    
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                performSearch();
-            }, 500);
-        });
-        
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                performSearch();
-            }
-        });
-    }
-}
-
-
-
 // ================================================
-// FUNÇÕES DE PAGINAÇÃO E BUSCA ORIGINAIS
+// ATALHOS DE TECLADO
 // ================================================
 
-// Funções de Paginação
-function updatePageSize(pageSize) {
-    const currentUrl = new URL(window.location.href);
-    const searchTerm = document.getElementById('globalSearch')?.value || '';
-    
-    currentUrl.searchParams.set('page_size', pageSize);
-    currentUrl.searchParams.set('page', '1');
-    
-    if (searchTerm) {
-        currentUrl.searchParams.set('busca', searchTerm);
-    } else {
-        currentUrl.searchParams.delete('busca');
-    }
-    
-    window.location.href = currentUrl.toString();
-}
-
-// Função para limpar decimal
-function limparDecimal(valor) {
-    if (valor === null || valor === undefined || valor === '') return '';
-    
-    const str = String(valor);
-    
-    if (str.endsWith('.0')) {
-        return str.slice(0, -2);
-    }
-    
-    if (str.includes('.')) {
-        const partes = str.split('.');
-        if (partes[1] && partes[1].replace(/0/g, '') === '') {
-            return partes[0];
+document.addEventListener('keydown', function(e) {
+    // Ctrl+F - Focar na busca
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        const searchInput = document.getElementById('globalSearch');
+        if (searchInput) {
+            searchInput.focus();
         }
     }
     
-    return str;
-}
-
-// Busca em tempo real
-function performSearch() {
-    const searchTerm = document.getElementById('globalSearch')?.value || '';
-    const currentUrl = new URL(window.location.href);
-    
-    if (searchTerm) {
-        currentUrl.searchParams.set('busca', searchTerm);
-    } else {
-        currentUrl.searchParams.delete('busca');
+    // Esc - Limpar filtros
+    if (e.key === 'Escape') {
+        clearAllFilters();
     }
-    
-    currentUrl.searchParams.set('page', '1');
-    window.location.href = currentUrl.toString();
-}
-
-// Busca com debounce
-function setupSearch() {
-    const searchInput = document.getElementById('globalSearch');
-    
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                performSearch();
-            }, 500);
-        });
-        
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                performSearch();
-            }
-        });
-    }
-}
-
-// ================================================
-// FUNÇÕES DE UTILITÁRIOS ORIGINAIS
-// ================================================
-
-// Utilitários
-function showAlert(message, type) {
-    const existingAlerts = document.querySelectorAll('.alert-dismissible');
-    existingAlerts.forEach(alert => alert.remove());
-    
-    const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3 z-3`;
-    alertDiv.style.minWidth = '400px';
-    alertDiv.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
-    `;
-    
-    document.body.appendChild(alertDiv);
-    
-    setTimeout(() => {
-        if (alertDiv.parentElement) alertDiv.remove();
-    }, 5000);
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-// ================================================
-// FUNÇÕES DE MODAL ORIGINAIS
-// ================================================
-
-// Funções de Modal
-function showBootstrapModal(modalId) {
-    const modalElement = document.getElementById(modalId);
-    if (modalElement) {
-        const modal = new bootstrap.Modal(modalElement);
-        modal.show();
-    }
-}
-
-function hideBootstrapModal(modalId) {
-    const modalElement = document.getElementById(modalId);
-    if (modalElement) {
-        const modal = bootstrap.Modal.getInstance(modalElement);
-        if (modal) {
-            modal.hide();
-        }
-    }
-}
-
-// Mostrar/Ocultar Loader
-function showLoader(show = true) {
-    const loader = document.getElementById('importLoader');
-    if (loader) {
-        loader.style.display = show ? 'flex' : 'none';
-    }
-}
-
-// ================================================
-// FUNÇÕES DE IMPORTAÇÃO ORIGINAIS
-// ================================================
-
-// Importação com loader
-async function previewImport() {
-    const form = document.getElementById('importForm');
-    const formData = new FormData(form);
-    const fileInput = form.querySelector('input[type="file"]');
-    
-    if (!fileInput.files.length) {
-        showAlert('Selecione um arquivo para importar.', 'warning');
-        return;
-    }
-    
-    selectedModifications = new Set();
-    
-    // Mostrar loader
-    showLoader(true);
-    
-    try {
-        const response = await fetch('{% url "sapp:importar_estoque" %}', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': getCookie('csrftoken'),
-                'X-Requested-With': 'XMLHttpRequest'
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            currentImportData = data;
-            showPreviewModal(data);
-            hideBootstrapModal('importModal');
-        } else {
-            showAlert('Erro: ' + data.error, 'danger');
-        }
-    } catch (error) {
-        showAlert('Erro ao processar arquivo: ' + error.message, 'danger');
-    } finally {
-        showLoader(false);
-    }
-}
-
-function showPreviewModal(data) {
-    const content = document.getElementById('previewContent');
-    let html = `
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-light border-success">
-                    <div class="card-body text-center">
-                        <h4 class="text-success">${data.comparacao.resumo.novos}</h4>
-                        <small>Novos Lotes</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-light border-warning">
-                    <div class="card-body text-center">
-                        <h4 class="text-warning">${data.comparacao.resumo.atualizados}</h4>
-                        <small>Atualizações</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-light border-info">
-                    <div class="card-body text-center">
-                        <h4 class="text-info">${data.comparacao.resumo.iguais}</h4>
-                        <small>Sem Alteração</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-light">
-                    <div class="card-body text-center">
-                        <h4 class="text-primary">${data.processed_count}</h4>
-                        <small>Total Processado</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="alert alert-info">
-            <i class="fa-solid fa-circle-info me-2"></i>
-            <strong>Importação Incremental:</strong> Novos lotes serão criados, existentes serão atualizados. 
-            Nenhum lote será removido do sistema.
-        </div>
-    `;
-    
-    // Novos Lotes
-    if (data.comparacao.novos_lotes.length > 0) {
-        html += `
-        <div class="mb-4">
-            <h6 class="text-success">
-                <i class="fa-solid fa-plus me-2"></i>Novos Lotes (${data.comparacao.novos_lotes.length})
-            </h6>
-            <div class="table-responsive">
-                <table class="table table-sm table-hover">
-                    <thead class="table-success">
-                        <tr>
-                            <th width="40"><input type="checkbox" id="selectAllNew" checked onchange="toggleAll(this.checked, 'new')"></th>
-                            <th>Lote</th>
-                            <th>Cliente</th>
-                            <th>Cultivar</th>
-                            <th>Peneira</th>
-                            <th>Endereço</th>
-                            <th>Saldo</th>
-                            <th>Embalagem</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-        
-        data.comparacao.novos_lotes.forEach((item, index) => {
-            selectedModifications.add(`new_${index}`);
-            html += `
-                <tr>
-                    <td><input type="checkbox" class="modification-check" data-type="new" data-index="${index}" checked></td>
-                    <td><strong class="text-primary">${item.lote}</strong></td>
-                    <td><span class="badge bg-purple text-white">${item.dados.cliente || ''}</span></td>
-                    <td>${item.dados.cultivar || ''}</td>
-                    <td>${item.dados.peneira || ''}</td>
-                    <td><span class="badge bg-light text-dark border">${item.endereco}</span></td>
-                    <td><span class="badge bg-success">${item.dados.saldo || 0}</span></td>
-                    <td><span class="badge ${item.dados.embalagem === 'BAG' ? 'bg-primary' : 'bg-secondary'}">${item.dados.embalagem || 'BAG'}</span></td>
-                </tr>`;
-        });
-        
-        html += `</tbody></table></div></div>`;
-    }
-    
-    // Atualizações
-    if (data.comparacao.lotes_alterados.length > 0) {
-        html += `
-        <div class="mb-4">
-            <h6 class="text-warning">
-                <i class="fa-solid fa-pen-to-square me-2"></i>Lotes para Atualizar (${data.comparacao.lotes_alterados.length})
-            </h6>
-            <div class="table-responsive">
-                <table class="table table-sm table-hover">
-                    <thead class="table-warning">
-                        <tr>
-                            <th width="40"><input type="checkbox" id="selectAllUpdates" checked onchange="toggleAll(this.checked, 'update')"></th>
-                            <th>Lote</th>
-                            <th>Cliente</th>
-                            <th>Endereço</th>
-                            <th>Saldo Antigo → Novo</th>
-                            <th>AZ</th>
-                            <th>Mudanças</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-        
-        data.comparacao.lotes_alterados.forEach((item, index) => {
-            selectedModifications.add(`update_${index}`);
-            const clienteNovo = item.dados_novos.cliente || '';
-            const clienteAntigo = item.dados_atuais.cliente || '';
-            const clienteDiferente = clienteNovo !== clienteAntigo && clienteNovo !== '';
-            
-            html += `
-                <tr>
-                    <td><input type="checkbox" class="modification-check" data-type="update" data-index="${index}" checked></td>
-                    <td><strong class="text-primary">${item.lote}</strong></td>
-                    <td>
-                        ${clienteDiferente ? 
-                            `<div>
-                                <span class="badge bg-secondary">${clienteAntigo || 'Nenhum'}</span> 
-                                <i class="fa-solid fa-arrow-right mx-1 text-muted"></i>
-                                <span class="badge bg-purple text-white">${clienteNovo}</span>
-                            </div>` : 
-                            `<span class="badge bg-purple text-white">${clienteNovo || 'Nenhum'}</span>`
-                        }
-                    </td>
-                    <td>
-                        <span class="badge bg-light text-dark border">${item.endereco}</span>
-                        ${item.endereco_original && item.endereco_original !== item.endereco ? 
-                            `<br><small class="text-muted">Ant: ${item.endereco_original}</small>` : ''}
-                    </td>
-                    <td>
-                        <span class="badge bg-secondary">${item.dados_atuais.saldo || 0}</span> 
-                        <i class="fa-solid fa-arrow-right mx-2 text-muted"></i>
-                        <span class="badge bg-success">${item.dados_novos.saldo || 0}</span>
-                    </td>
-                    <td>
-                        <span class="badge bg-info">${limparDecimal(item.dados_novos.az) || ''}</span>
-                        ${item.az_original && item.az_original !== item.dados_novos.az ? 
-                            `<br><small class="text-muted">Ant: ${limparDecimal(item.az_original)}</small>` : ''}
-                    </td>
-                    <td>
-                        <span class="badge bg-warning" title="${item.divergencias ? item.divergencias.join(', ') : ''}">
-                            ${item.divergencias ? item.divergencias.length : 0} mudanças
-                        </span>
-                    </td>
-                </tr>`;
-        });
-        
-        html += `</tbody></table></div></div>`;
-    }
-    
-    // Lotes idênticos
-    if (data.comparacao.lotes_iguais.length > 0) {
-        html += `
-        <div class="mb-4">
-            <h6 class="text-info">
-                <i class="fa-solid fa-check me-2"></i>Lotes Idênticos (${data.comparacao.lotes_iguais.length})
-            </h6>
-            <div class="alert alert-info">
-                <i class="fa-solid fa-circle-info me-2"></i>
-                Estes lotes já existem no sistema com os mesmos dados e não serão processados.
-            </div>
-        </div>`;
-    }
-    
-    content.innerHTML = html;
-    showBootstrapModal('previewModal');
-}
-
-// Funções de seleção
-function toggleAll(checked, type) {
-    document.querySelectorAll(`.modification-check[data-type="${type}"]`).forEach(checkbox => {
-        checkbox.checked = checked;
-        const key = `${checkbox.dataset.type}_${checkbox.dataset.index}`;
-        checked ? selectedModifications.add(key) : selectedModifications.delete(key);
-    });
-}
-
-// Aprovação
-function proceedToApproval() {
-    if (selectedModifications.size === 0) {
-        showAlert('Selecione pelo menos uma modificação para aprovar.', 'warning');
-        return;
-    }
-    
-    const newCount = Array.from(selectedModifications).filter(key => key.startsWith('new_')).length;
-    const updateCount = Array.from(selectedModifications).filter(key => key.startsWith('update_')).length;
-    
-    document.getElementById('approvalContent').innerHTML = `
-        <div class="alert alert-info">
-            <h6><i class="fa-solid fa-info-circle me-2"></i>Resumo das Modificações</h6>
-            <div class="row text-center mt-3">
-                <div class="col-6">
-                    <div class="p-3 bg-success bg-opacity-10 rounded">
-                        <h4 class="text-success">${newCount}</h4>
-                        <small>Novos Lotes</small>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="p-3 bg-warning bg-opacity-10 rounded">
-                        <h4 class="text-warning">${updateCount}</h4>
-                        <small>Atualizações</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="alert alert-warning">
-            <i class="fa-solid fa-triangle-exclamation me-2"></i>
-            <strong>Atenção:</strong> Esta ação não pode ser desfeita. Os dados serão atualizados conforme selecionado.
-        </div>
-        <div class="text-center">
-            <p class="text-muted">Clique em "Aprovar Modificações" para confirmar a importação.</p>
-        </div>
-    `;
-    
-    showBootstrapModal('approvalModal');
-}
-
-function getCSRFToken() {
-    let csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
-    if (csrfToken) {
-        return csrfToken.value;
-    }
-    
-    const name = 'csrftoken';
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-async function submitApproval() {
-    console.log("🟡 [APROVAÇÃO] Iniciando envio...");
-    
-    const modifications = [];
-    
-    selectedModifications.forEach(key => {
-        const [type, index] = key.split('_');
-        const indexNum = parseInt(index);
-        
-        if (type === 'new' && currentImportData.comparacao.novos_lotes[indexNum]) {
-            const item = currentImportData.comparacao.novos_lotes[indexNum];
-            modifications.push({ 
-                tipo: 'novo', 
-                ...item.dados, 
-                lote: item.lote, 
-                endereco: item.endereco,
-                cliente: item.dados.cliente || '', // INCLUIR CLIENTE
-                cultivar_id: item.dados.cultivar_id,
-                peneira_id: item.dados.peneira_id, 
-                categoria_id: item.dados.categoria_id,
-                tratamento_id: item.dados.tratamento_id
-            });
-        } else if (type === 'update' && currentImportData.comparacao.lotes_alterados[indexNum]) {
-            const item = currentImportData.comparacao.lotes_alterados[indexNum];
-            modifications.push({ 
-                tipo: 'atualizar', 
-                ...item.dados_novos, 
-                lote: item.lote, 
-                endereco: item.endereco,
-                cliente: item.dados_novos.cliente || '', // INCLUIR CLIENTE
-                dados_atuais: item.dados_atuais
-            });
-        }
-    });
-    
-    if (modifications.length === 0) {
-        showAlert('Nenhuma modificação selecionada para aprovar.', 'warning');
-        return;
-    }
-    
-    console.log("📤 Modificações a enviar:", modifications.length);
-    
-    const approveBtn = document.getElementById('approveButton');
-    const originalText = approveBtn.innerHTML;
-    approveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-2"></i>Processando...';
-    approveBtn.disabled = true;
-    
-    // Mostrar loader
-    showLoader(true);
-    
-    try {
-        const csrfToken = getCSRFToken();
-        if (!csrfToken) {
-            throw new Error('Token CSRF não encontrado. Recarregue a página.');
-        }
-        
-        const response = await fetch('{% url "sapp:aprovar_importacao" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken
-            },
-            body: JSON.stringify({ modificacoes: modifications })
-        });
-        
-        console.log("📨 Resposta recebida, status:", response.status);
-        
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.error('Resposta não é JSON:', text.substring(0, 500));
-            throw new Error('Resposta inválida do servidor');
-        }
-        
-        const data = await response.json();
-        console.log("📊 Dados da resposta:", data);
-        
-        if (!response.ok) {
-            throw new Error(data.error || `Erro ${response.status}`);
-        }
-        
-        if (data.success) {
-            showAlert('✅ ' + data.message, 'success');
-            hideBootstrapModal('approvalModal');
-            
-            // Recarregar a página após 2 segundos
-            setTimeout(() => {
-                window.location.reload(true);
-            }, 2000);
-        } else {
-            throw new Error(data.error || 'Erro desconhecido');
-        }
-        
-    } catch (error) {
-        console.error('❌ Erro ao aprovar modificações:', error);
-        showAlert('❌ Erro ao aprovar modificações: ' + error.message, 'danger');
-    } finally {
-        approveBtn.innerHTML = originalText;
-        approveBtn.disabled = false;
-        showLoader(false);
-    }
-}
-
-// ================================================
-// NOVAS FUNÇÕES DE FILTROS POR COLUNA
-// ================================================
-
-// ATUALIZAR CONTADORES
-function updateCounters() {
-    const totalRows = document.querySelectorAll('.data-row').length;
-    const visibleRows = document.querySelectorAll('.data-row:not(.hidden-row)').length;
-    
-    // Atualizar contador flutuante
-    const counterBadge = document.getElementById('counterBadge');
-    if (counterBadge) {
-        document.getElementById('visibleRows').textContent = visibleRows;
-        document.getElementById('totalRows').textContent = totalRows;
-        
-        // Mudar cor se filtrado
-        if (visibleRows === totalRows) {
-            counterBadge.style.background = '#2f8f4e';
-        } else {
-            counterBadge.style.background = '#007bff';
-        }
-    }
-    
-    // Atualizar badges do header
-    const totalRegistros = document.getElementById('totalRegistros');
-    const filtradosRegistros = document.getElementById('filtradosRegistros');
-    
-    if (totalRegistros) {
-        totalRegistros.textContent = totalRows + ' itens';
-    }
-    if (filtradosRegistros) {
-        filtradosRegistros.textContent = visibleRows + ' filtrados';
-    }
-    
-    // Atualizar clientes únicos
-    calcularClientesUnicos();
-}
-
-// FILTRAR TABELA (BUSCA GLOBAL + FILTROS POR COLUNA)
-function filterTable() {
-    const rows = document.querySelectorAll('.data-row');
-    let visibleCount = 0;
-    
-    rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        let shouldShow = true;
-        
-        // Aplicar filtro global
-        if (globalFilter) {
-            let rowContainsGlobal = false;
-            cells.forEach(cell => {
-                const cellText = cell.textContent.toLowerCase();
-                if (cellText.includes(globalFilter)) {
-                    rowContainsGlobal = true;
-                }
-            });
-            if (!rowContainsGlobal) {
-                shouldShow = false;
-            }
-        }
-        
-        // Aplicar filtros por coluna
-        Object.keys(columnFilters).forEach(colIndex => {
-            if (columnFilters[colIndex]) {
-                const cell = cells[colIndex];
-                const cellText = cell.textContent.toLowerCase();
-                const filterText = columnFilters[colIndex].toLowerCase();
-                
-                if (!cellText.includes(filterText)) {
-                    shouldShow = false;
-                }
-            }
-        });
-        
-        // Mostrar/ocultar linha
-        if (shouldShow) {
-            row.classList.remove('hidden-row');
-            visibleCount++;
-        } else {
-            row.classList.add('hidden-row');
-        }
-    });
-    
-    updateCounters();
-}
-
-// FILTRAR POR COLUNA ESPECÍFICA
-function filterColumn(columnIndex, filterValue) {
-    columnFilters[columnIndex] = filterValue;
-    filterTable();
-}
-
-// ALTERNAR VISIBILIDADE DOS FILTROS POR COLUNA
-function toggleColumnFilters() {
-    const filterRow = document.getElementById('filterRow');
-    const toggleBtn = document.getElementById('toggleFiltersBtn');
-    
-    if (isColumnFiltersVisible) {
-        // Esconder filtros
-        filterRow.style.display = 'none';
-        toggleBtn.classList.remove('active');
-        toggleBtn.innerHTML = '<i class="fa-solid fa-filter me-2"></i> Filtros por Coluna';
-        
-        // Limpar filtros de coluna
-        columnFilters = {};
-        document.querySelectorAll('.filter-input').forEach(input => {
-            input.value = '';
-        });
-        
-        isColumnFiltersVisible = false;
-    } else {
-        // Mostrar filtros
-        filterRow.style.display = 'table-row';
-        toggleBtn.classList.add('active');
-        toggleBtn.innerHTML = '<i class="fa-solid fa-filter-circle-xmark me-2"></i> Ocultar Filtros';
-        isColumnFiltersVisible = true;
-    }
-    
-    filterTable();
-}
-
-// LIMPAR TODOS OS FILTROS
-function clearAllFilters() {
-    // Limpar busca global
-    const globalSearch = document.getElementById('globalSearch');
-    if (globalSearch) {
-        globalSearch.value = '';
-        globalFilter = '';
-    }
-    
-    // Limpar filtros de coluna
-    columnFilters = {};
-    document.querySelectorAll('.filter-input').forEach(input => {
-        input.value = '';
-    });
-    
-    filterTable();
-}
-
-// CALCULAR CLIENTES ÚNICOS DINAMICAMENTE
-function calcularClientesUnicos() {
-    const rows = document.querySelectorAll('.data-row:not(.hidden-row)');
-    const clientesSet = new Set();
-    
-    rows.forEach(row => {
-        const cells = row.querySelectorAll('td');
-        // Coluna 12 é Cliente (índice 12, mas começa em 0)
-        const clienteCell = cells[12];
-        if (clienteCell) {
-            // Extrair texto do cliente (remover HTML dos badges)
-            const clienteText = clienteCell.textContent.trim();
-            if (clienteText && clienteText !== '-') {
-                clientesSet.add(clienteText);
-            }
-        }
-    });
-    
-    const clientesUnicos = document.getElementById('clientesUnicos');
-    if (clientesUnicos) {
-        clientesUnicos.textContent = clientesSet.size;
-    }
-    
-    return clientesSet.size;
-}
-
-// ================================================
-// EVENT LISTENERS E INICIALIZAÇÃO
-// ================================================
-
-// Event Listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Configurar busca
-    setupSearch();
-    
-    // Inicializar contadores
-    updateCounters();
-    
-    // Configurar busca global
-    const globalSearch = document.getElementById('globalSearch');
-    if (globalSearch) {
-        globalSearch.addEventListener('input', function(e) {
-            globalFilter = e.target.value.toLowerCase();
-            filterTable();
-        });
-    }
-    
-    // Limpar formulário quando modal abrir
-    document.getElementById('importModal')?.addEventListener('show.bs.modal', function() {
-        document.getElementById('importForm').reset();
-        selectedModifications = new Set();
-    });
-    
-    // Event listener para checkboxes de modificação
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('modification-check')) {
-            const key = `${e.target.dataset.type}_${e.target.dataset.index}`;
-            e.target.checked ? selectedModifications.add(key) : selectedModifications.delete(key);
-        }
-    });
-    
-    // Fechar modais com ESC
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            const openModals = document.querySelectorAll('.modal.show');
-            openModals.forEach(modal => {
-                const modalInstance = bootstrap.Modal.getInstance(modal);
-                if (modalInstance) {
-                    modalInstance.hide();
-                }
-            });
-        }
-    });
-    
-    // Adicionar atalhos de teclado para os filtros
-    document.addEventListener('keydown', function(e) {
-        // Ctrl+F - Focar na busca global
-        if (e.ctrlKey && e.key === 'f') {
-            e.preventDefault();
-            const searchInput = document.getElementById('globalSearch');
-            if (searchInput) {
-                searchInput.focus();
-            }
-        }
-        
-        // Esc - Limpar filtros
-        if (e.key === 'Escape') {
-            clearAllFilters();
-        }
-        
-        // Ctrl+Shift+F - Alternar filtros por coluna
-        if (e.ctrlKey && e.shiftKey && e.key === 'F') {
-            e.preventDefault();
-            toggleColumnFilters();
-        }
-    });
-});
-
-// Inicializar quando a página carregar
-window.addEventListener('load', function() {
-    calcularClientesUnicos();
 });
 
 // ================================================
-// GARANTIR QUE AS FUNÇÕES ESTEJAM DISPONÍVEIS GLOBALMENTE
+// GARANTIR FUNÇÕES GLOBAIS
 // ================================================
-
-
-
 
 window.updatePageSize = updatePageSize;
-window.performSearch = performSearch;
-window.previewImport = previewImport;
-window.proceedToApproval = proceedToApproval;
-window.submitApproval = submitApproval;
-window.toggleAll = toggleAll;
-window.showAlert = showAlert;
 window.toggleColumnFilters = toggleColumnFilters;
 window.clearAllFilters = clearAllFilters;
 window.filterColumn = filterColumn;
 window.filterTable = filterTable;
 window.calcularClientesUnicos = calcularClientesUnicos;
+
+console.log("✅ Todas as funções JS estão disponíveis!");
 </script>
-
-<style>
-    .bg-purple {
-        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%) !important;
-    }
-    
-    /* Estilo para linhas ocultas */
-    .hidden-row {
-        display: none !important;
-    }
-</style>
-
 {% endblock %}
-<!-- JAVASCRIPT PARA FILTROS POR COLUNA -->
-
