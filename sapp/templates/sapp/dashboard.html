@@ -150,7 +150,7 @@
             <div class="card shadow mb-4" style="border-radius: var(--radius-md);">
                 <div class="card-header py-3" style="background: linear-gradient(135deg, #FFCE56, #FFB347); border-radius: var(--radius-md) var(--radius-md) 0 0;">
                     <h6 class="m-0 font-weight-bold text-white">
-                        <i class="fas fa-warehouse mr-2"></i>Ocupação por Armazém
+                        <i class="fas fa-warehouse mr-2"></i>Ocupação por Armazém (AZ)
                     </h6>
                 </div>
                 <div class="card-body">
@@ -168,6 +168,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
         <!-- NOVA SEÇÃO: Movimentação Recente com Dados Reais -->
         <div class="col-xl-6 col-lg-6">
@@ -361,62 +362,72 @@ if (ctx2 && peneiraLabels.length > 0) {
 }
 
     // Gráfico de Armazém com Dados Reais
-    const armazemLabels = [{% for item in capacidade_armazem %}'Armazém {{ item.armazem_num }}',{% endfor %}];
-    const armazemValues = [{% for item in capacidade_armazem %}{{ item.total_sc }},{% endfor %}];
-    const armazemLotes = [{% for item in capacidade_armazem %}{{ item.total_lotes }},{% endfor %}];
-    
-    const ctx3 = document.getElementById('armazemChart');
-    if (ctx3 && armazemLabels.length > 0) {
-        new Chart(ctx3, {
-            type: 'bar',
-            data: {
-                labels: armazemLabels,
-                datasets: [{
-                    label: 'Volume (bgs)',
-                    data: armazemValues,
-                    backgroundColor: themeColors,
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const index = context.dataIndex;
-                                return `Volume: ${context.raw.toLocaleString('pt-BR')} bgs (${armazemLotes[index]} lotes)`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Volume (bgs)'
+    // Gráfico de Armazém (AZ)
+const armazemLabels = [{% for item in capacidade_armazem %}'AZ {{ item.az }}',{% endfor %}];  <!-- Alterado de armazem_num para az -->
+const armazemValues = [{% for item in capacidade_armazem %}{{ item.total_sc }},{% endfor %}];
+const armazemLotes = [{% for item in capacidade_armazem %}{{ item.total_lotes }},{% endfor %}];
+const armazemPeso = [{% for item in capacidade_armazem %}{{ item.peso_total }},{% endfor %}];  <!-- Adicionei peso também -->
+
+const ctx3 = document.getElementById('armazemChart');
+if (ctx3 && armazemLabels.length > 0) {
+    new Chart(ctx3, {
+        type: 'bar',
+        data: {
+            labels: armazemLabels,
+            datasets: [{
+                label: 'Volume (bgs)',
+                data: armazemValues,
+                backgroundColor: themeColors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const index = context.dataIndex;
+                            return [
+                                `Volume: ${context.raw.toLocaleString('pt-BR')} bgs`,
+                                `Lotes: ${armazemLotes[index]}`,
+                                `Peso: ${armazemPeso[index]?.toFixed(0) || 0} kg`
+                            ];
                         }
                     }
                 }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Volume (bgs)'
+                    }
+                }
             }
-        });
-        
-        // Legenda para armazém
-        const armazemLegend = document.getElementById('armazemLegend');
-        let armazemHtml = '<div class="d-flex flex-wrap justify-content-center">';
-        armazemLabels.forEach((label, index) => {
-            armazemHtml += `
-                <div class="legend-item m-1 p-1 small" style="border-left: 3px solid ${themeColors[index]}; padding-left: 8px;">
-                    <strong>${label}</strong><br>
-                    <span class="text-muted">${armazemValues[index].toLocaleString('pt-BR')} bgs (${armazemLotes[index]} lotes)</span>
-                </div>
-            `;
-        });
-        armazemLegend.innerHTML = armazemHtml + '</div>';
-    }
+        }
+    });
+    
+    // Legenda para armazém
+    const armazemLegend = document.getElementById('armazemLegend');
+    let armazemHtml = '<div class="d-flex flex-wrap justify-content-center">';
+    armazemLabels.forEach((label, index) => {
+        armazemHtml += `
+            <div class="legend-item m-1 p-1 small" style="border-left: 3px solid ${themeColors[index]}; padding-left: 8px;">
+                <strong>${label}</strong><br>
+                <span class="text-muted">
+                    ${armazemValues[index].toLocaleString('pt-BR')} bgs<br>
+                    ${armazemLotes[index]} lotes<br>
+                    ${armazemPeso[index]?.toFixed(0) || 0} kg
+                </span>
+            </div>
+        `;
+    });
+    armazemLegend.innerHTML = armazemHtml + '</div>';
+}
 });
 </script>
 
@@ -457,3 +468,4 @@ if (ctx2 && peneiraLabels.length > 0) {
 </style>
 
 {% endblock %}
+
