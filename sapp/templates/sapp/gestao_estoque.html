@@ -3,114 +3,323 @@
 
 {% block content %}
 <style>
-    /* ESTILOS EXISTENTES MANTIDOS */
-    .table-advanced {
-        font-size: 0.875rem;
+    /* ESTILOS GERAIS */
+    .container-fluid {
+        padding: 20px;
     }
     
-    .table-advanced th {
+    /* HEADER */
+    .page-header {
         background: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
         color: white;
-        font-weight: 600;
-        border: none;
-        padding: 12px 8px;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
     }
     
-    /* NOVOS ESTILOS PARA DATATABLES */
-    .dataTables_wrapper {
-        padding: 0 !important;
+    .stats-badges {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
     }
     
-    .dataTables_filter {
-        margin-bottom: 15px;
+    /* BARRA DE CONTROLES */
+    .controls-bar {
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
     }
     
-    .dataTables_filter input {
+    .filter-controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .global-search {
+        position: relative;
+        width: 300px;
+    }
+    
+    .global-search input {
+        width: 100%;
+        padding: 8px 15px 8px 40px;
         border: 1px solid #dee2e6;
         border-radius: 8px;
-        padding: 8px 12px;
-        width: 300px !important;
+        font-size: 14px;
     }
     
-    .dataTables_length select {
-        border: 1px solid #dee2e6;
+    .global-search i {
+        position: absolute;
+        left: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+    
+    /* BOTÕES */
+    .btn-group-custom {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .btn-filter {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 15px;
         border-radius: 6px;
-        padding: 4px 8px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
     
-    .dataTables_paginate .paginate_button {
-        border: 1px solid #dee2e6 !important;
-        border-radius: 6px !important;
-        margin: 0 2px !important;
+    .btn-filter.active {
+        background: #2f8f4e;
     }
     
-    .dataTables_paginate .paginate_button.current {
-        background: #2f8f4e !important;
-        border-color: #2f8f4e !important;
-        color: white !important;
+    .btn-export {
+        background: #28a745;
+        color: white;
     }
     
-    /* Estilo para os filtros individuais */
-    .col-filter {
+    .btn-import {
+        background: #007bff;
+        color: white;
+    }
+    
+    .btn-clear {
+        background: #dc3545;
+        color: white;
+    }
+    
+    /* TABELA COM FILTROS */
+    .table-container {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .table-wrapper {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    /* ESTILOS DA TABELA */
+    .filterable-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 14px;
+    }
+    
+    .filterable-table thead {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .filterable-table th {
+        background: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
+        color: white;
+        padding: 12px 8px;
+        text-align: left;
+        font-weight: 600;
+        border: none;
+        position: relative;
+    }
+    
+    /* CABEÇALHO COM FILTROS */
+    .filter-header {
+        padding: 5px 8px !important;
+    }
+    
+    .filter-input {
         width: 100%;
         padding: 4px 8px;
-        font-size: 0.8rem;
-        border: 1px solid #dee2e6;
+        border: 1px solid rgba(255,255,255,0.3);
         border-radius: 4px;
-        background-color: white;
+        background: rgba(255,255,255,0.1);
+        color: white;
+        font-size: 12px;
     }
     
-    .col-filter:focus {
-        border-color: #2f8f4e;
+    .filter-input::placeholder {
+        color: rgba(255,255,255,0.7);
+    }
+    
+    .filter-input:focus {
         outline: none;
-        box-shadow: 0 0 0 2px rgba(47, 143, 78, 0.1);
+        background: white;
+        color: #333;
+    }
+    
+    /* LINHAS DA TABELA */
+    .filterable-table td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #e9ecef;
+        vertical-align: middle;
+    }
+    
+    .filterable-table tbody tr:hover {
+        background-color: #f8f9fa;
+        cursor: pointer;
+    }
+    
+    .filterable-table tbody tr.hidden-row {
+        display: none;
+    }
+    
+    /* BADGES */
+    .badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .badge-success { background: #198754; color: white; }
+    .badge-warning { background: #ffc107; color: black; }
+    .badge-danger { background: #dc3545; color: white; }
+    .badge-info { background: #17a2b8; color: white; }
+    .badge-primary { background: #007bff; color: white; }
+    .badge-secondary { background: #6c757d; color: white; }
+    .badge-light { background: #f8f9fa; color: #212529; border: 1px solid #dee2e6; }
+    
+    .badge-cliente {
+        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+        color: white;
+    }
+    
+    .badge-empresa {
+        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        color: white;
+    }
+    
+    /* CONTADORES */
+    .counter-badge {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #2f8f4e;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        z-index: 100;
+        font-size: 14px;
+    }
+    
+    /* SCROLLBAR */
+    .table-wrapper::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+    }
+    
+    .table-wrapper::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+    
+    /* RESPONSIVIDADE */
+    @media (max-width: 768px) {
+        .controls-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .global-search {
+            width: 100%;
+        }
+        
+        .btn-group-custom {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .table-wrapper {
+            max-height: 60vh;
+        }
     }
 </style>
 
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="text-success fw-bold mb-1">
-                <i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque
-            </h2>
-            <p class="text-muted mb-0">Controle completo do estoque atual</p>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary" id="totalItens">{{ estoque.paginator.count|intcomma }} itens</span>
-            <span class="badge bg-success" id="totalSC">{{ total_sc|intcomma }} SC total</span>
-        </div>
-    </div>
-
-    <!-- Botões de Ação -->
-    <div class="action-buttons mb-3">
-        <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
-            <i class="fa-solid fa-download me-2"></i>Exportar
-        </button>
-        
-        <button class="btn btn-import" data-bs-toggle="modal" data-bs-target="#importModal">
-            <i class="fa-solid fa-upload me-2"></i>Importar
-        </button>
-        
-        <button class="btn btn-print" onclick="window.print()">
-            <i class="fa-solid fa-print me-2"></i>Imprimir
-        </button>
-        
-        <div class="ms-auto">
-            <button class="btn btn-info" onclick="habilitarFiltrosColunas()">
-                <i class="fa-solid fa-filter me-2"></i>Filtros nas Colunas
-            </button>
-            <button class="btn btn-secondary" onclick="limparFiltros()">
-                <i class="fa-solid fa-times me-2"></i>Limpar Filtros
-            </button>
+<div class="container-fluid">
+    <!-- HEADER -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-2">
+                    <i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque
+                </h2>
+                <p class="mb-0">Controle completo com filtros avançados</p>
+            </div>
+            <div class="stats-badges">
+                <span class="badge bg-primary" id="totalRegistros">0 itens</span>
+                <span class="badge bg-success" id="filtradosRegistros">0 filtrados</span>
+            </div>
         </div>
     </div>
 
-    <!-- Tabela de Estoque com DataTables -->
+    <!-- BARRA DE CONTROLES -->
+    <div class="controls-bar">
+        <div class="filter-controls">
+            <div class="global-search">
+                <i class="fa-solid fa-search"></i>
+                <input type="text" 
+                       id="globalSearch" 
+                       placeholder="Busca global em todas as colunas..."
+                       onkeyup="filterTable()">
+            </div>
+            
+            <div class="btn-group-custom">
+                <button class="btn btn-filter" onclick="toggleColumnFilters()" id="toggleFiltersBtn">
+                    <i class="fa-solid fa-filter"></i> Filtros por Coluna
+                </button>
+                <button class="btn btn-filter btn-clear" onclick="clearAllFilters()">
+                    <i class="fa-solid fa-times"></i> Limpar Filtros
+                </button>
+            </div>
+        </div>
+        
+        <div class="btn-group-custom">
+            <button class="btn btn-filter btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
+                <i class="fa-solid fa-download"></i> Exportar
+            </button>
+            <button class="btn btn-filter btn-import" data-bs-toggle="modal" data-bs-target="#importModal">
+                <i class="fa-solid fa-upload"></i> Importar
+            </button>
+            <button class="btn btn-filter" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Imprimir
+            </button>
+        </div>
+    </div>
+
+    <!-- TABELA COM FILTROS -->
     <div class="table-container">
-        <div class="table-responsive">
-            <table class="table table-advanced table-hover mb-0" id="estoqueTable">
+        <div class="table-wrapper" id="tableWrapper">
+            <table class="filterable-table" id="estoqueTable">
                 <thead>
+                    <!-- LINHA DE TÍTULOS DAS COLUNAS -->
                     <tr>
                         <th>AZ</th>
                         <th>Lote</th>
@@ -129,13 +338,66 @@
                         <th>Status</th>
                         <th>Conferente</th>
                     </tr>
+                    
+                    <!-- LINHA DE FILTROS (INICIALMENTE ESCONDIDA) -->
+                    <tr id="filterRow" style="display: none;">
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar AZ..." onkeyup="filterColumn(0, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Lote..." onkeyup="filterColumn(1, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Cultivar..." onkeyup="filterColumn(2, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Peneira..." onkeyup="filterColumn(3, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Categoria..." onkeyup="filterColumn(4, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Endereço..." onkeyup="filterColumn(5, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Saldo..." onkeyup="filterColumn(6, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Peso Unit..." onkeyup="filterColumn(7, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Peso Total..." onkeyup="filterColumn(8, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Espécie..." onkeyup="filterColumn(9, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Tratamento..." onkeyup="filterColumn(10, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Embalagem..." onkeyup="filterColumn(11, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Cliente..." onkeyup="filterColumn(12, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Empresa..." onkeyup="filterColumn(13, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Status..." onkeyup="filterColumn(14, this.value)">
+                        </th>
+                        <th class="filter-header">
+                            <input type="text" class="filter-input" placeholder="Filtrar Conferente..." onkeyup="filterColumn(15, this.value)">
+                        </th>
+                    </tr>
                 </thead>
-                <tbody>
+                
+                <tbody id="tableBody">
                     {% for item in estoque %}
-                    <tr>
+                    <tr class="data-row">
                         <td>{{ item.az|default:"-" }}</td>
                         <td>
-                            <span class="fw-bold text-primary">{{ item.lote }}</span>
+                            <strong class="text-primary">{{ item.lote }}</strong>
                             {% if item.produto %}
                             <br><small class="text-muted">{{ item.produto }}</small>
                             {% endif %}
@@ -144,10 +406,10 @@
                         <td>{{ item.peneira.nome }}</td>
                         <td>{{ item.categoria.nome }}</td>
                         <td>
-                            <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
+                            <span class="badge badge-light">{{ item.endereco }}</span>
                         </td>
                         <td>
-                            <span class="badge badge-saldo {% if item.saldo > 100 %}bg-success{% elif item.saldo > 0 %}bg-warning{% else %}bg-danger{% endif %}">
+                            <span class="badge {% if item.saldo > 100 %}badge-success{% elif item.saldo > 0 %}badge-warning{% else %}badge-danger{% endif %}">
                                 {{ item.saldo|intcomma }}
                             </span>
                         </td>
@@ -157,26 +419,26 @@
                         </td>
                         <td>
                             {% if item.especie %}
-                                <span class="badge bg-info text-white">{{ item.especie }}</span>
+                                <span class="badge badge-info">{{ item.especie }}</span>
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if item.tratamento %}
-                                <span class="badge bg-info">{{ item.tratamento.nome|truncatechars:10 }}</span>
+                                <span class="badge badge-info">{{ item.tratamento.nome|truncatechars:10 }}</span>
                             {% else %}
-                                <span class="badge bg-secondary">Sem Trat.</span>
+                                <span class="badge badge-secondary">Sem Trat.</span>
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge {% if item.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">
+                            <span class="badge {% if item.embalagem == 'BAG' %}badge-primary{% else %}badge-secondary{% endif %}">
                                 {{ item.get_embalagem_display }}
                             </span>
                         </td>
                         <td>
                             {% if item.cliente %}
-                                <span class="badge badge-cliente" title="{{ item.cliente }}">
+                                <span class="badge badge-cliente">
                                     <i class="fas fa-user-tag me-1"></i>{{ item.cliente|truncatechars:15 }}
                                 </span>
                             {% else %}
@@ -192,13 +454,13 @@
                         </td>
                         <td>
                             {% if item.status == 'ATIVO' %}
-                                <span class="badge badge-status-ativo">{{ item.status }}</span>
+                                <span class="badge badge-success">{{ item.status }}</span>
                             {% elif item.status == 'ESGOTADO' %}
-                                <span class="badge badge-status-esgotado">{{ item.status }}</span>
+                                <span class="badge badge-danger">{{ item.status }}</span>
                             {% elif item.status == 'BLOQUEADO' %}
-                                <span class="badge badge-status-bloqueado">{{ item.status }}</span>
+                                <span class="badge badge-secondary">{{ item.status }}</span>
                             {% else %}
-                                <span class="badge bg-secondary">{{ item.status }}</span>
+                                <span class="badge badge-secondary">{{ item.status }}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -217,101 +479,351 @@
             </table>
         </div>
     </div>
+
+    <!-- CONTADOR FLUTUANTE -->
+    <div class="counter-badge" id="counterBadge">
+        <span id="visibleRows">0</span> de <span id="totalRows">0</span> itens
+    </div>
 </div>
 
-<!-- Scripts DataTables -->
-<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
-
+<!-- JAVASCRIPT COMPLETO -->
 <script>
-$(document).ready(function() {
-    // Inicializar DataTable
-    var table = $('#estoqueTable').DataTable({
-        "pageLength": 25,
-        "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
-        "language": {
-            "url": "//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json"
-        },
-        "order": [[1, 'asc']], // Ordenar por lote por padrão
-        "initComplete": function() {
-            // Atualizar contadores
-            $('#totalItens').text(table.rows().count() + ' itens');
-            updateTotalSC(table);
-        }
+// VARIÁVEIS GLOBAIS
+let columnFilters = {};
+let globalFilter = '';
+let isColumnFiltersVisible = false;
+
+// INICIALIZAÇÃO
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTable();
+    updateCounters();
+    
+    // Adicionar eventos aos filtros
+    document.getElementById('globalSearch').addEventListener('input', function(e) {
+        globalFilter = e.target.value.toLowerCase();
+        filterTable();
     });
     
-    // Adicionar campos de filtro em cada coluna
-    function adicionarFiltrosColunas() {
-        $('#estoqueTable thead tr').clone(true).appendTo('#estoqueTable thead');
-        $('#estoqueTable thead tr:eq(1) th').each(function(i) {
-            var title = $(this).text();
-            $(this).html('<input type="text" class="col-filter" placeholder="Filtrar ' + title + '" />');
-            
-            $('input', this).on('keyup change', function() {
-                if (table.column(i).search() !== this.value) {
-                    table
-                        .column(i)
-                        .search(this.value)
-                        .draw();
-                    
-                    // Atualizar contadores
-                    $('#totalItens').text(table.rows({search:'applied'}).count() + ' itens');
-                    updateTotalSC(table);
+    // Tornar linhas clicáveis
+    makeRowsClickable();
+});
+
+// INICIALIZAR TABELA
+function initializeTable() {
+    const rows = document.querySelectorAll('.data-row');
+    const totalRows = rows.length;
+    
+    document.getElementById('totalRows').textContent = totalRows;
+    document.getElementById('visibleRows').textContent = totalRows;
+    document.getElementById('totalRegistros').textContent = totalRows + ' itens';
+    document.getElementById('filtradosRegistros').textContent = totalRows + ' itens';
+}
+
+// ATUALIZAR CONTADORES
+function updateCounters() {
+    const visibleRows = document.querySelectorAll('.data-row:not(.hidden-row)').length;
+    const totalRows = document.querySelectorAll('.data-row').length;
+    
+    document.getElementById('visibleRows').textContent = visibleRows;
+    document.getElementById('totalRows').textContent = totalRows;
+    document.getElementById('filtradosRegistros').textContent = visibleRows + ' filtrados';
+    
+    // Atualizar contador flutuante
+    const counter = document.getElementById('counterBadge');
+    if (visibleRows === totalRows) {
+        counter.style.background = '#2f8f4e';
+    } else {
+        counter.style.background = '#007bff';
+    }
+}
+
+// FILTRAR TABELA (BUSCA GLOBAL + FILTROS POR COLUNA)
+function filterTable() {
+    const rows = document.querySelectorAll('.data-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        let shouldShow = true;
+        
+        // Aplicar filtro global
+        if (globalFilter) {
+            let rowContainsGlobal = false;
+            cells.forEach(cell => {
+                const cellText = cell.textContent.toLowerCase();
+                if (cellText.includes(globalFilter)) {
+                    rowContainsGlobal = true;
                 }
             });
-        });
-    }
-    
-    // Função para habilitar/desabilitar filtros
-    function habilitarFiltrosColunas() {
-        if ($('#estoqueTable thead tr').length === 1) {
-            adicionarFiltrosColunas();
-            $('.btn-info').html('<i class="fa-solid fa-filter-circle-xmark me-2"></i>Remover Filtros Colunas');
-        } else {
-            $('#estoqueTable thead tr:eq(1)').remove();
-            $('.btn-info').html('<i class="fa-solid fa-filter me-2"></i>Filtros nas Colunas');
+            if (!rowContainsGlobal) {
+                shouldShow = false;
+            }
         }
-    }
-    
-    // Função para limpar todos os filtros
-    function limparFiltros() {
-        table.search('').columns().search('').draw();
-        $('.col-filter').val('');
-        $('#totalItens').text(table.rows().count() + ' itens');
-        updateTotalSC(table);
-    }
-    
-    // Função para atualizar total SC
-    function updateTotalSC(dt) {
-        // Esta função precisa ser adaptada para seu cálculo específico
-        // Por enquanto, mostra apenas a contagem
-        $('#totalSC').text(dt.rows({search:'applied'}).count() + ' itens filtrados');
-    }
-    
-    // Exportar para Excel com filtros aplicados
-    window.exportarExcelFiltrado = function() {
-        var data = table.rows({search:'applied'}).data();
-        // Implementar lógica de exportação aqui
-        alert('Exportando ' + data.length + ' registros...');
-    };
-    
-    // Tornar funções globais
-    window.habilitarFiltrosColunas = habilitarFiltrosColunas;
-    window.limparFiltros = limparFiltros;
-    
-    // Clique na linha para ver detalhes
-    $('#estoqueTable tbody').on('click', 'tr', function() {
-        var data = table.row(this).data();
-        if (data) {
-            // Implementar ação ao clicar na linha
-            console.log('Linha clicada:', data);
+        
+        // Aplicar filtros por coluna
+        Object.keys(columnFilters).forEach(colIndex => {
+            if (columnFilters[colIndex]) {
+                const cell = cells[colIndex];
+                const cellText = cell.textContent.toLowerCase();
+                const filterText = columnFilters[colIndex].toLowerCase();
+                
+                if (!cellText.includes(filterText)) {
+                    shouldShow = false;
+                }
+            }
+        });
+        
+        // Mostrar/ocultar linha
+        if (shouldShow) {
+            row.classList.remove('hidden-row');
+            visibleCount++;
+        } else {
+            row.classList.add('hidden-row');
         }
     });
+    
+    updateCounters();
+}
+
+// FILTRAR POR COLUNA ESPECÍFICA
+function filterColumn(columnIndex, filterValue) {
+    columnFilters[columnIndex] = filterValue;
+    filterTable();
+}
+
+// ALTERNAR VISIBILIDADE DOS FILTROS POR COLUNA
+function toggleColumnFilters() {
+    const filterRow = document.getElementById('filterRow');
+    const toggleBtn = document.getElementById('toggleFiltersBtn');
+    
+    if (isColumnFiltersVisible) {
+        // Esconder filtros
+        filterRow.style.display = 'none';
+        toggleBtn.classList.remove('active');
+        toggleBtn.innerHTML = '<i class="fa-solid fa-filter"></i> Filtros por Coluna';
+        
+        // Limpar filtros de coluna
+        columnFilters = {};
+        document.querySelectorAll('.filter-input').forEach(input => {
+            input.value = '';
+        });
+        
+        isColumnFiltersVisible = false;
+    } else {
+        // Mostrar filtros
+        filterRow.style.display = 'table-row';
+        toggleBtn.classList.add('active');
+        toggleBtn.innerHTML = '<i class="fa-solid fa-filter-circle-xmark"></i> Ocultar Filtros';
+        isColumnFiltersVisible = true;
+    }
+    
+    filterTable();
+}
+
+// LIMPAR TODOS OS FILTROS
+function clearAllFilters() {
+    // Limpar busca global
+    document.getElementById('globalSearch').value = '';
+    globalFilter = '';
+    
+    // Limpar filtros de coluna
+    columnFilters = {};
+    document.querySelectorAll('.filter-input').forEach(input => {
+        input.value = '';
+    });
+    
+    // Se filtros estiverem visíveis, manter visíveis
+    // Se não, esconder a linha de filtros
+    if (!isColumnFiltersVisible) {
+        document.getElementById('filterRow').style.display = 'none';
+    }
+    
+    filterTable();
+}
+
+// TORNAR LINHAS CLICÁVEIS
+function makeRowsClickable() {
+    document.querySelectorAll('.data-row').forEach(row => {
+        row.addEventListener('click', function() {
+            // Remover seleção anterior
+            document.querySelectorAll('.data-row.selected').forEach(r => {
+                r.classList.remove('selected');
+            });
+            
+            // Adicionar seleção atual
+            this.classList.add('selected');
+            
+            // Aqui você pode adicionar ações ao clicar
+            // Por exemplo, mostrar detalhes do lote
+            const lote = this.querySelector('td:nth-child(2) strong').textContent;
+            console.log('Lote selecionado:', lote);
+            
+            // Destacar visualmente
+            this.style.backgroundColor = '#e8f4fd';
+            
+            // Remover destaque após 2 segundos
+            setTimeout(() => {
+                this.style.backgroundColor = '';
+            }, 2000);
+        });
+    });
+}
+
+// FUNÇÃO PARA ORDENAR COLUNA (OPCIONAL)
+function sortColumn(columnIndex) {
+    const tbody = document.getElementById('tableBody');
+    const rows = Array.from(tbody.querySelectorAll('.data-row:not(.hidden-row)'));
+    
+    const isNumeric = columnIndex === 6 || columnIndex === 7 || columnIndex === 8; // Colunas numéricas
+    
+    rows.sort((a, b) => {
+        const cellA = a.children[columnIndex];
+        const cellB = b.children[columnIndex];
+        
+        let valueA = cellA.textContent.trim();
+        let valueB = cellB.textContent.trim();
+        
+        if (isNumeric) {
+            // Extrair números
+            const numA = parseFloat(valueA.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            const numB = parseFloat(valueB.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+            return numA - numB;
+        } else {
+            return valueA.localeCompare(valueB, 'pt-BR', { sensitivity: 'base' });
+        }
+    });
+    
+    // Reordenar as linhas
+    rows.forEach(row => tbody.appendChild(row));
+    updateCounters();
+}
+
+// EXPORTAR DADOS FILTRADOS (SIMPLES)
+function exportFilteredData() {
+    const visibleRows = document.querySelectorAll('.data-row:not(.hidden-row)');
+    const data = [];
+    
+    // Cabeçalhos
+    const headers = [];
+    document.querySelectorAll('#estoqueTable thead tr:first-child th').forEach(th => {
+        headers.push(th.textContent.trim());
+    });
+    data.push(headers);
+    
+    // Dados das linhas visíveis
+    visibleRows.forEach(row => {
+        const rowData = [];
+        row.querySelectorAll('td').forEach(cell => {
+            rowData.push(cell.textContent.trim());
+        });
+        data.push(rowData);
+    });
+    
+    // Converter para CSV
+    const csvContent = data.map(row => 
+        row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+    
+    // Criar e baixar arquivo
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `estoque_filtrado_${new Date().toISOString().slice(0,10)}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// ADICIONAR ORDENAÇÃO POR CLIQUE NO CABEÇALHO (OPCIONAL)
+document.addEventListener('DOMContentLoaded', function() {
+    const headers = document.querySelectorAll('#estoqueTable thead tr:first-child th');
+    headers.forEach((header, index) => {
+        header.style.cursor = 'pointer';
+        header.title = 'Clique para ordenar';
+        
+        header.addEventListener('click', function() {
+            sortColumn(index);
+        });
+    });
+});
+
+// ATALHOS DE TECLADO
+document.addEventListener('keydown', function(e) {
+    // Ctrl+F - Focar na busca global
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        document.getElementById('globalSearch').focus();
+    }
+    
+    // Esc - Limpar filtros
+    if (e.key === 'Escape') {
+        clearAllFilters();
+    }
+    
+    // Ctrl+E - Exportar
+    if (e.ctrlKey && e.key === 'e') {
+        e.preventDefault();
+        exportFilteredData();
+    }
 });
 </script>
 
-<!-- Modais (mantenha os existentes) -->
-{% include 'sapp/modais_export_import.html' %}
+<!-- MODAIS (MANTENHA OS EXISTENTES) -->
+<!-- Modais de exportação/importação (seus existentes) -->
+
+<style>
+/* ESTILOS ADICIONAIS PARA FUNCIONALIDADES */
+.data-row.selected {
+    background-color: #e8f4fd !important;
+    box-shadow: inset 0 0 0 2px #007bff;
+}
+
+.data-row.hidden-row {
+    display: none !important;
+}
+
+/* ANIMAÇÕES */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.filter-row {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* DICAS DE USO */
+.tooltip-custom {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-custom .tooltiptext {
+    visibility: hidden;
+    width: 200px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 12px;
+}
+
+.tooltip-custom:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+</style>
+
 {% endblock %}
