@@ -40,6 +40,7 @@ urlpatterns = [
     path('api/estoque-resumo/', views.api_estoque_resumo, name='api_estoque_resumo'),
     path('api/ultimas-movimentacoes/', views.api_ultimas_movimentacoes, name='api_ultimas_movimentacoes'),
     
+    
     # --- Configurações e Histórico ---
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     path('historico-geral/', views.historico_geral, name='historico_geral'),
@@ -54,7 +55,8 @@ urlpatterns = [
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
     path('limpar-cache-importacao/', views.limpar_cache_importacao, name='limpar_cache_importacao'),
     
-    
+    path('lista-estoque/', views.lista_estoque, name='lista_estoque'),
+    path('transferir/<int:id>/', views.transferir, name='transferir'),  
     
     
     
@@ -62,6 +64,7 @@ urlpatterns = [
     
         # --- Sistema de Empenho/Rascunho ---
     path('empenho/', views.pagina_rascunho, name='pagina_rascunho'),
+    path('api/autocomplete-entrada/', views.api_autocomplete_nova_entrada, name='api_autocomplete_entrada'),
     
 ]
 

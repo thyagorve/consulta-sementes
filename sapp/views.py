@@ -2244,16 +2244,59 @@ def registrar_saida(request, id):
 @login_required
 def transferir(request, id):
     item_origem = get_object_or_404(Estoque, id=id)
+    
     if request.method == 'POST':
         try:
             with transaction.atomic():
+                # --- 1. CAPTURA DOS DADOS BÁSICOS ---
                 qtd = int(request.POST.get('quantidade'))
-                novo_end = request.POST.get('novo_endereco')
-                obs = request.POST.get('observacao', '') # Transferencia tbm pode ter obs
-                fotos = request.FILES.getlist('fotos') # Fotos opcionais na transferencia
+                novo_end = request.POST.get('novo_endereco').strip().upper()
+                obs = request.POST.get('observacao', '')
+                fotos = request.FILES.getlist('fotos')
 
+                # --- 2. CAPTURA DOS DADOS EDITÁVEIS (PREENCHIDOS OU ORIGINAIS) ---
+                # Se o campo vier vazio no POST, usamos o dado da origem como fallback
+                novo_produto = request.POST.get('produto', item_origem.produto or '').strip()
+                nova_empresa = request.POST.get('empresa', item_origem.empresa or '').strip()
+                novo_az = request.POST.get('az', item_origem.az or '').strip()
+                nova_embalagem = request.POST.get('embalagem', item_origem.embalagem)
+                
+                # Tratamento de Peso Unitário
+                peso_raw = request.POST.get('peso_unitario', str(item_origem.peso_unitario))
+                try:
+                    peso_raw = str(peso_raw).replace(',', '.')
+                    novo_peso_unitario = Decimal(peso_raw)
+                except:
+                    novo_peso_unitario = item_origem.peso_unitario
+
+                # Tratamento de Foreign Keys (Cultivar, Peneira, etc)
+                # Tenta pegar do POST, senão mantém o original
+                try:
+                    novo_cultivar_id = request.POST.get('cultivar')
+                    obj_cultivar = Cultivar.objects.get(id=novo_cultivar_id) if novo_cultivar_id else item_origem.cultivar
+                except: obj_cultivar = item_origem.cultivar
+
+                try:
+                    nova_peneira_id = request.POST.get('peneira')
+                    obj_peneira = Peneira.objects.get(id=nova_peneira_id) if nova_peneira_id else item_origem.peneira
+                except: obj_peneira = item_origem.peneira
+
+                try:
+                    nova_categoria_id = request.POST.get('categoria')
+                    obj_categoria = Categoria.objects.get(id=nova_categoria_id) if nova_categoria_id else item_origem.categoria
+                except: obj_categoria = item_origem.categoria
+
+                try:
+                    novo_tratamento_id = request.POST.get('tratamento')
+                    if novo_tratamento_id:
+                        obj_tratamento = Tratamento.objects.get(id=novo_tratamento_id)
+                    else:
+                        obj_tratamento = item_origem.tratamento
+                except: obj_tratamento = item_origem.tratamento
+
+                # --- 3. VALIDAÇÃO E SAÍDA DA ORIGEM ---
                 if qtd > item_origem.saldo:
-                    messages.error(request, "Saldo insuficiente.")
+                    messages.error(request, f"Saldo insuficiente. Disponível: {item_origem.saldo}")
                     return redirect('sapp:lista_estoque')
 
                 # Retira da Origem
@@ -2261,30 +2304,32 @@ def transferir(request, id):
                 item_origem.saldo = item_origem.entrada - item_origem.saida
                 item_origem.save()
 
+                # Histórico de Saída
                 desc_saida = f"""
                     <strong>Saiu:</strong> <span class="text-danger">-{qtd}</span><br>
                     <strong>Destino:</strong> {novo_end}<br>
                     {f'<small class="text-muted">Obs: {obs}</small>' if obs else ''}
                 """
-                
                 h_saida = HistoricoMovimentacao.objects.create(
                     estoque=item_origem,
                     usuario=request.user,
                     tipo='Transferência (Saída)',
                     descricao=desc_saida
                 )
-                
-                # Fotos na saída da transferência
                 for f in fotos: FotoMovimentacao.objects.create(historico=h_saida, arquivo=f)
 
-                # Busca/Cria Destino
+                # --- 4. ENTRADA NO DESTINO (COM DADOS NOVOS/EDITADOS) ---
+                
+                # Procura se já existe um lote IDENTICO aos NOVOS DADOS no NOVO ENDEREÇO
                 item_destino = Estoque.objects.filter(
                     lote=item_origem.lote,
                     endereco=novo_end,
-                    cultivar=item_origem.cultivar,
-                    peneira=item_origem.peneira,
-                    categoria=item_origem.categoria,
-                    tratamento=item_origem.tratamento
+                    cultivar=obj_cultivar,
+                    peneira=obj_peneira,
+                    categoria=obj_categoria,
+                    tratamento=obj_tratamento,
+                    produto=novo_produto, # Verifica também se o produto é o mesmo
+                    az=novo_az
                 ).first()
 
                 desc_entrada = f"""
@@ -2293,41 +2338,57 @@ def transferir(request, id):
                 """
 
                 if item_destino:
+                    # Se já existe exatamente igual, apenas soma
                     item_destino.entrada += qtd
+                    item_destino.saldo += qtd # Recalcula saldo
+                    # Atualiza dados secundários caso tenham mudado (opcional)
+                    item_destino.peso_unitario = novo_peso_unitario 
                     item_destino.conferente = request.user
                     item_destino.save()
-                    h_ent = HistoricoMovimentacao.objects.create(estoque=item_destino, usuario=request.user, tipo='Transferência (Entrada)', descricao=desc_entrada)
+                    
+                    HistoricoMovimentacao.objects.create(
+                        estoque=item_destino, 
+                        usuario=request.user, 
+                        tipo='Transferência (Entrada)', 
+                        descricao=desc_entrada
+                    )
                 else:
+                    # Se não existe, CRIA UM NOVO com os dados editados
                     novo_item = Estoque.objects.create(
                         lote=item_origem.lote,
-                        produto=item_origem.produto,
-                        cultivar=item_origem.cultivar,
-                        peneira=item_origem.peneira,
-                        categoria=item_origem.categoria,
-                        tratamento=item_origem.tratamento,
-                        az=item_origem.az,
+                        produto=novo_produto, # Dado Novo
+                        cultivar=obj_cultivar, # Dado Novo
+                        peneira=obj_peneira, # Dado Novo
+                        categoria=obj_categoria, # Dado Novo
+                        tratamento=obj_tratamento, # Dado Novo
+                        az=novo_az, # Dado Novo
                         endereco=novo_end,
                         entrada=qtd,
                         saida=0,
                         saldo=qtd,
-                        cliente=item_origem.cliente, 
+                        cliente=request.POST.get('cliente', item_origem.cliente), # Tenta pegar cliente novo ou usa antigo
                         origem_destino=f"Transf. de {item_origem.endereco}",
                         conferente=request.user,
-                        especie=item_origem.especie,
-                        empresa=item_origem.empresa,
-                        embalagem=item_origem.embalagem,
-                        peso_unitario=item_origem.peso_unitario
+                        especie=request.POST.get('especie', item_origem.especie),
+                        empresa=nova_empresa, # Dado Novo
+                        embalagem=nova_embalagem, # Dado Novo
+                        peso_unitario=novo_peso_unitario, # Dado Novo
+                        observacao=f"Transferido de {item_origem.endereco}. {obs}"
                     )
-                    h_ent = HistoricoMovimentacao.objects.create(estoque=novo_item, usuario=request.user, tipo='Transferência (Entrada)', descricao=desc_entrada)
+                    HistoricoMovimentacao.objects.create(
+                        estoque=novo_item, 
+                        usuario=request.user, 
+                        tipo='Transferência (Entrada)', 
+                        descricao=desc_entrada
+                    )
 
-                # Duplicamos a foto no destino também para constar no histórico de lá
-                # (Como o arquivo já foi salvo no primeiro loop, aqui teríamos que reabrir, 
-                # mas para simplificar, associamos apenas na origem ou salvamos novamente se o Django permitir stream)
-                # Para evitar complexidade, fotos de transferência ficam atreladas à origem (Saída).
-
-                messages.success(request, "✅ Transferência realizada!")
+                messages.success(request, f"✅ Transferência realizada para {novo_end}!")
+                
         except Exception as e:
-            messages.error(request, f"Erro: {e}")
+            import traceback
+            print(traceback.format_exc())
+            messages.error(request, f"Erro na transferência: {e}")
+            
     return redirect('sapp:lista_estoque')
 
 @login_required
@@ -3158,48 +3219,36 @@ def debug_estoque_status(request):
 
 # ========== APIs para frontend ==========
 
+# No final do views.py
 @login_required
 def api_buscar_dados_lote(request):
-    """API para buscar dados de um lote específico (usado no editar)"""
-    lote_buscado = request.GET.get('lote')
+    """API para buscar dados de um lote específico"""
     item_id = request.GET.get('item_id')
     
-    # Primeiro tenta pelo ID
     if item_id:
         try:
             item = Estoque.objects.get(id=item_id)
+            data = {
+                'encontrado': True,
+                'lote': item.lote,
+                'produto': item.produto or '',
+                'saldo': item.saldo,
+                'az': item.az or '',
+                'empresa': item.empresa or '',
+                'cliente': item.cliente or '',
+                'peso_unitario': str(item.peso_unitario) if item.peso_unitario else '0',
+                'embalagem': item.embalagem or 'BAG',
+                'especie': item.especie or 'SOJA',
+                'observacao': item.observacao or '',
+                # IDs para selects
+                'cultivar_id': item.cultivar.id if item.cultivar else None,
+                'peneira_id': item.peneira.id if item.peneira else None,
+                'categoria_id': item.categoria.id if item.categoria else None,
+                'tratamento_id': item.tratamento.id if item.tratamento else None,
+            }
+            return JsonResponse(data)
         except Estoque.DoesNotExist:
-            item = None
-    # Se não tiver ID, busca pelo lote
-    elif lote_buscado:
-        item = Estoque.objects.filter(lote=lote_buscado).order_by('-id').first()
-    else:
-        return JsonResponse({'encontrado': False})
-    
-    if item:
-        data = {
-            'encontrado': True,
-            'lote': item.lote,
-            'produto': item.produto or '',
-            'cultivar_id': item.cultivar.id if item.cultivar else None,
-            'cultivar_nome': item.cultivar.nome if item.cultivar else '',
-            'peneira_id': item.peneira.id if item.peneira else None,
-            'peneira_nome': item.peneira.nome if item.peneira else '',
-            'categoria_id': item.categoria.id if item.categoria else None,
-            'categoria_nome': item.categoria.nome if item.categoria else '',
-            'tratamento_id': item.tratamento.id if item.tratamento else None,
-            'tratamento_nome': item.tratamento.nome if item.tratamento else '',
-            'endereco': item.endereco or '',
-            'empresa': item.empresa or '',
-            'origem_destino': item.origem_destino or '',
-            'peso_unitario': str(item.peso_unitario),
-            'embalagem': item.embalagem or 'BAG',
-            'az': item.az or '',
-            'observacao': item.observacao or '',
-            'especie': item.especie or 'SOJA',
-            'saldo': item.saldo
-        }
-        return JsonResponse(data)
+            pass
     
     return JsonResponse({'encontrado': False})
 
@@ -3473,5 +3522,44 @@ def pagina_rascunho(request):
     
 
     return render(request, 'sapp/pagina_rascunho.html', context)
+
+
+
+# Em sapp/views.py
+
+@login_required
+def api_autocomplete_nova_entrada(request):
+    """
+    Busca lotes pelo termo digitado e retorna TODOS os dados para preenchimento.
+    """
+    termo = request.GET.get('term', '').strip()
+    
+    if len(termo) < 2:
+        return JsonResponse([], safe=False)
+    
+    # Busca lotes que contenham o texto digitado
+    # Ordena por ID decrescente para pegar os mais recentes primeiro
+    qs = Estoque.objects.filter(lote__icontains=termo).values(
+        'lote', 'produto', 'cultivar__id', 'peneira__id', 'categoria__id', 
+        'tratamento__id', 'empresa', 'origem_destino', 'cliente', 
+        'peso_unitario', 'embalagem', 'az', 'especie', 'observacao'
+    ).order_by('-id')
+    
+    # Filtra para não mostrar lotes repetidos na lista
+    resultados = []
+    lotes_vistos = set()
+    
+    for item in qs:
+        if item['lote'] not in lotes_vistos:
+            resultados.append({
+                'label': item['lote'],
+                'dados': item
+            })
+            lotes_vistos.add(item['lote'])
+        
+        if len(resultados) >= 10: # Limita a 10 resultados
+            break
+            
+    return JsonResponse(resultados, safe=False)
 
 
