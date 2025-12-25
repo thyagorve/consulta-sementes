@@ -875,91 +875,161 @@ def dashboard(request):
 
 # CORREÇÃO NO VIEWS.PY - Na função gestao_estoque:
 
-# No views.py, na função gestao_estoque, adicione após os cálculos de totais:
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Q, Sum
+# Importe seu modelo
+from .models import Estoque 
+
 @login_required
 def gestao_estoque(request):
-    """Gestão de estoque com paginação e busca"""
-    # Buscar todos os itens com saldo positivo
-    estoque_query = Estoque.objects.filter(saldo__gt=0).select_related(
+    """
+    View completa para Gestão de Estoque com Filtros Avançados no Backend.
+    """
+    
+    # 1. QuerySet Base (Apenas itens com saldo positivo)
+    qs = Estoque.objects.filter(saldo__gt=0).select_related(
         'cultivar', 'peneira', 'categoria', 'tratamento', 'conferente'
     ).order_by('endereco', 'lote')
+
+    # --- 2. APLICAÇÃO DOS FILTROS VINDOS DA URL ---
     
-    # Filtro de busca
-    busca = request.GET.get('busca', '')
+    # Busca Global (Input de texto)
+    busca = request.GET.get('busca', '').strip()
     if busca:
-        estoque_query = estoque_query.filter(
+        qs = qs.filter(
             Q(lote__icontains=busca) |
             Q(cultivar__nome__icontains=busca) |
             Q(endereco__icontains=busca) |
             Q(peneira__nome__icontains=busca) |
-            Q(tratamento__nome__icontains=busca) |
-            Q(produto__icontains=busca) |
             Q(cliente__icontains=busca) |
-            Q(empresa__icontains=busca) |
-            Q(especie__icontains=busca) |
-            Q(categoria__nome__icontains=busca)
+            Q(empresa__icontains=busca)
         )
+
+    # Filtros de Coluna (Múltipla Escolha)
+    # As chaves DEVEM ser idênticas ao 'data-column' do HTML
+    filter_map = {
+        'az': 'az__in',
+        'lote': 'lote__in',
+        'cultivar': 'cultivar__nome__in',
+        'peneira': 'peneira__nome__in',
+        'categoria': 'categoria__nome__in',
+        'endereco': 'endereco__in',
+        'especie': 'especie__in',
+        'tratamento': 'tratamento__nome__in',
+        'embalagem': 'embalagem__in',
+        'cliente': 'cliente__in',
+        'empresa': 'empresa__in',
+        'status': 'status__in',
+        'conferente': 'conferente__username__in'
+    }
+
+    # Aplica os filtros de lista (ex: &cultivar=Soja&cultivar=Milho)
+    for param, lookup in filter_map.items():
+        values = request.GET.getlist(param)
+        values = [v for v in values if v.strip()] # Remove vazios
+        if values:
+            qs = qs.filter(**{lookup: values})
+
+    # Filtros Numéricos (Min e Max)
+    numeric_fields = ['saldo', 'peso_unitario', 'peso_total']
+    for field in numeric_fields:
+        min_val = request.GET.get(f'min_{field}')
+        max_val = request.GET.get(f'max_{field}')
+        
+        if min_val:
+            qs = qs.filter(**{f'{field}__gte': min_val})
+        if max_val:
+            qs = qs.filter(**{f'{field}__lte': max_val})
+
+    # --- 3. CÁLCULO DE TOTAIS (Baseado no resultado filtrado) ---
+    total_itens = qs.count()
     
-    # Configuração de paginação
-    page_size = int(request.GET.get('page_size', 25))
+    # Agregações
+    resumo = qs.aggregate(
+        total_saldo=Sum('saldo'),
+        total_peso=Sum('peso_total')
+    )
+    
+    # Lógica de BAG vs SC
+    bags_count = qs.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
+    sc_fisico = qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+    
+    # Conversão: 1 BAG = 25 SC
+    total_sc_equivalente = (bags_count * 25) + sc_fisico
+    
+    clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
+
+    # --- 4. PREPARAÇÃO DAS OPÇÕES PARA O FILTRO (Backend -> Frontend) ---
+    # Pegamos uma base SEM filtros de coluna para mostrar todas as opções disponíveis
+    # Isso resolve o problema de "Sem opções disponíveis"
+    base_options_qs = Estoque.objects.filter(saldo__gt=0)
+    
+    def get_options_list(field_lookup):
+        """Retorna lista de strings únicas para o filtro"""
+        # Extrai valores distintos, remove nulos/vazios e ordena
+        vals = base_options_qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
+        # Converte TUDO para string para evitar erro no JSON
+        return [str(v) for v in vals if v is not None and str(v).strip() != '']
+
+    filter_options = {
+        'az': get_options_list('az'),
+        'lote': get_options_list('lote'),
+        'cultivar': get_options_list('cultivar__nome'),
+        'peneira': get_options_list('peneira__nome'),
+        'categoria': get_options_list('categoria__nome'),
+        'endereco': get_options_list('endereco'),
+        'especie': get_options_list('especie'),
+        'tratamento': get_options_list('tratamento__nome'),
+        'embalagem': get_options_list('embalagem'),
+        'cliente': get_options_list('cliente'),
+        'empresa': get_options_list('empresa'),
+        'status': get_options_list('status'),
+        'conferente': get_options_list('conferente__username') # ou conferente__first_name
+    }
+
+    # --- 5. PAGINAÇÃO ---
+    page_size = request.GET.get('page_size', 25)
+    try:
+        page_size = int(page_size)
+    except ValueError:
+        page_size = 25
+
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get('page', 1)
-    
-    paginator = Paginator(estoque_query, page_size)
-    
+
     try:
         estoque_page = paginator.page(page_number)
     except PageNotAnInteger:
         estoque_page = paginator.page(1)
     except EmptyPage:
         estoque_page = paginator.page(paginator.num_pages)
-    
-    # 🔥 CORREÇÃO: Calcular totais SEPARADOS por tipo de embalagem
-    total_itens = estoque_query.count()
-    
-    # Calcular por tipo de embalagem
-    bags = estoque_query.filter(embalagem='BAG')
-    sacos = estoque_query.filter(embalagem='SC')
-    
-    # Total de unidades BAG
-    total_bags_units = bags.aggregate(total=Sum('saldo'))['total'] or 0
-    
-    # Total de unidades SC
-    total_sc_units = sacos.aggregate(total=Sum('saldo'))['total'] or 0
-    
-    # 🔥 CORREÇÃO: 1 BAG = 25 SC (CONVERSÃO)
-    total_bags_em_sc = total_bags_units * 25
-    
-    # Total geral em SC (BAG convertido + SC físico)
-    total_geral_sc = total_bags_em_sc + total_sc_units
-    
-    # Total geral de unidades (todas embalagens)
-    total_unidades = estoque_query.aggregate(total=Sum('saldo'))['total'] or 0
-    
-    # 🔥 CORREÇÃO: Calcular clientes únicos
-    clientes_com_estoque = estoque_query.exclude(
-        Q(cliente__isnull=True) | Q(cliente='')
-    ).values_list('cliente', flat=True).distinct()
-    
-    clientes_unicos = len(clientes_com_estoque)
-    
-    # Para debug - lista de clientes
-    clientes_lista = list(clientes_com_estoque)[:20]  # Limitar para debug
-    
+
+    # --- 6. URL PARAMS PARA PAGINAÇÃO ---
+    # Preserva os filtros atuais nos links de próxima página
+    query_params = request.GET.copy()
+    if 'page' in query_params:
+        del query_params['page']
+    url_params = query_params.urlencode()
+
     context = {
         'estoque': estoque_page,
         'total_itens': total_itens,
-        'total_saldo': total_unidades,
-        'total_sc': total_geral_sc,
-        'total_bags': total_bags_units,
-        'total_sc_fisico': total_sc_units,
+        'total_sc': total_sc_equivalente,
+        'total_bags': bags_count,
+        'total_sc_fisico': sc_fisico,
         'clientes_unicos': clientes_unicos,
-        'clientes_lista': clientes_lista,
+        # Dados essenciais para o filtro funcionar:
+        'filter_options': filter_options, 
+        'url_params': url_params,
         'page_sizes': [10, 25, 50, 100],
         'page_size': page_size,
         'busca': busca,
-        'debug_mode': True,  # Para ajudar no debug
     }
+
     return render(request, 'sapp/gestao_estoque.html', context)
+
 
 @login_required
 def importar_estoque(request):

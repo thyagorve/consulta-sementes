@@ -4,488 +4,92 @@
 {% block content %}
 <style>
     /* ESTILOS GERAIS */
-    .container-fluid {
-        padding: 20px;
-    }
+    .container-fluid { padding: 20px; }
     
     /* CARDS DE ESTATÍSTICAS */
     .stats-card {
-        background: white;
-        border-radius: 10px;
-        padding: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-        margin-bottom: 20px;
-        border: 1px solid #e9ecef;
-        transition: transform 0.2s;
+        background: white; border-radius: 10px; padding: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px;
+        border: 1px solid #e9ecef; transition: transform 0.2s;
     }
-    
-    .stats-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    
-    .stats-card .rounded-circle {
-        width: 50px;
-        height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+    .stats-card:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    .stats-card .rounded-circle { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; }
     
     /* BOTÕES DE AÇÃO */
-    .action-buttons {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin-bottom: 20px;
-        align-items: center;
-    }
-    
-    .action-buttons .btn {
-        padding: 8px 16px;
-        font-weight: 500;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    
-    .btn-export {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        border: none;
-        color: white;
-    }
-    
-    .btn-import {
-        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-        border: none;
-        color: white;
-    }
-    
-    .btn-print {
-        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-        border: none;
-        color: white;
-    }
-    
-    .btn-clear-filters {
-        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-        border: none;
-        color: white;
-    }
+    .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; align-items: center; }
+    .action-buttons .btn { padding: 8px 16px; font-weight: 500; border-radius: 8px; display: flex; align-items: center; gap: 8px; }
+    .btn-export { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border: none; color: white; }
+    .btn-import { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); border: none; color: white; }
+    .btn-print { background: linear-gradient(135deg, #6c757d 0%, #495057 100%); border: none; color: white; }
+    .btn-clear-filters { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); border: none; color: white; }
     
     /* TABELA */
-    .table-container {
-        background: white;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        margin-bottom: 20px;
-        border: 1px solid #e9ecef;
-    }
-    
-    .table-advanced {
-        width: 100%;
-        margin-bottom: 0;
-        font-size: 0.875rem;
-    }
-    
+    .table-container { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e9ecef; }
+    .table-advanced { width: 100%; margin-bottom: 0; font-size: 0.875rem; }
     .table-advanced th {
         background: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
-        color: white;
-        font-weight: 600;
-        border: none;
-        padding: 12px 8px;
-        position: relative;
-        cursor: pointer;
-        white-space: nowrap;
+        color: white; font-weight: 600; border: none; padding: 12px 8px;
+        position: relative; cursor: pointer; white-space: nowrap;
     }
-    
-    .table-advanced th:hover {
-        background: linear-gradient(135deg, #267a41 0%, #1f6a36 100%);
-    }
-    
-    .table-advanced th.filter-active {
-        background: linear-gradient(135deg, #1f6a36 0%, #16572b 100%);
-    }
-    
-    .table-advanced th.filter-active::after {
-        content: '✓';
-        position: absolute;
-        right: 8px;
-        color: #ffc107;
-        font-weight: bold;
-    }
-    
-    .table-advanced td {
-        padding: 10px 8px;
-        vertical-align: middle;
-        border-color: #e9ecef;
-        white-space: nowrap;
-    }
-    
-    .table-advanced tbody tr:hover {
-        background-color: rgba(47, 143, 78, 0.05);
-    }
+    .table-advanced th:hover { background: linear-gradient(135deg, #267a41 0%, #1f6a36 100%); }
+    .table-advanced th.filter-active { background: linear-gradient(135deg, #1f6a36 0%, #16572b 100%); }
+    .table-advanced th.filter-active::after { content: '✓'; position: absolute; right: 8px; color: #ffc107; font-weight: bold; }
+    .table-advanced td { padding: 10px 8px; vertical-align: middle; border-color: #e9ecef; white-space: nowrap; }
+    .table-advanced tbody tr:hover { background-color: rgba(47, 143, 78, 0.05); }
     
     /* BADGES */
-    .badge-saldo {
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        border-radius: 20px;
-        font-weight: 600;
-    }
-    
-    .badge-cliente {
-        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
-        color: white;
-        font-size: 0.75rem;
-        padding: 3px 8px;
-        border-radius: 20px;
-        max-width: 150px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        display: inline-block;
-    }
-    
-    .badge-empresa {
-        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-        color: white;
-        font-size: 0.75rem;
-        padding: 3px 8px;
-        border-radius: 20px;
-    }
-    
-    .badge-status-ativo { 
-        background: #198754;
-        color: white;
-    }
-    
-    .badge-status-esgotado { 
-        background: #dc3545;
-        color: white;
-    }
-    
-    .badge-status-bloqueado { 
-        background: #6c757d;
-        color: white;
-    }
+    .badge-saldo { font-size: 0.75rem; padding: 4px 8px; border-radius: 20px; font-weight: 600; }
+    .badge-cliente { background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: white; font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
+    .badge-empresa { background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; }
+    .badge-status-ativo { background: #198754; color: white; }
+    .badge-status-esgotado { background: #dc3545; color: white; }
+    .badge-status-bloqueado { background: #6c757d; color: white; }
     
     /* BUSCA */
-    .search-container {
-        position: relative;
-        flex: 1;
-        max-width: 400px;
-    }
-    
-    .search-input {
-        padding-left: 40px;
-        padding-right: 40px;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        height: 40px;
-        width: 100%;
-    }
-    
-    .search-icon {
-        position: absolute;
-        left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #6c757d;
-        z-index: 5;
-    }
-    
-    .clear-search {
-        position: absolute;
-        right: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: none;
-        border: none;
-        color: #6c757d;
-        cursor: pointer;
-        display: none;
-        z-index: 5;
-    }
+    .search-container { position: relative; flex: 1; max-width: 400px; }
+    .search-input { padding-left: 40px; padding-right: 40px; border: 1px solid #dee2e6; border-radius: 8px; height: 40px; width: 100%; }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #6c757d; z-index: 5; }
+    .clear-search { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #6c757d; cursor: pointer; display: none; z-index: 5; }
     
     /* FILTROS ATIVOS */
-    .active-filters-container {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 12px 15px;
-        margin-bottom: 15px;
-        border: 1px solid #e9ecef;
-        display: none;
-    }
-    
-    .active-filter-badge {
-        background: #2f8f4e;
-        color: white;
-        padding: 4px 10px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        margin: 2px;
-    }
-    
-    .remove-filter {
-        cursor: pointer;
-        font-size: 0.8rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background: rgba(255,255,255,0.2);
-    }
-    
-    .remove-filter:hover {
-        background: rgba(255,255,255,0.3);
-    }
-    
-    /* RESULTADOS FILTRADOS */
-    .filtered-results {
-        background: #e7f1ff;
-        border: 1px solid #b3d4fc;
-        border-radius: 8px;
-        padding: 10px 15px;
-        font-size: 0.875rem;
-        color: #0d6efd;
-        margin-bottom: 15px;
-        display: none;
-    }
+    .active-filters-container { background: #f8f9fa; border-radius: 8px; padding: 12px 15px; margin-bottom: 15px; border: 1px solid #e9ecef; display: none; }
+    .active-filter-badge { background: #2f8f4e; color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 5px; margin: 2px; }
+    .remove-filter { cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .remove-filter:hover { background: rgba(255,255,255,0.3); }
     
     /* FILTROS ESTILO EXCEL */
-    .excel-filter-container {
-        position: absolute;
-        background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        box-shadow: 0 4px 25px rgba(0,0,0,0.15);
-        z-index: 1060;
-        min-width: 280px;
-        max-width: 350px;
-        animation: slideDown 0.2s ease;
-        overflow: hidden;
-    }
-    
-    @keyframes slideDown {
-        from {
-            opacity: 0;
-            transform: translateY(-10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    .filter-header {
-        padding: 12px 15px;
-        background: #f8f9fa;
-        border-bottom: 1px solid #dee2e6;
-        font-weight: 600;
-        color: #495057;
-    }
-    
-    .filter-search {
-        padding: 10px 15px;
-        border-bottom: 1px solid #dee2e6;
-    }
-    
-    .filter-search input {
-        width: 100%;
-        padding: 6px 12px;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-        font-size: 0.875rem;
-    }
-    
-    .filter-options {
-        max-height: 300px;
-        overflow-y: auto;
-        padding: 5px 0;
-    }
-    
-    .filter-option {
-        padding: 6px 15px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        cursor: pointer;
-    }
-    
-    .filter-option:hover {
-        background: #f8f9fa;
-    }
-    
-    .filter-option input[type="checkbox"] {
-        margin: 0;
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-    }
-    
-    .filter-option label {
-        flex: 1;
-        cursor: pointer;
-        margin: 0;
-        font-size: 0.875rem;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
-    .filter-count {
-        font-size: 0.75rem;
-        color: #6c757d;
-        background: #e9ecef;
-        padding: 1px 6px;
-        border-radius: 10px;
-        min-width: 24px;
-        text-align: center;
-    }
-    
-    .filter-actions {
-        padding: 10px 15px;
-        border-top: 1px solid #dee2e6;
-        background: #f8f9fa;
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
-    }
-    
-    .filter-actions .btn {
-        font-size: 0.75rem;
-        padding: 4px 10px;
-    }
-    
-    /* FILTROS NUMÉRICOS */
-    .filter-numeric {
-        padding: 15px;
-    }
-    
-    .range-inputs {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-        margin-bottom: 15px;
-    }
-    
-    .range-inputs input {
-        width: 100%;
-        padding: 6px 12px;
-        border: 1px solid #dee2e6;
-        border-radius: 4px;
-        font-size: 0.875rem;
-    }
+    .excel-filter-container { position: absolute; background: white; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: 0 4px 25px rgba(0,0,0,0.15); z-index: 1060; min-width: 280px; max-width: 350px; animation: slideDown 0.2s ease; overflow: hidden; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .filter-header { padding: 12px 15px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; font-weight: 600; color: #495057; }
+    .filter-search { padding: 10px 15px; border-bottom: 1px solid #dee2e6; }
+    .filter-search input { width: 100%; padding: 6px 12px; border: 1px solid #dee2e6; border-radius: 4px; font-size: 0.875rem; }
+    .filter-options { max-height: 250px; overflow-y: auto; padding: 5px 0; }
+    .filter-option { padding: 6px 15px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .filter-option:hover { background: #f8f9fa; }
+    .filter-option input[type="checkbox"] { margin: 0; width: 16px; height: 16px; cursor: pointer; }
+    .filter-option label { flex: 1; cursor: pointer; margin: 0; font-size: 0.875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .filter-actions { padding: 10px 15px; border-top: 1px solid #dee2e6; background: #f8f9fa; display: flex; gap: 8px; justify-content: flex-end; }
     
     /* PAGINAÇÃO */
-    .pagination-container {
-        background: white;
-        border-radius: 10px;
-        padding: 15px;
-        margin-top: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        border: 1px solid #e9ecef;
-    }
-    
-    .pagination-controls {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-    }
-    
-    .pagination-btn {
-        min-width: 36px;
-        height: 36px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        background: white;
-        color: #2f8f4e;
-        font-weight: 500;
-        text-decoration: none;
-        cursor: pointer;
-    }
-    
-    .pagination-btn:hover {
-        background: #f8f9fa;
-        border-color: #2f8f4e;
-    }
-    
-    .pagination-btn.active {
-        background: #2f8f4e;
-        border-color: #2f8f4e;
-        color: white;
-    }
-    
-    .pagination-btn.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        background: #f8f9fa;
-    }
+    .pagination-container { background: white; border-radius: 10px; padding: 15px; margin-top: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #e9ecef; }
+    .pagination-controls { display: flex; align-items: center; justify-content: center; gap: 5px; }
+    .pagination-btn { min-width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid #dee2e6; border-radius: 6px; background: white; color: #2f8f4e; font-weight: 500; text-decoration: none; cursor: pointer; }
+    .pagination-btn:hover { background: #f8f9fa; border-color: #2f8f4e; }
+    .pagination-btn.active { background: #2f8f4e; border-color: #2f8f4e; color: white; }
+    .pagination-btn.disabled { opacity: 0.5; cursor: not-allowed; background: #f8f9fa; }
     
     /* LOADER */
-    .import-loader {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        z-index: 9999;
-        justify-content: center;
-        align-items: center;
-    }
-    
-    /* RESPONSIVIDADE */
-    @media (max-width: 768px) {
-        .action-buttons {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        
-        .action-buttons > div {
-            width: 100%;
-        }
-        
-        .search-container {
-            max-width: 100%;
-        }
-        
-        .table-container {
-            overflow-x: auto;
-        }
-        
-        .range-inputs {
-            grid-template-columns: 1fr;
-        }
-    }
+    .import-loader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; }
 </style>
 
 <div class="container-fluid py-4">
     <!-- HEADER -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h2 class="text-success fw-bold mb-1">
-                <i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque
-            </h2>
+            <h2 class="text-success fw-bold mb-1"><i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque</h2>
             <p class="text-muted mb-0">Controle completo do estoque atual</p>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-primary" id="totalItens">{{ total_itens|intcomma }} itens</span>
-            <span class="badge bg-success">{{ total_sc|intcomma }} SC total</span>
-        </div>
+        
     </div>
 
     <!-- CARDS DE ESTATÍSTICAS -->
@@ -493,59 +97,36 @@
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="d-flex align-items-center">
-                    <div class="bg-success rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-layer-group text-white"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 text-success">{{ total_itens|intcomma }}</h4>
-                        <small class="text-muted">Lotes Ativos</small>
-                    </div>
+                    <div class="bg-success rounded-circle p-3 me-3"><i class="fa-solid fa-layer-group text-white"></i></div>
+                    <div><h4 class="mb-0 text-success">{{ total_itens|intcomma }}</h4><small class="text-muted">Lotes Ativos</small></div>
                 </div>
             </div>
         </div>
-        
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="d-flex align-items-center">
-                    <div class="bg-info rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-weight-hanging text-white"></i>
-                    </div>
+                    <div class="bg-info rounded-circle p-3 me-3"><i class="fa-solid fa-weight-hanging text-white"></i></div>
                     <div>
                         <h4 class="mb-0 text-info">{{ total_sc|intcomma }}</h4>
-                        <small class="text-muted">Equivalente SC</small>
-                        <br>
-                        <small class="text-muted">
-                            ({{ total_bags|intcomma }} BAG × 25 + {{ total_sc_fisico|intcomma }} SC)
-                        </small>
+                        <small class="text-muted">Equivalente SC</small><br>
+                        <small class="text-muted">({{ total_bags|intcomma }} BAG × 25 + {{ total_sc_fisico|intcomma }} SC)</small>
                     </div>
                 </div>
             </div>
         </div>
-        
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="d-flex align-items-center">
-                    <div class="bg-warning rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-box text-white"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 text-warning">{{ total_bags|intcomma }}</h4>
-                        <small class="text-muted">Unidades BAG</small>
-                    </div>
+                    <div class="bg-warning rounded-circle p-3 me-3"><i class="fa-solid fa-box text-white"></i></div>
+                    <div><h4 class="mb-0 text-warning">{{ total_bags|intcomma }}</h4><small class="text-muted">Unidades BAG</small></div>
                 </div>
             </div>
         </div>
-        
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="d-flex align-items-center">
-                    <div class="bg-primary rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-users text-white"></i>
-                    </div>
-                    <div>
-                        <h4 class="mb-0 text-primary">{{ clientes_unicos|intcomma }}</h4>
-                        <small class="text-muted">Clientes Únicos</small>
-                    </div>
+                    <div class="bg-primary rounded-circle p-3 me-3"><i class="fa-solid fa-users text-white"></i></div>
+                    <div><h4 class="mb-0 text-primary">{{ clientes_unicos|intcomma }}</h4><small class="text-muted">Clientes Únicos</small></div>
                 </div>
             </div>
         </div>
@@ -557,40 +138,17 @@
         <div id="activeFilters"></div>
     </div>
 
-    <!-- RESULTADOS FILTRADOS -->
-    <div class="filtered-results" id="filteredResults">
-        Mostrando <span id="filteredCount">0</span> de <span id="totalCount">{{ total_itens|intcomma }}</span> itens
-        <span id="clearAllFilters" class="ms-2 text-danger" style="cursor: pointer; text-decoration: underline;">
-            Limpar todos os filtros
-        </span>
-    </div>
-
     <!-- BOTÕES DE AÇÃO -->
     <div class="action-buttons">
-        <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
-            <i class="fa-solid fa-download me-2"></i>Exportar
-        </button>
-        
-        <button class="btn btn-import" data-bs-toggle="modal" data-bs-target="#importModal">
-            <i class="fa-solid fa-upload me-2"></i>Importar
-        </button>
-        
-        <button class="btn btn-print" onclick="window.print()">
-            <i class="fa-solid fa-print me-2"></i>Imprimir
-        </button>
-        
-        <button class="btn btn-clear-filters" onclick="clearAllFilters()" id="clearFiltersBtn" style="display: none;">
-            <i class="fa-solid fa-filter-circle-xmark me-2"></i>Limpar Filtros
-        </button>
+        <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="fa-solid fa-download me-2"></i>Exportar</button>
+        <button class="btn btn-import" data-bs-toggle="modal" data-bs-target="#importModal"><i class="fa-solid fa-upload me-2"></i>Importar</button>
+        <button class="btn btn-print" onclick="window.print()"><i class="fa-solid fa-print me-2"></i>Imprimir</button>
+        <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;"><i class="fa-solid fa-filter-circle-xmark me-2"></i>Limpar Filtros</button>
         
         <div class="search-container">
             <i class="fa-solid fa-search search-icon"></i>
-            <input type="text" id="searchInput" class="form-control search-input" 
-                   placeholder="Buscar em todas as colunas..." 
-                   value="{{ busca }}">
-            <button class="clear-search" id="clearSearchBtn">
-                <i class="fa-solid fa-times"></i>
-            </button>
+            <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar em todas as colunas..." value="{{ busca }}">
+            <button class="clear-search" id="clearSearchBtn"><i class="fa-solid fa-times"></i></button>
         </div>
     </div>
 
@@ -600,168 +158,54 @@
             <table class="table table-advanced table-hover mb-0" id="estoqueTable">
                 <thead>
                     <tr>
-                        <th data-column="az" data-type="text" onclick="showFilter(this, 'az', 'text')">
-                            AZ <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="lote" data-type="text" onclick="showFilter(this, 'lote', 'text')">
-                            Lote <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="cultivar" data-type="select" onclick="showFilter(this, 'cultivar', 'select')">
-                            Cultivar <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="peneira" data-type="select" onclick="showFilter(this, 'peneira', 'select')">
-                            Peneira <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="categoria" data-type="select" onclick="showFilter(this, 'categoria', 'select')">
-                            Categoria <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="endereco" data-type="text" onclick="showFilter(this, 'endereco', 'text')">
-                            Endereço <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="saldo" data-type="number" onclick="showFilter(this, 'saldo', 'number')">
-                            Saldo <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="peso_unitario" data-type="number" onclick="showFilter(this, 'peso_unitario', 'number')">
-                            Peso Unit. (kg) <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="peso_total" data-type="number" onclick="showFilter(this, 'peso_total', 'number')">
-                            Peso Total (kg) <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="especie" data-type="select" onclick="showFilter(this, 'especie', 'select')">
-                            Espécie <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="tratamento" data-type="select" onclick="showFilter(this, 'tratamento', 'select')">
-                            Tratamento <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="embalagem" data-type="select" onclick="showFilter(this, 'embalagem', 'select')">
-                            Embalagem <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="cliente" data-type="select" onclick="showFilter(this, 'cliente', 'select')">
-                            Cliente <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="empresa" data-type="select" onclick="showFilter(this, 'empresa', 'select')">
-                            Empresa <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="status" data-type="select" onclick="showFilter(this, 'status', 'select')">
-                            Status <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-                        <th data-column="conferente" data-type="select" onclick="showFilter(this, 'conferente', 'select')">
-                            Conferente <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
+                        <th data-column="az" data-type="text" onclick="showFilter(this, 'az', 'text')">AZ <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="lote" data-type="text" onclick="showFilter(this, 'lote', 'text')">Lote <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="cultivar" data-type="select" onclick="showFilter(this, 'cultivar', 'select')">Cultivar <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="peneira" data-type="select" onclick="showFilter(this, 'peneira', 'select')">Peneira <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="categoria" data-type="select" onclick="showFilter(this, 'categoria', 'select')">Categoria <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="endereco" data-type="text" onclick="showFilter(this, 'endereco', 'text')">Endereço <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="saldo" data-type="number" onclick="showFilter(this, 'saldo', 'number')">Saldo <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="peso_unitario" data-type="number" onclick="showFilter(this, 'peso_unitario', 'number')">Peso Unit. <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="peso_total" data-type="number" onclick="showFilter(this, 'peso_total', 'number')">Peso Total <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="especie" data-type="select" onclick="showFilter(this, 'especie', 'select')">Espécie <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="tratamento" data-type="select" onclick="showFilter(this, 'tratamento', 'select')">Tratamento <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="embalagem" data-type="select" onclick="showFilter(this, 'embalagem', 'select')">Emb. <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="cliente" data-type="select" onclick="showFilter(this, 'cliente', 'select')">Cliente <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="empresa" data-type="select" onclick="showFilter(this, 'empresa', 'select')">Empresa <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="status" data-type="select" onclick="showFilter(this, 'status', 'select')">Status <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="conferente" data-type="select" onclick="showFilter(this, 'conferente', 'select')">Conferente <i class="fa-solid fa-filter filter-indicator"></i></th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     {% for item in estoque %}
-                    <tr onclick="window.location.href='{% url 'sapp:lista_estoque' %}?busca={{ item.lote }}'" 
+                    <tr ondblclick="window.location.href='{% url 'sapp:lista_estoque' %}?busca={{ item.lote }}'" 
                         style="cursor: pointer;"
-                        data-az="{{ item.az|default:'' }}"
-                        data-lote="{{ item.lote }}"
-                        data-cultivar="{{ item.cultivar.nome }}"
-                        data-peneira="{{ item.peneira.nome }}"
-                        data-categoria="{{ item.categoria.nome }}"
-                        data-endereco="{{ item.endereco }}"
-                        data-saldo="{{ item.saldo }}"
-                        data-peso_unitario="{{ item.peso_unitario }}"
-                        data-peso_total="{{ item.peso_total }}"
-                        data-especie="{{ item.especie|default:'' }}"
-                        data-tratamento="{{ item.tratamento.nome|default:'' }}"
-                        data-embalagem="{{ item.embalagem }}"
-                        data-cliente="{{ item.cliente|default:'' }}"
-                        data-empresa="{{ item.empresa|default:'' }}"
-                        data-status="{{ item.status }}"
-                        data-conferente="{{ item.conferente.first_name|default:item.conferente.username }}">
-                        
-                        <td>
-                            {% if item.az %}
-                                <small class="text-muted">{{ item.az }}</small>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        
-                        <td>
-                            <span class="fw-bold text-primary">{{ item.lote }}</span>
-                        </td>
-                        
+                        title="Dê um clique duplo para ver detalhes">
+                        <td><small class="text-muted">{{ item.az|default:"-" }}</small></td>
+                        <td><span class="fw-bold text-primary">{{ item.lote }}</span></td>
                         <td>{{ item.cultivar.nome }}</td>
-                        
                         <td>{{ item.peneira.nome }}</td>
-                        
                         <td>{{ item.categoria.nome }}</td>
-                        
-                        <td>
-                            <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
-                        </td>
-                        
+                        <td><span class="badge bg-light text-dark border">{{ item.endereco }}</span></td>
                         <td>
                             <span class="badge badge-saldo {% if item.saldo > 100 %}bg-success{% elif item.saldo > 0 %}bg-warning{% else %}bg-danger{% endif %}">
                                 {{ item.saldo|intcomma }}
                             </span>
                         </td>
-                        
-                        <td>{{ item.peso_unitario|floatformat:3 }} kg</td>
-                        
+                        <td>{{ item.peso_unitario|floatformat:3 }}</td>
+                        <td><strong>{{ item.peso_total|floatformat:2 }}</strong></td>
+                        <td>{{ item.especie|default:"-" }}</td>
+                        <td>{% if item.tratamento %}<span class="badge bg-info">{{ item.tratamento.nome|truncatechars:15 }}</span>{% else %}<span class="badge bg-secondary">Sem Trat.</span>{% endif %}</td>
+                        <td><span class="badge {% if item.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">{{ item.get_embalagem_display }}</span></td>
+                        <td>{% if item.cliente %}<span class="badge badge-cliente" title="{{ item.cliente }}"><i class="fas fa-user-tag me-1"></i>{{ item.cliente|truncatechars:15 }}</span>{% else %}-{% endif %}</td>
+                        <td>{% if item.empresa %}<span class="badge badge-empresa">{{ item.empresa|truncatechars:15 }}</span>{% else %}-{% endif %}</td>
                         <td>
-                            <strong>{{ item.peso_total|floatformat:2 }} kg</strong>
+                            {% if item.status == 'ATIVO' %}<span class="badge badge-status-ativo">{{ item.status }}</span>
+                            {% elif item.status == 'ESGOTADO' %}<span class="badge badge-status-esgotado">{{ item.status }}</span>
+                            {% elif item.status == 'BLOQUEADO' %}<span class="badge badge-status-bloqueado">{{ item.status }}</span>
+                            {% else %}<span class="badge bg-secondary">{{ item.status }}</span>{% endif %}
                         </td>
-                        
-                        <td>
-                            {% if item.especie %}
-                                <span class="badge bg-info text-white">
-                                    {{ item.especie }}
-                                </span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        
-                        <td>
-                            {% if item.tratamento %}
-                                <span class="badge bg-info">{{ item.tratamento.nome|truncatechars:15 }}</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Sem Trat.</span>
-                            {% endif %}
-                        </td>
-                        
-                        <td>
-                            <span class="badge {% if item.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">
-                                {{ item.get_embalagem_display }}
-                            </span>
-                        </td>
-                        
-                        <td>
-                            {% if item.cliente %}
-                                <span class="badge badge-cliente" title="{{ item.cliente }}">
-                                    <i class="fas fa-user-tag me-1"></i>{{ item.cliente|truncatechars:15 }}
-                                </span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        
-                        <td>
-                            {% if item.empresa %}
-                                <span class="badge badge-empresa">{{ item.empresa|truncatechars:15 }}</span>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
-                        </td>
-                        
-                        <td>
-                            {% if item.status == 'ATIVO' %}
-                                <span class="badge badge-status-ativo">{{ item.status }}</span>
-                            {% elif item.status == 'ESGOTADO' %}
-                                <span class="badge badge-status-esgotado">{{ item.status }}</span>
-                            {% elif item.status == 'BLOQUEADO' %}
-                                <span class="badge badge-status-bloqueado">{{ item.status }}</span>
-                            {% else %}
-                                <span class="badge bg-secondary">{{ item.status }}</span>
-                            {% endif %}
-                        </td>
-                        
-                        <td>
-                            <small>{{ item.conferente.first_name|default:item.conferente.username }}</small>
-                        </td>
+                        <td><small>{{ item.conferente.first_name|default:item.conferente.username }}</small></td>
                     </tr>
                     {% empty %}
                     <tr>
@@ -788,60 +232,40 @@
             
             <div class="col-md-4">
                 <div class="pagination-controls">
-                    <!-- Botão Anterior -->
                     {% if estoque.has_previous %}
-                    <a href="?page={{ estoque.previous_page_number }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
-                       class="pagination-btn" title="Página anterior">
+                    <a href="?page={{ estoque.previous_page_number }}&{{ url_params }}" class="pagination-btn" title="Anterior">
                         <i class="fa-solid fa-chevron-left"></i>
                     </a>
                     {% else %}
-                    <span class="pagination-btn disabled">
-                        <i class="fa-solid fa-chevron-left"></i>
-                    </span>
+                    <span class="pagination-btn disabled"><i class="fa-solid fa-chevron-left"></i></span>
                     {% endif %}
                     
-                    <!-- Primeira página -->
                     {% if estoque.number > 3 %}
-                    <a href="?page=1{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
-                       class="pagination-btn" title="Primeira página">
-                        1
-                    </a>
+                    <a href="?page=1&{{ url_params }}" class="pagination-btn">1</a>
                     <span class="pagination-dots">...</span>
                     {% endif %}
                     
-                    <!-- Páginas ao redor da atual -->
                     {% for num in estoque.paginator.page_range %}
                         {% if num > estoque.number|add:'-3' and num < estoque.number|add:'3' %}
                             {% if num == estoque.number %}
-                            <span class="pagination-btn active" title="Página atual">{{ num }}</span>
+                            <span class="pagination-btn active">{{ num }}</span>
                             {% else %}
-                            <a href="?page={{ num }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
-                               class="pagination-btn" title="Página {{ num }}">
-                                {{ num }}
-                            </a>
+                            <a href="?page={{ num }}&{{ url_params }}" class="pagination-btn">{{ num }}</a>
                             {% endif %}
                         {% endif %}
                     {% endfor %}
                     
-                    <!-- Última página -->
                     {% if estoque.number < estoque.paginator.num_pages|add:'-2' %}
                     <span class="pagination-dots">...</span>
-                    <a href="?page={{ estoque.paginator.num_pages }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
-                       class="pagination-btn" title="Última página">
-                        {{ estoque.paginator.num_pages }}
-                    </a>
+                    <a href="?page={{ estoque.paginator.num_pages }}&{{ url_params }}" class="pagination-btn">{{ estoque.paginator.num_pages }}</a>
                     {% endif %}
                     
-                    <!-- Botão Próximo -->
                     {% if estoque.has_next %}
-                    <a href="?page={{ estoque.next_page_number }}{% if request.GET.page_size %}&page_size={{ request.GET.page_size }}{% endif %}{% if busca %}&busca={{ busca }}{% endif %}" 
-                       class="pagination-btn" title="Próxima página">
+                    <a href="?page={{ estoque.next_page_number }}&{{ url_params }}" class="pagination-btn" title="Próximo">
                         <i class="fa-solid fa-chevron-right"></i>
                     </a>
                     {% else %}
-                    <span class="pagination-btn disabled">
-                        <i class="fa-solid fa-chevron-right"></i>
-                    </span>
+                    <span class="pagination-btn disabled"><i class="fa-solid fa-chevron-right"></i></span>
                     {% endif %}
                 </div>
             </div>
@@ -861,213 +285,39 @@
     {% endif %}
 </div>
 
-<!-- MODAIS (EM ARQUIVO SEPARADO OU AQUI MESMO) -->
+<!-- DADOS IMPORTANTES DO BACKEND PARA O JS -->
+{{ filter_options|json_script:"filter-options-data" }}
+
 {% include 'sapp/modais_export_import.html' %}
 
-<!-- LOADER PARA IMPORTAÇÃO -->
-<div class="import-loader" id="importLoader">
-    <div class="loader-content">
-        <div class="spinner-border text-success mb-3" role="status">
-            <span class="visually-hidden">Processando...</span>
-        </div>
-        <h5>Processando Importação</h5>
-        <p class="text-muted">Aguarde enquanto processamos o arquivo...</p>
-    </div>
-</div>
-
-<!-- SISTEMA DE FILTROS DINÂMICOS -->
+<!-- SCRIPT DE FILTRAGEM -->
 <script>
-// ==============================================
-// SISTEMA DE FILTROS ESTILO EXCEL - 100% FUNCIONAL
-// ==============================================
+let backendOptions = {};
+let currentUrlParams = new URLSearchParams(window.location.search);
 
-// Variáveis globais
-let filters = {};
-let tableData = [];
-let columnValues = {};
-let searchTimeout = null;
-
-// Inicializar quando o DOM estiver pronto
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Iniciando sistema de filtros...');
-    
-    // Extrair dados da tabela
-    extractTableData();
-    
-    // Configurar eventos
+    const dataScript = document.getElementById('filter-options-data');
+    if (dataScript) {
+        try {
+            backendOptions = JSON.parse(dataScript.textContent);
+        } catch (e) {
+            console.error('Erro ao ler opções de filtro:', e);
+        }
+    }
     setupSearch();
     setupClearButtons();
-    
-    // Carregar filtros salvos
-    loadSavedFilters();
-    
-    console.log('✅ Sistema inicializado com', tableData.length, 'itens');
+    updateActiveFiltersUI();
+    markActiveHeaders();
 });
 
-// ==============================================
-// EXTRAÇÃO DE DADOS DA TABELA
-// ==============================================
-
-function extractTableData() {
-    const rows = document.querySelectorAll('#tableBody tr');
-    tableData = [];
-    columnValues = {};
-    
-    rows.forEach((row, rowIndex) => {
-        const rowData = {
-            element: row,
-            visible: true,
-            values: {}
-        };
-        
-        // Extrair valores de cada coluna
-        const headers = document.querySelectorAll('thead th[data-column]');
-        headers.forEach((header, colIndex) => {
-            const colName = header.dataset.column;
-            const colType = header.dataset.type;
-            
-            // Inicializar conjunto de valores únicos
-            if (!columnValues[colName]) {
-                columnValues[colName] = new Set();
-            }
-            
-            // Extrair valor da célula
-            let value = extractCellValue(row, colIndex, colName, colType);
-            rowData.values[colName] = value;
-            
-            // Armazenar valor único
-            if (value !== null && value !== undefined && value !== '') {
-                columnValues[colName].add(value);
-            }
-        });
-        
-        tableData.push(rowData);
-    });
-    
-    // Converter Sets para Arrays ordenados
-    Object.keys(columnValues).forEach(colName => {
-        const values = Array.from(columnValues[colName]);
-        
-        // Ordenar baseado no tipo
-        if (colName.includes('saldo') || colName.includes('peso')) {
-            values.sort((a, b) => parseFloat(a) - parseFloat(b));
-        } else {
-            values.sort((a, b) => String(a).localeCompare(String(b)));
-        }
-        
-        columnValues[colName] = values;
-    });
-}
-
-function extractCellValue(row, cellIndex, colName, colType) {
-    // Primeiro tentar do dataset
-    const datasetValue = row.dataset[colName];
-    if (datasetValue !== undefined) {
-        if (colType === 'number' || colName.includes('saldo') || colName.includes('peso')) {
-            const num = parseFloat(datasetValue);
-            return isNaN(num) ? 0 : num;
-        }
-        return datasetValue;
-    }
-    
-    // Se não, pegar da célula
-    const cell = row.children[cellIndex];
-    if (!cell) return '';
-    
-    let text = cell.textContent.trim();
-    
-    // Para números, extrair valor numérico
-    if (colType === 'number' || colName.includes('saldo') || colName.includes('peso')) {
-        // Remover caracteres não numéricos, exceto ponto e vírgula
-        const cleanText = text.replace(/[^\d.,]/g, '');
-        const num = parseFloat(cleanText.replace(',', '.'));
-        return isNaN(num) ? 0 : num;
-    }
-    
-    // Para selects, pegar texto do badge se existir
-    if (colType === 'select') {
-        const badge = cell.querySelector('.badge');
-        if (badge) return badge.textContent.trim();
-    }
-    
-    return text || '';
-}
-
-// ==============================================
-// SISTEMA DE BUSCA
-// ==============================================
-
-function setupSearch() {
-    const searchInput = document.getElementById('searchInput');
-    const clearSearchBtn = document.getElementById('clearSearchBtn');
-    
-    if (!searchInput) return;
-    
-    // Atualizar botão de limpar busca
-    searchInput.addEventListener('input', function() {
-        clearSearchBtn.style.display = this.value ? 'block' : 'none';
-    });
-    
-    // Busca com debounce
-    searchInput.addEventListener('input', function() {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            applyFilters();
-        }, 300);
-    });
-    
-    // Buscar com Enter
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            applyFilters();
-        }
-    });
-    
-    // Limpar busca
-    clearSearchBtn.addEventListener('click', function() {
-        searchInput.value = '';
-        this.style.display = 'none';
-        applyFilters();
-    });
-}
-
-function setupClearButtons() {
-    // Limpar todos os filtros
-    document.getElementById('clearAllFilters')?.addEventListener('click', clearAllFilters);
-    
-    // Limpar filtro específico
-    document.addEventListener('click', function(e) {
-        if (e.target.closest('.remove-filter')) {
-            const columnName = e.target.closest('.remove-filter').dataset.column;
-            clearColumnFilter(columnName);
-        }
-    });
-}
-
-// ==============================================
-
-// ==============================================
-
-function showFilter(thElement, columnName, columnType) {
-    console.log('🔄 Mostrando filtro para', columnName);
-    
-    // Fechar filtros abertos
+// UI DOS FILTROS
+window.showFilter = function(thElement, columnName, columnType) {
     closeAllFilters();
     
-    // Remover classe ativa de outros cabeçalhos
-    document.querySelectorAll('th').forEach(th => {
-        th.classList.remove('filter-active');
-    });
-    
-    // Adicionar classe ativa ao cabeçalho atual
-    thElement.classList.add('filter-active');
-    
-    // Posicionar o filtro
     const rect = thElement.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     
-    // Criar container do filtro
     const filterContainer = document.createElement('div');
     filterContainer.className = 'excel-filter-container';
     filterContainer.style.position = 'absolute';
@@ -1075,7 +325,6 @@ function showFilter(thElement, columnName, columnType) {
     filterContainer.style.left = (rect.left + scrollLeft) + 'px';
     filterContainer.style.zIndex = '1060';
     
-    // Adicionar conteúdo baseado no tipo
     if (columnType === 'number') {
         filterContainer.innerHTML = createNumericFilterHTML(columnName);
     } else {
@@ -1083,519 +332,210 @@ function showFilter(thElement, columnName, columnType) {
     }
     
     document.body.appendChild(filterContainer);
-    
-    // Configurar eventos do filtro
     setupFilterEvents(filterContainer, columnName, columnType);
     
-    // Evento para fechar ao clicar fora
     setTimeout(() => {
         document.addEventListener('click', function closeOnClickOutside(e) {
-            if (!filterContainer.contains(e.target) && !thElement.contains(e.target)) {
+            if (filterContainer && !filterContainer.contains(e.target) && !thElement.contains(e.target)) {
                 closeAllFilters();
                 document.removeEventListener('click', closeOnClickOutside);
             }
         });
     }, 10);
-}
+};
 
 function createNumericFilterHTML(columnName) {
-    const currentFilter = filters[columnName] || {};
-    const values = columnValues[columnName] || [];
-    
-    // Encontrar min e max dos valores
-    let minVal = 0, maxVal = 100;
-    if (values.length > 0) {
-        const numericValues = values.map(v => parseFloat(v)).filter(v => !isNaN(v));
-        if (numericValues.length > 0) {
-            minVal = Math.min(...numericValues);
-            maxVal = Math.max(...numericValues);
-        }
-    }
-    
+    const minVal = currentUrlParams.get(`min_${columnName}`) || '';
+    const maxVal = currentUrlParams.get(`max_${columnName}`) || '';
     return `
-        <div class="filter-header">
-            <strong>Filtrar ${getColumnDisplayName(columnName)}</strong>
-        </div>
-        <div class="filter-numeric">
-            <div class="range-inputs">
-                <div>
-                    <small class="text-muted d-block mb-1">Mínimo</small>
-                    <input type="number" 
-                           id="${columnName}-min" 
-                           class="form-control form-control-sm" 
-                           placeholder="Mínimo" 
-                           value="${currentFilter.min || ''}" 
-                           step="0.001"
-                           min="${minVal}">
-                </div>
-                <div>
-                    <small class="text-muted d-block mb-1">Máximo</small>
-                    <input type="number" 
-                           id="${columnName}-max" 
-                           class="form-control form-control-sm" 
-                           placeholder="Máximo" 
-                           value="${currentFilter.max || ''}" 
-                           step="0.001"
-                           max="${maxVal}">
-                </div>
-            </div>
-            <div class="filter-actions">
-                <button type="button" class="btn btn-sm btn-secondary" onclick="clearColumnFilter('${columnName}')">
-                    Limpar
-                </button>
-                <button type="button" class="btn btn-sm btn-primary" onclick="applyNumericFilter('${columnName}')">
-                    Aplicar
-                </button>
+        <div class="filter-header"><strong>Filtrar ${columnName}</strong></div>
+        <div class="filter-numeric p-3">
+            <div class="mb-2"><small>Mínimo</small><input type="number" id="${columnName}-min" class="form-control form-control-sm" value="${minVal}" step="0.01"></div>
+            <div class="mb-3"><small>Máximo</small><input type="number" id="${columnName}-max" class="form-control form-control-sm" value="${maxVal}" step="0.01"></div>
+            <div class="d-flex justify-content-between">
+                <button class="btn btn-sm btn-secondary" onclick="clearColumnFilter('${columnName}')">Limpar</button>
+                <button class="btn btn-sm btn-primary" onclick="applyNumericFilter('${columnName}')">Aplicar</button>
             </div>
         </div>
     `;
 }
 
 function createSelectFilterHTML(columnName) {
-    const currentFilter = filters[columnName] || {};
-    const selectedValues = currentFilter.values || [];
-    const values = columnValues[columnName] || [];
-    
+    const options = backendOptions[columnName] || [];
+    const selectedValues = currentUrlParams.getAll(columnName);
     let optionsHtml = '';
-    values.forEach(value => {
-        const displayValue = value === '' ? '(Vazio)' : String(value);
-        const checked = selectedValues.includes(value) ? 'checked' : '';
-        const count = countOccurrences(columnName, value);
-        
-        optionsHtml += `
-            <div class="filter-option">
-                <input type="checkbox" 
-                       id="opt-${columnName}-${String(value).replace(/[^a-z0-9]/gi, '-')}" 
-                       value="${value}" 
-                       ${checked}>
-                <label for="opt-${columnName}-${String(value).replace(/[^a-z0-9]/gi, '-')}">
-                    ${displayValue}
-                </label>
-                <span class="filter-count">${count}</span>
-            </div>
-        `;
-    });
     
+    if (options.length === 0) {
+        optionsHtml = '<div class="p-3 text-center text-muted">Sem opções disponíveis</div>';
+    } else {
+        options.forEach(value => {
+            const safeValue = String(value);
+            const isChecked = selectedValues.includes(safeValue) ? 'checked' : '';
+            const id = `chk-${columnName}-${safeValue.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            optionsHtml += `
+                <div class="filter-option">
+                    <input type="checkbox" id="${id}" value="${safeValue}" ${isChecked}>
+                    <label for="${id}">${safeValue}</label>
+                </div>
+            `;
+        });
+    }
     return `
-        <div class="filter-header">
-            <strong>Filtrar ${getColumnDisplayName(columnName)}</strong>
-            <small class="text-muted ms-2">${values.length} valores</small>
-        </div>
-        <div class="filter-search">
-            <input type="text" 
-                   id="search-${columnName}" 
-                   class="form-control form-control-sm" 
-                   placeholder="Buscar nesta coluna..." 
-                   onkeyup="searchFilterOptions('${columnName}')">
-        </div>
-        <div class="filter-options" id="options-${columnName}">
-            ${optionsHtml || '<div class="p-2 text-muted text-center">Nenhum valor</div>'}
-        </div>
+        <div class="filter-header"><strong>${columnName}</strong></div>
+        <div class="filter-search"><input type="text" class="form-control form-control-sm" placeholder="Buscar..." onkeyup="filterOptionsList(this)"></div>
+        <div class="filter-options" id="options-list-${columnName}">${optionsHtml}</div>
         <div class="filter-actions">
-            <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllOptions('${columnName}', false)">
-                Nenhum
-            </button>
-            <button type="button" class="btn btn-sm btn-secondary" onclick="selectAllOptions('${columnName}', true)">
-                Todos
-            </button>
-            <button type="button" class="btn btn-sm btn-danger" onclick="clearColumnFilter('${columnName}')">
-                Limpar
-            </button>
-            <button type="button" class="btn btn-sm btn-primary" onclick="applySelectFilter('${columnName}')">
-                Aplicar
-            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="toggleAll('${columnName}', true)">Todos</button>
+                <button class="btn btn-sm btn-link p-0 text-decoration-none" onclick="toggleAll('${columnName}', false)">Nenhum</button>
+            </div>
+            <div class="d-flex gap-2 ms-auto">
+                <button class="btn btn-sm btn-secondary" onclick="clearColumnFilter('${columnName}')">Limpar</button>
+                <button class="btn btn-sm btn-primary" onclick="applySelectFilter('${columnName}')">Aplicar</button>
+            </div>
         </div>
     `;
 }
 
-function setupFilterEvents(filterContainer, columnName, columnType) {
-    // Focar no campo apropriado
-    const input = filterContainer.querySelector('input[type="text"], input[type="number"]');
-    if (input) input.focus();
-    
-    // Configurar Enter para aplicar
-    const inputs = filterContainer.querySelectorAll('input');
+// EVENTOS
+function setupFilterEvents(container, columnName, type) {
+    const inputs = container.querySelectorAll('input');
+    if(inputs.length > 0) setTimeout(() => inputs[0].focus(), 50);
     inputs.forEach(input => {
-        input.addEventListener('keypress', function(e) {
+        input.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                if (columnType === 'number') {
-                    applyNumericFilter(columnName);
-                } else {
-                    applySelectFilter(columnName);
-                }
+                if (type === 'number') applyNumericFilter(columnName);
+                else applySelectFilter(columnName);
             }
         });
     });
 }
 
-// ==============================================
-
-// ==============================================
-
-function applyNumericFilter(columnName) {
-    const minInput = document.getElementById(`${columnName}-min`);
-    const maxInput = document.getElementById(`${columnName}-max`);
-    
-    const min = minInput?.value ? parseFloat(minInput.value) : null;
-    const max = maxInput?.value ? parseFloat(maxInput.value) : null;
-    
-    if (min !== null || max !== null) {
-        filters[columnName] = {
-            type: 'number',
-            min: min,
-            max: max
-        };
-    } else {
-        delete filters[columnName];
-    }
-    
-    closeAllFilters();
-    applyFilters();
-    updateUI();
-}
-
-function applySelectFilter(columnName) {
-    const checkboxes = document.querySelectorAll(`#options-${columnName} input[type="checkbox"]:checked`);
-    const selectedValues = Array.from(checkboxes).map(cb => cb.value);
-    
-    if (selectedValues.length > 0) {
-        filters[columnName] = {
-            type: 'select',
-            values: selectedValues
-        };
-    } else {
-        delete filters[columnName];
-    }
-    
-    closeAllFilters();
-    applyFilters();
-    updateUI();
-}
-
-function applyFilters() {
-    const searchTerm = document.getElementById('searchInput')?.value?.toLowerCase() || '';
-    let visibleCount = 0;
-    
-    tableData.forEach(row => {
-        let showRow = true;
-        
-        // Aplicar busca global
-        if (searchTerm && showRow) {
-            const rowText = row.element.textContent.toLowerCase();
-            if (!rowText.includes(searchTerm)) {
-                showRow = false;
-            }
-        }
-        
-        // Aplicar filtros de coluna
-        Object.keys(filters).forEach(colName => {
-            if (!showRow) return;
-            
-            const filter = filters[colName];
-            const cellValue = row.values[colName];
-            
-            if (filter.type === 'number') {
-                const numValue = parseFloat(cellValue) || 0;
-                
-                if (filter.min !== null && numValue < filter.min) {
-                    showRow = false;
-                }
-                if (filter.max !== null && numValue > filter.max) {
-                    showRow = false;
-                }
-            } 
-            else if (filter.type === 'select') {
-                const strValue = String(cellValue);
-                if (!filter.values.includes(strValue)) {
-                    showRow = false;
-                }
+function setupSearch() {
+    const input = document.getElementById('searchInput');
+    const btn = document.getElementById('clearSearchBtn');
+    if (input) {
+        if (input.value) btn.style.display = 'block';
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                currentUrlParams.set('busca', input.value);
+                currentUrlParams.set('page', 1);
+                reloadPage();
             }
         });
-        
-        // Aplicar visibilidade
-        row.visible = showRow;
-        row.element.style.display = showRow ? '' : 'none';
-        
-        if (showRow) visibleCount++;
+        input.addEventListener('input', function() { btn.style.display = this.value ? 'block' : 'none'; });
+        btn.addEventListener('click', function() {
+            input.value = '';
+            currentUrlParams.delete('busca');
+            reloadPage();
+        });
+    }
+}
+
+function setupClearButtons() {
+    const btn = document.getElementById('clearFiltersBtn');
+    if(btn) btn.onclick = clearAllFilters;
+}
+
+// LÓGICA
+window.applyNumericFilter = function(columnName) {
+    const min = document.getElementById(`${columnName}-min`).value;
+    const max = document.getElementById(`${columnName}-max`).value;
+    currentUrlParams.delete(`min_${columnName}`);
+    currentUrlParams.delete(`max_${columnName}`);
+    if (min) currentUrlParams.set(`min_${columnName}`, min);
+    if (max) currentUrlParams.set(`max_${columnName}`, max);
+    currentUrlParams.set('page', 1);
+    reloadPage();
+};
+
+window.applySelectFilter = function(columnName) {
+    const container = document.getElementById(`options-list-${columnName}`);
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    currentUrlParams.delete(columnName);
+    checkboxes.forEach(cb => { currentUrlParams.append(columnName, cb.value); });
+    currentUrlParams.set('page', 1);
+    reloadPage();
+};
+
+window.clearColumnFilter = function(columnName) {
+    currentUrlParams.delete(columnName);
+    currentUrlParams.delete(`min_${columnName}`);
+    currentUrlParams.delete(`max_${columnName}`);
+    reloadPage();
+};
+
+window.clearAllFilters = function() {
+    let baseUrl = window.location.pathname;
+    if (currentUrlParams.has('page_size')) baseUrl += `?page_size=${currentUrlParams.get('page_size')}`;
+    window.location.href = baseUrl;
+};
+
+// UTILITÁRIOS
+window.filterOptionsList = function(input) {
+    const term = input.value.toLowerCase();
+    const container = input.closest('.filter-search').nextElementSibling;
+    const options = container.querySelectorAll('.filter-option');
+    options.forEach(opt => {
+        const text = opt.innerText.toLowerCase();
+        opt.style.display = text.includes(term) ? 'flex' : 'none';
     });
-    
-    // Atualizar UI
-    updateUI();
-    
-    // Salvar filtros
-    saveFilters();
-}
+};
 
-// ==============================================
+window.toggleAll = function(columnName, checked) {
+    const container = document.getElementById(`options-list-${columnName}`);
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => { if (cb.parentElement.style.display !== 'none') cb.checked = checked; });
+};
 
-// ==============================================
-
-function searchFilterOptions(columnName) {
-    const searchTerm = document.getElementById(`search-${columnName}`).value.toLowerCase();
-    const options = document.querySelectorAll(`#options-${columnName} .filter-option`);
-    
-    options.forEach(option => {
-        const label = option.querySelector('label').textContent.toLowerCase();
-        option.style.display = label.includes(searchTerm) ? '' : 'none';
-    });
-}
-
-function selectAllOptions(columnName, selectAll) {
-    const checkboxes = document.querySelectorAll(`#options-${columnName} input[type="checkbox"]`);
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAll;
-    });
-}
-
-function countOccurrences(columnName, value) {
-    return tableData.filter(row => String(row.values[columnName]) === String(value)).length;
-}
-
-function getColumnDisplayName(columnName) {
-    const names = {
-        'az': 'AZ',
-        'lote': 'Lote',
-        'cultivar': 'Cultivar',
-        'peneira': 'Peneira',
-        'categoria': 'Categoria',
-        'endereco': 'Endereço',
-        'saldo': 'Saldo',
-        'peso_unitario': 'Peso Unitário',
-        'peso_total': 'Peso Total',
-        'especie': 'Espécie',
-        'tratamento': 'Tratamento',
-        'embalagem': 'Embalagem',
-        'cliente': 'Cliente',
-        'empresa': 'Empresa',
-        'status': 'Status',
-        'conferente': 'Conferente'
-    };
-    return names[columnName] || columnName.replace(/_/g, ' ');
-}
-
-function clearColumnFilter(columnName) {
-    delete filters[columnName];
-    closeAllFilters();
-    applyFilters();
-    updateUI();
-}
-
-function clearAllFilters() {
-    filters = {};
-    document.getElementById('searchInput').value = '';
-    document.getElementById('clearSearchBtn').style.display = 'none';
-    
-    closeAllFilters();
-    applyFilters();
-    updateUI();
-}
+window.updatePageSize = function(size) {
+    currentUrlParams.set('page_size', size);
+    currentUrlParams.set('page', 1);
+    reloadPage();
+};
 
 function closeAllFilters() {
     document.querySelectorAll('.excel-filter-container').forEach(el => el.remove());
-    document.querySelectorAll('th').forEach(th => th.classList.remove('filter-active'));
 }
 
-// ==============================================
+function reloadPage() {
+    window.location.search = currentUrlParams.toString();
+}
 
-// ==============================================
-
-function updateUI() {
-    const visibleCount = tableData.filter(row => row.visible).length;
-    const totalCount = tableData.length;
-    
-    // Atualizar contadores
-    document.getElementById('filteredCount').textContent = visibleCount.toLocaleString();
-    document.getElementById('totalCount').textContent = totalCount.toLocaleString();
-    
-    // Atualizar badge total
-    const totalBadge = document.getElementById('totalItens');
-    if (totalBadge) {
-        if (visibleCount < totalCount) {
-            totalBadge.textContent = `${visibleCount.toLocaleString()} de ${totalCount.toLocaleString()} itens`;
-            totalBadge.className = 'badge bg-warning';
-        } else {
-            totalBadge.textContent = `${totalCount.toLocaleString()} itens`;
-            totalBadge.className = 'badge bg-primary';
+function markActiveHeaders() {
+    const keys = Array.from(currentUrlParams.keys());
+    document.querySelectorAll('th[data-column]').forEach(th => {
+        const col = th.dataset.column;
+        if (keys.includes(col) || keys.includes(`min_${col}`) || keys.includes(`max_${col}`)) {
+            th.classList.add('filter-active');
         }
-    }
-    
-    // Mostrar/ocultar elementos
-    const hasFilters = Object.keys(filters).length > 0 || document.getElementById('searchInput')?.value;
-    
-    document.getElementById('filteredResults').style.display = hasFilters ? 'block' : 'none';
-    document.getElementById('clearFiltersBtn').style.display = hasFilters ? 'inline-block' : 'none';
-    document.getElementById('activeFiltersContainer').style.display = Object.keys(filters).length > 0 ? 'block' : 'none';
-    
-    // Atualizar filtros ativos
-    updateActiveFilters();
+    });
 }
 
-function updateActiveFilters() {
+function updateActiveFiltersUI() {
     const container = document.getElementById('activeFilters');
-    if (!container) return;
-    
+    if(!container) return;
     container.innerHTML = '';
+    let count = 0;
+    const ignore = ['page', 'page_size', 'busca'];
+    const uniqueKeys = new Set(Array.from(currentUrlParams.keys()).filter(k => !ignore.includes(k)));
     
-    Object.keys(filters).forEach(colName => {
-        const filter = filters[colName];
-        let text = getColumnDisplayName(colName) + ': ';
-        
-        if (filter.type === 'number') {
-            const parts = [];
-            if (filter.min !== null) parts.push(`≥ ${filter.min}`);
-            if (filter.max !== null) parts.push(`≤ ${filter.max}`);
-            text += parts.join(' e ');
-        } else if (filter.type === 'select') {
-            text += `${filter.values.length} valor(es)`;
-        }
+    uniqueKeys.forEach(key => {
+        count++;
+        let label = key;
+        const vals = currentUrlParams.getAll(key);
+        if (key.startsWith('min_')) label = `${key.replace('min_', '')} ≥ ${vals[0]}`;
+        else if (key.startsWith('max_')) label = `${key.replace('max_', '')} ≤ ${vals[0]}`;
+        else label = `${key}: ${vals.length > 1 ? vals.length + ' selecionados' : vals[0]}`;
         
         const badge = document.createElement('span');
         badge.className = 'active-filter-badge';
-        badge.innerHTML = `
-            ${text}
-            <span class="remove-filter" data-column="${colName}">
-                <i class="fa-solid fa-times"></i>
-            </span>
-        `;
+        badge.innerHTML = `${label} <i class="fa-solid fa-times ms-1" onclick="clearColumnFilter('${key.replace(/min_|max_/, '')}')"></i>`;
         container.appendChild(badge);
     });
-}
-
-// ==============================================
-
-// ==============================================
-
-function saveFilters() {
-    try {
-        const data = {
-            filters: filters,
-            search: document.getElementById('searchInput')?.value || ''
-        };
-        localStorage.setItem('estoque_filters', JSON.stringify(data));
-    } catch (e) {
-        console.warn('Não foi possível salvar filtros:', e);
-    }
-}
-
-function loadSavedFilters() {
-    try {
-        const saved = localStorage.getItem('estoque_filters');
-        if (saved) {
-            const data = JSON.parse(saved);
-            filters = data.filters || {};
-            
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput && data.search) {
-                searchInput.value = data.search;
-                document.getElementById('clearSearchBtn').style.display = 'block';
-            }
-            
-            // Aplicar filtros salvos
-            if (Object.keys(filters).length > 0 || data.search) {
-                applyFilters();
-                updateUI();
-            }
-        }
-    } catch (e) {
-        console.warn('Não foi possível carregar filtros:', e);
-    }
-}
-
-// ==============================================
-
-// ==============================================
-
-// Exportar para uso global
-window.showFilter = showFilter;
-window.searchFilterOptions = searchFilterOptions;
-window.selectAllOptions = selectAllOptions;
-window.applyNumericFilter = applyNumericFilter;
-window.applySelectFilter = applySelectFilter;
-window.clearColumnFilter = clearColumnFilter;
-window.clearAllFilters = clearAllFilters;
-window.updatePageSize = function(pageSize) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('page_size', pageSize);
-    url.searchParams.set('page', '1');
-    window.location.href = url.toString();
-};
-
-// Debug
-window.debugFilters = function() {
-    console.log('🔍 DEBUG FILTROS:', {
-        filters: filters,
-        tableData: tableData,
-        visible: tableData.filter(r => r.visible).length,
-        total: tableData.length
-    });
-};
-</script>
-
-<!-- FUNÇÕES DE IMPORT/EXPORT (MANTIDAS DA VERSÃO ANTERIOR) -->
-<script>
-// Mantenha as funções de import/export da versão anterior aqui
-let currentImportData = null;
-let selectedModifications = new Set();
-
-function previewImport() {
-    const form = document.getElementById('importForm');
-    const formData = new FormData(form);
-    const fileInput = form.querySelector('input[type="file"]');
     
-    if (!fileInput.files.length) {
-        alert('Selecione um arquivo para importar.');
-        return;
-    }
-    
-    showLoader(true);
-    
-    fetch('{% url "sapp:importar_estoque" %}', {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': getCookie('csrftoken'),
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            currentImportData = data;
-            // Mostrar modal de preview
-            console.log('Importação bem sucedida:', data);
-        } else {
-            alert('Erro: ' + data.error);
-        }
-    })
-    .catch(error => {
-        alert('Erro ao processar arquivo: ' + error.message);
-    })
-    .finally(() => {
-        showLoader(false);
-    });
-}
-
-function showLoader(show) {
-    const loader = document.getElementById('importLoader');
-    if (loader) {
-        loader.style.display = show ? 'flex' : 'none';
-    }
-}
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
+    document.getElementById('activeFiltersContainer').style.display = count > 0 ? 'block' : 'none';
+    document.getElementById('clearFiltersBtn').style.display = count > 0 ? 'inline-block' : 'none';
 }
 </script>
-
 {% endblock %}
