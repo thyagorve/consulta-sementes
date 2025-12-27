@@ -1,146 +1,99 @@
 {% extends 'sapp/base.html' %}
+{% load static %}
 
 {% block content %}
+<!-- Garante que os ícones carreguem -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
 <style>
     /* --- Estilo Personalizado das Abas --- */
-    .nav-tabs {
-        border-bottom: 2px solid #dee2e6;
-    }
+    .nav-tabs { border-bottom: 2px solid #dee2e6; }
     
     .nav-tabs .nav-link {
-        color: #495057;
-        background-color: #f1f3f5;
-        margin-right: 4px;
-        border: 1px solid #ced4da;
-        border-bottom: none;
-        border-radius: 8px 8px 0 0;
-        font-weight: 500;
-        padding: 12px 20px;
-        transition: all 0.3s ease;
+        color: #495057; background-color: #f8f9fa; margin-right: 4px;
+        border: 1px solid #dee2e6; border-bottom: none;
+        border-radius: 8px 8px 0 0; font-weight: 500; padding: 12px 20px;
+        transition: all 0.2s ease;
     }
     
-    .nav-tabs .nav-link:hover {
-        background-color: #e9ecef;
-        color: #000;
-        border-color: #adb5bd;
-        transform: translateY(-2px);
-    }
+    .nav-tabs .nav-link:hover { background-color: #e9ecef; transform: translateY(-2px); }
 
     .nav-tabs .nav-link.active {
-        color: #fff;
-        background-color: #198754;
-        border-color: #198754 #198754 #fff;
-        border-top: 3px solid #146c43;
-        font-weight: 600;
-        box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
-    }
-
-    .nav-tabs .nav-link.active:hover {
-        background-color: #157347;
-        color: #fff;
-        border-color: #146c43 #146c43 #fff;
+        color: #fff; background-color: #198754;
+        border-color: #198754 #198754 #fff; border-top: 3px solid #146c43;
+        font-weight: 600; box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
     }
     
-    .tab-content {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        border-radius: 0 0 8px 8px;
-    }
+    .tab-content { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 0 0 8px 8px; background: white; }
 
-    /* --- Cards e Header --- */
-    .card {
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border-radius: 10px;
-        overflow: hidden;
-    }
-
-    .card-header {
-        font-weight: 600;
-        font-size: 1.1rem;
-        padding: 15px 20px;
-    }
-
-    /* --- Switch Personalizado --- */
-    .form-check-input:checked {
-        background-color: #198754;
-        border-color: #198754;
-    }
-
-    .form-check-input {
-        width: 3em;
-        height: 1.5em;
-    }
-
-    /* --- Badges e Elementos Interativos --- */
-    .badge {
+    /* --- Scrollbar Customizada --- */
+    .scroll-container {
+        max-height: 350px;
+        overflow-y: auto;
+        padding-right: 5px;
+        border: 1px solid #f1f3f5;
         border-radius: 6px;
-        transition: all 0.2s ease;
+        padding: 10px;
+        background-color: #f8f9fa;
     }
+    
+    /* Estilo da barra de rolagem */
+    .scroll-container::-webkit-scrollbar { width: 6px; }
+    .scroll-container::-webkit-scrollbar-track { background: #f1f1f1; }
+    .scroll-container::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+    .scroll-container::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
-    .badge:hover {
-        transform: scale(1.02);
+    /* --- Badges --- */
+    .badge-item {
+        transition: all 0.2s; cursor: default;
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 0.9rem; padding: 8px 12px;
     }
+    .badge-item:hover { background-color: #e9ecef !important; transform: scale(1.02); }
 
-    /* --- Botões --- */
-    .btn {
-        border-radius: 6px;
-        font-weight: 500;
-        transition: all 0.2s ease;
-    }
-
-    .btn:hover {
-        transform: translateY(-1px);
-    }
-
-    /* --- Ícones nas abas --- */
-    .nav-tabs .nav-link i {
-        opacity: 0.8;
-    }
-
-    .nav-tabs .nav-link.active i {
-        opacity: 1;
-        color: #fff;
-    }
+    /* --- Switch --- */
+    .form-check-input:checked { background-color: #198754; border-color: #198754; }
+    .form-check-input { width: 3em; height: 1.5em; cursor: pointer; }
 </style>
 
-<div class="container mt-4">
+<div class="container mt-4 pb-5">
     <!-- Header Principal -->
     <div class="d-flex align-items-center mb-4">
-        <div class="bg-success rounded-circle p-3 me-3">
+        <div class="bg-success rounded-circle p-3 me-3 shadow-sm">
             <i class="fa-solid fa-gear fa-lg text-white"></i>
         </div>
         <div>
             <h2 class="mb-1 text-success fw-bold">Configurações do Sistema</h2>
-            <p class="text-muted mb-0">Gerencie as configurações e cadastros do sistema</p>
+            <p class="text-muted mb-0">Gerencie cadastros auxiliares e usuários</p>
         </div>
     </div>
 
     <!-- 1. Configuração Geral -->
     <div class="row">
         <div class="col-md-12 mb-4">
-            <div class="card border-success">
+            <div class="card border-success shadow-sm">
                 <div class="card-header bg-success text-white d-flex align-items-center">
-                    <i class="fa-solid fa-sliders me-2"></i>
-                    Configurações Gerais
+                    <i class="fa-solid fa-sliders me-2"></i> Configurações Gerais
                 </div>
                 <div class="card-body">
                     <form method="POST">
                         {% csrf_token %}
                         <input type="hidden" name="acao" value="config_geral">
-                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded">
+                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded border">
                             <div class="form-check form-switch fs-5">
                                 {{ form_config.ocultar_esgotados }}
                             </div>
                             <div>
-                                <label class="form-check-label fw-medium">
-                                    Ocultar automaticamente lotes com <strong class="text-danger">Saldo 0 (Esgotados)</strong>
+                                <label class="form-check-label fw-bold text-dark">
+                                    Ocultar automaticamente lotes com Saldo 0
                                 </label>
-                                <small class="text-muted d-block mt-1">
-                                    Quando ativado, os lotes esgotados não serão exibidos na tabela de estoque
+                                <small class="text-muted d-block">
+                                    Lotes esgotados não aparecerão na tabela principal, apenas no histórico.
                                 </small>
                             </div>
                         </div>
-                        <button type="submit" class="btn btn-success mt-3 px-4">
-                            <i class="fa-solid fa-floppy-disk me-2"></i>Salvar Preferência
+                        <button type="submit" class="btn btn-success mt-3 px-4 fw-bold">
+                            <i class="fa-solid fa-check me-2"></i>Salvar Preferência
                         </button>
                     </form>
                 </div>
@@ -148,153 +101,129 @@
         </div>
     </div>
 
-    <hr class="my-4">
-
     <!-- 2. Sistema de Abas -->
     <ul class="nav nav-tabs" id="configTabs" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="cultivar-tab" data-bs-toggle="tab" data-bs-target="#cultivar" type="button" role="tab">
-                <i class="fa-solid fa-seedling me-2"></i>Cultivares
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="peneira-tab" data-bs-toggle="tab" data-bs-target="#peneira" type="button" role="tab">
-                <i class="fa-solid fa-filter me-2"></i>Peneiras
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="categoria-tab" data-bs-toggle="tab" data-bs-target="#categoria" type="button" role="tab">
-                <i class="fa-solid fa-tags me-2"></i>Categorias
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="conferente-tab" data-bs-toggle="tab" data-bs-target="#conferente" type="button" role="tab">
-                <i class="fa-solid fa-user-check me-2"></i>Conferentes
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="tratamento-tab" data-bs-toggle="tab" data-bs-target="#tratamento" type="button" role="tab">
-                <i class="fa-solid fa-flask me-2"></i>Tratamentos
-            </button>
-        </li>
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cultivar"><i class="fa-solid fa-seedling me-2"></i>Cultivares</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#especie"><i class="fa-solid fa-leaf me-2"></i>Espécies</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#peneira"><i class="fa-solid fa-filter me-2"></i>Peneiras</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#categoria"><i class="fa-solid fa-tags me-2"></i>Categorias</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tratamento"><i class="fa-solid fa-flask me-2"></i>Tratamentos</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#conferente"><i class="fa-solid fa-user-check me-2"></i>Conferentes</button></li>
     </ul>
 
     <!-- 3. Conteúdo das Abas -->
     <div class="tab-content p-4 border border-top-0 bg-white rounded-bottom" id="configTabsContent">
         
         <!-- Aba Cultivares -->
-        <div class="tab-pane fade show active" id="cultivar" role="tabpanel">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Cultivar" lista=cultivares tipo="cultivar" acao_add="add_cultivar" %}
+        <div class="tab-pane fade show active" id="cultivar">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Cultivar" lista=cultivares tipo="cultivar" acao_add="add_cultivar" %}
+        </div>
+
+        <!-- Aba Espécies (NOVO) -->
+        <div class="tab-pane fade" id="especie">
+            <!-- Nota: Certifique-se de passar 'especies' no context da view django -->
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Espécie" lista=especies tipo="especie" acao_add="add_especie" %}
         </div>
         
         <!-- Aba Peneiras -->
-        <div class="tab-pane fade" id="peneira" role="tabpanel">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Peneira" lista=peneiras tipo="peneira" acao_add="add_peneira" %}
+        <div class="tab-pane fade" id="peneira">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Peneira" lista=peneiras tipo="peneira" acao_add="add_peneira" %}
         </div>
         
         <!-- Aba Categorias -->
-        <div class="tab-pane fade" id="categoria" role="tabpanel">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Nova Categoria" lista=categorias tipo="categoria" acao_add="add_categoria" %}
+        <div class="tab-pane fade" id="categoria">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Categoria" lista=categorias tipo="categoria" acao_add="add_categoria" %}
+        </div>
+
+        <!-- Aba Tratamentos -->
+        <div class="tab-pane fade" id="tratamento">
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Tratamento" lista=tratamentos tipo="tratamento" acao_add="add_tratamento" %}
         </div>
         
         <!-- Aba Conferentes -->
-        <div class="tab-pane fade" id="conferente" role="tabpanel">
+        <div class="tab-pane fade" id="conferente">
             {% if user.is_superuser %}
                 <div class="row">
+                    <!-- Formulário Novo Usuário -->
                     <div class="col-md-4 border-end pe-md-4">
-                        <h5 class="text-primary mb-3 d-flex align-items-center">
-                            <i class="fa-solid fa-user-plus me-2"></i>Novo Conferente
-                        </h5>
-                        <form method="POST">
-                            {% csrf_token %}
-                            <input type="hidden" name="acao" value="add_conferente_user">
-                            
-                            <div class="mb-3">
-                                <label class="form-label fw-medium">Login</label>
-                                <input type="text" name="username" class="form-control" placeholder="ex: joao.silva" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label fw-medium">Nome Completo</label>
-                                <input type="text" name="first_name" class="form-control" placeholder="Nome do conferente" required>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-success w-100 py-2">
-                                <i class="fa-solid fa-user-plus me-2"></i>Criar Usuário
-                            </button>
-                            <small class="text-muted d-block mt-2 text-center">
-                                <i class="fa-solid fa-key me-1"></i>Senha padrão: <strong>conceito</strong>
-                            </small>
-                        </form>
-                    </div>
-                    <div class="col-md-8 ps-md-4">
-                        <h5 class="text-secondary mb-3 d-flex align-items-center">
-                            <i class="fa-solid fa-users me-2"></i>Usuários Conferentes
-                        </h5>
-                        <div class="d-flex flex-wrap gap-3">
-                            {% for u in usuarios_conferentes %}
-                            <div class="badge bg-light text-dark border fs-6 p-3 d-flex align-items-center gap-2 shadow-sm">
-                                <i class="fas fa-user text-primary"></i> 
-                                <div>
-                                    <div class="fw-medium">{{ u.first_name }}</div>
-                                    <small class="text-muted">{{ u.username }}</small>
+                        <div class="bg-light p-3 rounded border">
+                            <h5 class="text-primary mb-3"><i class="fa-solid fa-user-plus me-2"></i>Novo Acesso</h5>
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="acao" value="add_conferente_user">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Login (Usuário)</label>
+                                    <input type="text" name="username" class="form-control" placeholder="ex: joao.silva" required autocomplete="off">
                                 </div>
-                                <form method="POST" style="display:inline;" onsubmit="return confirm('Excluir acesso de {{ u.username }}?');">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="acao" value="delete_conferente_user">
-                                    <input type="hidden" name="id_item" value="{{ u.id }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1 border-0 ms-2">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </form>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold small">Nome Completo</label>
+                                    <input type="text" name="first_name" class="form-control" placeholder="Nome de exibição" required>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success w-100 fw-bold">
+                                    <i class="fa-solid fa-save me-2"></i>Criar Usuário
+                                </button>
+                                <div class="alert alert-info mt-3 py-2 small mb-0">
+                                    <i class="fa-solid fa-key me-1"></i> Senha padrão: <strong>conceito</strong>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Usuários (COM SCROLL) -->
+                    <div class="col-md-8 ps-md-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="text-secondary m-0"><i class="fa-solid fa-users me-2"></i>Usuários Ativos</h5>
+                            <span class="badge bg-secondary">{{ usuarios_conferentes|length }} cadastrados</span>
+                        </div>
+                        
+                        <div class="scroll-container" style="max-height: 400px;">
+                            <div class="row g-2">
+                                {% for u in usuarios_conferentes %}
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center h-100">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 40px; height: 40px;">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                            <div style="line-height: 1.2;">
+                                                <!-- AQUI: Usa o nome completo, se não tiver, usa o login -->
+                                                <div class="fw-bold text-dark">{{ u.get_full_name|default:u.username }}</div>
+                                                <small class="text-muted">@{{ u.username }}</small>
+                                            </div>
+                                        </div>
+                                        
+                                        <form method="POST" onsubmit="return confirm('Remover acesso de {{ u.username }}?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="acao" value="delete_conferente_user">
+                                            <input type="hidden" name="id_item" value="{{ u.id }}">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="col-12 text-center py-5">
+                                    <i class="fa-solid fa-users-slash fa-2x text-muted mb-2"></i>
+                                    <p class="text-muted">Nenhum conferente cadastrado.</p>
+                                </div>
+                                {% endfor %}
                             </div>
-                            {% empty %}
-                            <div class="text-center w-100 py-4">
-                                <i class="fa-solid fa-users-slash fa-2x text-muted mb-2"></i>
-                                <p class="text-muted">Nenhum conferente cadastrado.</p>
-                            </div>
-                            {% endfor %}
                         </div>
                     </div>
                 </div>
             {% else %}
-                <div class="alert alert-danger mt-3 d-flex align-items-center">
-                    <i class="fas fa-lock me-2"></i> Área restrita a administradores do sistema.
+                <div class="alert alert-danger d-flex align-items-center">
+                    <i class="fas fa-lock fa-2x me-3"></i>
+                    <div>
+                        <strong>Acesso Negado</strong><br>
+                        Apenas administradores podem gerenciar usuários.
+                    </div>
                 </div>
             {% endif %}
         </div>
-
-        <!-- Aba Tratamentos -->
-        <div class="tab-pane fade" id="tratamento" role="tabpanel">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Novo Tratamento" lista=tratamentos tipo="tratamento" acao_add="add_tratamento" %}
-        </div>
-
     </div>
 </div>
-
-<!-- Script para melhorar a interação -->
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        // Melhora a aparência do switch
-        const switchInput = document.querySelector('.form-check-input');
-        if(switchInput) {
-            switchInput.classList.add('form-check-input'); 
-            switchInput.style.cursor = 'pointer';
-        }
-
-        // Adiciona efeito hover nas abas
-        const navLinks = document.querySelectorAll('.nav-tabs .nav-link');
-        navLinks.forEach(link => {
-            link.addEventListener('mouseenter', function() {
-                if (!this.classList.contains('active')) {
-                    this.style.transform = 'translateY(-2px)';
-                }
-            });
-            link.addEventListener('mouseleave', function() {
-                if (!this.classList.contains('active')) {
-                    this.style.transform = 'translateY(0)';
-                }
-            });
-        });
-    });
-</script>
 {% endblock %}

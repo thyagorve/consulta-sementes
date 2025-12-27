@@ -14,16 +14,18 @@ urlpatterns = [
 
     # --- Dashboard ---
     path('', views.dashboard, name='dashboard'),
-    path('dashboard/', views.dashboard, name='dashboard'),
     
-    # --- Gestão de Estoque (Prefixos corrigidos) ---
+    # --- PÁGINAS PRINCIPAIS (SEPARADAS) ---
+    # 1. Página Antiga (Tabela Simples)
     path('estoque/', views.lista_estoque, name='lista_estoque'),
+    
+    # 2. Página Nova (Gestão Avançada)
     path('estoque/gestao/', views.gestao_estoque, name='gestao_estoque'),
     
-    # --- Operações CRUD (URLs ajustadas para evitar 404) ---
+    # --- Operações CRUD ---
     path('estoque/nova-entrada/', views.nova_entrada, name='nova_entrada'),
-    path('estoque/transferir/<int:id>/', views.transferir, name='transferir'), # CORRIGIDO AQUI
-    path('estoque/editar/<int:id>/', views.editar, name='editar'),             # CORRIGIDO AQUI
+    path('estoque/transferir/<int:id>/', views.transferir, name='transferir'),
+    path('estoque/editar/<int:id>/', views.editar, name='editar'),
     path('estoque/excluir/<int:id>/', views.excluir_lote, name='excluir_lote'),
     
     # --- Saídas ---
@@ -31,19 +33,12 @@ urlpatterns = [
     path('estoque/nova-saida/', views.nova_saida, name='nova_saida'),
     path('relatorio-saidas/', views.relatorio_saidas, name='relatorio_saidas'),
     
-    # --- APIs (Mantidas) ---
-    path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
-    path('api/saldo/<int:id>/', views.api_saldo_lote, name='api_saldo_lote'),
-    path('api/buscar-lotes/', views.api_buscar_lotes, name='api_buscar_lotes'),
-    path('api/buscar-lote-completo/', views.api_buscar_lote_completo, name='api_buscar_lote_completo'),
-    path('api/verificar-lote/', views.api_verificar_lote, name='api_verificar_lote'),
-    path('api/estoque-resumo/', views.api_estoque_resumo, name='api_estoque_resumo'),
-    path('api/ultimas-movimentacoes/', views.api_ultimas_movimentacoes, name='api_ultimas_movimentacoes'),
-    
-    
-    # --- Configurações e Histórico ---
+    # --- Configurações, Histórico e Rascunho ---
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     path('historico-geral/', views.historico_geral, name='historico_geral'),
+    path('empenho/', views.pagina_rascunho, name='pagina_rascunho'),
+    path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
+    path('api/itens-empenhos/', views.api_itens_empenhos, name='api_itens_empenhos'),
     
     # --- Import/Export ---
     path('importar-estoque/', views.importar_estoque, name='importar_estoque'),
@@ -51,21 +46,21 @@ urlpatterns = [
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
     
-    # --- Debug ---
+    # --- Debug e Manutenção ---
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
     path('limpar-cache-importacao/', views.limpar_cache_importacao, name='limpar_cache_importacao'),
-    
-    path('lista-estoque/', views.lista_estoque, name='lista_estoque'),
-    path('transferir/<int:id>/', views.transferir, name='transferir'),  
-    
-    
-    
+    path('lotes-para-remover/', views.lotes_para_remover, name='lotes_para_remover'),
+    path('consolidar-duplicados/', views.consolidar_lotes_duplicados, name='consolidar_lotes_duplicados'),
+
+    # --- APIs (JSON) ---
     path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
-    
-        # --- Sistema de Empenho/Rascunho ---
-    path('empenho/', views.pagina_rascunho, name='pagina_rascunho'),
     path('api/autocomplete-entrada/', views.api_autocomplete_nova_entrada, name='api_autocomplete_entrada'),
-    
+    path('api/saldo/<int:id>/', views.api_saldo_lote, name='api_saldo_lote'),
+    path('api/buscar-lotes/', views.api_buscar_lotes, name='api_buscar_lotes'),
+    path('api/buscar-lote-completo/', views.api_buscar_lote_completo, name='api_buscar_lote_completo'),
+    path('api/verificar-lote/', views.api_verificar_lote, name='api_verificar_lote'),
+    path('api/estoque-resumo/', views.api_estoque_resumo, name='api_estoque_resumo'),
+    path('api/ultimas-movimentacoes/', views.api_ultimas_movimentacoes, name='api_ultimas_movimentacoes'),
 ]
 
 if settings.DEBUG:

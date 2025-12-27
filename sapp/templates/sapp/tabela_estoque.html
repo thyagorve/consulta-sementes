@@ -3,516 +3,561 @@
 {% load static %}
 
 {% block content %}
-<!-- 1. IMPORTS NECESSÁRIOS (JQUERY + SELECT2) -->
+<!-- IMPORTS (JQUERY + SELECT2 + FONTAWESOME) -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
-    /* --- DESIGN SYSTEM --- */
+    /* --- DESIGN SYSTEM REFINADO --- */
     :root {
-        --primary: #2563eb; --primary-dark: #1e40af;
-        --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
-        --border: #e2e8f0; --text: #334155; --text-light: #64748b;
-        --surface-dark: #1e293b;
+        --primary: #2563eb; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+        --dark: #1e293b; --light: #f8fafc; --border: #e2e8f0;
     }
 
-    body { background-color: #f8fafc; font-family: 'Inter', sans-serif; color: var(--text); }
+    body { background-color: var(--light); font-family: 'Inter', system-ui, sans-serif; color: #334155; }
 
-    /* HEADER & METRICS */
-    .page-header { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .page-title { font-size: 1.5rem; font-weight: 700; color: var(--surface-dark); margin-bottom: 0.25rem; }
-    
-    .btn-primary-main { background: var(--primary); border: none; border-radius: 8px; padding: 0.75rem 1.5rem; font-weight: 600; color: white; display: inline-flex; align-items: center; gap: 0.5rem; transition: all 0.2s; }
-    .btn-primary-main:hover { background: var(--primary-dark); transform: translateY(-1px); }
-
+    /* CARDS MÉTRICAS */
     .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-    .metric-card { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); position: relative; overflow: hidden; transition: transform 0.2s; }
-    .metric-card:hover { transform: translateY(-2px); }
-    .metric-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
-    .metric-card.entrada::before { background: var(--success); }
-    .metric-card.saida::before { background: var(--danger); }
-    .metric-card.saldo::before { background: var(--primary); }
+    .metric-card { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: transform 0.2s; position: relative; overflow: hidden; }
+    .metric-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    .metric-card::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 4px; }
+    .metric-card.entrada::after { background: var(--success); }
+    .metric-card.saida::after { background: var(--danger); }
+    .metric-card.saldo::after { background: var(--primary); }
     
-    .metric-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .metric-value { font-size: 2rem; font-weight: 700; color: var(--surface-dark); line-height: 1; }
-    .metric-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); }
-    
-    /* SEARCH & TABLE */
-    .search-container { background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid var(--border); }
-    .search-input { width: 100%; padding: 0.75rem 1rem 0.75rem 2.75rem; border: 1px solid var(--border); border-radius: 8px; }
-    .search-wrapper { position: relative; }
-    .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-light); }
+    .metric-value { font-size: 2rem; font-weight: 800; color: var(--dark); line-height: 1; }
+    .metric-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
 
-    .table-container { background: white; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 2rem; }
-    .table { width: 100%; border-collapse: collapse; }
-    .table th { padding: 1rem; text-align: left; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-light); background: #f8fafc; border-bottom: 1px solid var(--border); }
-    .table td { padding: 1rem; vertical-align: middle; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
-    .table tbody tr:hover { background: #f8fafc; cursor: pointer; }
-    .table-active { background-color: rgba(37, 99, 235, 0.05) !important; }
+    /* PESQUISA */
+    .search-container { background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .search-input { border-radius: 8px; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); }
+    .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
 
-    /* BADGES & BUTTONS */
-    .badge { padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
-    .badge-success { background: #d1fae5; color: #065f46; }
-    .badge-danger { background: #fee2e2; color: #991b1b; }
-    .badge-primary { background: #dbeafe; color: #1e40af; }
-    
-    .action-buttons { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
-    .btn-action { padding: 0.5rem 1rem; border: none; border-radius: 6px; font-size: 0.875rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: all 0.2s; }
-    .btn-danger { background: var(--danger); color: white; }
-    .btn-warning { background: var(--warning); color: white; }
-    .btn-secondary { background: #f1f5f9; color: var(--text); border: 1px solid var(--border); }
+    /* TABELA */
+    .table-container { background: white; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; }
+    .table thead th { background: #f1f5f9; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; color: #475569; padding: 1rem; border-bottom: 2px solid var(--border); }
+    .table tbody td { padding: 1rem; vertical-align: middle; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
+    .table-hover tbody tr:hover { background-color: #f8fafc; cursor: pointer; }
 
-    /* DETAILS & TIMELINE */
-    .detail-row { background: #f8fafc; }
-    .detail-content { padding: 1.5rem; }
-    .spec-card, .timeline-card { background: white; border-radius: 8px; padding: 1.25rem; border: 1px solid var(--border); height: 100%; }
-    
-    .spec-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; }
-    .spec-item:last-child { border-bottom: none; }
-    .spec-label { color: var(--text-light); }
-    .spec-value { font-weight: 600; color: var(--text); }
+    /* BADGES DE FLUXO */
+    .flow-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
+    .flow-in { background: #dcfce7; color: #166534; }
+    .flow-out { background: #fee2e2; color: #991b1b; }
+    .flow-zero { background: #f1f5f9; color: #94a3b8; }
 
-    .timeline { position: relative; padding-left: 2rem; max-height: 400px; overflow-y: auto; }
-    .timeline::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--border); }
-    .timeline-item { position: relative; margin-bottom: 1.25rem; padding-left: 1rem; }
-    .timeline-dot { position: absolute; left: -1.45rem; top: 0.25rem; width: 10px; height: 10px; border-radius: 50%; background: var(--border); border: 2px solid white; box-shadow: 0 0 0 2px var(--border); }
-    .timeline-dot.entrada { background: var(--success); }
-    .timeline-dot.saida { background: var(--danger); }
-    .timeline-dot.transferencia { background: var(--warning); }
+    /* TIMELINE & DETALHES */
+    .detail-row { background-color: #f8fafc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
+    .timeline { position: relative; border-left: 2px solid var(--border); padding-left: 1.5rem; margin-left: 0.5rem; }
+    .timeline-item { position: relative; margin-bottom: 1.5rem; }
+    .timeline-dot { position: absolute; left: -1.85rem; top: 0.25rem; width: 12px; height: 12px; border-radius: 50%; background: white; border: 2px solid var(--primary); }
+    .timeline-dot.entrada { border-color: var(--success); }
+    .timeline-dot.saida { border-color: var(--danger); }
 
-    /* --- CORREÇÃO SELECT2 --- */
-    .select2-container { width: 100% !important; }
+    /* MODAL HEADER COLORS */
+    .modal-header.bg-primary { background: linear-gradient(135deg, #2563eb, #1e40af) !important; }
+    .modal-header.bg-danger { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; }
+    .modal-header.bg-warning { background: linear-gradient(135deg, #f59e0b, #d97706) !important; color: white !important; }
+    .modal-header.bg-secondary { background: linear-gradient(135deg, #64748b, #475569) !important; }
+
+    /* AUTOCOMPLETE */
+    .suggestions-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 1050; background: white; border: 1px solid var(--border); border-radius: 0 0 8px 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 250px; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
+    .suggestion-item { padding: 10px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s; }
+    .suggestion-item:hover { background-color: #eff6ff; color: var(--primary); }
+
+    /* SELECT2 TWEAKS */
     .select2-container .select2-selection--single { height: 38px !important; border: 1px solid #dee2e6 !important; border-radius: 0.375rem; display: flex; align-items: center; }
     .select2-container--default .select2-selection--single .select2-selection__arrow { height: 36px !important; }
-    
-    /* --- AUTOCOMPLETE LIST --- */
-    .suggestions-list {
-        position: absolute; top: 100%; left: 12px; right: 12px;
-        background: white; border: 1px solid #e2e8f0; border-radius: 0 0 8px 8px;
-        max-height: 250px; overflow-y: auto; z-index: 1060;
-        list-style: none; padding: 0; margin: 0;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    .suggestion-item { padding: 10px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; font-size: 0.875rem; }
-    .suggestion-item:hover { background-color: #f0f9ff; color: var(--primary); }
-    .suggestion-item strong { display: block; color: var(--surface-dark); }
-    .suggestion-item span { font-size: 0.75rem; color: #64748b; }
-
-    /* UTILS */
-    .d-none { display: none; }
-    .thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; cursor: pointer; }
-
-
-
-
-
-    /* Adicione no seu bloco <style> */
-.flow-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 8px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: 0.5px;
-    transition: transform 0.2s;
-}
-
-.flow-badge:hover { transform: translateY(-1px); }
-
-/* Entrada (Verde Suave) */
-.flow-in {
-    background-color: #dcfce7; /* Fundo verde claro */
-    color: #166534;           /* Texto verde escuro */
-    border: 1px solid #bbf7d0;
-}
-
-/* Saída (Vermelho Suave) */
-.flow-out {
-    background-color: #fee2e2; /* Fundo vermelho claro */
-    color: #991b1b;            /* Texto vermelho escuro */
-    border: 1px solid #fecaca;
-}
-
-/* Deixar o zero cinza para não chamar atenção */
-.flow-zero {
-    background-color: #f1f5f9;
-    color: #94a3b8;
-    border: 1px solid #e2e8f0;
-}
 </style>
 
-<div class="container-fluid py-3">
-    <!-- HEADER -->
-    <div class="page-header">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
-            <div>
-                <h1 class="page-title">Controle de Estoque</h1>
-                <p class="page-subtitle">Visão geral e gerenciamento de lotes</p>
-            </div>
-            <button class="btn-primary-main" data-bs-toggle="modal" data-bs-target="#modalNovaEntrada">
-                <i class="fas fa-plus"></i> Nova Entrada
-            </button>
+<div class="container-fluid py-4">
+    <!-- TITULO E BOTÃO NOVO -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 fw-bold text-dark mb-1">Controle de Estoque</h2>
+            <p class="text-muted mb-0">Gerenciamento completo de lotes e movimentações</p>
         </div>
+        <button class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNovaEntrada">
+            <i class="fas fa-plus me-2"></i> Nova Entrada
+        </button>
     </div>
 
-    <!-- MÉTRICAS -->
+    <!-- CARDS DE MÉTRICAS -->
     <div class="metrics-grid">
         <div class="metric-card entrada">
-            <div class="metric-header">
-                <div><div class="metric-label">Entrada Total</div><div class="metric-value">{{ dados_entrada.bags|intcomma }}</div></div>
-                <div class="metric-icon bg-success text-white rounded p-2"><i class="fas fa-arrow-down"></i></div>
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="metric-label">Entrada Total</div>
+                    <div class="metric-value">{{ dados_entrada.bags|intcomma }} <small class="fs-6 text-muted">BAGs</small></div>
+                </div>
+                <div class="bg-success bg-opacity-10 p-2 rounded"><i class="fas fa-arrow-down text-success fa-lg"></i></div>
             </div>
-            <div class="metric-total mt-2 pt-2 border-top">
-                <span class="total-label">Convertido (SC)</span><span class="total-value text-success">{{ dados_entrada.total_sc|intcomma }}</span>
+            <div class="border-top pt-2 mt-2 text-success fw-bold small">
+                <i class="fas fa-sack-dollar me-1"></i> {{ dados_entrada.total_sc|intcomma }} SC (Convertido)
             </div>
         </div>
         <div class="metric-card saida">
-            <div class="metric-header">
-                <div><div class="metric-label">Saída Total</div><div class="metric-value">{{ dados_saida.bags|intcomma }}</div></div>
-                <div class="metric-icon bg-danger text-white rounded p-2"><i class="fas fa-arrow-up"></i></div>
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="metric-label">Saída Total</div>
+                    <div class="metric-value">{{ dados_saida.bags|intcomma }} <small class="fs-6 text-muted">BAGs</small></div>
+                </div>
+                <div class="bg-danger bg-opacity-10 p-2 rounded"><i class="fas fa-arrow-up text-danger fa-lg"></i></div>
             </div>
-            <div class="metric-total mt-2 pt-2 border-top">
-                <span class="total-label">Convertido (SC)</span><span class="total-value text-danger">{{ dados_saida.total_sc|intcomma }}</span>
+            <div class="border-top pt-2 mt-2 text-danger fw-bold small">
+                <i class="fas fa-sack-dollar me-1"></i> {{ dados_saida.total_sc|intcomma }} SC (Convertido)
             </div>
         </div>
         <div class="metric-card saldo">
-            <div class="metric-header">
-                <div><div class="metric-label">Saldo Físico</div><div class="metric-value">{{ dados_saldo.bags|intcomma }}</div></div>
-                <div class="metric-icon bg-primary text-white rounded p-2"><i class="fas fa-balance-scale"></i></div>
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <div class="metric-label">Saldo Físico</div>
+                    <div class="metric-value">{{ dados_saldo.bags|intcomma }} <small class="fs-6 text-muted">BAGs</small></div>
+                </div>
+                <div class="bg-primary bg-opacity-10 p-2 rounded"><i class="fas fa-scale-balanced text-primary fa-lg"></i></div>
             </div>
-            <div class="metric-total mt-2 pt-2 border-top">
-                <span class="total-label">Disponível (SC)</span><span class="total-value text-primary">{{ dados_saldo.total_sc|intcomma }}</span>
+            <div class="border-top pt-2 mt-2 text-primary fw-bold small">
+                <i class="fas fa-check-circle me-1"></i> {{ dados_saldo.total_sc|intcomma }} SC (Disponível)
             </div>
         </div>
     </div>
 
-    <!-- PESQUISA -->
+    <!-- BARRA DE PESQUISA -->
     <div class="search-container">
-        <div class="row g-2">
-            <div class="col-md-8">
-                <div class="search-wrapper">
-                    <i class="fas fa-search search-icon"></i>
-                    <form method="GET" class="mb-0">
-                        <input type="text" name="busca" class="search-input" placeholder="Pesquisar por lote, cultivar, local..." value="{{ busca }}">
-                    </form>
+        <form method="GET" class="row g-3 align-items-center">
+            <div class="col-md-9 position-relative">
+                <i class="fas fa-search search-icon"></i>
+                <!-- Mantém o status na busca -->
+                {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+                <input type="text" name="busca" class="form-control search-input" placeholder="Pesquisar por lote, cultivar, cliente, endereço..." value="{{ busca }}">
+            </div>
+            <div class="col-md-3">
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="todos" {% if status == 'todos' or not status %}selected{% endif %}>📋 Todos</option>
+                <option value="disponivel" {% if status == 'disponivel' %}selected{% endif %}>🟢 Disponíveis</option>
+                <option value="esgotado" {% if status == 'esgotado' %}selected{% endif %}>🔴 Esgotados</option>
+            </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- TABELA PRINCIPAL -->
+    <div class="table-container">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th width="40"></th>
+                        <th>Lote / Data</th>
+                        <th>Produto / Cliente</th>
+                        <th>Endereço</th>
+                        <th>Tratamento</th>
+                        <th class="text-center">Movimentação</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+<tbody id="tableBody">
+    {% for item in estoque %}
+    <!-- 1. LINHA PRINCIPAL (CLIQUE PARA EXPANDIR) -->
+    <tr onclick="toggleDetails('details-{{ item.id }}')" style="cursor: pointer;" class="align-middle">
+        <td class="text-center"><i class="fas fa-chevron-right text-primary transition-icon" id="chevron-{{ item.id }}"></i></td>
+        <td>
+            <div class="fw-bold text-dark">{{ item.lote }}</div>
+            <small class="text-muted"><i class="far fa-calendar me-1"></i>{{ item.data_entrada|date:"d/m/y" }}</small>
+        </td>
+        <td>
+            <div class="fw-bold">{{ item.cultivar.nome }}</div>
+            <small class="text-muted">{{ item.produto|default:"-" }}</small>
+        </td>
+        <td><span class="badge bg-light text-dark border">{{ item.endereco }}</span></td>
+        <td>
+            <div class="fw-bold">{{ item.tratamento.nome|truncatechars:20 }}</div>
+            <small class="text-muted">{{ item.peneira.nome }}</small>
+        </td>
+        <td>
+            <div class="d-flex justify-content-center gap-2 align-items-center">
+                <span class="flow-badge flow-in" title="Entrada"><i class="fas fa-arrow-down"></i> {{ item.entrada }}</span>
+                <span class="flow-badge {% if item.saida > 0 %}flow-out{% else %}flow-zero{% endif %}" title="Saída"><i class="fas fa-arrow-up"></i> {{ item.saida }}</span>
+                <div class="ms-2 fw-bold fs-5 text-dark">{{ item.saldo }} <small class="fw-normal fs-6 text-muted">{{ item.embalagem }}</small></div>
+            </div>
+        </td>
+        <td class="text-center">
+            {% if item.saldo > 0 %}
+            <span class="badge bg-success bg-opacity-10 text-success border border-success">Disponível</span>
+            {% else %}
+            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Esgotado</span>
+            {% endif %}
+        </td>
+    </tr>
+
+    <!-- 2. LINHA DE DETALHES (OCULTA POR PADRÃO) -->
+    <tr id="details-{{ item.id }}" class="d-none detail-row">
+        <td colspan="7" class="p-0">
+            <div class="p-4">
+                <div class="row g-4">
+                    <!-- ESQUERDA: DADOS E AÇÕES -->
+                    <div class="col-lg-5">
+                        <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
+                            <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">📋 Detalhes do Lote</h6>
+                            
+                            <div class="row g-2 small mb-3">
+                                <div class="col-6"><span class="text-muted">Espécie:</span> <span class="fw-bold text-dark">{{ item.especie.nome|default:"-" }}</span></div>
+                                <div class="col-6"><span class="text-muted">Categoria:</span> <span class="fw-bold text-dark">{{ item.categoria.nome }}</span></div>
+                                <div class="col-6"><span class="text-muted">Peso Unit:</span> <span class="fw-bold text-dark">{{ item.peso_unitario }} kg</span></div>
+                                <div class="col-6"><span class="text-muted">Empresa:</span> <span class="fw-bold text-dark">{{ item.empresa|default:"-" }}</span></div>
+                                <div class="col-6"><span class="text-muted">AZ:</span> <span class="fw-bold text-dark">{{ item.az|default:"-" }}</span></div>
+                                <div class="col-6"><span class="text-muted">Cliente:</span> <span class="fw-bold text-dark">{{ item.cliente|default:"-" }}</span></div>
+                            </div>
+                            
+                            <div class="bg-light p-2 rounded border small mb-3">
+                                <strong>Obs:</strong> {{ item.observacao|default:"Sem observações" }}
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                {% if item.saldo > 0 %}
+                                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalSaida{{ item.id }}">
+                                    <i class="fas fa-truck-ramp-box me-2"></i> Expedição
+                                </button>
+                                <button class="btn btn-warning text-dark fw-bold" onclick="abrirModalTransferencia({{ item.id }})">
+                                    <i class="fas fa-right-left me-2"></i> Transferir / Ajustar
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
+                                    <i class="fas fa-pen-to-square me-2"></i> Editar Dados
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DIREITA: HISTÓRICO COM FOTOS -->
+                    <div class="col-lg-7">
+                        <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
+                            <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">🕒 Linha do Tempo</h6>
+                            <div class="timeline" style="max-height: 350px; overflow-y: auto;">
+                                {% for h in item.historico.all %}
+                                <div class="timeline-item">
+                                    <div class="timeline-dot {% if 'Entrada' in h.tipo %}entrada{% elif 'Saída' in h.tipo %}saida{% endif %}"></div>
+                                    
+                                    <div class="d-flex justify-content-between align-items-start mb-1">
+                                        <div>
+                                            <span class="fw-bold text-dark">{{ h.tipo }}</span>
+                                            <div class="text-muted" style="font-size: 0.75rem;">
+                                                <i class="fas fa-user me-1"></i> {{ h.usuario.first_name|default:h.usuario.username }}
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">{{ h.data_hora|date:"d/m/y H:i" }}</small>
+                                    </div>
+                                    
+                                    <div class="small text-muted bg-light p-2 rounded mb-2 border">
+                                        {{ h.descricao|safe }}
+                                    </div>
+
+                                    <!-- FOTOS (RECUPERADO AQUI) -->
+                                    {% if h.fotos.exists %}
+                                    <div class="d-flex gap-2 mt-1 flex-wrap">
+                                        {% for foto in h.fotos.all %}
+                                        <a href="{{ foto.arquivo.url }}" target="_blank">
+                                            <img src="{{ foto.arquivo.url }}" class="rounded border shadow-sm" style="width: 50px; height: 50px; object-fit: cover; cursor: zoom-in;" title="Clique para ampliar">
+                                        </a>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% empty %}
+                                <div class="text-center text-muted py-4">Nenhum histórico registrado.</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <form method="GET">
-                    <input type="hidden" name="busca" value="{{ busca }}">
-                    <select name="status" class="form-select" onchange="this.form.submit()">
-                        <option value="">Status</option>
-                        <option value="disponivel" {% if status == 'disponivel' %}selected{% endif %}>Disponíveis</option>
-                        <option value="esgotado" {% if status == 'esgotado' %}selected{% endif %}>Esgotados</option>
-                    </select>
+        </td>
+    </tr>
+
+    <!-- 3. MODAL DE SAÍDA (EXPEDIÇÃO) -->
+    <div class="modal fade" id="modalSaida{{ item.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-truck me-2"></i>Expedição - {{ item.lote }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{% url 'sapp:registrar_saida' item.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="text-center py-3 bg-danger bg-opacity-10 rounded border border-danger mb-3">
+                            <small class="text-danger text-uppercase fw-bold">Saldo Disponível</small>
+                            <div class="fs-1 fw-bold text-danger">{{ item.saldo }}</div>
+                            <small class="text-muted">{{ item.embalagem }}</small>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6"><label class="fw-bold">Qtd Saída *</label><input type="number" name="quantidade_saida" class="form-control border-danger fw-bold" max="{{ item.saldo }}" min="1" required></div>
+                            <div class="col-6"><label>Nº Carga *</label><input type="text" name="numero_carga" class="form-control" required></div>
+                            <div class="col-6"><label>Motorista *</label><input type="text" name="motorista" class="form-control" required></div>
+                            <div class="col-6"><label>Placa *</label><input type="text" name="placa" class="form-control" required></div>
+                            <div class="col-12"><label>Cliente</label><input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}"></div>
+                            <div class="col-12"><label>Fotos (Obrigatório)</label><input type="file" name="fotos" class="form-control" multiple required></div>
+                            <div class="col-12"><label>Observação</label><textarea name="observacao" class="form-control" rows="2"></textarea></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Confirmar Saída</button>
+                    </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- TABELA -->
-    <div class="table-container">
-        <div class="table-responsive">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th width="50"></th>
-                        <th>Lote</th>
-                        <th>Produto / Cliente</th>
-                        <th>Endereço</th>
-                        <th>Tratamento</th>
-                        <th class="text-center">Fluxo</th>
-                        <th class="text-center">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for item in itens %}
-                    <tr onclick="toggleDetails('details-{{ item.id }}')" class="{% if item.saldo == 0 %}bg-light opacity-75{% endif %}">
-                        <td class="text-center"><i class="fas fa-chevron-right text-primary" id="chevron-{{ item.id }}"></i></td>
-                        <td>
-                            <div class="fw-bold text-dark">{{ item.lote }}</div>
-                            <small class="text-muted">{{ item.data_entrada|date:"d/m/y" }}</small>
-                        </td>
-                        <td>
-                            <div class="fw-bold">{{ item.cultivar.nome }}</div>
-                            <small class="text-muted">{{ item.produto|default:"-" }}</small>
-                        </td>
-                        <td><span class="badge badge-primary">{{ item.endereco }}</span></td>
-                        <td>
-                            <div class="fw-bold">{{ item.tratamento.nome }}</div>
-                            <small class="text-muted">{{ item.peneira.nome }}</small>
-                        </td>
-                        <td>
-                            <div class="d-flex justify-content-center gap-2 mb-2">
-                                <!-- Entrada -->
-                                <span class="flow-badge flow-in" title="Total de Entradas">
-                                    <i class="fas fa-arrow-down small"></i> {{ item.entrada }}
-                                </span>
-                                
-                                <!-- Saída (Lógica para ficar cinza se for 0) -->
-                                <span class="flow-badge {% if item.saida > 0 %}flow-out{% else %}flow-zero{% endif %}" title="Total de Saídas">
-                                    <i class="fas fa-arrow-up small"></i> {{ item.saida }}
-                                </span>
+    <!-- 4. MODAL DE EDITAR (COMPLETO E TURBINADO) -->
+    <div class="modal fade" id="modalEditar{{ item.id }}" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Lote {{ item.lote }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{% url 'sapp:editar' item.id %}">
+                    {% csrf_token %}
+                    <div class="modal-body text-start">
+                        
+                        <!-- Seção 1: Dados Principais -->
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fas fa-box me-1"></i> Dados do Lote</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Número do Lote</label>
+                                <input type="text" name="lote" class="form-control bg-light" value="{{ item.lote }}" required>
                             </div>
-                            <div class="text-center fw-bold fs-5">{{ item.saldo }} <small class="fw-normal fs-6">{{ item.embalagem }}</small></div>
-                        </td>
-                        <td class="text-center">
-                            {% if item.saldo > 0 %}
-                            <span class="badge badge-success">Disponível</span>
-                            {% else %}
-                            <span class="badge badge-danger">Esgotado</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-
-                    <!-- DETALHES -->
-                    <tr id="details-{{ item.id }}" class="d-none detail-row">
-                        <td colspan="7" class="p-0">
-                            <div class="detail-content">
-                                <div class="row g-3">
-                                    <div class="col-lg-5">
-                                        <div class="spec-card">
-                                            <h6 class="fw-bold mb-3 text-uppercase small text-muted">Dados do Lote</h6>
-                                            <div class="spec-item"><span class="spec-label">Embalagem</span><span class="spec-value">{{ item.embalagem }}</span></div>
-                                            <div class="spec-item"><span class="spec-label">Peso Unit.</span><span class="spec-value">{{ item.peso_unitario }} kg</span></div>
-                                            <div class="spec-item"><span class="spec-label">Peneira</span><span class="spec-value">{{ item.peneira.nome }}</span></div>
-                                            <div class="spec-item"><span class="spec-label">Categoria</span><span class="spec-value">{{ item.categoria.nome }}</span></div>
-                                            <div class="spec-item"><span class="spec-label">Cliente</span><span class="spec-value">{{ item.cliente|default:"-" }}</span></div>
-                                            <div class="spec-item"><span class="spec-label">Espécie</span><span class="spec-value">{{ item.especie }}</span></div>
-                                            
-                                            <div class="bg-light p-2 mt-3 rounded border small">
-                                                <strong>Obs:</strong> {{ item.observacao|default:"-" }}
-                                            </div>
-
-                                            <div class="action-buttons">
-                                                {% if item.saldo > 0 %}
-                                                <button class="btn-action btn-danger" data-bs-toggle="modal" data-bs-target="#modalSaida{{ item.id }}">
-                                                    <i class="fas fa-truck"></i> Expedição
-                                                </button>
-                                                <button class="btn-action btn-warning" onclick="abrirModalTransferencia({{ item.id }})">
-                                                    <i class="fas fa-exchange-alt"></i> Transferir
-                                                </button>
-                                                {% endif %}
-                                                <button class="btn-action btn-secondary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
-                                                    <i class="fas fa-edit"></i> Editar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-7">
-                                        <div class="timeline-card">
-                                            <h6 class="fw-bold mb-3 text-uppercase small text-muted">Histórico</h6>
-                                            <div class="timeline">
-                                                {% for h in item.historico.all|slice:":5" %}
-                                                <div class="timeline-item">
-                                                    <div class="timeline-dot {% if 'Entrada' in h.tipo %}entrada{% elif 'Saída' in h.tipo %}saida{% else %}transferencia{% endif %}"></div>
-                                                    <div class="bg-white p-2 rounded border">
-                                                        <div class="d-flex justify-content-between">
-                                                            <strong>{{ h.tipo }}</strong>
-                                                            <small class="text-muted">{{ h.data_hora|date:"d/m H:i" }}</small>
-                                                        </div>
-                                                        <div class="small text-muted">{{ h.descricao|safe }}</div>
-                                                    </div>
-                                                </div>
-                                                {% empty %}
-                                                <div class="text-center text-muted py-3">Sem histórico recente.</div>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Armazém (AZ)</label>
+                                <input type="text" name="az" class="form-control" value="{{ item.az|default:'' }}">
                             </div>
-                        </td>
-                    </tr>
-
-                    <!-- MODAL SAÍDA -->
-                    <div class="modal fade" id="modalSaida{{ item.id }}" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">Expedição - {{ item.lote }}</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <form method="POST" action="{% url 'sapp:registrar_saida' item.id %}" enctype="multipart/form-data">
-                                    {% csrf_token %}
-                                    <div class="modal-body">
-                                        <div class="alert alert-warning py-2 mb-3">Saldo: <strong>{{ item.saldo }}</strong></div>
-                                        <div class="row g-2">
-                                            <div class="col-6"><label>Qtd *</label><input type="number" name="quantidade_saida" class="form-control" max="{{ item.saldo }}" min="1" required></div>
-                                            <div class="col-6"><label>Carga</label><input type="text" name="numero_carga" class="form-control" required></div>
-                                            <div class="col-6"><label>Motorista</label><input type="text" name="motorista" class="form-control" required></div>
-                                            <div class="col-6"><label>Placa</label><input type="text" name="placa" class="form-control" required></div>
-                                            <div class="col-12"><label>Cliente</label><input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}"></div>
-                                            <div class="col-12"><label>Fotos</label><input type="file" name="fotos" class="form-control" multiple required></div>
-                                            <div class="col-12"><label>Obs</label><textarea name="observacao" class="form-control" rows="2"></textarea></div>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer"><button type="submit" class="btn btn-danger w-100">Confirmar Saída</button></div>
-                                </form>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Endereço</label>
+                                <input type="text" name="endereco" class="form-control border-primary" value="{{ item.endereco }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Espécie</label>
+                                <select name="especie" class="form-select select2-modal">
+                                    <option value="">Selecione...</option>
+                                    {% for e in all_especies %}
+                                    <option value="{{ e.id }}" {% if item.especie_id == e.id %}selected{% endif %}>{{ e.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Embalagem</label>
+                                <select name="embalagem" class="form-select">
+                                    <option value="BAG" {% if item.embalagem == 'BAG' %}selected{% endif %}>Big Bag</option>
+                                    <option value="SC" {% if item.embalagem == 'SC' %}selected{% endif %}>Saco</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- MODAL EDITAR -->
-                    <div class="modal fade" id="modalEditar{{ item.id }}" tabindex="-1">
-                        <div class="modal-dialog modal-lg">
-                            <div class="modal-content">
-                                <div class="modal-header"><h5 class="modal-title">Editar {{ item.lote }}</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-                                <form method="POST" action="{% url 'sapp:editar' item.id %}">
-                                    {% csrf_token %}
-                                    <div class="modal-body">
-                                        <div class="row g-3">
-                                            <div class="col-6"><label>Lote</label><input type="text" name="lote" class="form-control" value="{{ item.lote }}" required></div>
-                                            <div class="col-6"><label>Endereço</label><input type="text" name="endereco" class="form-control" value="{{ item.endereco }}" required></div>
-                                            <div class="col-6"><label>Produto</label><input type="text" name="produto" class="form-control" value="{{ item.produto|default:'' }}"></div>
-                                            <div class="col-6"><label>Espécie</label><input type="text" name="especie" class="form-control" value="{{ item.especie }}"></div>
-                                            <div class="col-6"><label>Peso Unit.</label><input type="text" name="peso_unitario" class="form-control" value="{{ item.peso_unitario }}"></div>
-                                            <div class="col-6"><label>Embalagem</label><select name="embalagem" class="form-select"><option value="BAG" {% if item.embalagem == 'BAG' %}selected{% endif %}>BAG</option><option value="SC" {% if item.embalagem == 'SC' %}selected{% endif %}>Saco</option></select></div>
-                                            
-                                            <!-- Selects Simples para Edição -->
-                                            <div class="col-6"><label>Cultivar</label><select name="cultivar" class="form-select">{% for c in all_cultivares %}<option value="{{ c.id }}" {% if c.id == item.cultivar.id %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}</select></div>
-                                            <div class="col-6"><label>Peneira</label><select name="peneira" class="form-select">{% for p in all_peneiras %}<option value="{{ p.id }}" {% if p.id == item.peneira.id %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}</select></div>
-                                            
-                                            <div class="col-12"><label>Obs</label><textarea name="observacao" class="form-control">{{ item.observacao|default:'' }}</textarea></div>
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer"><button type="submit" class="btn btn-primary">Salvar</button></div>
-                                </form>
+                        <!-- Seção 2: Classificação -->
+                        <h6 class="fw-bold text-success border-bottom pb-2 mb-3"><i class="fas fa-leaf me-1"></i> Classificação Técnica</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <label class="form-label">Cultivar</label>
+                                <select name="cultivar" class="form-select select2-modal">
+                                    {% for c in all_cultivares %}
+                                    <option value="{{ c.id }}" {% if c.id == item.cultivar.id %}selected{% endif %}>{{ c.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Peneira</label>
+                                <select name="peneira" class="form-select select2-modal">
+                                    {% for p in all_peneiras %}
+                                    <option value="{{ p.id }}" {% if p.id == item.peneira.id %}selected{% endif %}>{{ p.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Categoria</label>
+                                <select name="categoria" class="form-select select2-modal">
+                                    {% for c in all_categorias %}
+                                    <option value="{{ c.id }}" {% if c.id == item.categoria.id %}selected{% endif %}>{{ c.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Tratamento</label>
+                                <select name="tratamento" class="form-select select2-modal">
+                                    <option value="">Sem Tratamento</option>
+                                    {% for t in all_tratamentos %}
+                                    <option value="{{ t.id }}" {% if t.id == item.tratamento.id %}selected{% endif %}>{{ t.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
+
+                        <!-- Seção 3: Logística e Info -->
+                        <h6 class="fw-bold text-info border-bottom pb-2 mb-3"><i class="fas fa-truck me-1"></i> Logística e Informações</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Produto / Descrição</label>
+                                <input type="text" name="produto" class="form-control" value="{{ item.produto|default:'' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Cliente / Proprietário</label>
+                                <input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Empresa</label>
+                                <input type="text" name="empresa" class="form-control" value="{{ item.empresa|default:'' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Peso Unitário (kg)</label>
+                                <input type="text" name="peso_unitario" class="form-control" value="{{ item.peso_unitario }}">
+                            </div>
+                         
+                            <div class="col-md-3">
+                                <label class="form-label">Origem/Destino</label>
+                                <input type="text" name="origem_destino" class="form-control" value="{{ item.origem_destino|default:'' }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Observações</label>
+                                <textarea name="observacao" class="form-control" rows="2">{{ item.observacao|default:'' }}</textarea>
+                            </div>
+                        </div>
+
                     </div>
-                    {% endfor %}
-                </tbody>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</tbody>
             </table>
         </div>
     </div>
     
-    <!-- PAGINAÇÃO -->
+    <!-- PAGINAÇÃO COM BUSCA E STATUS -->
     {% if itens.has_other_pages %}
-    <nav class="d-flex justify-content-center">
-        <ul class="pagination">
-            {% if itens.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ itens.previous_page_number }}">Anterior</a></li>{% endif %}
-            <li class="page-item disabled"><span class="page-link">{{ itens.number }} de {{ itens.paginator.num_pages }}</span></li>
-            {% if itens.has_next %}<li class="page-item"><a class="page-link" href="?page={{ itens.next_page_number }}">Próximo</a></li>{% endif %}
+    <nav class="d-flex justify-content-center mt-4">
+        <ul class="pagination shadow-sm">
+            {% if itens.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ itens.previous_page_number }}&busca={{ busca }}&status={{ status }}">Anterior</a></li>
+            {% endif %}
+            
+            <li class="page-item disabled"><span class="page-link fw-bold text-dark">{{ itens.number }} de {{ itens.paginator.num_pages }}</span></li>
+            
+            {% if itens.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ itens.next_page_number }}&busca={{ busca }}&status={{ status }}">Próximo</a></li>
+            {% endif %}
         </ul>
     </nav>
     {% endif %}
 </div>
 
-<!-- === MODAL NOVA ENTRADA (COM AUTOCOMPLETE & SELECT2) === -->
+<!-- === MODAL NOVA ENTRADA === -->
 <div class="modal fade" id="modalNovaEntrada" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Nova Entrada</h5>
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Nova Entrada</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{% url 'sapp:nova_entrada' %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 <div class="modal-body">
                     <div class="row g-3">
-                        <!-- LOTE COM AUTOCOMPLETE -->
                         <div class="col-md-6 position-relative">
-                            <label class="form-label">Número do Lote *</label>
-                            <input type="text" name="lote" id="inputLoteEntrada" class="form-control" autocomplete="off" required placeholder="Digite para buscar...">
+                            <label class="form-label fw-bold text-primary">Número do Lote *</label>
+                            <input type="text" name="lote" id="inputLoteEntrada" class="form-control form-control-lg border-primary" autocomplete="off" required placeholder="Digite para buscar...">
                             <ul id="listaSugestoesLote" class="suggestions-list" style="display:none;"></ul>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Quantidade *</label>
-                            <input type="number" name="entrada" class="form-control" required min="1">
+                            <label class="form-label fw-bold text-primary">Quantidade *</label>
+                            <input type="number" name="entrada" class="form-control form-control-lg border-primary" required min="1">
                         </div>
 
-                        <!-- SELECTS COM SELECT2 -->
-                        <div class="col-md-6">
-                            <label class="form-label">Cultivar *</label>
-                            <select name="cultivar" class="form-control select2-field" required>
-                                <option value="">Selecione...</option>
-                                {% for c in all_cultivares %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Peneira *</label>
-                            <select name="peneira" class="form-control select2-field" required>
-                                <option value="">Selecione...</option>
-                                {% for p in all_peneiras %}<option value="{{ p.id }}">{{ p.nome }}</option>{% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Categoria *</label>
-                            <select name="categoria" class="form-control select2-field" required>
-                                <option value="">Selecione...</option>
-                                {% for c in all_categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Tratamento</label>
-                            <select name="tratamento" class="form-control select2-field">
-                                <option value="">Nenhum</option>
-                                {% for t in all_tratamentos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}
-                            </select>
-                        </div>
+                        <!-- SELECTS COM BUSCA (SELECT2) -->
+                        <div class="col-md-6"><label>Cultivar *</label><select name="cultivar" class="form-control select2-modal" required><option value="">Selecione...</option>{% for c in all_cultivares %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Espécie *</label><select name="especie" class="form-control select2-modal"><option value="">Selecione...</option>{% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Peneira *</label><select name="peneira" class="form-control select2-modal" required><option value="">Selecione...</option>{% for p in all_peneiras %}<option value="{{ p.id }}">{{ p.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Categoria *</label><select name="categoria" class="form-control select2-modal" required><option value="">Selecione...</option>{% for c in all_categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Tratamento</label><select name="tratamento" class="form-control select2-modal"><option value="">Nenhum</option>{% for t in all_tratamentos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}</select></div>
 
-                        <div class="col-md-6"><label class="form-label">Endereço *</label><input type="text" name="endereco" class="form-control" required></div>
-                        <div class="col-md-6"><label class="form-label">Embalagem</label><select name="embalagem" class="form-control select2-field"><option value="BAG">Big Bag</option><option value="SC">Saco</option></select></div>
+                        <div class="col-md-6"><label>Endereço *</label><input type="text" name="endereco" class="form-control" required></div>
+                        <div class="col-md-6"><label>Embalagem</label><select name="embalagem" class="form-control select2-modal"><option value="BAG">Big Bag</option><option value="SC">Saco</option></select></div>
                         
-                        <div class="col-md-6"><label class="form-label">Produto</label><input type="text" name="produto" class="form-control"></div>
-                        <div class="col-md-6"><label class="form-label">Espécie</label><input type="text" name="especie" class="form-control" value="SOJA"></div>
-                        <div class="col-md-6"><label class="form-label">Cliente</label><input type="text" name="cliente" class="form-control"></div>
-                        <div class="col-md-6"><label class="form-label">Peso Unit. (kg)</label><input type="text" name="peso_unitario" class="form-control"></div>
-                        <div class="col-md-6"><label class="form-label">Armazém (AZ)</label><input type="text" name="az" class="form-control"></div>
-                        <div class="col-md-6"><label class="form-label">Empresa</label><input type="text" name="empresa" class="form-control"></div>
+                        <div class="col-md-6"><label>Produto</label><input type="text" name="produto" class="form-control"></div>
+                        <div class="col-md-6"><label>Cliente</label><input type="text" name="cliente" class="form-control"></div>
+                        <div class="col-md-4"><label>Peso Unit. (kg)</label><input type="text" name="peso_unitario" class="form-control"></div>
+                        <div class="col-md-4"><label>Armazém (AZ)</label><input type="text" name="az" class="form-control"></div>
+                        <div class="col-md-4"><label>Empresa</label><input type="text" name="empresa" class="form-control"></div>
                         
-                        <div class="col-12"><label class="form-label">Origem/Destino</label><input type="text" name="origem_destino" class="form-control"></div>
-                        <div class="col-12"><label class="form-label">Fotos</label><input type="file" name="fotos" class="form-control" multiple accept="image/*"></div>
-                        <div class="col-12"><label class="form-label">Obs</label><textarea name="observacao" class="form-control" rows="2"></textarea></div>
+                        <div class="col-12"><label>Origem/Destino</label><input type="text" name="origem_destino" class="form-control"></div>
+                        <div class="col-12"><label>Fotos</label><input type="file" name="fotos" class="form-control" multiple accept="image/*"></div>
+                        <div class="col-12"><label>Obs</label><textarea name="observacao" class="form-control" rows="2"></textarea></div>
                     </div>
                 </div>
-                <div class="modal-footer"><button type="submit" class="btn btn-primary">Salvar Entrada</button></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Entrada</button>
+                </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- === MODAL TRANSFERÊNCIA COMPLETA (COM EDIÇÃO) === -->
+<!-- === MODAL TRANSFERÊNCIA === -->
 <div class="modal fade" id="modalTransferencia" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
+            <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title"><i class="fas fa-exchange-alt me-2"></i>Transferir e Ajustar</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="formTransferencia" method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="item_id" id="transf_item_id">
                 <div class="modal-body">
-                    <!-- Área de Movimentação -->
-                    <div class="row mb-3 p-3 bg-light rounded border">
-                        <div class="col-12 mb-2"><h6 class="text-muted border-bottom pb-2">Destino</h6></div>
+                    <!-- SALDO DESTAQUE -->
+                    <div class="text-center py-2 bg-light rounded border mb-3">
+                        <small class="text-muted text-uppercase fw-bold">Saldo Atual</small>
+                        <div class="fs-2 fw-bold text-dark" id="transf_saldo_atual">0</div>
+                    </div>
+
+                    <div class="row mb-3 p-3 bg-warning bg-opacity-10 rounded border border-warning">
+                        <div class="col-12 mb-2"><h6 class="text-warning fw-bold border-bottom border-warning pb-2">Destino da Transferência</h6></div>
                         <div class="col-6 mb-2"><label class="fw-bold">Novo Endereço *</label><input type="text" name="novo_endereco" class="form-control border-warning" required></div>
-                        <div class="col-3 mb-2"><label class="fw-bold">Qtd *</label><input type="number" name="quantidade" id="transf_quantidade" class="form-control border-warning" required min="1"><small>Max: <span id="transf_saldo_atual">0</span></small></div>
+                        <div class="col-3 mb-2"><label class="fw-bold">Qtd *</label><input type="number" name="quantidade" id="transf_quantidade" class="form-control border-warning fw-bold" required min="1"></div>
                         <div class="col-3 mb-2"><label>AZ</label><input type="text" name="az" id="transf_az" class="form-control"></div>
                     </div>
 
-                    <!-- Área de Edição -->
                     <div class="row g-2">
                         <div class="col-12"><h6 class="text-muted border-bottom pb-1">Dados do Item (Editar se necessário)</h6></div>
                         <div class="col-4"><label>Lote</label><input type="text" class="form-control bg-light" id="transf_lote_display" readonly></div>
                         <div class="col-8"><label>Produto</label><input type="text" name="produto" id="transf_produto" class="form-control"></div>
-                        <div class="col-6"><label>Empresa</label><input type="text" name="empresa" id="transf_empresa" class="form-control"></div>
+                        
+                        <!-- CAMPO ESPÉCIE -->
+                        <div class="col-6">
+                            <label>Espécie</label>
+                            <select name="especie" id="transf_especie" class="form-select">
+                                <option value="">Selecione...</option>
+                                {% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}
+                            </select>
+                        </div>
+
                         <div class="col-6"><label>Cliente</label><input type="text" name="cliente" id="transf_cliente" class="form-control"></div>
                         <div class="col-4"><label>Peso</label><input type="text" name="peso_unitario" id="transf_peso" class="form-control"></div>
                         <div class="col-4"><label>Emb.</label><select name="embalagem" id="transf_embalagem" class="form-select"><option value="BAG">BAG</option><option value="SC">Saco</option></select></div>
-                        <div class="col-4"><label>Espécie</label><input type="text" name="especie" id="transf_especie" class="form-control"></div>
+                        <div class="col-4"><label>Empresa</label><input type="text" name="empresa" id="transf_empresa" class="form-control"></div>
                         
-                        <!-- Campos Técnicos (Collapse) -->
                         <div class="col-12 mt-2">
-                            <a class="text-primary text-decoration-none small" data-bs-toggle="collapse" href="#advancedFields">Mostrar Cultivar/Peneira/Tratamento</a>
+                            <a class="text-primary text-decoration-none small fw-bold" data-bs-toggle="collapse" href="#advancedFields">
+                                <i class="fas fa-cog me-1"></i> Dados Técnicos (Cultivar, Peneira...)
+                            </a>
                             <div class="collapse mt-2" id="advancedFields">
-                                <div class="row g-2">
+                                <div class="row g-2 bg-light p-3 rounded border">
                                     <div class="col-6"><label>Cultivar</label><select name="cultivar" id="transf_cultivar" class="form-select">{% for c in all_cultivares %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
                                     <div class="col-6"><label>Peneira</label><select name="peneira" id="transf_peneira" class="form-select">{% for p in all_peneiras %}<option value="{{ p.id }}">{{ p.nome }}</option>{% endfor %}</select></div>
                                     <div class="col-6"><label>Categoria</label><select name="categoria" id="transf_categoria" class="form-select">{% for c in all_categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
@@ -526,48 +571,53 @@
                     </div>
                     <div class="mt-2"><label>Fotos</label><input type="file" name="fotos" class="form-control" multiple></div>
                 </div>
-                <div class="modal-footer"><button type="submit" class="btn btn-warning fw-bold">Confirmar</button></div>
+                <div class="modal-footer">
+                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-white">Confirmar Transferência</button>
+                </div>
             </form>
         </div>
     </div>
 </div>
 
 <script>
-    // 1. INICIALIZAÇÃO E UTILITÁRIOS
+    // 1. INICIALIZAÇÃO SELECT2 EM MODAIS
     $(document).ready(function() {
-        // Ativar Select2 apenas no modal de Nova Entrada
-        $('.select2-field').select2({
+        // Inicializa no Modal Nova Entrada
+        $('.select2-modal').select2({
             dropdownParent: $('#modalNovaEntrada'),
+            width: '100%',
             placeholder: "Selecione...",
-            allowClear: true,
-            language: { noResults: () => "Não encontrado" }
+            allowClear: true
         });
     });
 
+    // 2. TOGGLE DETALHES (ACORDEÃO)
     function toggleDetails(rowId) {
         const row = document.getElementById(rowId);
-        const chevron = document.getElementById(`chevron-${rowId.split('-')[1]}`);
+        const cid = rowId.split('-')[1];
+        const chevron = document.getElementById(`chevron-${cid}`);
         
-        // Esconde outros
+        // Fecha outros
         document.querySelectorAll('tr[id^="details-"]').forEach(r => {
             if(r.id !== rowId) {
                 r.classList.add('d-none');
-                const cid = r.id.split('-')[1];
-                document.getElementById(`chevron-${cid}`).className = 'fas fa-chevron-right text-primary';
+                const otherCid = r.id.split('-')[1];
+                document.getElementById(`chevron-${otherCid}`).className = 'fas fa-chevron-right text-primary transition-icon';
             }
         });
 
-        // Toggle atual
+        // Abre atual
         if(row.classList.contains('d-none')) {
             row.classList.remove('d-none');
-            chevron.className = 'fas fa-chevron-down text-primary';
+            chevron.className = 'fas fa-chevron-down text-primary transition-icon';
         } else {
             row.classList.add('d-none');
-            chevron.className = 'fas fa-chevron-right text-primary';
+            chevron.className = 'fas fa-chevron-right text-primary transition-icon';
         }
     }
 
-    // 2. LÓGICA DE AUTOCOMPLETE (NOVA ENTRADA)
+    // 3. AUTOCOMPLETE LOTE
     document.addEventListener('DOMContentLoaded', function() {
         const inputLote = document.getElementById('inputLoteEntrada');
         const listaSugestoes = document.getElementById('listaSugestoesLote');
@@ -585,21 +635,17 @@
                 }
 
                 debounceTimer = setTimeout(() => {
-                    // Importante: URL gerada via template tag
                     const urlApi = "{% url 'sapp:api_autocomplete_entrada' %}";
                     
                     fetch(`${urlApi}?term=${encodeURIComponent(termo)}`)
-                        .then(res => {
-                            if(!res.ok) throw new Error('Erro API');
-                            return res.json();
-                        })
+                        .then(res => res.json())
                         .then(data => {
                             listaSugestoes.innerHTML = '';
                             if (data.length > 0) {
                                 data.forEach(item => {
                                     const li = document.createElement('li');
                                     li.className = 'suggestion-item';
-                                    li.innerHTML = `<strong>${item.dados.lote}</strong><span>${item.dados.produto || ''} | ${item.dados.empresa || ''}</span>`;
+                                    li.innerHTML = `<strong>${item.label}</strong><span>${item.dados.produto || ''}</span>`;
                                     
                                     li.addEventListener('click', () => {
                                         preencherModalEntrada(item.dados);
@@ -625,7 +671,6 @@
 
         function preencherModalEntrada(dados) {
             inputLote.value = dados.lote;
-            
             const setVal = (n, v) => { const el = modalEntrada.querySelector(`[name="${n}"]`); if(el) el.value = v || ''; };
             
             setVal('produto', dados.produto);
@@ -634,10 +679,9 @@
             setVal('origem_destino', dados.origem_destino);
             setVal('peso_unitario', dados.peso_unitario);
             setVal('az', dados.az);
-            setVal('especie', dados.especie);
             setVal('observacao', dados.observacao);
-
-            // Selects (Select2 requires jQuery)
+            
+            // JQUERY SELECT2 UPDATE
             const setS2 = (n, v) => {
                 const el = $(modalEntrada).find(`select[name="${n}"]`);
                 if(el.length && v) el.val(v).trigger('change');
@@ -648,13 +692,13 @@
             setS2('categoria', dados.categoria__id);
             setS2('tratamento', dados.tratamento__id);
             setS2('embalagem', dados.embalagem);
+            setS2('especie', dados.especie__id);
             
-            // Foco na quantidade
             setTimeout(() => modalEntrada.querySelector('[name="entrada"]').focus(), 100);
         }
     });
 
-    // 3. LÓGICA DE TRANSFERÊNCIA (ABRIR E PREENCHER)
+    // 4. PREENCHER MODAL TRANSFERÊNCIA
     function abrirModalTransferencia(id) {
         const form = document.getElementById('formTransferencia');
         const urlTransferir = "{% url 'sapp:transferir' 0 %}".replace('0', id);
@@ -667,24 +711,21 @@
             .then(res => res.json())
             .then(data => {
                 if (data.encontrado) {
-                    // Dados principais
                     document.getElementById('transf_item_id').value = id;
                     document.getElementById('transf_lote_display').value = data.lote;
                     document.getElementById('transf_saldo_atual').innerText = data.saldo;
                     document.getElementById('transf_quantidade').value = data.saldo;
                     document.getElementById('transf_quantidade').max = data.saldo;
                     
-                    // Preencher campos de edição
                     document.getElementById('transf_produto').value = data.produto || '';
                     document.getElementById('transf_empresa').value = data.empresa || '';
                     document.getElementById('transf_cliente').value = data.cliente || '';
                     document.getElementById('transf_az').value = data.az || '';
                     document.getElementById('transf_peso').value = data.peso_unitario;
                     document.getElementById('transf_embalagem').value = data.embalagem || 'BAG';
-                    document.getElementById('transf_especie').value = data.especie || 'SOJA';
                     document.getElementById('transf_obs').value = data.observacao || '';
                     
-                    // Selects técnicos (se existirem)
+                    if(data.especie_id) document.getElementById('transf_especie').value = data.especie_id;
                     if(data.cultivar_id) document.getElementById('transf_cultivar').value = data.cultivar_id;
                     if(data.peneira_id) document.getElementById('transf_peneira').value = data.peneira_id;
                     if(data.categoria_id) document.getElementById('transf_categoria').value = data.categoria_id;
@@ -698,7 +739,7 @@
             .catch(err => console.error(err));
     }
 
-    // Auto focus em todos os modais
+    // AUTO FOCUS EM INPUTS DE MODAL
     document.addEventListener('shown.bs.modal', function(event) {
         const firstInput = event.target.querySelector('input:not([type="hidden"]), select, textarea');
         if (firstInput) firstInput.focus();

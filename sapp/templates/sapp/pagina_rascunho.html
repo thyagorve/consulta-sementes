@@ -3,474 +3,947 @@
 
 {% block content %}
 <style>
-    /* ESTILOS DA TABELA EXCEL-LIKE */
-    .table-empenho {
-        font-size: 0.8rem;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    /* ESTILOS MODERNOS E CLEAN */
+    :root {
+        --primary: #2563eb;
+        --primary-light: #3b82f6;
+        --primary-dark: #1e40af;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --info: #06b6d4;
+        --dark: #1e293b;
+        --light: #f8fafc;
+        --border: #e2e8f0;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-700: #374151;
     }
     
-    .table-empenho th {
-        background: #f8f9fa;
-        color: #2c3e50;
-        font-weight: 600;
-        border: 1px solid #dee2e6;
-        padding: 8px 6px;
-        position: sticky;
-        top: 0;
-        z-index: 10;
+    body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
     }
     
-    .table-empenho td {
-        padding: 6px 4px;
-        border: 1px solid #e9ecef;
-        vertical-align: middle;
-    }
-    
-    .filtro-header {
-        background: #e3f2fd !important;
-    }
-    
-    .filtro-input {
-        width: 100%;
-        padding: 4px 6px;
-        font-size: 0.75rem;
-        border: 1px solid #ced4da;
-        border-radius: 3px;
+    /* CONTAINER PRINCIPAL */
+    .main-container {
         background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        margin: 20px auto;
+        max-width: 1400px;
+        padding: 0;
+        overflow: hidden;
     }
     
-    .filtro-input:focus {
-        outline: none;
-        border-color: #80bdff;
-        box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.25);
-    }
-    
-    /* BADGES DE STATUS */
-    .badge-saldo-total { background: #2f8f4e; color: white; }
-    .badge-empenhado { background: #f39c12; color: white; }
-    .badge-disponivel { background: #3498db; color: white; }
-    .badge-saldo-zero { background: #e74c3c; color: white; }
-    
-    .badge-nome-empenho {
-        background: #9b59b6;
+    /* HEADER ESTILIZADO */
+    .page-header {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
         color: white;
-        font-size: 0.7rem;
-        padding: 2px 6px;
-        margin: 1px;
-        cursor: pointer;
-        display: inline-block;
+        padding: 30px 35px;
+        border-radius: 16px 16px 0 0;
+        margin-bottom: 0;
+        position: relative;
+        overflow: hidden;
     }
     
-    /* FORMULÁRIO FLUTUANTE */
-    .form-flutuante {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-        z-index: 1050;
-        width: 400px;
-        padding: 20px;
-        display: none;
-    }
-    
-    .overlay {
-        position: fixed;
+    .page-header::before {
+        content: '';
+        position: absolute;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        z-index: 1040;
-        display: none;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #10b981, #06b6d4, #3b82f6);
     }
     
-    /* BARRA DE AÇÕES */
-    .acao-bar {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        color: white;
+    .page-header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .stat-card {
+        background: rgba(255,255,255,0.15);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 12px;
         padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-    }
-    
-    .btn-acao {
-        border: none;
-        border-radius: 6px;
-        padding: 8px 16px;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-    
-    .btn-acao-transferir { background: #17a2b8; color: white; }
-    .btn-acao-expedir { background: #28a745; color: white; }
-    .btn-acao-editar { background: #ffc107; color: black; }
-    .btn-acao-excluir { background: #dc3545; color: white; }
-    
-    .btn-acao:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    }
-    
-    /* CHECKBOX ESTILIZADO */
-    .checkbox-empenho {
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
-    }
-    
-    /* PAGINAÇÃO */
-    .paginacao-empenho {
-        background: #f8f9fa;
-        padding: 10px;
-        border-radius: 6px;
-        border: 1px solid #dee2e6;
-    }
-    
-    /* SCROLL PERSONALIZADO */
-    .table-container {
-        max-height: 600px;
-        overflow-y: auto;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-    }
-    
-    .table-container::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    .table-container::-webkit-scrollbar-track {
-        background: #f1f1f1;
-    }
-    
-    .table-container::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-    
-    .table-container::-webkit-scrollbar-thumb:hover {
-        background: #555;
-    }
-    
-    /* CARDS DE RESUMO */
-    .card-resumo {
-        border: none;
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        text-align: center;
         transition: transform 0.3s;
     }
     
-    .card-resumo:hover {
-        transform: translateY(-5px);
+    .stat-card:hover {
+        transform: translateY(-3px);
+        background: rgba(255,255,255,0.2);
     }
     
-    /* BARRA DE FILTROS RÁPIDOS */
-    .filtro-rapido {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
+    .stat-number {
+        font-size: 1.8rem;
+        font-weight: 800;
+        display: block;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* BARRA DE AÇÕES */
+    .actions-bar {
+        background: var(--light);
+        border-bottom: 1px solid var(--border);
+        padding: 20px 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+    
+    .actions-left {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .actions-right {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .btn-modern {
+        border: none;
+        border-radius: 10px;
+        padding: 10px 20px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+    
+    .btn-modern:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+    }
+    
+    .btn-modern:active {
+        transform: translateY(-1px);
+    }
+    
+    .btn-transfer { 
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+    
+    .btn-expedir { 
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+    
+    .btn-excluir { 
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        color: white;
+    }
+    
+    /* SWITCH PERSONALIZADO */
+    .switch-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: white;
+        padding: 8px 15px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+    }
+    
+    .switch-label {
+        font-weight: 600;
+        color: var(--gray-700);
+        white-space: nowrap;
+    }
+    
+    /* FILTROS AVANÇADOS */
+    .filters-section {
+        padding: 25px 30px;
+        background: white;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .filter-input-group {
+        position: relative;
+    }
+    
+    .filter-input {
+        width: 100%;
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 15px;
+        font-size: 0.9rem;
+        transition: all 0.3s;
+        background: white;
+    }
+    
+    .filter-input:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        outline: none;
+    }
+    
+    .filter-input-icon {
+        position: absolute;
+        right: 15px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--gray-300);
+    }
+    
+    /* TABELA MODERNA */
+    .table-wrapper {
+        border-radius: 0 0 16px 16px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+    }
+    
+    .modern-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+    }
+    
+    .modern-table thead {
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .modern-table th {
+        padding: 16px 15px;
+        text-align: left;
+        font-weight: 700;
+        color: var(--dark);
+        border-bottom: 2px solid var(--border);
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+        white-space: nowrap;
+    }
+    
+    .modern-table td {
+        padding: 14px 15px;
+        border-bottom: 1px solid var(--gray-100);
+        vertical-align: middle;
+        transition: background 0.2s;
+    }
+    
+    .modern-table tbody tr {
+        transition: all 0.3s;
+        border-left: 3px solid transparent;
+    }
+    
+    .modern-table tbody tr:hover {
+        background: var(--gray-100);
+        border-left-color: var(--primary);
+    }
+    
+    .modern-table tbody tr.negative {
+        background: linear-gradient(90deg, rgba(254, 226, 226, 0.1), transparent);
+        border-left-color: var(--danger);
+    }
+    
+    /* BADGES MODERNOS */
+    .badge-modern {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        border: 1px solid transparent;
+    }
+    
+    .badge-saldo { 
+        background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+        color: #065f46;
+        border-color: #10b981;
+    }
+    
+    .badge-empenhado { 
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        color: #92400e;
+        border-color: #f59e0b;
+    }
+    
+    .badge-disponivel { 
+        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        color: #1e40af;
+        border-color: #3b82f6;
+    }
+    
+    .badge-negativo { 
+        background: linear-gradient(135deg, #fee2e2, #fecaca);
+        color: #991b1b;
+        border-color: #ef4444;
+    }
+    
+    .badge-empenho {
+        background: linear-gradient(135deg, #ede9fe, #e0e7ff);
+        color: #5b21b6;
+        border-color: #8b5cf6;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .badge-empenho:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(139, 92, 246, 0.2);
+    }
+    
+    /* CARDS DE EMPENHO - GRID MODERNO */
+    .empenhos-section {
+        padding: 30px;
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        border-top: 1px solid var(--border);
+    }
+    
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 25px;
+        color: var(--dark);
+    }
+    
+    .section-title i {
+        color: var(--primary);
+    }
+    
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
         margin-bottom: 20px;
-        border: 1px solid #dee2e6;
+    }
+    
+    .empenho-card-modern {
+        background: white;
+        border: 2px solid var(--border);
+        border-radius: 15px;
+        padding: 20px;
+        transition: all 0.4s;
+        position: relative;
+        overflow: hidden;
+        cursor: pointer;
+    }
+    
+    .empenho-card-modern::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 5px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--primary), var(--info));
+    }
+    
+    .empenho-card-modern:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+        border-color: var(--primary);
+    }
+    
+    .empenho-card-modern.selected {
+        border-color: var(--primary);
+        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+    }
+    
+    .empenho-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+    
+    .empenho-card-title {
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--dark);
+        margin: 0;
+        flex: 1;
+    }
+    
+    .empenho-card-stats {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .empenho-card-details {
+        font-size: 0.8rem;
+        color: var(--gray-700);
+        line-height: 1.5;
+        margin-bottom: 15px;
+    }
+    
+    .empenho-card-items {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 15px;
+    }
+    
+    .empenho-card-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+        border-bottom: 1px solid var(--gray-100);
+    }
+    
+    /* AÇÕES DE CARD */
+    .cards-actions {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        border: 2px solid var(--border);
+        margin-top: 20px;
+        display: none;
+        animation: slideUp 0.3s ease-out;
+    }
+    
+    .cards-actions.show {
+        display: block;
+    }
+    
+    /* MODAIS ESTILIZADOS */
+    .modal-content {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+        overflow: hidden;
+    }
+    
+    .modal-header-gradient {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        border-radius: 16px 16px 0 0;
+        padding: 25px 30px;
+        border: none;
+        position: relative;
+    }
+    
+    .modal-header-gradient::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--success), var(--info), var(--warning));
+    }
+    
+    .modal-title-lg {
+        font-size: 1.5rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .modal-body-padded {
+        padding: 30px;
+    }
+    
+    .modal-section {
+        margin-bottom: 25px;
+    }
+    
+    .modal-section-title {
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .modal-section-title i {
+        color: var(--primary);
+    }
+    
+    .form-group-modern {
+        margin-bottom: 20px;
+    }
+    
+    .form-label-modern {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: var(--gray-700);
+    }
+    
+    .form-control-modern {
+        width: 100%;
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 15px;
+        font-size: 0.95rem;
+        transition: all 0.3s;
+        background: white;
+    }
+    
+    .form-control-modern:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        outline: none;
+    }
+    
+    .form-control-modern:disabled {
+        background: var(--gray-100);
+        border-color: var(--gray-200);
+        cursor: not-allowed;
+    }
+    
+    .alert-modern {
+        border-radius: 12px;
+        padding: 20px;
+        border: 2px solid transparent;
+        margin-bottom: 20px;
+    }
+    
+    .alert-warning-modern {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border-color: #f59e0b;
+        color: #92400e;
+    }
+    
+    .alert-danger-modern {
+        background: linear-gradient(135deg, #fee2e2, #fecaca);
+        border-color: #ef4444;
+        color: #991b1b;
+    }
+    
+    .alert-info-modern {
+        background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+        border-color: #3b82f6;
+        color: #1e40af;
+    }
+    
+    /* BOTÕES DE AÇÃO */
+    .btn-icon-modern {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--border);
+        background: white;
+        color: var(--gray-700);
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    
+    .btn-icon-modern:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+    }
+    
+    .btn-icon-modern.btn-info:hover {
+        background: var(--info);
+        color: white;
+        border-color: var(--info);
+    }
+    
+    .btn-icon-modern.btn-success:hover {
+        background: var(--success);
+        color: white;
+        border-color: var(--success);
+    }
+    
+    /* PAGINAÇÃO */
+    .pagination-modern {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        padding: 20px;
+        background: var(--light);
+        border-top: 1px solid var(--border);
+    }
+    
+    .page-link-modern {
+        padding: 8px 16px;
+        border-radius: 10px;
+        border: 2px solid var(--border);
+        background: white;
+        color: var(--gray-700);
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .page-link-modern:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        transform: translateY(-2px);
+    }
+    
+    .page-link-modern.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+    
+    /* ANIMAÇÕES */
+    @keyframes fadeIn {
+        from { 
+            opacity: 0; 
+            transform: translateY(20px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
+    }
+    
+    @keyframes slideUp {
+        from { 
+            opacity: 0; 
+            transform: translateY(30px); 
+        }
+        to { 
+            opacity: 1; 
+            transform: translateY(0); 
+        }
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    /* RESPONSIVO */
+    @media (max-width: 1200px) {
+        .main-container {
+            margin: 15px;
+        }
+        
+        .cards-grid {
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .page-header {
+            padding: 20px 25px;
+        }
+        
+        .page-header h1 {
+            font-size: 1.5rem;
+        }
+        
+        .actions-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 15px;
+        }
+        
+        .actions-left, .actions-right {
+            width: 100%;
+            justify-content: center;
+        }
+        
+        .filter-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        
+        .modern-table {
+            min-width: 800px;
+        }
+        
+        .modal-body-padded {
+            padding: 20px;
+        }
     }
 </style>
 
-<div class="container-fluid py-3">
-    <!-- HEADER COM RESUMO -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="text-primary fw-bold mb-1">
-                        <i class="fas fa-table me-2"></i>Planilha de Empenho
-                    </h2>
-                    <p class="text-muted mb-0">
-                        Sistema de rascunho - Empenhe lotes antes de movimentar
-                    </p>
+<div class="main-container fade-in">
+    <!-- HEADER COM ESTATÍSTICAS -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <h1><i class="fas fa-clipboard-list"></i> Gestão de Empenhos - Rascunho</h1>
+                <p class="mb-0 opacity-90">Sistema de planejamento para movimentações em lote</p>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-number">{{ total_lotes|intcomma }}</span>
+                    <span class="stat-label">Lotes Ativos</span>
                 </div>
-                <div class="d-flex gap-3">
-                    <span class="badge bg-primary fs-6">{{ total_lotes|intcomma }} lotes</span>
-                    <span class="badge bg-success fs-6">{{ total_saldo|intcomma }} unidades</span>
-                    <span class="badge bg-info fs-6">{{ total_sc_convertido|intcomma }} SC</span>
+                <div class="stat-card">
+                    <span class="stat-number">{{ total_saldo|intcomma }}</span>
+                    <span class="stat-label">Unidades</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">{{ total_sc_convertido|intcomma }}</span>
+                    <span class="stat-label">SC Convertido</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number">{{ todos_empenhos.count }}</span>
+                    <span class="stat-label">Empenhos</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- BARRA DE FILTROS RÁPIDOS -->
-    <div class="filtro-rapido">
-        <form method="get" class="row g-2">
-            <div class="col-md-2">
-                <input type="text" name="filtro_lote" class="form-control form-control-sm" 
-                       placeholder="Filtrar Lote" value="{{ filtro_lote }}">
+    <!-- BARRA DE AÇÕES PRINCIPAIS -->
+    <div class="actions-bar">
+        <div class="actions-left">
+            <div class="switch-group">
+                <input class="form-check-input" type="checkbox" id="modoSelecao" 
+                       style="transform: scale(1.2);" onchange="alternarModoSelecao()">
+                <label class="switch-label" for="modoSelecao">
+                    <i class="fas fa-check-square me-2"></i>Modo Seleção Múltipla
+                </label>
             </div>
-            <div class="col-md-2">
-                <input type="text" name="filtro_cultivar" class="form-control form-control-sm" 
-                       placeholder="Filtrar Cultivar" value="{{ filtro_cultivar }}">
+            
+            <div class="vr"></div>
+            
+            <div>
+                <span class="badge-modern bg-primary text-white" id="contadorSelecionados">
+                    <i class="fas fa-check-circle me-1"></i>
+                    <span id="contadorNumero">0</span> selecionados
+                </span>
             </div>
-            <div class="col-md-2">
-                <input type="text" name="filtro_endereco" class="form-control form-control-sm" 
-                       placeholder="Filtrar Endereço" value="{{ filtro_endereco }}">
+        </div>
+        
+        <div class="actions-right">
+            <button class="btn-modern btn-transfer" onclick="abrirModalMassa('transferir')" 
+                    id="btnTransferir" disabled>
+                <i class="fas fa-exchange-alt"></i> Transferir
+            </button>
+            <button class="btn-modern btn-expedir" onclick="abrirModalMassa('expedir')" 
+                    id="btnExpedir" disabled>
+                <i class="fas fa-truck"></i> Expedir
+            </button>
+            <button class="btn-modern btn-excluir" onclick="abrirModalMassa('excluir')" 
+                    id="btnExcluir" disabled>
+                <i class="fas fa-trash"></i> Excluir
+            </button>
+        </div>
+    </div>
+
+    <!-- FILTROS AVANÇADOS -->
+    <div class="filters-section">
+        <form method="GET" class="row g-4">
+            <div class="col-md-8">
+                <div class="filter-grid">
+                    <div class="filter-input-group">
+                        <input type="text" class="form-control filter-input" name="filtro_lote" 
+                               placeholder="🔍 Número do Lote" value="{{ filtro_lote }}">
+                        <i class="fas fa-hashtag filter-input-icon"></i>
+                    </div>
+                    
+                    <div class="filter-input-group">
+                        <input type="text" class="form-control filter-input" name="filtro_cultivar" 
+                               placeholder="🌱 Cultivar" value="{{ filtro_cultivar }}">
+                        <i class="fas fa-leaf filter-input-icon"></i>
+                    </div>
+                    
+                    <div class="filter-input-group">
+                        <input type="text" class="form-control filter-input" name="filtro_endereco" 
+                               placeholder="📍 Endereço" value="{{ filtro_endereco }}">
+                        <i class="fas fa-map-marker-alt filter-input-icon"></i>
+                    </div>
+                    
+                    <div class="filter-input-group">
+                        <input type="text" class="form-control filter-input" name="filtro_cliente" 
+                               placeholder="👤 Cliente" value="{{ filtro_cliente }}">
+                        <i class="fas fa-user filter-input-icon"></i>
+                    </div>
+                </div>
             </div>
-            <div class="col-md-2">
-                <input type="text" name="filtro_cliente" class="form-control form-control-sm" 
-                       placeholder="Filtrar Cliente" value="{{ filtro_cliente }}">
-            </div>
-            <div class="col-md-2">
-                <input type="text" name="filtro_peneira" class="form-control form-control-sm" 
-                       placeholder="Filtrar Peneira" value="{{ filtro_peneira }}">
-            </div>
-            <div class="col-md-2">
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
-                        <i class="fas fa-filter me-1"></i>Filtrar
-                    </button>
-                    <a href="?" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-times"></i>
-                    </a>
+            
+            <div class="col-md-4">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <select class="form-select filter-input" name="embalagem">
+                            <option value="">📦 Todas Embalagens</option>
+                            <option value="BAG" {% if embalagem == 'BAG' %}selected{% endif %}>BAG</option>
+                            <option value="SC" {% if embalagem == 'SC' %}selected{% endif %}>SC</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <button type="submit" class="btn btn-primary w-100 h-100 d-flex align-items-center justify-content-center gap-2">
+                            <i class="fas fa-filter"></i> Filtrar
+                        </button>
+                    </div>
                 </div>
             </div>
         </form>
         
-        <!-- BUSCA GERAL -->
-        <div class="mt-3">
-            <div class="input-group input-group-sm">
-                <span class="input-group-text bg-light">
+        <div class="mt-4">
+            <div class="input-group input-group-lg">
+                <span class="input-group-text bg-light border-end-0">
                     <i class="fas fa-search text-muted"></i>
                 </span>
-                <input type="text" class="form-control" id="buscaGeral" 
-                       placeholder="Busca em todas as colunas (como Excel)..." value="{{ busca }}">
+                <input type="text" class="form-control border-start-0 filter-input" id="buscaGeral" 
+                       placeholder="Buscar em todas as colunas (pressione Enter)..." value="{{ busca }}">
                 <button class="btn btn-outline-primary" type="button" onclick="realizarBusca()">
-                    Buscar
+                    <i class="fas fa-search"></i>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- BARRA DE AÇÕES EM LOTE -->
-    <div class="acao-bar mb-4">
-        <div class="row align-items-center">
-            <div class="col-md-8">
-                <div class="d-flex flex-wrap gap-2">
-                    <button class="btn btn-acao btn-acao-transferir" onclick="abrirFormAcao('transferir')">
-                        <i class="fas fa-exchange-alt me-2"></i>Transferir Selecionados
-                    </button>
-                    <button class="btn btn-acao btn-acao-expedir" onclick="abrirFormAcao('expedir')">
-                        <i class="fas fa-truck me-2"></i>Expedir Selecionados
-                    </button>
-                    <button class="btn btn-acao btn-acao-editar" onclick="abrirFormAcao('editar')">
-                        <i class="fas fa-edit me-2"></i>Editar Campos
-                    </button>
-                    <button class="btn btn-acao btn-acao-excluir" onclick="abrirFormAcao('excluir')">
-                        <i class="fas fa-trash me-2"></i>Excluir Empenhos
-                    </button>
-                </div>
-            </div>
-            <div class="col-md-4 text-end">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" id="modoSelecao" onchange="alternarModoSelecao()">
-                    <label class="form-check-label text-white" for="modoSelecao">
-                        Modo Seleção Múltipla
-                    </label>
-                </div>
-                <small class="text-light">Selecione vários lotes para ações em lote</small>
-            </div>
-        </div>
-    </div>
-
-    <!-- CARDS DE RESUMO -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card card-resumo border-primary">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-primary bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-boxes text-primary fs-3"></i>
-                        </div>
-                        <div>
-                            <h4 class="mb-0 text-primary">{{ total_lotes|intcomma }}</h4>
-                            <small class="text-muted">Lotes Ativos</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card card-resumo border-success">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-success bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-weight text-success fs-3"></i>
-                        </div>
-                        <div>
-                            <h4 class="mb-0 text-success">{{ total_saldo|intcomma }}</h4>
-                            <small class="text-muted">Unidades Totais</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card card-resumo border-info">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-info bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-layer-group text-info fs-3"></i>
-                        </div>
-                        <div>
-                            <h4 class="mb-0 text-info">{{ total_sc_convertido|intcomma }}</h4>
-                            <small class="text-muted">Equivalente SC</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-3">
-            <div class="card card-resumo border-warning">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="bg-warning bg-opacity-10 rounded-circle p-3 me-3">
-                            <i class="fas fa-clipboard-list text-warning fs-3"></i>
-                        </div>
-                        <div>
-                            <h4 class="mb-0 text-warning">{{ todos_empenhos.count }}</h4>
-                            <small class="text-muted">Empenhos Ativos</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- TABELA PRINCIPAL -->
-    <div class="table-container">
-        <table class="table table-empenho table-hover table-striped mb-0">
+    <div class="table-wrapper">
+        <table class="modern-table">
             <thead>
                 <tr>
-                    <th width="40">
-                        <input type="checkbox" id="selectAll" onchange="selecionarTodos(this.checked)">
+                    <th width="50" class="text-center">
+                        <input type="checkbox" id="selectAll" onchange="selecionarTodos(this.checked)" 
+                               class="form-check-input" style="transform: scale(1.1);" disabled>
                     </th>
                     <th>LOTE</th>
                     <th>CULTIVAR</th>
-                    <th>PENEIRA</th>
-                    <th>CATEGORIA</th>
                     <th>ENDEREÇO</th>
-                    <th>SALDO TOTAL</th>
+                    <th>SALDO</th>
                     <th>EMPENHADO</th>
                     <th>DISPONÍVEL</th>
-                    <th>NOMES DOS EMPENHOS</th>
+                    <th>EMPENHOS</th>
                     <th>CLIENTE</th>
-                    <th>EMBALAGEM</th>
                     <th>AÇÕES</th>
-                </tr>
-                
-                <!-- LINHA DE FILTROS -->
-                <tr class="filtro-header">
-                    <td></td>
-                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(1, this.value)"></td>
-                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(2, this.value)"></td>
-                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(3, this.value)"></td>
-                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(4, this.value)"></td>
-                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(5, this.value)"></td>
-                    <td></td>
-                    <td></td>
-                    <td></td>
-                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(9, this.value)"></td>
-                    <td><input type="text" class="filtro-input" placeholder="Filtrar..." onkeyup="filtrarColuna(10, this.value)"></td>
-                    <td></td>
-                    <td></td>
                 </tr>
             </thead>
             <tbody id="tabelaCorpo">
                 {% for item in lotes %}
-                <tr id="lote-{{ item.lote.id }}" data-lote-id="{{ item.lote.id }}">
-                    <td>
-                        <input type="checkbox" class="checkbox-empenho lote-selecionado" 
-                               data-lote-id="{{ item.lote.id }}">
-                    </td>
-                    <td>
-                        <strong class="text-primary">{{ item.lote.lote }}</strong>
-                        {% if item.lote.produto %}
-                        <br><small class="text-muted">{{ item.lote.produto }}</small>
-                        {% endif %}
-                    </td>
-                    <td>{{ item.lote.cultivar.nome }}</td>
-                    <td>{{ item.lote.peneira.nome }}</td>
-                    <td>{{ item.lote.categoria.nome }}</td>
-                    <td>
-                        <span class="badge bg-light text-dark border">{{ item.lote.endereco }}</span>
-                        {% if item.lote.az %}
-                        <br><small class="text-muted">AZ: {{ item.lote.az }}</small>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="badge badge-saldo-total">{{ item.saldo_total|intcomma }}</span>
-                    </td>
-                    <td>
-                        {% if item.empenhado > 0 %}
-                        <span class="badge badge-empenhado">{{ item.empenhado|intcomma }}</span>
-                        {% else %}
-                        <span class="text-muted">-</span>
-                        {% endif %}
-                    </td>
-                    <td>
+                <tr class="{% if item.disponivel < 0 %}negative{% endif %}" data-lote-id="{{ item.lote.id }}">
+                    <td class="text-center">
                         {% if item.disponivel > 0 %}
-                        <span class="badge badge-disponivel">{{ item.disponivel|intcomma }}</span>
-                        {% else %}
-                        <span class="badge badge-saldo-zero">ESGOTADO</span>
+                        <input type="checkbox" class="form-check-input checkbox-lote" 
+                               value="{{ item.lote.id }}" style="transform: scale(1.1);">
                         {% endif %}
                     </td>
                     <td>
-                        {% if item.empenhos %}
-                            {% for emp in item.empenhos %}
-                            <span class="badge badge-nome-empenho" 
-                                  title="Quantidade: {{ emp.quantidade }} - {{ emp.observacao|default:'Sem observação' }}"
-                                  onclick="filtrarPorEmpenho('{{ emp.empenho.observacao }}')">
-                                {{ emp.empenho.observacao|truncatechars:20 }}
-                            </span>
-                            {% endfor %}
-                        {% else %}
-                            <span class="text-muted">Nenhum empenho</span>
-                        {% endif %}
+                        <div class="d-flex flex-column">
+                            <strong class="text-dark">{{ item.lote.lote }}</strong>
+                            {% if item.lote.produto %}
+                            <small class="text-muted">{{ item.lote.produto }}</small>
+                            {% endif %}
+                        </div>
                     </td>
                     <td>
-                        {% if item.lote.cliente %}
-                        <span class="badge bg-purple text-white">{{ item.lote.cliente|truncatechars:15 }}</span>
-                        {% else %}
-                        <span class="text-muted">-</span>
-                        {% endif %}
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fas fa-leaf text-success"></i>
+                            <span>{{ item.lote.cultivar.nome }}</span>
+                        </div>
                     </td>
                     <td>
-                        <span class="badge {% if item.lote.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">
-                            {{ item.lote.get_embalagem_display }}
+                        <div class="d-flex flex-column">
+                            <span class="fw-medium">{{ item.lote.endereco }}</span>
+                            {% if item.lote.az %}
+                            <small class="text-muted">AZ: {{ item.lote.az }}</small>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge-modern badge-saldo">
+                            <i class="fas fa-box"></i> {{ item.saldo_total|intcomma }}
                         </span>
                     </td>
                     <td>
-                        <div class="d-flex gap-1">
+                        {% if item.empenhado > 0 %}
+                        <span class="badge-modern badge-empenhado">
+                            <i class="fas fa-lock"></i> {{ item.empenhado|intcomma }}
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if item.disponivel < 0 %}
+                        <span class="badge-modern badge-negativo">
+                            <i class="fas fa-exclamation-triangle"></i> {{ item.disponivel|intcomma }}
+                        </span>
+                        {% elif item.disponivel > 0 %}
+                        <span class="badge-modern badge-disponivel">
+                            <i class="fas fa-check-circle"></i> {{ item.disponivel|intcomma }}
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if item.empenhos %}
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for emp in item.empenhos %}
+                            <span class="badge-modern badge-empenho" 
+                                  onclick="filtrarPorEmpenho('{{ emp.empenho.observacao }}')"
+                                  title="{{ emp.quantidade }} unidades - {{ emp.observacao|default:'Sem observação' }}">
+                                <i class="fas fa-tag"></i> {{ emp.empenho.observacao|truncatechars:12 }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if item.lote.cliente %}
+                        <span class="d-flex align-items-center gap-2">
+                            <i class="fas fa-user-tie text-info"></i>
+                            {{ item.lote.cliente|truncatechars:15 }}
+                        </span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2">
                             {% if item.disponivel > 0 %}
-                            <button class="btn btn-sm btn-success" 
-                                    onclick="abrirFormEmpenho({{ item.lote.id }}, {{ item.disponivel }})"
-                                    title="Empenhar unidades">
+                            <button class="btn-icon-modern btn-success" 
+                                    onclick="abrirModalIndividual({{ item.lote.id }}, '{{ item.lote.lote }}', {{ item.disponivel }})"
+                                    title="Adicionar empenho">
                                 <i class="fas fa-plus"></i>
                             </button>
                             {% endif %}
-                            
-                            {% if item.empenhado > 0 %}
-                            <button class="btn btn-sm btn-warning" 
-                                    onclick="verEmpenhosLote({{ item.lote.id }})"
-                                    title="Ver empenhos deste lote">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            {% endif %}
-                            
-                            <button class="btn btn-sm btn-info" 
+                            <button class="btn-icon-modern btn-info" 
                                     onclick="detalhesLote({{ item.lote.id }})"
-                                    title="Detalhes do lote">
+                                    title="Detalhes completos">
                                 <i class="fas fa-info-circle"></i>
                             </button>
                         </div>
@@ -478,9 +951,12 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="13" class="text-center py-4 text-muted">
-                        <i class="fas fa-inbox fa-2x mb-2 d-block"></i>
-                        Nenhum lote encontrado
+                    <td colspan="10" class="text-center py-5">
+                        <div class="text-muted py-5">
+                            <i class="fas fa-inbox fa-3x mb-3 opacity-25"></i>
+                            <h5 class="fw-medium">Nenhum lote encontrado</h5>
+                            <p class="mb-0">Tente ajustar os filtros de busca</p>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -489,321 +965,629 @@
     </div>
 
     <!-- PAGINAÇÃO -->
-    {% if estoque.paginator.num_pages > 1 %}
-    <div class="paginacao-empenho mt-3">
-        <div class="row align-items-center">
-            <div class="col-md-4">
-                <small class="text-muted">
-                    Mostrando {{ estoque.start_index }} - {{ estoque.end_index }} de {{ estoque.paginator.count }} lotes
-                </small>
+    {% if estoque.has_other_pages %}
+    <div class="pagination-modern">
+        <nav>
+            <ul class="pagination justify-content-center mb-0 gap-2">
+                {% if estoque.has_previous %}
+                <li>
+                    <a class="page-link-modern" href="?page={{ estoque.previous_page_number }}{{ url_filtros }}">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% for num in estoque.paginator.page_range %}
+                    {% if num >= estoque.number|add:-2 and num <= estoque.number|add:2 %}
+                    <li>
+                        <a class="page-link-modern {% if num == estoque.number %}active{% endif %}" 
+                           href="?page={{ num }}{{ url_filtros }}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if estoque.has_next %}
+                <li>
+                    <a class="page-link-modern" href="?page={{ estoque.next_page_number }}{{ url_filtros }}">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+    <!-- CARDS DE EMPENHOS ATIVOS -->
+    {% if todos_empenhos %}
+    <div class="empenhos-section">
+        <h5 class="section-title">
+            <i class="fas fa-clipboard-check"></i>
+            Empenhos Ativos <span class="badge bg-primary ms-2">{{ todos_empenhos.count }}</span>
+        </h5>
+        
+        <div class="cards-grid" id="cardsContainer">
+            {% for emp in todos_empenhos %}
+            <div class="empenho-card-modern" data-empenho-id="{{ emp.id }}"
+                 onclick="toggleCardSelecao(this, event)">
+                <div class="empenho-card-header">
+                    <h6 class="empenho-card-title">{{ emp.observacao|truncatechars:25 }}</h6>
+                    <input type="checkbox" class="form-check-input card-checkbox" 
+                           data-empenho-id="{{ emp.id }}" style="transform: scale(1.1);">
+                </div>
+                
+                <div class="empenho-card-stats">
+                    <span class="badge-modern badge-saldo">
+                        <i class="fas fa-boxes"></i> {{ emp.itens.count }} itens
+                    </span>
+                    <span class="badge-modern badge-empenhado">
+                        <i class="fas fa-weight-hanging"></i> {{ emp.saldo_afetado }} un
+                    </span>
+                </div>
+                
+                <div class="empenho-card-details">
+                    <small class="text-muted">
+                        <i class="far fa-clock me-1"></i>
+                        Criado em {{ emp.data_criacao|date:"d/m/Y H:i" }}
+                    </small>
+                </div>
+                
+                <div class="empenho-card-items">
+                    {% for item in emp.itens.all|slice:":3" %}
+                    <div class="empenho-card-item">
+                        <span class="text-truncate">
+                            <i class="fas fa-circle fa-xs me-2 text-primary"></i>
+                            {{ item.estoque.lote }}
+                        </span>
+                        <span class="fw-medium">{{ item.quantidade }} un</span>
+                    </div>
+                    {% endfor %}
+                    {% if emp.itens.count > 3 %}
+                    <div class="text-center mt-2">
+                        <small class="text-muted">
+                            + {{ emp.itens.count|add:"-3" }} mais itens
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <button class="btn btn-outline-primary btn-sm w-100" 
+                        onclick="filtrarPorEmpenhoCard('{{ emp.observacao }}')">
+                    <i class="fas fa-filter me-1"></i> Filtrar na Tabela
+                </button>
             </div>
-            <div class="col-md-4">
-                <nav aria-label="Paginação">
-                    <ul class="pagination pagination-sm justify-content-center mb-0">
-                        {% if estoque.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ estoque.previous_page_number }}{{ url_filtros }}">
-                                <i class="fas fa-chevron-left"></i>
-                            </a>
-                        </li>
-                        {% endif %}
-                        
-                        {% for num in estoque.paginator.page_range %}
-                            {% if num >= estoque.number|add:-2 and num <= estoque.number|add:2 %}
-                            <li class="page-item {% if num == estoque.number %}active{% endif %}">
-                                <a class="page-link" href="?page={{ num }}{{ url_filtros }}">{{ num }}</a>
-                            </li>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if estoque.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?page={{ estoque.next_page_number }}{{ url_filtros }}">
-                                <i class="fas fa-chevron-right"></i>
-                            </a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-            <div class="col-md-4 text-end">
-                <div class="input-group input-group-sm" style="width: 150px;">
-                    <span class="input-group-text">Por página:</span>
-                    <select class="form-select" onchange="atualizarItensPorPagina(this.value)">
-                        {% for size in page_sizes %}
-                        <option value="{{ size }}" {% if size == page_size %}selected{% endif %}>{{ size }}</option>
-                        {% endfor %}
-                    </select>
+            {% endfor %}
+        </div>
+        
+        <!-- AÇÕES PARA CARDS SELECIONADOS -->
+        <div class="cards-actions" id="acoesCards">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-3">
+                    <h6 class="mb-0 fw-bold">
+                        <i class="fas fa-tasks me-2"></i>
+                        <span id="contadorCards">0</span> card(s) selecionado(s)
+                    </h6>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-warning btn-sm d-flex align-items-center gap-2" 
+                            onclick="abrirModalMassaCards('transferir')">
+                        <i class="fas fa-exchange-alt"></i> Transferir
+                    </button>
+                    <button class="btn btn-success btn-sm d-flex align-items-center gap-2" 
+                            onclick="abrirModalMassaCards('expedir')">
+                        <i class="fas fa-truck"></i> Expedir
+                    </button>
+                    <button class="btn btn-danger btn-sm d-flex align-items-center gap-2" 
+                            onclick="abrirModalMassaCards('excluir')">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
                 </div>
             </div>
         </div>
     </div>
     {% endif %}
+</div>
 
-    <!-- LISTA DE EMPENHOS ATIVOS -->
-    <div class="card mt-4">
-        <div class="card-header bg-light">
-            <h5 class="mb-0">
-                <i class="fas fa-clipboard-list me-2"></i>
-                Empenhos Ativos ({{ todos_empenhos.count }})
-            </h5>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                {% for emp in todos_empenhos %}
-                <div class="col-md-3 mb-3">
-                    <div class="card border-start border-{% cycle 'primary' 'success' 'warning' 'info' 'danger' %} border-3">
-                        <div class="card-body py-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="mb-1">{{ emp.observacao|truncatechars:25 }}</h6>
-                                    <small class="text-muted">
-                                        {{ emp.itens.count }} itens • 
-                                        {{ emp.saldo_afetado }} unidades
-                                    </small>
+<!-- ========================================== -->
+<!-- MODAIS COM MAIS INFORMAÇÕES -->
+<!-- ========================================== -->
+
+<!-- MODAL EMPENHO INDIVIDUAL -->
+<div class="modal fade" id="modalEmpenhoIndividual" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header-gradient">
+                <div>
+                    <h5 class="modal-title-lg">
+                        <i class="fas fa-plus-circle"></i> Adicionar Empenho
+                    </h5>
+                    <p class="mb-0 opacity-90">Preencha os dados para criar um novo empenho</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formEmpenhoIndividual">
+                {% csrf_token %}
+                <input type="hidden" name="empenhar_lote" value="1">
+                <input type="hidden" name="lote_id" id="modal_lote_id">
+                
+                <div class="modal-body-padded">
+                    <div class="alert-modern alert-info-modern">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="fw-bold mb-2">Detalhes do Lote</h6>
+                                <p class="mb-1"><strong id="modal_lote_nome"></strong></p>
+                                <p class="mb-0">Disponível: <span id="modal_saldo" class="fw-bold"></span> unidades</p>
+                            </div>
+                            <i class="fas fa-info-circle fa-2x opacity-50"></i>
+                        </div>
+                    </div>
+
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="modal-section">
+                                <h6 class="modal-section-title">
+                                    <i class="fas fa-balance-scale"></i> Quantidade
+                                </h6>
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Quantidade a Empenhar *</label>
+                                    <input type="number" name="quantidade" class="form-control-modern" 
+                                           min="1" id="modal_input_qtd" required>
+                                    <small class="text-muted">Máximo disponível: <span id="modal_max_qtd"></span> unidades</small>
                                 </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="modal-section">
+                                <h6 class="modal-section-title">
+                                    <i class="fas fa-tag"></i> Identificação
+                                </h6>
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Nome do Empenho *</label>
+                                    <input type="text" name="nome_empenho" class="form-control-modern" 
+                                           placeholder="Ex: Carga TS1, Transferência P1, Expedição Cliente X" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <h6 class="modal-section-title">
+                            <i class="fas fa-clipboard"></i> Observações
+                        </h6>
+                        <div class="form-group-modern">
+                            <label class="form-label-modern">Observações Adicionais</label>
+                            <textarea name="observacao" class="form-control-modern" rows="3" 
+                                      placeholder="Detalhes sobre este empenho..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <h6 class="modal-section-title">
+                            <i class="fas fa-history"></i> Histórico Recente
+                        </h6>
+                        <div class="bg-light p-3 rounded border">
+                            <div id="historicoEmpenhos" class="small">
+                                <!-- Histórico será carregado via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top p-3">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i> Salvar Empenho
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL AÇÕES EM MASSA -->
+<div class="modal fade" id="modalAcoesMassa" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header-gradient bg-warning">
+                <div>
+                    <h5 class="modal-title-lg" id="tituloMassa">
+                        <i class="fas fa-cogs"></i> Ação em Lote
+                    </h5>
+                    <p class="mb-0 opacity-90">Aplicar ação para múltiplos lotes selecionados</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formMassa">
+                {% csrf_token %}
+                <input type="hidden" name="ids_lotes" id="ids_lotes_selecionados">
+                <input type="hidden" name="acao_tipo" id="acao_tipo">
+                <input type="hidden" name="origem_acao" value="linhas">
+                
+                <div class="modal-body-padded">
+                    <div class="alert-modern alert-warning-modern">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="fas fa-info-circle fa-2x"></i>
+                            <div>
+                                <h6 class="fw-bold mb-1">Atenção!</h6>
+                                <p class="mb-0">
+                                    Esta ação será aplicada em <strong id="qtd_selecionados_modal">0</strong> lote(s) selecionado(s).
+                                    Verifique os detalhes abaixo.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section" id="campos_transferencia" style="display: none;">
+                        <h6 class="modal-section-title text-warning">
+                            <i class="fas fa-exchange-alt"></i> Dados da Transferência
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Novo Endereço *</label>
+                                    <input type="text" name="novo_endereco" class="form-control-modern" 
+                                           placeholder="Ex: RUA 10, SETOR B" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Armazém (AZ)</label>
+                                    <input type="text" name="az" class="form-control-modern" 
+                                           placeholder="Ex: AZ-01, AZ-02">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section" id="campos_expedicao" style="display: none;">
+                        <h6 class="modal-section-title text-success">
+                            <i class="fas fa-truck"></i> Dados da Expedição
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Número da Carga *</label>
+                                    <input type="text" name="numero_carga" class="form-control-modern" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Placa do Veículo *</label>
+                                    <input type="text" name="placa" class="form-control-modern" 
+                                           placeholder="AAA1B23" required>
+                                </div>
+                            </div>
+                            <div class="col-md-12">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Cliente Destino *</label>
+                                    <input type="text" name="cliente" class="form-control-modern" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section" id="campos_exclusao" style="display: none;">
+                        <h6 class="modal-section-title text-danger">
+                            <i class="fas fa-exclamation-triangle"></i> Confirmação de Exclusão
+                        </h6>
+                        <div class="alert-modern alert-danger-modern">
+                            <div class="d-flex align-items-start gap-3">
+                                <i class="fas fa-exclamation-triangle fa-2x"></i>
                                 <div>
-                                    <button class="btn btn-sm btn-outline-primary" 
-                                            onclick="filtrarPorEmpenho('{{ emp.observacao }}')">
-                                        <i class="fas fa-filter"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" 
-                                            onclick="excluirEmpenho({{ emp.id }})">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <h6 class="fw-bold mb-2">Atenção! Esta ação é irreversível</h6>
+                                    <p class="mb-0">
+                                        Todos os empenhos dos lotes selecionados serão permanentemente excluídos.
+                                        Certifique-se de que esta é a ação desejada.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <h6 class="modal-section-title">
+                            <i class="fas fa-clipboard"></i> Observações Gerais
+                        </h6>
+                        <div class="form-group-modern">
+                            <textarea name="obs_global" class="form-control-modern" rows="3" 
+                                      placeholder="Observações sobre esta ação em lote..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <h6 class="modal-section-title">
+                            <i class="fas fa-list"></i> Resumo dos Lotes Selecionados
+                        </h6>
+                        <div class="bg-light p-3 rounded border">
+                            <div id="resumoLotesSelecionados" class="small">
+                                <!-- Resumo será carregado via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top p-3">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn fw-medium" id="btnConfirmarMassa">
+                        <!-- Botão será preenchido via JavaScript -->
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL AÇÕES EM MASSA PARA CARDS -->
+<div class="modal fade" id="modalAcoesMassaCards" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header-gradient bg-info">
+                <div>
+                    <h5 class="modal-title-lg" id="tituloMassaCards">
+                        <i class="fas fa-clipboard-list"></i> Ação em Empenhos
+                    </h5>
+                    <p class="mb-0 opacity-90">Aplicar ação para múltiplos empenhos selecionados</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="formMassaCards">
+                {% csrf_token %}
+                <input type="hidden" name="empenhos_ids" id="empenhos_ids_selecionados">
+                <input type="hidden" name="acao_tipo" id="acao_tipo_cards">
+                <input type="hidden" name="origem_acao" value="cards">
+                
+                <div class="modal-body-padded">
+                    <div class="alert-modern alert-info-modern">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="fas fa-info-circle fa-2x"></i>
+                            <div>
+                                <h6 class="fw-bold mb-1">Empenhos Selecionados</h6>
+                                <p class="mb-0">
+                                    Ação será aplicada em <strong id="qtd_cards_selecionados">0</strong> empenho(s) selecionado(s).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section" id="campos_transferencia_cards" style="display: none;">
+                        <h6 class="modal-section-title text-warning">
+                            <i class="fas fa-exchange-alt"></i> Dados da Transferência
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Novo Endereço *</label>
+                                    <input type="text" name="novo_endereco" class="form-control-modern" 
+                                           placeholder="Ex: RUA 10, SETOR B" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section" id="campos_expedicao_cards" style="display: none;">
+                        <h6 class="modal-section-title text-success">
+                            <i class="fas fa-truck"></i> Dados da Expedição
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Número da Carga *</label>
+                                    <input type="text" name="numero_carga" class="form-control-modern" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group-modern">
+                                    <label class="form-label-modern">Cliente Destino *</label>
+                                    <input type="text" name="cliente" class="form-control-modern" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section" id="campos_exclusao_cards" style="display: none;">
+                        <h6 class="modal-section-title text-danger">
+                            <i class="fas fa-exclamation-triangle"></i> Confirmação de Exclusão
+                        </h6>
+                        <div class="alert-modern alert-danger-modern">
+                            <div class="d-flex align-items-start gap-3">
+                                <i class="fas fa-exclamation-triangle fa-2x"></i>
+                                <div>
+                                    <h6 class="fw-bold mb-2">Atenção! Exclusão Permanente</h6>
+                                    <p class="mb-0">
+                                        Todos os empenhos selecionados serão permanentemente excluídos.
+                                        Esta ação não pode ser desfeita.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <h6 class="modal-section-title">
+                            <i class="fas fa-clipboard"></i> Observações Gerais
+                        </h6>
+                        <div class="form-group-modern">
+                            <textarea name="obs_global" class="form-control-modern" rows="3" 
+                                      placeholder="Observações sobre esta ação..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-section">
+                        <h6 class="modal-section-title">
+                            <i class="fas fa-list"></i> Resumo dos Empenhos Selecionados
+                        </h6>
+                        <div class="bg-light p-3 rounded border">
+                            <div id="resumoCardsSelecionados" class="small">
+                                <!-- Resumo será carregado via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top p-3">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn fw-medium" id="btnConfirmarMassaCards">
+                        <!-- Botão será preenchido via JavaScript -->
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DETALHES COMPLETOS -->
+<div class="modal fade" id="modalDetalhes" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header-gradient">
+                <div>
+                    <h5 class="modal-title-lg">
+                        <i class="fas fa-info-circle"></i> Detalhes Completos do Lote
+                    </h5>
+                    <p class="mb-0 opacity-90">Informações detalhadas e histórico completo</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body-padded">
+                <div class="row g-4">
+                    <!-- COLUNA 1: INFORMAÇÕES BÁSICAS -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="modal-section-title mb-4">
+                                    <i class="fas fa-box"></i> Informações do Lote
+                                </h6>
+                                
+                                <div class="row g-3" id="infoBasicas">
+                                    <!-- Informações serão carregadas via JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- COLUNA 2: EMPENHOS E HISTÓRICO -->
+                    <div class="col-lg-6">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <h6 class="modal-section-title mb-4">
+                                    <i class="fas fa-history"></i> Empenhos e Movimentações
+                                </h6>
+                                
+                                <div id="historicoCompleto">
+                                    <!-- Histórico será carregado via JavaScript -->
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                {% empty %}
-                <div class="col-12 text-center py-3 text-muted">
-                    <i class="fas fa-clipboard fa-2x mb-2"></i>
-                    <p>Nenhum empenho ativo</p>
-                </div>
-                {% endfor %}
+            </div>
+            <div class="modal-footer border-top p-3">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i> Fechar
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- OVERLAY -->
-<div class="overlay" id="overlay" onclick="fecharForm()"></div>
-
-<!-- FORMULÁRIO PARA EMPENHAR LOTE -->
-<div class="form-flutuante" id="formEmpenho">
-    <div class="card border-primary">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">
-                <i class="fas fa-plus-circle me-2"></i>
-                Empenhar Lote
-            </h5>
-        </div>
-        <div class="card-body">
-            <form id="formEmpenhar" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="empenhar_lote" value="1">
-                <input type="hidden" id="loteIdEmpenho" name="lote_id">
-                
-                <div class="mb-3">
-                    <label class="form-label">Lote</label>
-                    <input type="text" class="form-control" id="loteInfo" readonly>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Saldo Disponível</label>
-                    <input type="text" class="form-control" id="saldoDisponivel" readonly>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Quantidade a Empenhar</label>
-                    {{ form_empenho.quantidade }}
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Nome do Empenho</label>
-                    {{ form_empenho.nome_empenho }}
-                    <small class="text-muted">
-                        Ex: Carga TS1, Transferência P1, Expedição Cliente X
-                    </small>
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Observação</label>
-                    {{ form_empenho.observacao }}
-                </div>
-                
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-grow-1">
-                        <i class="fas fa-save me-2"></i>Salvar Empenho
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="fecharForm()">
-                        Cancelar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- FORMULÁRIO PARA AÇÕES EM LOTE -->
-<div class="form-flutuante" id="formAcao" style="width: 500px;">
-    <div class="card border-warning">
-        <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0">
-                <i class="fas fa-cogs me-2"></i>
-                Ações em Lote
-            </h5>
-        </div>
-        <div class="card-body">
-            <form id="formAcoes" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="acao_empenho" value="1">
-                
-                <div class="mb-3">
-                    <label class="form-label">Ação</label>
-                    {{ form_acoes.acao }}
-                </div>
-                
-                <div id="campoEndereco" class="mb-3" style="display: none;">
-                    <label class="form-label">Endereço Destino</label>
-                    {{ form_acoes.endereco_destino }}
-                </div>
-                
-                <div id="campoEdicao" class="mb-3" style="display: none;">
-                    <label class="form-label">Novo Valor</label>
-                    <input type="text" class="form-control" placeholder="Digite o novo valor...">
-                </div>
-                
-                <div class="mb-3" id="campoConfirmacao" style="display: none;">
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Esta ação é irreversível. Marque a confirmação para continuar.
-                    </div>
-                    {{ form_acoes.confirmar }}
-                    <label class="form-check-label ms-2">Confirmo que desejo executar esta ação</label>
-                </div>
-                
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    <strong>Lotes selecionados: <span id="contadorSelecionados">0</span></strong>
-                </div>
-                
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-warning flex-grow-1">
-                        <i class="fas fa-play me-2"></i>Executar Ação
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="fecharForm()">
-                        Cancelar
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- MODAL DE DETALHES -->
-<div class="modal fade" id="modalDetalhes" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title">Detalhes do Lote</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="corpoDetalhes">
-                <!-- Conteúdo carregado via JS -->
-            </div>
-        </div>
-    </div>
-</div>
-
-{% block extra_js %}
 <script>
+// ==========================================
 // VARIÁVEIS GLOBAIS
+// ==========================================
+let empenhosSelecionados = new Set();
+let modoSelecaoAtivo = false;
 let lotesSelecionados = new Set();
-let modoSelecaoMultipla = false;
 
+// ==========================================
+// FUNÇÕES DE UTILIDADE
+// ==========================================
+function getElement(id) {
+    return document.getElementById(id);
+}
+
+function updateText(elementId, text) {
+    const element = getElement(elementId);
+    if (element) element.textContent = text;
+}
+
+function showElement(id) {
+    const element = getElement(id);
+    if (element) element.style.display = 'block';
+}
+
+function hideElement(id) {
+    const element = getElement(id);
+    if (element) element.style.display = 'none';
+}
+
+// ==========================================
 // FUNÇÕES PRINCIPAIS
-
-function abrirFormEmpenho(loteId, saldoDisponivel) {
-    // Buscar informações do lote
-    const loteRow = document.querySelector(`tr[data-lote-id="${loteId}"]`);
-    const loteNumero = loteRow.querySelector('td:nth-child(2) strong').textContent;
-    const cultivar = loteRow.querySelector('td:nth-child(3)').textContent;
+// ==========================================
+function alternarModoSelecao() {
+    modoSelecaoAtivo = !modoSelecaoAtivo;
+    const checkboxes = document.querySelectorAll('.checkbox-lote');
+    const selectAll = getElement('selectAll');
     
-    // Preencher formulário
-    document.getElementById('loteIdEmpenho').value = loteId;
-    document.getElementById('loteInfo').value = `${loteNumero} - ${cultivar}`;
-    document.getElementById('saldoDisponivel').value = saldoDisponivel;
-    
-    // Mostrar formulário
-    document.getElementById('formEmpenho').style.display = 'block';
-    document.getElementById('overlay').style.display = 'block';
-}
-
-function abrirFormAcao(acao) {
-    const quantidadeSelecionados = lotesSelecionados.size;
-    if (quantidadeSelecionados === 0) {
-        alert('Selecione pelo menos um lote para executar ações em lote.');
-        return;
+    if (selectAll) {
+        selectAll.disabled = !modoSelecaoAtivo;
+        selectAll.checked = false;
     }
     
-    document.getElementById('contadorSelecionados').textContent = quantidadeSelecionados;
-    document.getElementById('formAcao').style.display = 'block';
-    document.getElementById('overlay').style.display = 'block';
+    checkboxes.forEach(cb => {
+        cb.disabled = !modoSelecaoAtivo;
+        if (!modoSelecaoAtivo) cb.checked = false;
+    });
     
-    // Mostrar campos específicos da ação
-    mostrarCampoAcao(acao);
-}
-
-function mostrarCampoAcao(acao) {
-    document.getElementById('campoEndereco').style.display = 'none';
-    document.getElementById('campoEdicao').style.display = 'none';
-    document.getElementById('campoConfirmacao').style.display = 'none';
-    
-    if (acao === 'transferir') {
-        document.getElementById('campoEndereco').style.display = 'block';
-    } else if (acao === 'editar') {
-        document.getElementById('campoEdicao').style.display = 'block';
-    } else if (acao === 'excluir' || acao === 'expedir') {
-        document.getElementById('campoConfirmacao').style.display = 'block';
+    if (!modoSelecaoAtivo) {
+        lotesSelecionados.clear();
     }
-}
-
-function fecharForm() {
-    document.getElementById('formEmpenho').style.display = 'none';
-    document.getElementById('formAcao').style.display = 'none';
-    document.getElementById('overlay').style.display = 'none';
-}
-
-// FILTROS
-
-function filtrarColuna(colIndex, valor) {
-    const tabela = document.getElementById('tabelaCorpo');
-    const linhas = tabela.getElementsByTagName('tr');
     
-    for (let i = 0; i < linhas.length; i++) {
-        const celula = linhas[i].getElementsByTagName('td')[colIndex];
-        if (celula) {
-            const texto = celula.textContent || celula.innerText;
-            if (texto.toUpperCase().indexOf(valor.toUpperCase()) > -1) {
-                linhas[i].style.display = '';
-            } else {
-                linhas[i].style.display = 'none';
-            }
+    atualizarContadorSelecao();
+}
+
+function selecionarTodos(selecionar) {
+    if (!modoSelecaoAtivo) return;
+    
+    const checkboxes = document.querySelectorAll('.checkbox-lote:not(:disabled)');
+    checkboxes.forEach(cb => {
+        cb.checked = selecionar;
+        const loteId = cb.value;
+        if (selecionar) {
+            lotesSelecionados.add(loteId);
+        } else {
+            lotesSelecionados.delete(loteId);
         }
-    }
+    });
+    
+    atualizarContadorSelecao();
 }
 
-function filtrarPorEmpenho(nomeEmpenho) {
-    // Adicionar filtro na URL e recarregar
-    const url = new URL(window.location.href);
-    url.searchParams.set('busca', nomeEmpenho);
-    window.location.href = url.toString();
+function atualizarContadorSelecao() {
+    const selecionados = document.querySelectorAll('.checkbox-lote:checked');
+    updateText('contadorNumero', selecionados.length);
+    
+    const temSelecao = selecionados.length > 0;
+    ['btnTransferir', 'btnExpedir', 'btnExcluir'].forEach(id => {
+        const btn = getElement(id);
+        if (btn) btn.disabled = !temSelecao;
+    });
+    
+    // Atualizar conjunto
+    lotesSelecionados.clear();
+    selecionados.forEach(cb => {
+        lotesSelecionados.add(cb.value);
+    });
 }
 
+// ==========================================
+// FUNÇÕES DE FILTRO
+// ==========================================
 function realizarBusca() {
-    const busca = document.getElementById('buscaGeral').value;
+    const busca = document.getElementById('buscaGeral')?.value || '';
     const url = new URL(window.location.href);
     
     if (busca) {
@@ -812,185 +1596,624 @@ function realizarBusca() {
         url.searchParams.delete('busca');
     }
     
-    window.location.href = url.toString();
-}
-
-// SELEÇÃO
-
-function alternarModoSelecao() {
-    modoSelecaoMultipla = !modoSelecaoMultipla;
-    const checkboxes = document.querySelectorAll('.lote-selecionado');
-    
-    if (!modoSelecaoMultipla) {
-        // Desmarcar todos se sair do modo seleção
-        checkboxes.forEach(cb => cb.checked = false);
-        lotesSelecionados.clear();
-    }
-}
-
-function selecionarTodos(selecionar) {
-    const checkboxes = document.querySelectorAll('.lote-selecionado');
-    checkboxes.forEach(cb => {
-        cb.checked = selecionar;
-        const loteId = cb.dataset.loteId;
-        if (selecionar) {
-            lotesSelecionados.add(loteId);
-        } else {
-            lotesSelecionados.delete(loteId);
-        }
-    });
-}
-
-document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('lote-selecionado')) {
-        const loteId = e.target.dataset.loteId;
-        if (e.target.checked) {
-            lotesSelecionados.add(loteId);
-        } else {
-            lotesSelecionados.delete(loteId);
-        }
-    }
-});
-
-// AÇÕES
-
-// CÓDIGO NOVO (Colocar no lugar)
-function excluirEmpenho(empenhoId) {
-    if (confirm('Tem certeza que deseja excluir este empenho? Todos os itens serão liberados.')) {
-        // Cria um formulário invisível e submete
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = window.location.href; // Posta para a mesma página
-        
-        // Token CSRF
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = 'csrfmiddlewaretoken';
-        csrfInput.value = csrfToken;
-        form.appendChild(csrfInput);
-        
-        // Identificador da ação
-        const acaoInput = document.createElement('input');
-        acaoInput.type = 'hidden';
-        acaoInput.name = 'excluir_empenho';
-        acaoInput.value = '1';
-        form.appendChild(acaoInput);
-        
-        // ID do empenho
-        const idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'empenho_id';
-        idInput.value = empenhoId;
-        form.appendChild(idInput);
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-}
-function detalhesLote(loteId) {
-    fetch(`/api/buscar-dados-lote/?item_id=${loteId}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.encontrado) {
-                const modal = new bootstrap.Modal(document.getElementById('modalDetalhes'));
-                document.getElementById('corpoDetalhes').innerHTML = `
-                    <div class="row">
-                        <div class="col-md-6">
-                            <p><strong>Lote:</strong> ${data.lote}</p>
-                            <p><strong>Cultivar:</strong> ${data.cultivar_nome}</p>
-                            <p><strong>Peneira:</strong> ${data.peneira_nome}</p>
-                            <p><strong>Endereço:</strong> ${data.endereco}</p>
-                        </div>
-                        <div class="col-md-6">
-                            <p><strong>Cliente:</strong> ${data.cliente || 'Não informado'}</p>
-                            <p><strong>Empresa:</strong> ${data.empresa || 'Não informado'}</p>
-                            <p><strong>Embalagem:</strong> ${data.embalagem}</p>
-                            <p><strong>Saldo:</strong> ${data.saldo}</p>
-                        </div>
-                    </div>
-                `;
-                modal.show();
-            }
-        });
-}
-
-function verEmpenhosLote(loteId) {
-    // Implementar visualização dos empenhos deste lote específico
-    alert('Funcionalidade em desenvolvimento...');
-}
-
-// UTILITÁRIOS
-
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-function atualizarItensPorPagina(valor) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('page_size', valor);
     url.searchParams.set('page', '1');
     window.location.href = url.toString();
 }
 
-// INICIALIZAÇÃO
-document.addEventListener('DOMContentLoaded', function() {
-    // Adicionar eventos aos filtros
-    document.querySelectorAll('.filtro-input').forEach(input => {
-        input.addEventListener('input', function(e) {
-            filtrarColuna(e.target.parentElement.cellIndex, e.target.value);
+function filtrarPorEmpenho(nomeEmpenho) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('busca', nomeEmpenho);
+    window.location.href = url.toString();
+}
+
+function filtrarPorEmpenhoCard(nomeEmpenho) {
+    // Destacar linhas na tabela
+    const linhas = document.querySelectorAll('#tabelaCorpo tr');
+    linhas.forEach(linha => {
+        const badges = linha.querySelectorAll('.badge-empenho');
+        let encontrado = false;
+        badges.forEach(badge => {
+            if (badge.textContent.includes(nomeEmpenho)) {
+                encontrado = true;
+            }
         });
+        
+        if (encontrado) {
+            linha.style.backgroundColor = '#f0f9ff';
+            linha.style.boxShadow = 'inset 0 0 0 2px #3b82f6';
+        } else {
+            linha.style.backgroundColor = '';
+            linha.style.boxShadow = '';
+        }
     });
-});
+}
 
-// EXPORTAR FUNÇÕES PARA USO GLOBAL
-window.abrirFormEmpenho = abrirFormEmpenho;
-window.abrirFormAcao = abrirFormAcao;
-window.fecharForm = fecharForm;
-window.filtrarColuna = filtrarColuna;
-window.filtrarPorEmpenho = filtrarPorEmpenho;
-window.realizarBusca = realizarBusca;
-window.alternarModoSelecao = alternarModoSelecao;
-window.selecionarTodos = selecionarTodos;
-window.excluirEmpenho = excluirEmpenho;
-window.detalhesLote = detalhesLote;
-window.verEmpenhosLote = verEmpenhosLote;
-window.mostrarCampoAcao = mostrarCampoAcao;
-window.atualizarItensPorPagina = atualizarItensPorPagina;
-</script>
+// ==========================================
+// FUNÇÕES DE CARDS
+// ==========================================
+function toggleCardSelecao(cardElement, event) {
+    if (event.target.type === 'checkbox') return;
+    
+    const checkbox = cardElement.querySelector('.card-checkbox');
+    if (!checkbox) return;
+    
+    const empenhoId = checkbox.dataset.empenhoId;
+    checkbox.checked = !checkbox.checked;
+    
+    if (checkbox.checked) {
+        cardElement.classList.add('selected');
+        empenhosSelecionados.add(empenhoId);
+    } else {
+        cardElement.classList.remove('selected');
+        empenhosSelecionados.delete(empenhoId);
+    }
+    
+    atualizarContadorCards();
+}
 
-<!-- CSS ADICIONAL PARA RESPONSIVIDADE -->
-<style>
-@media (max-width: 768px) {
-    .table-container {
-        max-height: 400px;
-    }
+function selecionarTodosCards(selecionar) {
+    const checkboxes = document.querySelectorAll('.card-checkbox');
+    const cards = document.querySelectorAll('.empenho-card-modern');
     
-    .table-empenho {
-        font-size: 0.7rem;
-    }
+    checkboxes.forEach((cb, index) => {
+        cb.checked = selecionar;
+        const empenhoId = cb.dataset.empenhoId;
+        
+        if (selecionar) {
+            if (cards[index]) cards[index].classList.add('selected');
+            empenhosSelecionados.add(empenhoId);
+        } else {
+            if (cards[index]) cards[index].classList.remove('selected');
+            empenhosSelecionados.delete(empenhoId);
+        }
+    });
     
-    .acao-bar .d-flex {
-        flex-direction: column;
-        gap: 5px;
-    }
+    atualizarContadorCards();
+}
+
+function atualizarContadorCards() {
+    const contador = empenhosSelecionados.size;
+    updateText('contadorCards', contador);
     
-    .btn-acao {
-        width: 100%;
-        margin-bottom: 5px;
+    const acoesDiv = getElement('acoesCards');
+    if (acoesDiv) {
+        if (contador > 0) {
+            acoesDiv.classList.add('show');
+        } else {
+            acoesDiv.classList.remove('show');
+        }
     }
 }
-</style>
-{% endblock %}
+
+// ==========================================
+// FUNÇÕES DE MODAL - INDIVIDUAL
+// ==========================================
+async function abrirModalIndividual(id, lote, saldo) {
+    const modalElement = getElement('modalEmpenhoIndividual');
+    if (!modalElement) return;
+    
+    // Preencher informações básicas
+    getElement('modal_lote_id').value = id;
+    getElement('modal_lote_nome').textContent = lote;
+    getElement('modal_saldo').textContent = saldo;
+    getElement('modal_max_qtd').textContent = saldo;
+    
+    const modalInputQtd = getElement('modal_input_qtd');
+    if (modalInputQtd) {
+        modalInputQtd.max = saldo;
+        modalInputQtd.value = saldo;
+        modalInputQtd.placeholder = `Máx: ${saldo}`;
+    }
+    
+    // Carregar histórico de empenhos deste lote
+    try {
+        const response = await fetch(`/api/empenhos-lote/?lote_id=${id}`);
+        if (response.ok) {
+            const data = await response.json();
+            const historicoDiv = getElement('historicoEmpenhos');
+            if (historicoDiv && data.empenhos && data.empenhos.length > 0) {
+                historicoDiv.innerHTML = data.empenhos.map(emp => `
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="d-flex justify-content-between">
+                            <strong>${emp.nome}</strong>
+                            <span class="badge bg-warning">${emp.quantidade} un</span>
+                        </div>
+                        <small class="text-muted">${emp.data}</small>
+                        ${emp.observacao ? `<div class="mt-1"><small>${emp.observacao}</small></div>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                historicoDiv.innerHTML = '<p class="text-muted mb-0">Nenhum empenho registrado para este lote.</p>';
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+    }
+    
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+    
+    // Focar no campo de quantidade
+    setTimeout(() => modalInputQtd?.focus(), 500);
+}
+
+// ==========================================
+// FUNÇÕES DE MODAL - MASSA
+// ==========================================
+function abrirModalMassa(acao) {
+    const checkboxes = document.querySelectorAll('.checkbox-lote:checked');
+    if (checkboxes.length === 0) {
+        showToast('Selecione pelo menos um lote.', 'warning');
+        return;
+    }
+
+    let ids = Array.from(lotesSelecionados);
+    if (ids.length === 0) {
+        checkboxes.forEach(cb => ids.push(cb.value));
+    }
+
+    getElement('ids_lotes_selecionados').value = ids.join(',');
+    getElement('acao_tipo').value = acao;
+    updateText('qtd_selecionados_modal', ids.length);
+
+    // Esconder todos os campos primeiro
+    ['campos_transferencia', 'campos_expedicao', 'campos_exclusao'].forEach(hideElement);
+
+    // Configurar visual
+    const titulo = getElement('tituloMassa');
+    const btnConf = getElement('btnConfirmarMassa');
+    
+    // Carregar resumo dos lotes selecionados
+    carregarResumoLotesSelecionados(ids);
+
+    if (acao === 'transferir') {
+        titulo.innerHTML = '<i class="fas fa-exchange-alt me-2"></i> Transferir Lotes';
+        showElement('campos_transferencia');
+        btnConf.className = 'btn btn-warning fw-medium';
+        btnConf.innerHTML = '<i class="fas fa-exchange-alt me-2"></i> Transferir Lotes';
+    } 
+    else if (acao === 'expedir') {
+        titulo.innerHTML = '<i class="fas fa-truck me-2"></i> Expedir Lotes';
+        showElement('campos_expedicao');
+        btnConf.className = 'btn btn-success fw-medium';
+        btnConf.innerHTML = '<i class="fas fa-truck me-2"></i> Expedir Lotes';
+    } 
+    else if (acao === 'excluir') {
+        titulo.innerHTML = '<i class="fas fa-trash me-2"></i> Excluir Empenhos';
+        showElement('campos_exclusao');
+        btnConf.className = 'btn btn-danger fw-medium';
+        btnConf.innerHTML = '<i class="fas fa-trash me-2"></i> Excluir Empenhos';
+    }
+
+    const modalElement = getElement('modalAcoesMassa');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
+}
+
+async function carregarResumoLotesSelecionados(ids) {
+    try {
+        const response = await fetch(`/api/resumo-lotes/?ids=${ids.join(',')}`);
+        if (response.ok) {
+            const data = await response.json();
+            const resumoDiv = getElement('resumoLotesSelecionados');
+            if (resumoDiv && data.lotes && data.lotes.length > 0) {
+                resumoDiv.innerHTML = data.lotes.map(lote => `
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                        <div>
+                            <strong>${lote.lote}</strong>
+                            <div class="small text-muted">
+                                ${lote.cultivar} | ${lote.endereco}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-primary">${lote.saldo} un</span>
+                            ${lote.empenhado > 0 ? `<span class="badge bg-warning ms-1">${lote.empenhado} emp</span>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+                
+                // Adicionar total
+                const total = data.lotes.reduce((sum, lote) => sum + lote.saldo, 0);
+                const totalEmp = data.lotes.reduce((sum, lote) => sum + lote.empenhado, 0);
+                resumoDiv.innerHTML += `
+                    <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
+                        <strong>Total</strong>
+                        <div>
+                            <span class="badge bg-primary">${total} unidades</span>
+                            ${totalEmp > 0 ? `<span class="badge bg-warning ms-1">${totalEmp} empenhadas</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            } else {
+                resumoDiv.innerHTML = '<p class="text-muted mb-0">Carregando resumo...</p>';
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar resumo:', error);
+        getElement('resumoLotesSelecionados').innerHTML = '<p class="text-danger mb-0">Erro ao carregar resumo.</p>';
+    }
+}
+
+function abrirModalMassaCards(acao) {
+    if (empenhosSelecionados.size === 0) {
+        showToast('Selecione pelo menos um card.', 'warning');
+        return;
+    }
+
+    const idsArray = Array.from(empenhosSelecionados);
+    getElement('empenhos_ids_selecionados').value = idsArray.join(',');
+    getElement('acao_tipo_cards').value = acao;
+    updateText('qtd_cards_selecionados', empenhosSelecionados.size);
+
+    // Esconder campos
+    ['campos_transferencia_cards', 'campos_expedicao_cards', 'campos_exclusao_cards'].forEach(hideElement);
+
+    // Configurar visual
+    const titulo = getElement('tituloMassaCards');
+    const btnConf = getElement('btnConfirmarMassaCards');
+    
+    // Carregar resumo dos empenhos selecionados
+    carregarResumoCardsSelecionados(idsArray);
+
+    if (acao === 'transferir') {
+        titulo.innerHTML = '<i class="fas fa-exchange-alt me-2"></i> Transferir Empenhos';
+        showElement('campos_transferencia_cards');
+        btnConf.className = 'btn btn-warning fw-medium';
+        btnConf.innerHTML = '<i class="fas fa-exchange-alt me-2"></i> Transferir';
+    } 
+    else if (acao === 'expedir') {
+        titulo.innerHTML = '<i class="fas fa-truck me-2"></i> Expedir Empenhos';
+        showElement('campos_expedicao_cards');
+        btnConf.className = 'btn btn-success fw-medium';
+        btnConf.innerHTML = '<i class="fas fa-truck me-2"></i> Expedir';
+    } 
+    else if (acao === 'excluir') {
+        titulo.innerHTML = '<i class="fas fa-trash me-2"></i> Excluir Empenhos';
+        showElement('campos_exclusao_cards');
+        btnConf.className = 'btn btn-danger fw-medium';
+        btnConf.innerHTML = '<i class="fas fa-trash me-2"></i> Excluir';
+    }
+
+    const modalElement = getElement('modalAcoesMassaCards');
+    if (modalElement) {
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+    }
+}
+
+async function carregarResumoCardsSelecionados(ids) {
+    try {
+        const response = await fetch(`/api/resumo-empenhos/?ids=${ids.join(',')}`);
+        if (response.ok) {
+            const data = await response.json();
+            const resumoDiv = getElement('resumoCardsSelecionados');
+            if (resumoDiv && data.empenhos && data.empenhos.length > 0) {
+                resumoDiv.innerHTML = data.empenhos.map(emp => `
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>${emp.nome}</strong>
+                                <div class="small text-muted">
+                                    ${emp.itens} itens | ${emp.total} unidades
+                                </div>
+                            </div>
+                            <small class="text-muted">${emp.data}</small>
+                        </div>
+                        ${emp.detalhes ? `<div class="small mt-1">${emp.detalhes}</div>` : ''}
+                    </div>
+                `).join('');
+                
+                // Adicionar total
+                const totalItens = data.empenhos.reduce((sum, emp) => sum + emp.itens, 0);
+                const totalUn = data.empenhos.reduce((sum, emp) => sum + emp.total, 0);
+                resumoDiv.innerHTML += `
+                    <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top">
+                        <strong>Total</strong>
+                        <div>
+                            <span class="badge bg-primary">${totalItens} itens</span>
+                            <span class="badge bg-success ms-1">${totalUn} unidades</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                resumoDiv.innerHTML = '<p class="text-muted mb-0">Carregando resumo...</p>';
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar resumo:', error);
+        getElement('resumoCardsSelecionados').innerHTML = '<p class="text-danger mb-0">Erro ao carregar resumo.</p>';
+    }
+}
+
+// ==========================================
+// VALIDAÇÕES
+// ==========================================
+function validarFormMassa() {
+    const acao = getElement('acao_tipo')?.value;
+    
+    if (acao === 'transferir') {
+        const endereco = document.querySelector('#campos_transferencia input[name="novo_endereco"]');
+        if (!endereco || !endereco.value.trim()) {
+            showToast('Endereço de destino é obrigatório.', 'error');
+            if (endereco) endereco.focus();
+            return false;
+        }
+    }
+    else if (acao === 'expedir') {
+        const numeroCarga = document.querySelector('#campos_expedicao input[name="numero_carga"]');
+        const cliente = document.querySelector('#campos_expedicao input[name="cliente"]');
+        const placa = document.querySelector('#campos_expedicao input[name="placa"]');
+        
+        if (!numeroCarga || !numeroCarga.value.trim()) {
+            showToast('Número da carga é obrigatório.', 'error');
+            if (numeroCarga) numeroCarga.focus();
+            return false;
+        }
+        
+        if (!cliente || !cliente.value.trim()) {
+            showToast('Cliente é obrigatório.', 'error');
+            if (cliente) cliente.focus();
+            return false;
+        }
+        
+        if (!placa || !placa.value.trim()) {
+            showToast('Placa do veículo é obrigatória.', 'error');
+            if (placa) placa.focus();
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+function validarFormMassaCards() {
+    const acao = getElement('acao_tipo_cards')?.value;
+    
+    if (acao === 'transferir') {
+        const endereco = document.querySelector('#campos_transferencia_cards input[name="novo_endereco"]');
+        if (!endereco || !endereco.value.trim()) {
+            showToast('Endereço de destino é obrigatório.', 'error');
+            if (endereco) endereco.focus();
+            return false;
+        }
+    }
+    else if (acao === 'expedir') {
+        const numeroCarga = document.querySelector('#campos_expedicao_cards input[name="numero_carga"]');
+        const cliente = document.querySelector('#campos_expedicao_cards input[name="cliente"]');
+        
+        if (!numeroCarga || !numeroCarga.value.trim()) {
+            showToast('Número da carga é obrigatório.', 'error');
+            if (numeroCarga) numeroCarga.focus();
+            return false;
+        }
+        
+        if (!cliente || !cliente.value.trim()) {
+            showToast('Cliente é obrigatório.', 'error');
+            if (cliente) cliente.focus();
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// ==========================================
+// FUNÇÕES DE DETALHES
+// ==========================================
+async function detalhesLote(id) {
+    try {
+        const response = await fetch(`/api/buscar-dados-lote/?item_id=${id}`);
+        const data = await response.json();
+        
+        if (data.encontrado) {
+            // Preencher informações básicas
+            const infoBasicas = getElement('infoBasicas');
+            if (infoBasicas) {
+                infoBasicas.innerHTML = `
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Lote</small>
+                            <strong class="fs-5">${data.lote}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Cultivar</small>
+                            <strong>${data.cultivar_nome}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Endereço</small>
+                            <strong>${data.endereco}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">AZ</small>
+                            <strong>${data.az || '-'}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Cliente</small>
+                            <strong>${data.cliente || '-'}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Empresa</small>
+                            <strong>${data.empresa || '-'}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Embalagem</small>
+                            <strong>${data.embalagem}</strong>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Saldo Disponível</small>
+                            <strong class="text-primary fs-4">${data.saldo} unidades</strong>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="d-flex flex-column">
+                            <small class="text-muted">Observações</small>
+                            <div class="bg-light p-3 rounded border">${data.observacao || 'Nenhuma observação'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Carregar histórico
+            const historicoResponse = await fetch(`/api/historico-lote/?lote_id=${id}`);
+            if (historicoResponse.ok) {
+                const historicoData = await historicoResponse.json();
+                const historicoDiv = getElement('historicoCompleto');
+                if (historicoDiv && historicoData.historico && historicoData.historico.length > 0) {
+                    historicoDiv.innerHTML = historicoData.historico.map(item => `
+                        <div class="timeline-item mb-3">
+                            <div class="d-flex gap-3">
+                                <div class="timeline-dot ${item.tipo.includes('Entrada') ? 'entrada' : 'saida'}"></div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong>${item.tipo}</strong>
+                                            <div class="small text-muted">
+                                                <i class="fas fa-user me-1"></i> ${item.usuario}
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">${item.data}</small>
+                                    </div>
+                                    <div class="small mt-2">${item.descricao}</div>
+                                    ${item.fotos && item.fotos.length > 0 ? `
+                                        <div class="d-flex gap-2 mt-2">
+                                            ${item.fotos.map(foto => `
+                                                <a href="${foto}" target="_blank">
+                                                    <img src="${foto}" class="rounded border" style="width: 50px; height: 50px; object-fit: cover;">
+                                                </a>
+                                            `).join('')}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    historicoDiv.innerHTML = '<p class="text-muted text-center py-4">Nenhum histórico registrado.</p>';
+                }
+            }
+            
+            const modalElement = getElement('modalDetalhes');
+            if (modalElement) {
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            }
+        } else {
+            showToast('Lote não encontrado.', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao carregar detalhes:', error);
+        showToast('Erro ao carregar detalhes do lote.', 'error');
+    }
+}
+
+// ==========================================
+// UTILITÁRIOS
+// ==========================================
+function showToast(message, type = 'info') {
+    // Implementar sistema de notificação
+    alert(message); // Substituir por um sistema de toast mais elegante
+}
+
+// ==========================================
+// INICIALIZAÇÃO
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+    // Eventos para checkboxes
+    document.querySelectorAll('.checkbox-lote').forEach(cb => {
+        cb.addEventListener('change', function() {
+            const loteId = this.value;
+            if (this.checked) {
+                lotesSelecionados.add(loteId);
+            } else {
+                lotesSelecionados.delete(loteId);
+                getElement('selectAll').checked = false;
+            }
+            atualizarContadorSelecao();
+        });
+    });
+    
+    // Busca por Enter
+    const buscaInput = getElement('buscaGeral');
+    if (buscaInput) {
+        buscaInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') realizarBusca();
+        });
+    }
+    
+    // Inicializar contadores
+    atualizarContadorSelecao();
+    atualizarContadorCards();
+    
+    // Adicionar evento para o formulário de empenho individual
+    const formEmpenho = getElement('formEmpenhoIndividual');
+    if (formEmpenho) {
+        formEmpenho.addEventListener('submit', function(e) {
+            const quantidade = parseInt(getElement('modal_input_qtd').value);
+            const saldo = parseInt(getElement('modal_saldo').textContent);
+            
+            if (quantidade > saldo) {
+                e.preventDefault();
+                showToast(`Quantidade (${quantidade}) maior que saldo disponível (${saldo}).`, 'error');
+                return false;
+            }
+            
+            if (quantidade <= 0) {
+                e.preventDefault();
+                showToast('Quantidade deve ser maior que zero.', 'error');
+                return false;
+            }
+            
+            return true;
+        });
+    }
+});
+
+// Adicionar estilos para os toasts
+const style = document.createElement('style');
+style.textContent = `
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    background: white;
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-bottom: 10px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    border-left: 4px solid #3b82f6;
+    animation: slideIn 0.3s ease-out;
+}
+
+.toast-success { border-left-color: #10b981; }
+.toast-error { border-left-color: #ef4444; }
+.toast-warning { border-left-color: #f59e0b; }
+.toast-info { border-left-color: #3b82f6; }
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+`;
+document.head.appendChild(style);
+</script>
 {% endblock %}

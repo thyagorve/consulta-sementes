@@ -22,6 +22,11 @@ class Tratamento(models.Model):
     nome = models.CharField(max_length=100, unique=True)
     def __str__(self): return self.nome
 
+# --- NOVO: Tabela de Espécie (Adicionado) ---
+class Especie(models.Model):
+    nome = models.CharField(max_length=50, unique=True)
+    def __str__(self): return self.nome
+
 # --- NOVO: Perfil para controlar Primeiro Acesso ---
 class PerfilUsuario(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
@@ -48,15 +53,22 @@ class Configuracao(models.Model):
         obj, created = cls.objects.get_or_create(pk=1)
         return obj
 
-# No models.py, atualize o modelo Estoque:
-
+# --- Modelo Principal de Estoque ---
 class Estoque(models.Model):
     lote = models.CharField(max_length=50)
     produto = models.CharField(max_length=100, blank=True, null=True, default='')
+    
+    # Chaves Estrangeiras (Dropdowns)
     cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT)
     peneira = models.ForeignKey(Peneira, on_delete=models.PROTECT)
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
     tratamento = models.ForeignKey(Tratamento, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # ALTERADO: Agora Especie é uma ForeignKey para "puxar" da lista
+    #especie_antiga = models.CharField(max_length=50, default='SOJA', blank=True, null=True)
+    especie = models.ForeignKey(Especie, on_delete=models.PROTECT, null=True, blank=True) 
+    
+    
     endereco = models.CharField(max_length=20)
     entrada = models.IntegerField(default=0)
     saida = models.IntegerField(default=0)
@@ -66,7 +78,7 @@ class Estoque(models.Model):
     data_entrada = models.DateTimeField(auto_now_add=True)
     data_ultima_saida = models.DateTimeField(null=True, blank=True)
     data_ultima_movimentacao = models.DateTimeField(auto_now=True)
-    especie = models.CharField(max_length=50, default='SOJA')
+    
     empresa = models.CharField(max_length=100, blank=True, null=True, default='')
     embalagem = models.CharField(max_length=10, choices=[('SC', 'Saco'), ('BAG', 'Big Bag')], default='BAG')
     peso_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
@@ -121,9 +133,9 @@ class HistoricoMovimentacao(models.Model):
     # NOVOS CAMPOS PARA EXPEDIÇÃO DETALHADA
     numero_carga = models.CharField(max_length=50, blank=True, null=True)
     motorista = models.CharField(max_length=100, blank=True, null=True)
-    placa = models.CharField(max_length=20, blank=True, null=True) # Novo
+    placa = models.CharField(max_length=20, blank=True, null=True)
     cliente = models.CharField(max_length=255, blank=True, null=True)
-    ordem_entrega = models.CharField(max_length=50, blank=True, null=True) # Novo
+    ordem_entrega = models.CharField(max_length=50, blank=True, null=True)
     
     class Meta: 
         ordering = ['-data_hora']
@@ -134,7 +146,7 @@ class HistoricoMovimentacao(models.Model):
         super().save(*args, **kwargs)
 
 
-# --- Fotos (Essencial para múltiplas fotos) ---
+# --- Fotos ---
 class FotoMovimentacao(models.Model):
     historico = models.ForeignKey(HistoricoMovimentacao, related_name='fotos', on_delete=models.CASCADE)
     arquivo = models.ImageField(upload_to='historico_fotos/%Y/%m/')
@@ -142,11 +154,6 @@ class FotoMovimentacao(models.Model):
 
     def __str__(self):
         return f"Foto de {self.historico}"
-    
-    
-    
-    
-    
     
     
 # --- Sistema de Empenho/Rascunho ---

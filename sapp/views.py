@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash
 # Adicione no topo com os outros imports
 import datetime
+from django import forms  #
 # Python imports
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
@@ -19,7 +20,7 @@ import random
 # App imports
 from .models import (
     Estoque, HistoricoMovimentacao, Configuracao, Cultivar, 
-    Peneira, Categoria, Tratamento, PerfilUsuario
+    Peneira, Categoria, Tratamento, PerfilUsuario, Especie
 )
 from .forms import (
     NovaEntradaForm, ConfiguracaoForm, CultivarForm, PeneiraForm, 
@@ -39,6 +40,10 @@ import json
 from django.db import transaction
 import tempfile
 import os
+
+from django.db import transaction
+from .models import FotoMovimentacao # e os outros models   
+    
 
 # No início de views.py, com os outros imports de models
 from .models import (
@@ -871,164 +876,6 @@ def dashboard(request):
     
     return render(request, 'sapp/dashboard.html', context)
 
-# NO VIEWS.PY - Na função gestao_estoque, faça estas correções:
-
-# CORREÇÃO NO VIEWS.PY - Na função gestao_estoque:
-
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Q, Sum
-# Importe seu modelo
-from .models import Estoque 
-
-@login_required
-def gestao_estoque(request):
-    """
-    View completa para Gestão de Estoque com Filtros Avançados no Backend.
-    """
-    
-    # 1. QuerySet Base (Apenas itens com saldo positivo)
-    qs = Estoque.objects.filter(saldo__gt=0).select_related(
-        'cultivar', 'peneira', 'categoria', 'tratamento', 'conferente'
-    ).order_by('endereco', 'lote')
-
-    # --- 2. APLICAÇÃO DOS FILTROS VINDOS DA URL ---
-    
-    # Busca Global (Input de texto)
-    busca = request.GET.get('busca', '').strip()
-    if busca:
-        qs = qs.filter(
-            Q(lote__icontains=busca) |
-            Q(cultivar__nome__icontains=busca) |
-            Q(endereco__icontains=busca) |
-            Q(peneira__nome__icontains=busca) |
-            Q(cliente__icontains=busca) |
-            Q(empresa__icontains=busca)
-        )
-
-    # Filtros de Coluna (Múltipla Escolha)
-    # As chaves DEVEM ser idênticas ao 'data-column' do HTML
-    filter_map = {
-        'az': 'az__in',
-        'lote': 'lote__in',
-        'cultivar': 'cultivar__nome__in',
-        'peneira': 'peneira__nome__in',
-        'categoria': 'categoria__nome__in',
-        'endereco': 'endereco__in',
-        'especie': 'especie__in',
-        'tratamento': 'tratamento__nome__in',
-        'embalagem': 'embalagem__in',
-        'cliente': 'cliente__in',
-        'empresa': 'empresa__in',
-        'status': 'status__in',
-        'conferente': 'conferente__username__in'
-    }
-
-    # Aplica os filtros de lista (ex: &cultivar=Soja&cultivar=Milho)
-    for param, lookup in filter_map.items():
-        values = request.GET.getlist(param)
-        values = [v for v in values if v.strip()] # Remove vazios
-        if values:
-            qs = qs.filter(**{lookup: values})
-
-    # Filtros Numéricos (Min e Max)
-    numeric_fields = ['saldo', 'peso_unitario', 'peso_total']
-    for field in numeric_fields:
-        min_val = request.GET.get(f'min_{field}')
-        max_val = request.GET.get(f'max_{field}')
-        
-        if min_val:
-            qs = qs.filter(**{f'{field}__gte': min_val})
-        if max_val:
-            qs = qs.filter(**{f'{field}__lte': max_val})
-
-    # --- 3. CÁLCULO DE TOTAIS (Baseado no resultado filtrado) ---
-    total_itens = qs.count()
-    
-    # Agregações
-    resumo = qs.aggregate(
-        total_saldo=Sum('saldo'),
-        total_peso=Sum('peso_total')
-    )
-    
-    # Lógica de BAG vs SC
-    bags_count = qs.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
-    sc_fisico = qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
-    
-    # Conversão: 1 BAG = 25 SC
-    total_sc_equivalente = (bags_count * 25) + sc_fisico
-    
-    clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
-
-    # --- 4. PREPARAÇÃO DAS OPÇÕES PARA O FILTRO (Backend -> Frontend) ---
-    # Pegamos uma base SEM filtros de coluna para mostrar todas as opções disponíveis
-    # Isso resolve o problema de "Sem opções disponíveis"
-    base_options_qs = Estoque.objects.filter(saldo__gt=0)
-    
-    def get_options_list(field_lookup):
-        """Retorna lista de strings únicas para o filtro"""
-        # Extrai valores distintos, remove nulos/vazios e ordena
-        vals = base_options_qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
-        # Converte TUDO para string para evitar erro no JSON
-        return [str(v) for v in vals if v is not None and str(v).strip() != '']
-
-    filter_options = {
-        'az': get_options_list('az'),
-        'lote': get_options_list('lote'),
-        'cultivar': get_options_list('cultivar__nome'),
-        'peneira': get_options_list('peneira__nome'),
-        'categoria': get_options_list('categoria__nome'),
-        'endereco': get_options_list('endereco'),
-        'especie': get_options_list('especie'),
-        'tratamento': get_options_list('tratamento__nome'),
-        'embalagem': get_options_list('embalagem'),
-        'cliente': get_options_list('cliente'),
-        'empresa': get_options_list('empresa'),
-        'status': get_options_list('status'),
-        'conferente': get_options_list('conferente__username') # ou conferente__first_name
-    }
-
-    # --- 5. PAGINAÇÃO ---
-    page_size = request.GET.get('page_size', 25)
-    try:
-        page_size = int(page_size)
-    except ValueError:
-        page_size = 25
-
-    paginator = Paginator(qs, page_size)
-    page_number = request.GET.get('page', 1)
-
-    try:
-        estoque_page = paginator.page(page_number)
-    except PageNotAnInteger:
-        estoque_page = paginator.page(1)
-    except EmptyPage:
-        estoque_page = paginator.page(paginator.num_pages)
-
-    # --- 6. URL PARAMS PARA PAGINAÇÃO ---
-    # Preserva os filtros atuais nos links de próxima página
-    query_params = request.GET.copy()
-    if 'page' in query_params:
-        del query_params['page']
-    url_params = query_params.urlencode()
-
-    context = {
-        'estoque': estoque_page,
-        'total_itens': total_itens,
-        'total_sc': total_sc_equivalente,
-        'total_bags': bags_count,
-        'total_sc_fisico': sc_fisico,
-        'clientes_unicos': clientes_unicos,
-        # Dados essenciais para o filtro funcionar:
-        'filter_options': filter_options, 
-        'url_params': url_params,
-        'page_sizes': [10, 25, 50, 100],
-        'page_size': page_size,
-        'busca': busca,
-    }
-
-    return render(request, 'sapp/gestao_estoque.html', context)
 
 
 @login_required
@@ -2075,91 +1922,146 @@ def limpar_duplicados_manualmente(request):
 # OUTRAS VIEWS (mantenha as suas views existentes)
 # ================================================================
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Q
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.contrib import messages
-from .models import Estoque, Cultivar, Peneira, Categoria, Tratamento, HistoricoMovimentacao, FotoMovimentacao
-
 @login_required
-def lista_estoque(request):
-    # 1. Query Base
-    itens_queryset = Estoque.objects.all().select_related(
-        'cultivar', 'peneira', 'categoria', 'tratamento'
-    ).order_by('-data_ultima_movimentacao')
-
-    # 2. Filtros
-    termo = request.GET.get('busca', '').strip()
-    if termo:
-        palavras = termo.split()
-        query = Q()
-        for palavra in palavras:
-            query &= (
-                Q(lote__icontains=palavra) |
-                Q(produto__icontains=palavra) |
-                Q(cultivar__nome__icontains=palavra) |
-                Q(peneira__nome__icontains=palavra) |
-                Q(endereco__icontains=palavra) |
-                Q(empresa__icontains=palavra)
-            )
-        itens_queryset = itens_queryset.filter(query)
-
-    status_filter = request.GET.get('status', '')
-    if status_filter == 'disponivel':
-        itens_queryset = itens_queryset.filter(saldo__gt=0)
-    elif status_filter == 'esgotado':
-        itens_queryset = itens_queryset.filter(saldo=0)
-
-    # 3. CÁLCULO DETALHADO (BAG vs SC)
-    def calcular_metricas(queryset, campo):
-        # Soma quantidade física de BAGs
-        qtd_bags = queryset.filter(embalagem='BAG').aggregate(t=Sum(campo))['t'] or 0
-        # Soma quantidade física de Sacos
-        qtd_sc_fisico = queryset.filter(embalagem='SC').aggregate(t=Sum(campo))['t'] or 0
-        # Calcula total convertido (1 BAG = 25 SC) + Sacos físicos
-        total_convertido = (qtd_bags * 25) + qtd_sc_fisico
-        
-        return {
-            'bags': qtd_bags,
-            'sc_fisico': qtd_sc_fisico,
-            'total_sc': total_convertido
-        }
-
-    # Gera os dicionários de dados para os cards
-    dados_entrada = calcular_metricas(itens_queryset, 'entrada')
-    dados_saida = calcular_metricas(itens_queryset, 'saida')
-    dados_saldo = calcular_metricas(itens_queryset, 'saldo')
+def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
+    """
+    View unificada.
+    - Se for 'tabela_estoque.html': Mostra TUDO por padrão.
+    - Se for 'gestao_estoque.html': Mostra só ATIVOS por padrão.
+    """
     
-    total_lotes = itens_queryset.count()
+    # 1. QuerySet Base
+    qs = Estoque.objects.all().select_related(
+        'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
+    ).order_by('-data_ultima_movimentacao', '-id')
 
-    # 4. Paginação
-    page_size = int(request.GET.get('page_size', 25))
-    paginator = Paginator(itens_queryset, page_size)
-    page_number = request.GET.get('page', 1)
-    try:
-        page_obj = paginator.page(page_number)
-    except (PageNotAnInteger, EmptyPage):
-        page_obj = paginator.page(1)
+    # 2. Busca Global
+    busca = request.GET.get('busca', '').strip()
+    if busca:
+        for termo in busca.split():
+            qs = qs.filter(
+                Q(lote__icontains=termo) | 
+                Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) | 
+                Q(especie__nome__icontains=termo) |
+                Q(endereco__icontains=termo) | 
+                Q(cliente__icontains=termo) |
+                Q(empresa__icontains=termo)
+            )
 
+    # 3. Lógica de Status Inteligente
+    status = request.GET.get('status', '')
+    
+    # Se o usuário escolheu explicitamente um filtro, respeita ele
+    if status == 'esgotado':
+        qs = qs.filter(saldo__lte=0)
+    elif status == 'disponivel':
+        qs = qs.filter(saldo__gt=0)
+    elif status == 'todos':
+        pass # Mostra tudo
+    
+    # Se o usuário NÃO escolheu filtro (status vazio), aplicamos o padrão da página
+    elif not status:
+        if template_name == 'sapp/gestao_estoque.html':
+            # Página de Gestão: Padrão é só DISPONÍVEIS (limpa a visão)
+            qs = qs.filter(saldo__gt=0)
+            status = 'disponivel' # Marca no select
+        else:
+            # Página de Tabela/Histórico: Padrão é TODOS (mostra zerados)
+            status = 'todos' # Marca no select
+
+    # ... (Resto dos filtros de coluna e numéricos continuam igual) ...
+    filter_map = {
+        'az': 'az__in', 'lote': 'lote__in', 'cultivar': 'cultivar__nome__in',
+        'peneira': 'peneira__nome__in', 'categoria': 'categoria__nome__in',
+        'endereco': 'endereco__in', 'especie': 'especie__nome__in',
+        'tratamento': 'tratamento__nome__in', 'embalagem': 'embalagem__in',
+        'cliente': 'cliente__in', 'empresa': 'empresa__in',
+        
+    }
+
+    for param, lookup in filter_map.items():
+        values = request.GET.getlist(param)
+        values = [v for v in values if v.strip()]
+        if values: qs = qs.filter(**{lookup: values})
+
+    for field in ['saldo', 'peso_unitario', 'peso_total']:
+        min_val = request.GET.get(f'min_{field}')
+        max_val = request.GET.get(f'max_{field}')
+        if min_val: qs = qs.filter(**{f'{field}__gte': min_val})
+        if max_val: qs = qs.filter(**{f'{field}__lte': max_val})
+
+    # ... (Métricas e Contexto continuam igual) ...
+    
+    # Métricas
+    def calc_metrics(queryset, field):
+        bags = queryset.filter(embalagem='BAG').aggregate(s=Sum(field))['s'] or 0
+        scs = queryset.filter(embalagem='SC').aggregate(s=Sum(field))['s'] or 0
+        return {'bags': bags, 'total_sc': (bags * 25) + scs}
+
+    dados_entrada = calc_metrics(qs, 'entrada')
+    dados_saida = calc_metrics(qs, 'saida')
+    dados_saldo = calc_metrics(qs, 'saldo')
+    
+    total_itens = qs.count()
+    clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
+
+    # Opções de Filtro (Base total para não limitar opções)
+    base_qs = Estoque.objects.all()
+    def get_options_list(field_lookup):
+        vals = base_qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
+        return [str(v) for v in vals if v is not None and str(v).strip() != '']
+
+    filter_options = {
+        'az': get_options_list('az'),
+        'lote': get_options_list('lote'),
+        'cultivar': get_options_list('cultivar__nome'),
+        'peneira': get_options_list('peneira__nome'),
+        'categoria': get_options_list('categoria__nome'),
+        'endereco': get_options_list('endereco'),
+        'especie': get_options_list('especie__nome'),
+        'tratamento': get_options_list('tratamento__nome'),
+        'embalagem': get_options_list('embalagem'),
+        'cliente': get_options_list('cliente'),
+        'empresa': get_options_list('empresa'),
+        'status': get_options_list('status'),
+        'conferente': get_options_list('conferente__username')
+    }
+
+    # Paginação
+    page_size = request.GET.get('page_size', 25)
+    paginator = Paginator(qs, int(page_size))
+    page_obj = paginator.get_page(request.GET.get('page', 1))
+
+    query_params = request.GET.copy()
+    if 'page' in query_params: del query_params['page']
+    
     context = {
-        'itens': page_obj,
-        # Passando os dicionários completos para o template
-        'dados_entrada': dados_entrada,
-        'dados_saida': dados_saida,
-        'dados_saldo': dados_saldo,
-        'total_lotes': total_lotes,
-        'busca': termo,
-        'status': status_filter,
-        'all_cultivares': Cultivar.objects.all(),
-        'all_peneiras': Peneira.objects.all(),
-        'all_categorias': Categoria.objects.all(),
-        'all_tratamentos': Tratamento.objects.all(),
+        'estoque': page_obj, 'itens': page_obj,
+        'dados_entrada': dados_entrada, 'dados_saida': dados_saida, 'dados_saldo': dados_saldo,
+        'total_itens': total_itens, 'total_sc': dados_saldo['total_sc'], 'total_bags': dados_saldo['bags'],
+        'total_sc_fisico': qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0,
+        'clientes_unicos': clientes_unicos,
+        'filter_options': filter_options, 'url_params': query_params.urlencode(),
+        'page_sizes': [10, 25, 50, 100, 200], 'page_size': int(page_size),
+        'busca': busca, 'status': status, 
+        'all_cultivares': Cultivar.objects.all(), 'all_peneiras': Peneira.objects.all(),
+        'all_categorias': Categoria.objects.all(), 'all_tratamentos': Tratamento.objects.all(),
+        'all_especies': Especie.objects.all(),
     }
     
-    return render(request, 'sapp/tabela_estoque.html', context)
-    
-    
+    return render(request, template_name, context)
+
+# --- FUNÇÃO WRAPPER PARA CORRIGIR O ERRO NO URLS.PY ---
+@login_required
+def gestao_estoque(request):
+    """
+    Esta função existe para satisfazer a rota 'estoque/gestao/' no urls.py
+    Ela reutiliza a lógica da lista_estoque mas força o template novo.
+    """
+    return lista_estoque(request, template_name='sapp/gestao_estoque.html')
+# Alias
+
     
     
     
@@ -2243,363 +2145,166 @@ def registrar_saida(request, id):
 
 @login_required
 def transferir(request, id):
-    item_origem = get_object_or_404(Estoque, id=id)
+    origem = get_object_or_404(Estoque, id=id)
     
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                # --- 1. CAPTURA DOS DADOS BÁSICOS ---
                 qtd = int(request.POST.get('quantidade'))
                 novo_end = request.POST.get('novo_endereco').strip().upper()
-                obs = request.POST.get('observacao', '')
-                fotos = request.FILES.getlist('fotos')
-
-                # --- 2. CAPTURA DOS DADOS EDITÁVEIS (PREENCHIDOS OU ORIGINAIS) ---
-                # Se o campo vier vazio no POST, usamos o dado da origem como fallback
-                novo_produto = request.POST.get('produto', item_origem.produto or '').strip()
-                nova_empresa = request.POST.get('empresa', item_origem.empresa or '').strip()
-                novo_az = request.POST.get('az', item_origem.az or '').strip()
-                nova_embalagem = request.POST.get('embalagem', item_origem.embalagem)
                 
-                # Tratamento de Peso Unitário
-                peso_raw = request.POST.get('peso_unitario', str(item_origem.peso_unitario))
-                try:
-                    peso_raw = str(peso_raw).replace(',', '.')
-                    novo_peso_unitario = Decimal(peso_raw)
-                except:
-                    novo_peso_unitario = item_origem.peso_unitario
-
-                # Tratamento de Foreign Keys (Cultivar, Peneira, etc)
-                # Tenta pegar do POST, senão mantém o original
-                try:
-                    novo_cultivar_id = request.POST.get('cultivar')
-                    obj_cultivar = Cultivar.objects.get(id=novo_cultivar_id) if novo_cultivar_id else item_origem.cultivar
-                except: obj_cultivar = item_origem.cultivar
-
-                try:
-                    nova_peneira_id = request.POST.get('peneira')
-                    obj_peneira = Peneira.objects.get(id=nova_peneira_id) if nova_peneira_id else item_origem.peneira
-                except: obj_peneira = item_origem.peneira
-
-                try:
-                    nova_categoria_id = request.POST.get('categoria')
-                    obj_categoria = Categoria.objects.get(id=nova_categoria_id) if nova_categoria_id else item_origem.categoria
-                except: obj_categoria = item_origem.categoria
-
-                try:
-                    novo_tratamento_id = request.POST.get('tratamento')
-                    if novo_tratamento_id:
-                        obj_tratamento = Tratamento.objects.get(id=novo_tratamento_id)
-                    else:
-                        obj_tratamento = item_origem.tratamento
-                except: obj_tratamento = item_origem.tratamento
-
-                # --- 3. VALIDAÇÃO E SAÍDA DA ORIGEM ---
-                if qtd > item_origem.saldo:
-                    messages.error(request, f"Saldo insuficiente. Disponível: {item_origem.saldo}")
+                # Validação de saldo
+                if qtd > origem.saldo: 
+                    messages.error(request, f"Saldo insuficiente. Disponível: {origem.saldo}")
                     return redirect('sapp:lista_estoque')
-
-                # Retira da Origem
-                item_origem.saida += qtd
-                item_origem.saldo = item_origem.entrada - item_origem.saida
-                item_origem.save()
-
-                # Histórico de Saída
-                desc_saida = f"""
-                    <strong>Saiu:</strong> <span class="text-danger">-{qtd}</span><br>
-                    <strong>Destino:</strong> {novo_end}<br>
-                    {f'<small class="text-muted">Obs: {obs}</small>' if obs else ''}
-                """
-                h_saida = HistoricoMovimentacao.objects.create(
-                    estoque=item_origem,
-                    usuario=request.user,
-                    tipo='Transferência (Saída)',
-                    descricao=desc_saida
-                )
-                for f in fotos: FotoMovimentacao.objects.create(historico=h_saida, arquivo=f)
-
-                # --- 4. ENTRADA NO DESTINO (COM DADOS NOVOS/EDITADOS) ---
                 
-                # Procura se já existe um lote IDENTICO aos NOVOS DADOS no NOVO ENDEREÇO
-                item_destino = Estoque.objects.filter(
-                    lote=item_origem.lote,
-                    endereco=novo_end,
-                    cultivar=obj_cultivar,
-                    peneira=obj_peneira,
-                    categoria=obj_categoria,
-                    tratamento=obj_tratamento,
-                    produto=novo_produto, # Verifica também se o produto é o mesmo
-                    az=novo_az
-                ).first()
-
-                desc_entrada = f"""
-                    <strong>Entrou:</strong> <span class="text-success">+{qtd}</span><br>
-                    <strong>Origem:</strong> {item_origem.endereco}<br>
-                """
-
-                if item_destino:
-                    # Se já existe exatamente igual, apenas soma
-                    item_destino.entrada += qtd
-                    item_destino.saldo += qtd # Recalcula saldo
-                    # Atualiza dados secundários caso tenham mudado (opcional)
-                    item_destino.peso_unitario = novo_peso_unitario 
-                    item_destino.conferente = request.user
-                    item_destino.save()
-                    
-                    HistoricoMovimentacao.objects.create(
-                        estoque=item_destino, 
-                        usuario=request.user, 
-                        tipo='Transferência (Entrada)', 
-                        descricao=desc_entrada
-                    )
+                # 1. Retira da Origem
+                origem.saida += qtd
+                origem.save() # Saldo é recalculado automaticamente no save()
+                
+                # 2. Tratamento da Espécie (A CORREÇÃO ESTÁ AQUI)
+                especie_id_form = request.POST.get('especie')
+                
+                if especie_id_form:
+                    # Se o usuário escolheu uma espécie no form, buscamos o objeto pelo ID
+                    objeto_especie = get_object_or_404(Especie, id=especie_id_form)
                 else:
-                    # Se não existe, CRIA UM NOVO com os dados editados
-                    novo_item = Estoque.objects.create(
-                        lote=item_origem.lote,
-                        produto=novo_produto, # Dado Novo
-                        cultivar=obj_cultivar, # Dado Novo
-                        peneira=obj_peneira, # Dado Novo
-                        categoria=obj_categoria, # Dado Novo
-                        tratamento=obj_tratamento, # Dado Novo
-                        az=novo_az, # Dado Novo
-                        endereco=novo_end,
-                        entrada=qtd,
-                        saida=0,
-                        saldo=qtd,
-                        cliente=request.POST.get('cliente', item_origem.cliente), # Tenta pegar cliente novo ou usa antigo
-                        origem_destino=f"Transf. de {item_origem.endereco}",
-                        conferente=request.user,
-                        especie=request.POST.get('especie', item_origem.especie),
-                        empresa=nova_empresa, # Dado Novo
-                        embalagem=nova_embalagem, # Dado Novo
-                        peso_unitario=novo_peso_unitario, # Dado Novo
-                        observacao=f"Transferido de {item_origem.endereco}. {obs}"
-                    )
-                    HistoricoMovimentacao.objects.create(
-                        estoque=novo_item, 
-                        usuario=request.user, 
-                        tipo='Transferência (Entrada)', 
-                        descricao=desc_entrada
-                    )
+                    # Se não escolheu, mantém a espécie do lote original
+                    objeto_especie = origem.especie
 
-                messages.success(request, f"✅ Transferência realizada para {novo_end}!")
+                # 3. Cria o lote de Destino
+                destino = Estoque.objects.create(
+                    lote=origem.lote, 
+                    endereco=novo_end, 
+                    entrada=qtd, 
+                    saldo=qtd,
+                    
+                    # Chaves Estrangeiras (IDs)
+                    cultivar_id=request.POST.get('cultivar') or origem.cultivar_id,
+                    peneira_id=request.POST.get('peneira') or origem.peneira_id,
+                    categoria_id=request.POST.get('categoria') or origem.categoria_id,
+                    tratamento_id=request.POST.get('tratamento') or origem.tratamento_id,
+                    
+                    # CORREÇÃO: Passando o Objeto Espécie, não o ID
+                    especie=objeto_especie, 
+                    
+                    # Campos de Texto
+                    produto=request.POST.get('produto', origem.produto),
+                    cliente=request.POST.get('cliente', origem.cliente),
+                    empresa=request.POST.get('empresa', origem.empresa),
+                    az=request.POST.get('az', origem.az),
+                    peso_unitario=processar_decimal(request.POST.get('peso_unitario', origem.peso_unitario)),
+                    embalagem=request.POST.get('embalagem', origem.embalagem),
+                    conferente=request.user,
+                    origem_destino=f"Transf. de {origem.endereco}",
+                    observacao=request.POST.get('observacao', '')
+                )
+                
+                # 4. Históricos
+                hist_saida = HistoricoMovimentacao.objects.create(
+                    estoque=origem, 
+                    usuario=request.user, 
+                    tipo='Transferência (Saída)', 
+                    descricao=f"Para {novo_end} (-{qtd})"
+                )
+                
+                HistoricoMovimentacao.objects.create(
+                    estoque=destino, 
+                    usuario=request.user, 
+                    tipo='Transferência (Entrada)', 
+                    descricao=f"De {origem.endereco} (+{qtd})"
+                )
+                
+                # Salvar fotos na saída (origem)
+                for f in request.FILES.getlist('fotos'):
+                    FotoMovimentacao.objects.create(historico=hist_saida, arquivo=f)
+                    
+                messages.success(request, "Transferência concluída com sucesso!")
                 
         except Exception as e:
-            import traceback
-            print(traceback.format_exc())
-            messages.error(request, f"Erro na transferência: {e}")
+            # Imprime o erro no terminal para ajudar a debugar se acontecer de novo
+            print(f"ERRO TRANSFERENCIA: {e}") 
+            messages.error(request, f"Erro ao transferir: {e}")
             
     return redirect('sapp:lista_estoque')
 
 @login_required
 def nova_entrada(request):
-    """Registra uma nova entrada no estoque - VERSÃO SIMPLIFICADA E CORRIGIDA"""
     if request.method == 'POST':
         try:
-            print("🔔 [NOVA ENTRADA] Iniciando processamento...")
-            
-            # Captura dos dados básicos
-            lote = request.POST.get('lote', '').strip()
-            produto = request.POST.get('produto', '').strip()
-            endereco = request.POST.get('endereco', '').strip().upper()
-            quantidade = request.POST.get('entrada', '0').strip()
-            especie = request.POST.get('especie', 'SOJA').strip()
-            cliente = request.POST.get('cliente', '').strip()
-            
-            # Validações básicas
-            erros = []
-            if not lote:
-                erros.append("O número do lote é obrigatório.")
-            if not endereco:
-                erros.append("O endereço é obrigatório.")
-            
-            try:
-                quantidade_int = int(quantidade)
-                if quantidade_int <= 0:
-                    erros.append("A quantidade deve ser maior que zero.")
-            except ValueError:
-                erros.append("Quantidade inválida.")
-            
-            # Validar objetos relacionados
-            try:
-                cultivar_id = request.POST.get('cultivar')
-                if not cultivar_id:
-                    erros.append("O cultivar é obrigatório.")
-                else:
-                    cultivar = Cultivar.objects.get(id=cultivar_id)
-            except (ValueError, Cultivar.DoesNotExist):
-                erros.append("Cultivar inválido.")
-            
-            try:
-                peneira_id = request.POST.get('peneira')
-                if not peneira_id:
-                    erros.append("A peneira é obrigatória.")
-                else:
-                    peneira = Peneira.objects.get(id=peneira_id)
-            except (ValueError, Peneira.DoesNotExist):
-                erros.append("Peneira inválida.")
-            
-            try:
-                categoria_id = request.POST.get('categoria')
-                if not categoria_id:
-                    erros.append("A categoria é obrigatória.")
-                else:
-                    categoria = Categoria.objects.get(id=categoria_id)
-            except (ValueError, Categoria.DoesNotExist):
-                erros.append("Categoria inválida.")
-            
-            # Tratamento é opcional
-            tratamento_id = request.POST.get('tratamento')
-            tratamento = None
-            if tratamento_id:
-                try:
-                    tratamento = Tratamento.objects.get(id=tratamento_id)
-                except (ValueError, Tratamento.DoesNotExist):
-                    pass  # Tratamento é opcional, não é erro
-            
-            # Processar peso unitário
-            peso_raw = request.POST.get('peso_unitario', '0')
-            try:
-                peso_raw = str(peso_raw).replace(',', '.')
-                peso_unitario = Decimal(peso_raw)
-            except (InvalidOperation, ValueError):
-                peso_unitario = Decimal('0.00')
-            
-            # Outros campos
-            empresa = request.POST.get('empresa', '').strip()
-            origem_destino = request.POST.get('origem_destino', '').strip()
-            az = request.POST.get('az', '').strip()
-            observacao = request.POST.get('observacao', '').strip()
-            embalagem = request.POST.get('embalagem', 'BAG').strip()
-            
-            # Se houver erros, mostrar todos
-            if erros:
-                for erro in erros:
-                    messages.error(request, f"❌ {erro}")
-                return redirect('sapp:lista_estoque')
-            
-            # Verificar se já existe lote com mesmo endereço
-            lote_existente = Estoque.objects.filter(
-                lote=lote,
-                endereco=endereco,
-                cultivar=cultivar
-            ).first()
-            
             with transaction.atomic():
-                historico = None
+                lote = request.POST.get('lote', '').strip()
+                endereco = request.POST.get('endereco', '').strip().upper()
+                qtd = int(request.POST.get('entrada', 0))
                 
-                if lote_existente:
-                    print(f"✅ [NOVA ENTRADA] Lote existente encontrado: {lote}")
-                    # Somar à entrada existente
-                    entrada_anterior = lote_existente.entrada
-                    saldo_anterior = lote_existente.saldo
-                    
-                    lote_existente.entrada += quantidade_int
-                    lote_existente.conferente = request.user
-                    
-                    # Atualizar outros campos se fornecidos
-                    if empresa:
-                        lote_existente.empresa = empresa
-                    if produto:
-                        lote_existente.produto = produto
-                    if cliente:
-                        lote_existente.cliente = cliente
-                    if peso_unitario > 0:
-                        lote_existente.peso_unitario = peso_unitario
-                    if origem_destino:
-                        lote_existente.origem_destino = origem_destino
-                    if az:
-                        lote_existente.az = az
-                    if observacao:
-                        if lote_existente.observacao:
-                            lote_existente.observacao += f"\n\n[ENTRADA ADICIONAL {timezone.now().strftime('%d/%m/%Y %H:%M')}]: {observacao}"
-                        else:
-                            lote_existente.observacao = f"[ENTRADA ADICIONAL {timezone.now().strftime('%d/%m/%Y %H:%M')}]: {observacao}"
-                    
-                    # Salvar para recalcular saldo automaticamente
-                    lote_existente.save()
-                    
-                    # Criar histórico
-                    historico = HistoricoMovimentacao.objects.create(
-                        estoque=lote_existente,
-                        usuario=request.user,
-                        tipo='Entrada (Adição)',
-                        descricao=(
-                            f"<b>ENTRADA ADICIONAL</b><br>"
-                            f"<b>Quantidade adicionada:</b> {quantidade_int}<br>"
-                            f"<b>Entrada anterior:</b> {entrada_anterior}<br>"
-                            f"<b>Saldo anterior:</b> {saldo_anterior}<br>"
-                            f"<b>Novo saldo:</b> {lote_existente.saldo}<br>"
-                            f"<b>Produto:</b> {produto or 'Não informado'}<br>"
-                            f"<b>Observação:</b> {observacao or 'Nenhuma'}"
-                        )
-                    )
-                    
-                    msg = f"✅ {quantidade_int} unidades adicionadas ao lote existente {lote}!"
-                    
+                # CORREÇÃO AQUI: Buscar o Objeto Espécie pelo ID
+                especie_id = request.POST.get('especie')
+                if especie_id:
+                    especie_obj = get_object_or_404(Especie, id=especie_id)
                 else:
-                    print(f"✅ [NOVA ENTRADA] Criando novo lote: {lote}")
-                    # Criar novo lote
-                    novo_item = Estoque.objects.create(
-                        lote=lote,
-                        produto=produto,
-                        cultivar=cultivar,
-                        peneira=peneira,
-                        categoria=categoria,
+                    # Se não escolheu nada, cria/pega uma padrão 'SOJA'
+                    especie_obj, _ = Especie.objects.get_or_create(nome='SOJA')
+
+                # Tratamento de Cultivar/Peneira/Categoria (Obrigatórios)
+                cultivar = get_object_or_404(Cultivar, id=request.POST.get('cultivar'))
+                peneira = get_object_or_404(Peneira, id=request.POST.get('peneira'))
+                categoria = get_object_or_404(Categoria, id=request.POST.get('categoria'))
+                
+                # Tratamento (Opcional)
+                trat_id = request.POST.get('tratamento')
+                tratamento = Tratamento.objects.filter(id=trat_id).first() if trat_id else None
+
+                # Verifica se já existe lote nesse endereço (para somar)
+                item = Estoque.objects.filter(lote=lote, endereco=endereco, cultivar=cultivar).first()
+                
+                if item:
+                    item.entrada += qtd
+                    item.observacao += f"\n[+ENTRADA {qtd} em {timezone.now().strftime('%d/%m')}]"
+                    item.especie = especie_obj # Atualiza espécie se mudou
+                    msg = "adicionados ao lote existente"
+                else:
+                    # CRIAÇÃO DO NOVO LOTE
+                    item = Estoque(
+                        lote=lote, 
+                        endereco=endereco, 
+                        entrada=qtd, 
+                        saldo=qtd,
+                        cultivar=cultivar, 
+                        peneira=peneira, 
+                        categoria=categoria, 
                         tratamento=tratamento,
-                        endereco=endereco,
-                        entrada=quantidade_int,
-                        saida=0,
-                        saldo=quantidade_int,  # Será recalculado no save()
+                        especie=especie_obj, # Passando o OBJETO, não o ID
                         conferente=request.user,
-                        origem_destino=origem_destino,
-                        especie=especie,
-                        empresa=empresa,
-                        embalagem=embalagem,
-                        peso_unitario=peso_unitario,
-                        az=az,
-                        cliente=cliente,
-                        observacao=observacao or f"Criado via sistema em {timezone.now().strftime('%d/%m/%Y %H:%M')}"
+                        produto=request.POST.get('produto', ''),
+                        cliente=request.POST.get('cliente', ''),
+                        empresa=request.POST.get('empresa', ''),
+                        az=request.POST.get('az', ''),
+                        origem_destino=request.POST.get('origem_destino', ''),
+                        peso_unitario=processar_decimal(request.POST.get('peso_unitario')),
+                        embalagem=request.POST.get('embalagem', 'BAG'),
+                        observacao=request.POST.get('observacao', '')
                     )
-                    
-                    # Criar histórico
-                    historico = HistoricoMovimentacao.objects.create(
-                        estoque=novo_item,
-                        usuario=request.user,
-                        tipo='Entrada (Novo)',
-                        descricao=(
-                            f"<b>NOVO LOTE CRIADO</b><br>"
-                            f"<b>Quantidade inicial:</b> {quantidade_int}<br>"
-                            f"<b>Endereço:</b> {endereco}<br>"
-                            f"<b>Produto:</b> {produto or 'Não informado'}<br>"
-                            f"<b>Cliente:</b> {cliente or 'Não informado'}<br>"
-                            f"<b>Observação:</b> {observacao or 'Nenhuma'}"
-                        )
-                    )
-                    
-                    msg = f"✅ Novo lote {lote} criado com {quantidade_int} unidades!"
+                    msg = "criado com sucesso"
                 
-                # Salvar fotos se houver
-                fotos = request.FILES.getlist('fotos')
-                if fotos and historico:
-                    for foto in fotos:
-                        FotoMovimentacao.objects.create(historico=historico, arquivo=foto)
-                        print(f"📸 Foto salva: {foto.name}")
+                item.save()
                 
-                messages.success(request, msg)
-                print(f"✅ [NOVA ENTRADA] Concluído: {msg}")
+                # Histórico e Fotos
+                hist = HistoricoMovimentacao.objects.create(
+                    estoque=item, usuario=request.user, tipo='Entrada',
+                    descricao=f"Entrada de {qtd} unidades. ({msg})"
+                )
+                for f in request.FILES.getlist('fotos'):
+                    FotoMovimentacao.objects.create(historico=hist, arquivo=f)
+                
+                messages.success(request, f"✅ Lote {lote} {msg}!")
                 
         except Exception as e:
-            print(f"❌ [NOVA ENTRADA] Erro: {e}")
             import traceback
-            print(f"🔍 Traceback: {traceback.format_exc()}")
-            messages.error(request, f"❌ Erro ao processar entrada: {str(e)}")
-    
+            print(traceback.format_exc()) # Ajuda no debug
+            messages.error(request, f"Erro ao processar entrada: {str(e)}")
+            
     return redirect('sapp:lista_estoque')
 
-from django.db import transaction
-from .models import FotoMovimentacao # e os outros models   
-    
 
 
 @login_required
@@ -2735,7 +2440,6 @@ def limpar_cache_importacao(request):
 
 @login_required
 def editar(request, id):
-    """Edita um lote existente - VERSÃO CORRIGIDA"""
     item = get_object_or_404(Estoque, id=id)
     
     if request.method == 'POST':
@@ -2751,58 +2455,66 @@ def editar(request, id):
                     'embalagem': item.embalagem,
                     'az': item.az or "",
                     'observacao': item.observacao or "",
-                    'cliente': item.cliente or "",  # NOVO CAMPO
+                    'cliente': item.cliente or "", 
                     'cultivar': item.cultivar.nome if item.cultivar else "",
                     'peneira': item.peneira.nome if item.peneira else "",
                     'categoria': item.categoria.nome if item.categoria else "",
-                    'conferente': item.conferente.username,
+                    'especie': item.especie.nome if item.especie else "SOJA", # NOVO
                     'tratamento': item.tratamento.nome if item.tratamento else "Sem Tratamento",
-                    'produto': item.produto or "",  # Campo produto
+                    'produto': item.produto or "", 
                 }
 
                 # 2. CAPTURA OS NOVOS VALORES
                 novo_lote = request.POST.get('lote', '').strip()
-                novo_endereco = request.POST.get('endereco', '').strip()
+                novo_endereco = request.POST.get('endereco', '').strip().upper() # Padronizar maiúsculo
                 novo_empresa = request.POST.get('empresa', '').strip()
                 novo_origem_destino = request.POST.get('origem_destino', '').strip()
                 novo_produto = request.POST.get('produto', '').strip()
-                novo_cliente = request.POST.get('cliente', '').strip()  # NOVO CAMPO
+                novo_cliente = request.POST.get('cliente', '').strip()
                 
                 # Tratamento do peso
                 peso_raw = request.POST.get('peso_unitario', '0')
                 try:
-                    # Substituir vírgula por ponto
                     peso_raw = str(peso_raw).replace(',', '.')
-                    # Se tiver mais de um ponto, pegar apenas o primeiro
                     if peso_raw.count('.') > 1:
                         partes = peso_raw.split('.')
                         peso_raw = f"{partes[0]}.{''.join(partes[1:])}"
                     novo_peso = Decimal(peso_raw)
-                except (InvalidOperation, ValueError):
+                except:
                     novo_peso = Decimal('0.00')
                 
                 novo_emb = request.POST.get('embalagem', 'BAG')
                 novo_az = request.POST.get('az', '').strip()
                 novo_obs = request.POST.get('observacao', '').strip()
-                novo_especie = request.POST.get('especie', 'SOJA').strip()
 
-                # 3. BUSCAR OBJETOS RELACIONADOS
+                # 3. BUSCAR OBJETOS RELACIONADOS (CORREÇÃO DE ESPÉCIE AQUI)
+                # Espécie (CORREÇÃO)
+                novo_especie_id = request.POST.get('especie')
+                if novo_especie_id:
+                    # Busca o objeto Espécie pelo ID
+                    obj_especie = get_object_or_404(Especie, id=novo_especie_id)
+                else:
+                    obj_especie = item.especie # Mantém o original se não mudar
+
+                # Cultivar
                 try:
                     obj_cultivar = get_object_or_404(Cultivar, id=request.POST.get('cultivar'))
                 except:
                     obj_cultivar = item.cultivar
                     
+                # Peneira
                 try:
                     obj_peneira = get_object_or_404(Peneira, id=request.POST.get('peneira'))
                 except:
                     obj_peneira = item.peneira
                     
+                # Categoria
                 try:
                     obj_categoria = get_object_or_404(Categoria, id=request.POST.get('categoria'))
                 except:
                     obj_categoria = item.categoria
                 
-                # Tratamento é opcional
+                # Tratamento
                 tratamento_id = request.POST.get('tratamento')
                 if tratamento_id:
                     try:
@@ -2812,24 +2524,23 @@ def editar(request, id):
                 else:
                     obj_tratamento = None
 
-                # 4. COMPARAÇÃO DETALHADA
+                # 4. COMPARAÇÃO DETALHADA PARA O HISTÓRICO
                 mudancas = []
-                
-                # Comparar cada campo
                 campos_para_comparar = [
                     ('lote', 'Lote', antigo['lote'], novo_lote),
                     ('endereco', 'Endereço', antigo['endereco'], novo_endereco),
                     ('empresa', 'Empresa', antigo['empresa'], novo_empresa),
                     ('origem_destino', 'Origem/Destino', antigo['origem_destino'], novo_origem_destino),
                     ('produto', 'Produto', antigo['produto'], novo_produto),
-                    ('cliente', 'Cliente', antigo['cliente'], novo_cliente),  # NOVO
+                    ('cliente', 'Cliente', antigo['cliente'], novo_cliente),
                     ('peso_unitario', 'Peso Unitário', antigo['peso_unitario'], novo_peso),
                     ('embalagem', 'Embalagem', antigo['embalagem'], novo_emb),
                     ('az', 'AZ', antigo['az'], novo_az),
                     ('observacao', 'Observação', antigo['observacao'], novo_obs),
-                    ('cultivar', 'Cultivar', antigo['cultivar'], obj_cultivar.nome if obj_cultivar else ''),
-                    ('peneira', 'Peneira', antigo['peneira'], obj_peneira.nome if obj_peneira else ''),
-                    ('categoria', 'Categoria', antigo['categoria'], obj_categoria.nome if obj_categoria else ''),
+                    ('cultivar', 'Cultivar', antigo['cultivar'], obj_cultivar.nome),
+                    ('peneira', 'Peneira', antigo['peneira'], obj_peneira.nome),
+                    ('categoria', 'Categoria', antigo['categoria'], obj_categoria.nome),
+                    ('especie', 'Espécie', antigo['especie'], obj_especie.nome if obj_especie else '-'), # NOVO
                     ('tratamento', 'Tratamento', antigo['tratamento'], obj_tratamento.nome if obj_tratamento else 'Sem Tratamento'),
                 ]
                 
@@ -2843,21 +2554,23 @@ def editar(request, id):
                 item.empresa = novo_empresa
                 item.origem_destino = novo_origem_destino
                 item.produto = novo_produto
-                item.cliente = novo_cliente  # NOVO
+                item.cliente = novo_cliente
                 item.peso_unitario = novo_peso
                 item.embalagem = novo_emb
                 item.az = novo_az
                 item.observacao = novo_obs
-                item.especie = novo_especie
                 
+                # Atualizando Foreign Keys (Objetos)
                 item.cultivar = obj_cultivar
                 item.peneira = obj_peneira
                 item.categoria = obj_categoria
                 item.tratamento = obj_tratamento
+                item.especie = obj_especie # AGORA VAI FUNCIONAR (OBJETO)
+                
                 item.conferente = request.user
                 
                 # 6. SALVAR E RECALCULAR
-                item.save()  # Isso vai recalcular saldo e peso_total automaticamente
+                item.save()
 
                 # 7. REGISTRAR HISTÓRICO
                 if mudancas:
@@ -2878,24 +2591,13 @@ def editar(request, id):
 
                 messages.success(request, f"✅ Lote {item.lote} atualizado com sucesso!")
                 
-                # Redirecionar de volta para a lista de estoque
-                return redirect('sapp:lista_estoque')
-                
         except Exception as e:
-            print(f"❌ ERRO NA EDIÇÃO: {e}")
             import traceback
-            print(f"🔍 Traceback: {traceback.format_exc()}")
-            messages.error(request, f"❌ Erro ao editar lote: {str(e)}")
-            return redirect('sapp:lista_estoque')
-    
-    else:
-        # GET request - mostrar formulário de edição
-        # Vamos redirecionar para a página principal e abrir o modal via JS
-        # Na prática, você pode criar uma view separada para o formulário ou usar AJAX
-        
-        # Para simplificar, vamos redirecionar com uma flag para abrir o modal
-        return redirect(f"{reverse('sapp:lista_estoque')}?editar={id}")
-    
+            print(f"❌ ERRO NA EDIÇÃO: {e}")
+            print(traceback.format_exc())
+            messages.error(request, f"Erro ao editar lote: {str(e)}")
+            
+    return redirect('sapp:lista_estoque')
     
     
 @login_required
@@ -2927,12 +2629,12 @@ def logout_view(request):
 @login_required
 def configuracoes(request):
     config = Configuracao.get_solo()
-    # Lista de usuários que NÃO são superusers (Conferentes)
     usuarios_conferentes = User.objects.filter(is_superuser=False)
 
     if request.method == 'POST':
         acao = request.POST.get('acao')
         
+        # --- Lógica de Usuários ---
         if acao == 'add_conferente_user':
             if not request.user.is_superuser:
                 messages.error(request, "Apenas Administradores podem criar usuários.")
@@ -2945,7 +2647,7 @@ def configuracoes(request):
                             password='conceito', 
                             first_name=form.cleaned_data['first_name']
                         )
-                        messages.success(request, f"Usuário '{u.username}' criado! Senha padrão: conceito")
+                        messages.success(request, f"Usuário '{u.username}' criado!")
                     except Exception as e:
                         messages.error(request, f"Erro ao criar usuário: {e}")
 
@@ -2963,35 +2665,49 @@ def configuracoes(request):
              form = ConfiguracaoForm(request.POST, instance=config)
              if form.is_valid(): form.save(); messages.success(request, "Salvo!")
         
+        # --- Lógica de Cadastros Auxiliares ---
         elif acao == 'add_cultivar':
              f = CultivarForm(request.POST); 
-             if f.is_valid(): f.save()
+             if f.is_valid(): f.save(); messages.success(request, "Cultivar adicionada.")
+        
+        elif acao == 'add_especie': # <--- NOVO: Adicionar Espécie
+             nome = request.POST.get('nome')
+             if nome:
+                 Especie.objects.get_or_create(nome=nome.strip().upper())
+                 messages.success(request, "Espécie adicionada.")
+
         elif acao == 'add_peneira':
              f = PeneiraForm(request.POST); 
-             if f.is_valid(): f.save()
+             if f.is_valid(): f.save(); messages.success(request, "Peneira adicionada.")
+        
         elif acao == 'add_categoria':
              f = CategoriaForm(request.POST); 
-             if f.is_valid(): f.save()
+             if f.is_valid(): f.save(); messages.success(request, "Categoria adicionada.")
+        
         elif acao == 'add_tratamento':
              f = TratamentoForm(request.POST); 
-             if f.is_valid(): f.save()
+             if f.is_valid(): f.save(); messages.success(request, "Tratamento adicionado.")
         
+        # --- Lógica de Exclusão ---
         elif acao == 'delete_item':
              tipo = request.POST.get('tipo_item')
              uid = request.POST.get('id_item')
              try:
                  if tipo == 'cultivar': Cultivar.objects.get(id=uid).delete()
+                 elif tipo == 'especie': Especie.objects.get(id=uid).delete() # <--- NOVO
                  elif tipo == 'peneira': Peneira.objects.get(id=uid).delete()
                  elif tipo == 'categoria': Categoria.objects.get(id=uid).delete()
                  elif tipo == 'tratamento': Tratamento.objects.get(id=uid).delete()
                  messages.success(request, "Item removido.")
-             except: messages.error(request, "Erro ao remover item.")
+             except Exception as e: 
+                 messages.error(request, f"Erro ao remover item (pode estar em uso): {e}")
 
         return redirect('sapp:configuracoes')
 
     context = {
         'form_config': ConfiguracaoForm(instance=config),
         'cultivares': Cultivar.objects.all(),
+        'especies': Especie.objects.all(), # <--- Isso agora vai funcionar com o import
         'peneiras': Peneira.objects.all(),
         'categorias': Categoria.objects.all(),
         'tratamentos': Tratamento.objects.all(),
@@ -2999,6 +2715,8 @@ def configuracoes(request):
         'form_conf_user': NovoConferenteUserForm(),
     }
     return render(request, 'sapp/configuracoes.html', context)
+
+
 
 
 # views.py - mantenha como estava
@@ -3227,7 +2945,10 @@ def api_buscar_dados_lote(request):
     
     if item_id:
         try:
-            item = Estoque.objects.get(id=item_id)
+            item = Estoque.objects.select_related(
+                'cultivar', 'peneira', 'categoria', 'tratamento', 'especie'
+            ).get(id=item_id)
+            
             data = {
                 'encontrado': True,
                 'lote': item.lote,
@@ -3238,7 +2959,11 @@ def api_buscar_dados_lote(request):
                 'cliente': item.cliente or '',
                 'peso_unitario': str(item.peso_unitario) if item.peso_unitario else '0',
                 'embalagem': item.embalagem or 'BAG',
-                'especie': item.especie or 'SOJA',
+                
+                # --- CORREÇÃO AQUI: Enviar o ID ou Nome, não o objeto ---
+                'especie_id': item.especie.id if item.especie else None,
+                'especie_nome': item.especie.nome if item.especie else 'SOJA',
+                
                 'observacao': item.observacao or '',
                 # IDs para selects
                 'cultivar_id': item.cultivar.id if item.cultivar else None,
@@ -3251,6 +2976,7 @@ def api_buscar_dados_lote(request):
             pass
     
     return JsonResponse({'encontrado': False})
+
 
 @login_required
 def api_saldo_lote(request, id):
@@ -3397,51 +3123,33 @@ def api_ultimas_movimentacoes(request):
     
     
     
-    
 # No sapp/views.py
-
-# --- COLOQUE ISSO NO TOPO DO ARQUIVO SE AINDA NÃO TIVER ---
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from django.db.models import Q, Sum
-from django.core.paginator import Paginator
-from django.contrib import messages
-from .models import Empenho, EmpenhoStatus, ItemEmpenho, Estoque
-from django import forms
-import json
-
-# --- VIEW CORRIGIDA (COLE ALINHADA À ESQUERDA) ---
 @login_required
 def pagina_rascunho(request):
-    mensagem = ''
+    """
+    Página completa de Gestão de Empenhos (Rascunho).
+    Versão corrigida com validações e campos adicionais.
+    """
     
-    # Definição dos Forms
-    class EmpenhoLoteForm(forms.Form):
-        lote_id = forms.IntegerField(widget=forms.HiddenInput())
-        quantidade = forms.IntegerField(min_value=1, widget=forms.NumberInput(attrs={'class': 'form-control'}))
-        nome_empenho = forms.CharField(max_length=100, widget=forms.TextInput(attrs={'class': 'form-control'}))
-        observacao = forms.CharField(required=False, widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
-    
-    class AcoesEmpenhoForm(forms.Form):
-        acao = forms.ChoiceField(
-            choices=[('transferir', 'Transferir'), ('expedir', 'Expedir'), ('editar', 'Editar'), ('excluir', 'Excluir')],
-            widget=forms.Select(attrs={'class': 'form-control'})
-        )
-        endereco_destino = forms.CharField(required=False, widget=forms.TextInput(attrs={'class': 'form-control'}))
-        confirmar = forms.BooleanField(required=False, widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
-
-    # Lógica POST
     if request.method == 'POST':
-        # 1. Empenhar
+        # 1. ADICIONAR UM LOTE AO RASCUNHO
         if 'empenhar_lote' in request.POST:
-            lote_id = request.POST.get('lote_id')
-            quantidade = int(request.POST.get('quantidade', 0))
-            nome_empenho = request.POST.get('nome_empenho', '').strip()
-            observacao = request.POST.get('observacao', '')
-            
             try:
+                lote_id = request.POST.get('lote_id')
+                quantidade = int(request.POST.get('quantidade', 0))
+                nome_empenho = request.POST.get('nome_empenho', '').strip()
+                observacao = request.POST.get('observacao', '')
+                
                 lote = Estoque.objects.get(id=lote_id)
+                
+                if quantidade > lote.saldo:
+                    messages.error(request, f"Erro: Quantidade ({quantidade}) maior que saldo ({lote.saldo}).")
+                    return redirect('sapp:pagina_rascunho')
+                
+                if quantidade <= 0:
+                    messages.error(request, "Quantidade deve ser maior que zero.")
+                    return redirect('sapp:pagina_rascunho')
+
                 status_rascunho, _ = EmpenhoStatus.objects.get_or_create(nome='Rascunho')
                 empenho, _ = Empenho.objects.get_or_create(
                     usuario=request.user, 
@@ -3453,48 +3161,337 @@ def pagina_rascunho(request):
                     empenho=empenho, estoque=lote, quantidade=quantidade,
                     endereco_origem=lote.endereco, observacao=observacao
                 )
-                messages.success(request, "Lote empenhado com sucesso!")
-                return redirect('sapp:pagina_rascunho')
+                messages.success(request, "Lote adicionado ao rascunho!")
             except Exception as e:
-                messages.error(request, f"Erro: {str(e)}")
+                messages.error(request, f"Erro ao empenhar: {str(e)}")
+            return redirect('sapp:pagina_rascunho')
 
-        # 2. Excluir (Corrigido para aceitar o POST da mesma página)
+        # 2. EXCLUIR UM EMPENHO ESPECÍFICO
         elif 'excluir_empenho' in request.POST:
-            empenho_id = request.POST.get('empenho_id')
             try:
+                empenho_id = request.POST.get('empenho_id')
                 Empenho.objects.filter(id=empenho_id, usuario=request.user).delete()
-                messages.success(request, "Empenho excluído!")
-                return redirect('sapp:pagina_rascunho')
+                messages.success(request, "Rascunho excluído com sucesso.")
             except Exception as e:
-                messages.error(request, "Erro ao excluir.")
+                messages.error(request, f"Erro ao excluir: {str(e)}")
+            return redirect('sapp:pagina_rascunho')
 
-    # Lógica GET (Filtros e Paginação)
-    estoque_query = Estoque.objects.filter(saldo__gt=0).order_by('endereco')
+        # 3. AÇÕES EM MASSA
+        elif 'acao_tipo' in request.POST:
+            try:
+                acao = request.POST.get('acao_tipo')
+                origem_acao = request.POST.get('origem_acao', 'linhas')
+                
+                with transaction.atomic():
+                    if origem_acao == 'linhas':
+                        ids_str = request.POST.get('ids_lotes', '')
+                        if not ids_str:
+                            messages.warning(request, "Nenhum lote selecionado.")
+                            return redirect('sapp:pagina_rascunho')
+                        
+                        ids_lotes = [int(id) for id in ids_str.split(',') if id]
+                        lotes_processados = 0
+                        
+                        for lote_id in ids_lotes:
+                            try:
+                                origem = Estoque.objects.get(id=lote_id)
+                                itens_empenho = ItemEmpenho.objects.filter(
+                                    estoque=origem,
+                                    empenho__usuario=request.user,
+                                    empenho__status__nome='Rascunho'
+                                )
+                                
+                                qtd_total = sum(i.quantidade for i in itens_empenho)
+                                
+                                if qtd_total > 0:
+                                    if acao == 'excluir':
+                                        empenhos_ids = itens_empenho.values_list('empenho_id', flat=True).distinct()
+                                        Empenho.objects.filter(id__in=empenhos_ids).delete()
+                                        lotes_processados += 1
+                                    
+                                    elif acao == 'transferir':
+                                        novo_end = request.POST.get('novo_endereco', '').strip().upper()
+                                        if not novo_end:
+                                            messages.error(request, "Endereço de destino é obrigatório.")
+                                            return redirect('sapp:pagina_rascunho')
+                                        
+                                        # Valida se quantidade é menor ou igual ao saldo
+                                        if qtd_total > origem.saldo:
+                                            messages.error(request, 
+                                                         f"Quantidade empenhada ({qtd_total}) maior que saldo ({origem.saldo}) do lote {origem.lote}")
+                                            continue
+                                        
+                                        origem.saida += qtd_total
+                                        origem.save()
+                                        
+                                        obs_global = request.POST.get('obs_global', '')
+                                        tratamento = request.POST.get('tratamento', origem.tratamento)
+                                        cliente = request.POST.get('cliente_transferencia', origem.cliente)
+                                        
+                                        destino = Estoque.objects.create(
+                                            lote=origem.lote,
+                                            endereco=novo_end,
+                                            az=request.POST.get('az', origem.az),
+                                            entrada=qtd_total,
+                                            saldo=qtd_total,
+                                            cultivar=origem.cultivar,
+                                            peneira=origem.peneira,
+                                            categoria=origem.categoria,
+                                            tratamento=tratamento,
+                                            especie=origem.especie,
+                                            produto=origem.produto,
+                                            cliente=cliente,
+                                            empresa=origem.empresa,
+                                            peso_unitario=origem.peso_unitario,
+                                            embalagem=origem.embalagem,
+                                            conferente=request.user,
+                                            origem_destino=f"Transf. de {origem.endereco}",
+                                            observacao=f"Transferido em lote. {obs_global}"
+                                        )
+                                        
+                                        HistoricoMovimentacao.objects.create(
+                                            estoque=origem, usuario=request.user, 
+                                            tipo='Transferência (Saída)', 
+                                            descricao=f"Transferido para {novo_end} (-{qtd_total}) {obs_global}"
+                                        )
+                                        HistoricoMovimentacao.objects.create(
+                                            estoque=destino, usuario=request.user, 
+                                            tipo='Transferência (Entrada)', 
+                                            descricao=f"Recebido de {origem.endereco} (+{qtd_total}) {obs_global}"
+                                        )
+                                        
+                                        empenhos_ids = itens_empenho.values_list('empenho_id', flat=True).distinct()
+                                        Empenho.objects.filter(id__in=empenhos_ids).delete()
+                                        lotes_processados += 1
+                                    
+                                    elif acao == 'expedir':
+                                        numero_carga = request.POST.get('numero_carga', '').strip()
+                                        cliente = request.POST.get('cliente', '').strip()
+                                        
+                                        if not numero_carga:
+                                            messages.error(request, "Número da carga é obrigatório.")
+                                            return redirect('sapp:pagina_rascunho')
+                                        
+                                        if not cliente:
+                                            messages.error(request, "Cliente é obrigatório para expedição.")
+                                            return redirect('sapp:pagina_rascunho')
+                                        
+                                        # Valida se quantidade é menor ou igual ao saldo
+                                        if qtd_total > origem.saldo:
+                                            messages.error(request, 
+                                                         f"Quantidade empenhada ({qtd_total}) maior que saldo ({origem.saldo}) do lote {origem.lote}")
+                                            continue
+                                        
+                                        origem.saida += qtd_total
+                                        origem.save()
+                                        
+                                        obs_global = request.POST.get('obs_global', '')
+                                        
+                                        HistoricoMovimentacao.objects.create(
+                                            estoque=origem, usuario=request.user, 
+                                            tipo='Expedição', 
+                                            descricao=f"Expedido em lote para {cliente} (-{qtd_total}) {obs_global}",
+                                            numero_carga=numero_carga,
+                                            motorista=request.POST.get('motorista'),
+                                            placa=request.POST.get('placa'),
+                                            cliente=cliente
+                                        )
+                                        
+                                        empenhos_ids = itens_empenho.values_list('empenho_id', flat=True).distinct()
+                                        Empenho.objects.filter(id__in=empenhos_ids).delete()
+                                        lotes_processados += 1
+                            
+                            except Estoque.DoesNotExist:
+                                continue
+                        
+                        if lotes_processados > 0:
+                            messages.success(request, f"Processados {lotes_processados} lotes com sucesso.")
+                        else:
+                            messages.warning(request, "Nenhum lote foi processado.")
+                    
+                    elif origem_acao == 'cards':
+                        empenhos_ids_str = request.POST.get('empenhos_ids', '')
+                        if not empenhos_ids_str:
+                            messages.warning(request, "Nenhum card selecionado.")
+                            return redirect('sapp:pagina_rascunho')
+                        
+                        empenhos_ids = [int(id) for id in empenhos_ids_str.split(',') if id]
+                        cards_processados = 0
+                        
+                        for empenho_id in empenhos_ids:
+                            try:
+                                empenho = Empenho.objects.get(
+                                    id=empenho_id, 
+                                    usuario=request.user,
+                                    status__nome='Rascunho'
+                                )
+                                
+                                if acao == 'excluir':
+                                    empenho.delete()
+                                    cards_processados += 1
+                                
+                                elif acao == 'transferir' or acao == 'expedir':
+                                    itens_empenho = empenho.itens.all()
+                                    itens_processados = 0
+                                    
+                                    for item in itens_empenho:
+                                        origem = item.estoque
+                                        quantidade = item.quantidade
+                                        
+                                        if quantidade <= origem.saldo:
+                                            origem.saida += quantidade
+                                            origem.save()
+                                            
+                                            obs_global = request.POST.get('obs_global', '')
+                                            
+                                            if acao == 'transferir':
+                                                novo_end = request.POST.get('novo_endereco', '').strip().upper()
+                                                if not novo_end:
+                                                    messages.error(request, "Endereço de destino é obrigatório.")
+                                                    return redirect('sapp:pagina_rascunho')
+                                                
+                                                tratamento = request.POST.get('tratamento', origem.tratamento)
+                                                cliente = request.POST.get('cliente_transferencia', origem.cliente)
+                                                
+                                                destino = Estoque.objects.create(
+                                                    lote=origem.lote,
+                                                    endereco=novo_end,
+                                                    az=request.POST.get('az', origem.az),
+                                                    entrada=quantidade,
+                                                    saldo=quantidade,
+                                                    cultivar=origem.cultivar,
+                                                    peneira=origem.peneira,
+                                                    categoria=origem.categoria,
+                                                    tratamento=tratamento,
+                                                    especie=origem.especie,
+                                                    produto=origem.produto,
+                                                    cliente=cliente,
+                                                    empresa=origem.empresa,
+                                                    peso_unitario=origem.peso_unitario,
+                                                    embalagem=origem.embalagem,
+                                                    conferente=request.user,
+                                                    origem_destino=f"Transf. de {origem.endereco}",
+                                                    observacao=f"Transferido via empenho {empenho.observacao}. {obs_global}"
+                                                )
+                                                
+                                                HistoricoMovimentacao.objects.create(
+                                                    estoque=origem, usuario=request.user, 
+                                                    tipo='Transferência (Saída)', 
+                                                    descricao=f"Transferido para {novo_end} via empenho {empenho.observacao} (-{quantidade})"
+                                                )
+                                                HistoricoMovimentacao.objects.create(
+                                                    estoque=destino, usuario=request.user, 
+                                                    tipo='Transferência (Entrada)', 
+                                                    descricao=f"Recebido de {origem.endereco} via empenho {empenho.observacao} (+{quantidade})"
+                                                )
+                                            
+                                            elif acao == 'expedir':
+                                                numero_carga = request.POST.get('numero_carga', '').strip()
+                                                cliente_exped = request.POST.get('cliente', '').strip()
+                                                
+                                                if not numero_carga:
+                                                    messages.error(request, "Número da carga é obrigatório.")
+                                                    return redirect('sapp:pagina_rascunho')
+                                                
+                                                if not cliente_exped:
+                                                    messages.error(request, "Cliente é obrigatório para expedição.")
+                                                    return redirect('sapp:pagina_rascunho')
+                                                
+                                                HistoricoMovimentacao.objects.create(
+                                                    estoque=origem, usuario=request.user, 
+                                                    tipo='Expedição', 
+                                                    descricao=f"Expedido via empenho {empenho.observacao} para {cliente_exped} (-{quantidade})",
+                                                    numero_carga=numero_carga,
+                                                    motorista=request.POST.get('motorista'),
+                                                    placa=request.POST.get('placa'),
+                                                    cliente=cliente_exped
+                                                )
+                                            
+                                            itens_processados += 1
+                                    
+                                    if itens_processados > 0:
+                                        empenho.delete()
+                                        cards_processados += 1
+                            
+                            except Empenho.DoesNotExist:
+                                continue
+                        
+                        if cards_processados > 0:
+                            messages.success(request, f"Processados {cards_processados} cards com sucesso.")
+                        else:
+                            messages.warning(request, "Nenhum card foi processado.")
+                
+            except Exception as e:
+                messages.error(request, f"Erro ao processar ação: {str(e)}")
+            
+            return redirect('sapp:pagina_rascunho')
     
-    filtro_lote = request.GET.get('filtro_lote', '')
-    busca = request.GET.get('busca', '')
+    # ==========================================
+    # LÓGICA GET (EXIBIÇÃO)
+    # ==========================================
+    estoque_query = Estoque.objects.filter(saldo__gt=0).select_related(
+        'cultivar', 'peneira', 'categoria', 'especie'
+    ).order_by('endereco')
     
-    if filtro_lote: estoque_query = estoque_query.filter(lote__icontains=filtro_lote)
+    # Filtros
+    f_lote = request.GET.get('filtro_lote', '').strip()
+    f_cultivar = request.GET.get('filtro_cultivar', '').strip()
+    f_peneira = request.GET.get('filtro_peneira', '').strip()
+    f_categoria = request.GET.get('filtro_categoria', '').strip()
+    f_endereco = request.GET.get('filtro_endereco', '').strip()
+    f_cliente = request.GET.get('filtro_cliente', '').strip()
+    busca = request.GET.get('busca', '').strip()
+    embalagem = request.GET.get('embalagem', '').strip()
+    
+    if f_lote: 
+        estoque_query = estoque_query.filter(lote__icontains=f_lote)
+    if f_cultivar: 
+        estoque_query = estoque_query.filter(cultivar__nome__icontains=f_cultivar)
+    if f_peneira: 
+        estoque_query = estoque_query.filter(peneira__nome__icontains=f_peneira)
+    if f_categoria: 
+        estoque_query = estoque_query.filter(categoria__nome__icontains=f_categoria)
+    if f_endereco: 
+        estoque_query = estoque_query.filter(endereco__icontains=f_endereco)
+    if f_cliente: 
+        estoque_query = estoque_query.filter(cliente__icontains=f_cliente)
+    if embalagem:
+        estoque_query = estoque_query.filter(embalagem=embalagem)
+    
     if busca:
-        # Busca por nome de empenho ou dados do lote
-        ids_por_empenho = ItemEmpenho.objects.filter(empenho__observacao__icontains=busca).values_list('estoque_id', flat=True)
-        estoque_query = estoque_query.filter(Q(lote__icontains=busca) | Q(id__in=ids_por_empenho))
+        estoque_query = estoque_query.filter(
+            Q(lote__icontains=busca) | 
+            Q(produto__icontains=busca) |
+            Q(cliente__icontains=busca) |
+            Q(tratamento__icontains=busca) |
+            Q(id__in=ItemEmpenho.objects.filter(
+                empenho__observacao__icontains=busca
+            ).values_list('estoque_id', flat=True))
+        )
 
     # Paginação
-    paginator = Paginator(estoque_query, int(request.GET.get('page_size', 25)))
+    try:
+        page_size = int(request.GET.get('page_size', 25))
+    except: 
+        page_size = 25
+    
+    paginator = Paginator(estoque_query, page_size)
     estoque_page = paginator.get_page(request.GET.get('page', 1))
 
     # Montagem dos dados
     lotes_com_empenho = []
-    # Otimização simples para evitar N+1 queries
+    
+    # Busca empenhos apenas dos lotes visíveis
     itens_empenhados = ItemEmpenho.objects.filter(
         estoque__in=estoque_page, 
-        empenho__status__nome='Rascunho'
+        empenho__status__nome='Rascunho',
+        empenho__usuario=request.user
     ).select_related('empenho')
 
     for item in estoque_page:
         meus_itens = [i for i in itens_empenhados if i.estoque_id == item.id]
         qtd_emp = sum(i.quantidade for i in meus_itens)
+        
         lotes_com_empenho.append({
             'lote': item,
             'saldo_total': item.saldo,
@@ -3503,30 +3500,108 @@ def pagina_rascunho(request):
             'empenhos': meus_itens
         })
 
-    # Contexto
-    params = request.GET.copy()
-    if 'page' in params: del params['page']
+    # Totais
+    total_saldo = estoque_query.aggregate(Sum('saldo'))['saldo__sum'] or 0
+    total_bags = estoque_query.filter(embalagem='BAG').aggregate(Sum('saldo'))['saldo__sum'] or 0
+    total_sc = estoque_query.filter(embalagem='SC').aggregate(Sum('saldo'))['saldo__sum'] or 0
+    total_sc_convertido = (total_bags * 25) + total_sc
     
+    # Empenhos do usuário
+    todos_empenhos_usuario = Empenho.objects.filter(
+        usuario=request.user, 
+        status__nome='Rascunho'
+    ).prefetch_related('itens__estoque').order_by('-id')
+    
+    # REMOVA ESTA LINHA PROBLEMÁTICA:
+    # Não é necessário calcular saldo_afetado aqui, ele será calculado pela propriedade no template
+
+    # Preserva filtros
+    params = request.GET.copy()
+    if 'page' in params: 
+        del params['page']
+
     context = {
         'lotes': lotes_com_empenho,
         'estoque': estoque_page,
-        'todos_empenhos': Empenho.objects.filter(usuario=request.user, status__nome='Rascunho'),
-        'form_empenho': EmpenhoLoteForm(),
-        'form_acoes': AcoesEmpenhoForm(),
+        'todos_empenhos': todos_empenhos_usuario,
         'url_filtros': '&' + params.urlencode() if params else '',
-        'filtro_lote': filtro_lote,
+        
+        'filtro_lote': f_lote, 
+        'filtro_cultivar': f_cultivar,
+        'filtro_peneira': f_peneira, 
+        'filtro_categoria': f_categoria,
+        'filtro_endereco': f_endereco, 
+        'filtro_cliente': f_cliente,
         'busca': busca,
+        'embalagem': embalagem,
+        
         'total_lotes': estoque_query.count(),
-        'total_saldo': estoque_query.aggregate(Sum('saldo'))['saldo__sum'] or 0,
+        'total_saldo': total_saldo,
+        'total_sc_convertido': total_sc_convertido,
+        'page_sizes': [25, 50, 100, 200]
     }
-    
 
     return render(request, 'sapp/pagina_rascunho.html', context)
 
 
 
-# Em sapp/views.py
+@login_required
+def api_buscar_dados_lote(request):
+    """API para buscar detalhes de um lote"""
+    item_id = request.GET.get('item_id')
+    
+    try:
+        lote = Estoque.objects.get(id=item_id)
+        return JsonResponse({
+            'encontrado': True,
+            'lote': lote.lote,
+            'cultivar_nome': lote.cultivar.nome if lote.cultivar else '',
+            'peneira_nome': lote.peneira.nome if lote.peneira else '',
+            'categoria_nome': lote.categoria.nome if lote.categoria else '',
+            'endereco': lote.endereco,
+            'az': lote.az,
+            'cliente': lote.cliente,
+            'empresa': lote.empresa,
+            'embalagem': lote.get_embalagem_display(),
+            'tratamento': lote.tratamento,
+            'saldo': lote.saldo,
+            'observacao': lote.observacao
+        })
+    except Estoque.DoesNotExist:
+        return JsonResponse({'encontrado': False})    
 
+
+@login_required
+def api_itens_empenhos(request):
+    """API para buscar itens dos empenhos selecionados"""
+    empenhos_ids = request.GET.get('empenhos_ids', '')
+    
+    if not empenhos_ids:
+        return JsonResponse({'itens': []})
+    
+    ids_list = [int(id) for id in empenhos_ids.split(',') if id.isdigit()]
+    
+    itens = ItemEmpenho.objects.filter(
+        empenho_id__in=ids_list,
+        empenho__usuario=request.user
+    ).select_related('estoque', 'empenho')
+    
+    itens_data = []
+    for item in itens:
+        itens_data.append({
+            'lote': item.estoque.lote,
+            'quantidade': item.quantidade,
+            'empenho': item.empenho.observacao,
+            'endereco': item.estoque.endereco
+        })
+    
+    return JsonResponse({
+        'itens': itens_data,
+        'total': len(itens_data)
+    })
+    
+    
+    
 @login_required
 def api_autocomplete_nova_entrada(request):
     """
@@ -3538,26 +3613,43 @@ def api_autocomplete_nova_entrada(request):
         return JsonResponse([], safe=False)
     
     # Busca lotes que contenham o texto digitado
-    # Ordena por ID decrescente para pegar os mais recentes primeiro
-    qs = Estoque.objects.filter(lote__icontains=termo).values(
-        'lote', 'produto', 'cultivar__id', 'peneira__id', 'categoria__id', 
-        'tratamento__id', 'empresa', 'origem_destino', 'cliente', 
-        'peso_unitario', 'embalagem', 'az', 'especie', 'observacao'
+    qs = Estoque.objects.filter(lote__icontains=termo).select_related(
+        'especie', 'cultivar', 'peneira', 'categoria', 'tratamento'
     ).order_by('-id')
     
-    # Filtra para não mostrar lotes repetidos na lista
     resultados = []
     lotes_vistos = set()
     
     for item in qs:
-        if item['lote'] not in lotes_vistos:
+        if item.lote not in lotes_vistos:
+            # Prepara os dados manualmente para evitar erro de serialização
+            dados_item = {
+                'lote': item.lote,
+                'produto': item.produto or '',
+                'cultivar__id': item.cultivar.id if item.cultivar else None,
+                'peneira__id': item.peneira.id if item.peneira else None,
+                'categoria__id': item.categoria.id if item.categoria else None,
+                'tratamento__id': item.tratamento.id if item.tratamento else None,
+                
+                # --- CORREÇÃO AQUI ---
+                'especie__id': item.especie.id if item.especie else None,
+                
+                'empresa': item.empresa or '',
+                'origem_destino': item.origem_destino or '',
+                'cliente': item.cliente or '',
+                'peso_unitario': str(item.peso_unitario),
+                'embalagem': item.embalagem,
+                'az': item.az or '',
+                'observacao': item.observacao or ''
+            }
+
             resultados.append({
-                'label': item['lote'],
-                'dados': item
+                'label': item.lote,
+                'dados': dados_item
             })
-            lotes_vistos.add(item['lote'])
+            lotes_vistos.add(item.lote)
         
-        if len(resultados) >= 10: # Limita a 10 resultados
+        if len(resultados) >= 10: 
             break
             
     return JsonResponse(resultados, safe=False)
