@@ -1,151 +1,251 @@
-<!-- Modal de Exportação -->
-<div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="fa-solid fa-download me-2"></i>Exportar Dados
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- FONTES PREMIUM (Plus Jakarta Sans) -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+    :root {
+        --glass-bg: rgba(255, 255, 255, 0.95);
+        --p-indigo: #4f46e5;
+        --p-emerald: #10b981;
+        --p-amber: #f59e0b;
+        --p-rose: #f43f5e;
+        --soft-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    /* CUSTOMIZAÇÃO GERAL DE MODAIS */
+    .modal-content {
+        border-radius: 20px;
+        border: none;
+        box-shadow: var(--soft-shadow);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .modal-header {
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding: 1.5rem 2rem;
+    }
+
+    .modal-title { font-weight: 700; letter-spacing: -0.5px; }
+
+    /* ESTILO DOS CARDS DE EXPORTAÇÃO */
+    .export-card {
+        border: 2px solid #f1f5f9;
+        border-radius: 16px;
+        padding: 24px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        text-align: center;
+        text-decoration: none;
+        display: block;
+        height: 100%;
+    }
+
+    .export-card:hover {
+        transform: translateY(-8px);
+        border-color: var(--p-indigo);
+        background: #f8fafc;
+        box-shadow: 0 10px 20px rgba(79, 70, 229, 0.1);
+    }
+
+    .export-card.excel-type i { color: var(--p-emerald); }
+    .export-card.pdf-type i { color: var(--p-rose); }
+
+    /* ÁREA DE UPLOAD PERSONALIZADA */
+    .import-drop-area {
+        border: 2px dashed #cbd5e1;
+        border-radius: 16px;
+        padding: 40px;
+        text-align: center;
+        transition: 0.3s;
+        background: #f8fafc;
+    }
+
+    .import-drop-area:hover {
+        border-color: var(--p-indigo);
+        background: #f0f7ff;
+    }
+
+    /* ESTILOS DE STATUS DE PREVIEW */
+    .preview-table-container {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+
+    .row-status-new { border-left: 5px solid var(--p-emerald) !important; background: rgba(16, 185, 129, 0.03); }
+    .row-status-update { border-left: 5px solid var(--p-amber) !important; background: rgba(245, 158, 11, 0.03); }
+
+    /* ALERTAS CLEAN */
+    .premium-alert {
+        border: none;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        font-size: 0.85rem;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+    }
+
+    .alert-indigo { background: #e0e7ff; color: #3730a3; }
+    .alert-amber { background: #fef3c7; color: #92400e; }
+
+    /* BOTÕES */
+    .btn-premium {
+        border-radius: 10px;
+        padding: 10px 24px;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+</style>
+
+<!-- MODAL EXPORTAR (Visual Reformulado com Tiles) -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-2xl">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h4 class="modal-title text-dark"><i class="fa-solid fa-cloud-arrow-down me-2 text-primary"></i>Exportar Estoque</h4>
+                    <p class="text-muted small mb-0">Selecione o formato desejado para processamento.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <p class="text-muted mb-3">Escolha o formato para exportação:</p>
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card h-100 border-success">
-                            <div class="card-body text-center">
-                                <i class="fa-solid fa-file-excel fa-3x text-success mb-3"></i>
-                                <h5 class="card-title">Exportar para Excel</h5>
-                                <p class="card-text text-muted small">Exporta todos os dados com formatação completa</p>
-                                <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success w-100">
-                                    <i class="fa-solid fa-download me-2"></i>Baixar Excel
-                                </a>
-                            </div>
-                        </div>
+            <div class="modal-body p-4">
+                <div class="row g-4">
+                    <div class="col-6">
+                        <a href="{% url 'sapp:exportar_estoque_excel' %}" class="export-card excel-type shadow-sm">
+                            <div class="mb-3"><i class="fa-solid fa-file-excel fa-3x"></i></div>
+                            <h6 class="fw-bold text-dark">Planilha Excel</h6>
+                            <span class="text-muted extra-small">Edição e análise de dados.</span>
+                        </a>
                     </div>
-                    <div class="col-md-6">
-                        <div class="card h-100 border-danger">
-                            <div class="card-body text-center">
-                                <i class="fa-solid fa-file-pdf fa-3x text-danger mb-3"></i>
-                                <h5 class="card-title">Exportar para PDF</h5>
-                                <p class="card-text text-muted small">Relatório formatado para impressão</p>
-                                <a href="{% url 'sapp:exportar_estoque_pdf' %}" class="btn btn-danger w-100">
-                                    <i class="fa-solid fa-download me-2"></i>Baixar PDF
-                                </a>
-                            </div>
-                        </div>
+                    <div class="col-6">
+                        <a href="{% url 'sapp:exportar_estoque_pdf' %}" class="export-card pdf-type shadow-sm">
+                            <div class="mb-3"><i class="fa-solid fa-file-pdf fa-3x"></i></div>
+                            <h6 class="fw-bold text-dark">Relatório PDF</h6>
+                            <span class="text-muted extra-small">Formatado para impressão.</span>
+                        </a>
                     </div>
                 </div>
-                <div class="mt-3">
-                    <div class="alert alert-info">
-                        <i class="fa-solid fa-circle-info me-1"></i>
-                        <strong>Inclui todos os campos:</strong> Lote, Produto, Cultivar, Peneira, Categoria, Endereço, Saldo, 
-                        Peso Unitário, Peso Total, Tratamento, Embalagem, Cliente, Empresa, AZ, Status, Conferente, Data Entrada, Observações.
-                    </div>
+                <div class="premium-alert alert-indigo mt-4">
+                    <i class="fa-solid fa-info-circle fa-lg"></i>
+                    <span>O sistema irá processar todos os campos técnicos, incluindo lotes, endereços e saldos atuais.</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal de Importação -->
-<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
-                    <i class="fa-solid fa-upload me-2"></i>Importar Dados
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- MODAL IMPORTAR (Com UI de Arraste de Arquivo) -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0">
+            <div class="modal-header border-0 bg-primary text-white p-4">
+                <div>
+                    <h5 class="modal-title fs-4"><i class="fa-solid fa-cloud-arrow-up me-2"></i>Importação de Inteligente</h5>
+                    <p class="opacity-75 mb-0 small">As atualizações são processadas via algoritmo incremental.</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <form id="importForm" enctype="multipart/form-data">
                     {% csrf_token %}
-                    <div class="mb-4">
-                        <label class="form-label fw-medium">Selecione o arquivo Excel</label>
-                        <div class="input-group">
-                            <input type="file" class="form-control" name="excel_file" accept=".xlsx, .xls" required>
-                            <button class="btn btn-outline-primary" type="button" onclick="document.getElementById('downloadTemplate').click()">
-                                <i class="fa-solid fa-file-download me-1"></i>Template
-                            </button>
-                        </div>
-                        <div class="form-text">
-                            Use a planilha exportada deste sistema ou 
-                            <a href="#" onclick="document.getElementById('downloadTemplate').click()">baixe o template</a>
-                        </div>
-                        <a id="downloadTemplate" href="{% url 'sapp:exportar_estoque_excel' %}" style="display: none;"></a>
+                    <div class="import-drop-area mb-4">
+                        <i class="fa-solid fa-file-upload fa-4x text-muted opacity-50 mb-3"></i>
+                        <h6 class="fw-bold">Clique para selecionar ou arraste o arquivo</h6>
+                        <p class="text-muted small">Suportado apenas extensões .xlsx e .xls</p>
+                        <input type="file" name="excel_file" id="fileImportInput" class="form-control" hidden required onchange="updateFileNameDisplay(this)">
+                        <button type="button" class="btn btn-outline-primary btn-sm px-4 rounded-pill" onclick="document.getElementById('fileImportInput').click()">Selecionar Arquivo</button>
+                        <div id="fileNameDisplay" class="mt-2 fw-bold text-primary small"></div>
                     </div>
                     
-                    <div class="alert alert-info">
-                        <i class="fa-solid fa-lightbulb me-2"></i>
-                        <strong>Modo Incremental:</strong> 
-                        <ul class="mb-0 mt-1">
-                            <li>Novos lotes serão criados</li>
-                            <li>Lotes existentes serão atualizados</li>
-                            <li>Nenhum lote será removido do sistema</li>
-                            <li>O campo <strong>cliente</strong> será mantido nas transferências</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="alert alert-warning">
-                        <i class="fa-solid fa-triangle-exclamation me-2"></i>
-                        <strong>Importante:</strong> Certifique-se de que a planilha contenha as colunas necessárias, 
-                        incluindo o novo campo <strong>Cliente</strong>.
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <div class="premium-alert alert-indigo">
+                                <i class="fa-solid fa-check-double text-indigo"></i>
+                                <span><b>Lotes Novos:</b> Serão inseridos automaticamente. <br> <b>Existentes:</b> Apenas os dados modificados serão alterados.</span>
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="previewImport()">
-                    <i class="fa-solid fa-eye me-2"></i>Pré-visualizar
+            <div class="modal-footer border-0 p-4 pt-0">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary rounded-pill px-5 fw-bold shadow" onclick="previewImport()">
+                    <i class="fa-solid fa-wand-magic-sparkles me-2"></i>PROCESSAR ARQUIVO
                 </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal de Pré-visualização -->
-<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title">
-                    <i class="fa-solid fa-eye me-2"></i>Pré-visualização da Importação
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<!-- MODAL DE PRÉ-VISUALIZAÇÃO (Tabela Ultra Limpa) -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-fullscreen-lg-down">
+        <div class="modal-content shadow-2xl">
+            <div class="modal-header border-0 p-4">
+                <div>
+                    <h5 class="modal-title fw-bold text-dark fs-3">Verificação de Consistência</h5>
+                    <span class="badge rounded-pill bg-emerald-100 text-emerald-800 border-0 px-3">Dados Validados</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div id="previewContent"></div>
+            <div class="modal-body p-0 px-4">
+                <div class="d-flex gap-4 mb-4 mt-2">
+                    <div class="d-flex align-items-center"><div class="me-2 rounded-circle" style="width:12px; height:12px; background:var(--p-emerald)"></div> <small>Novo Lote</small></div>
+                    <div class="d-flex align-items-center"><div class="me-2 rounded-circle" style="width:12px; height:12px; background:var(--p-amber)"></div> <small>Alteração</small></div>
+                </div>
+                <div class="preview-table-container">
+                    <div id="previewContent" class="table-responsive" style="max-height: 50vh;">
+                        <!-- O CONTEÚDO SERÁ INJETADO AQUI PELO JS -->
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="proceedToApproval()">
-                    <i class="fa-solid fa-check me-2"></i>Continuar para Aprovação
-                </button>
+            <div class="modal-footer p-4 border-0">
+                <button type="button" class="btn btn-light px-4" data-bs-dismiss="modal">Recusar</button>
+                <button type="button" class="btn btn-primary rounded-pill px-5 fw-bold" onclick="proceedToApproval()">PROSSEGUIR COM APROVAÇÃO <i class="fa-solid fa-chevron-right ms-2"></i></button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal de Aprovação -->
-<div class="modal fade" id="approvalModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+<!-- MODAL DE APROVAÇÃO FINAL -->
+<div class="modal fade" id="approvalModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="fa-solid fa-shield-check me-2"></i>Aprovar Modificações
+            <div class="modal-header bg-success-subtle border-0">
+                <h5 class="modal-title fw-bold text-success">
+                    <i class="fa-solid fa-shield-halved me-2"></i>Confirmar Gravatão no Banco
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div id="approvalContent"></div>
+            <div class="modal-body p-4 text-center">
+                <div class="mb-3">
+                    <i class="fa-solid fa-database fa-4x text-success opacity-25"></i>
+                </div>
+                <h4 class="fw-bold mb-3">Tudo pronto para finalizar!</h4>
+                <p id="approvalStatsSummary" class="text-muted">Analisando impacto nas tabelas de Estoque e Clientes...</p>
+                
+                <div id="approvalContent" class="text-start">
+                    <!-- Detalhes injetados via JS -->
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success" onclick="submitApproval()" id="approveButton">
-                    <i class="fa-solid fa-check-double me-2"></i>Aprovar Modificações
+            <div class="modal-footer p-4 pt-0 flex-column border-0">
+                <button type="button" class="btn btn-success btn-lg w-100 fw-bold rounded-pill shadow-lg mb-2" onclick="submitApproval()" id="approveButton">
+                    <i class="fa-solid fa-check-circle me-2"></i>AUTORIZAR ALTERAÇÕES
                 </button>
+                <button type="button" class="btn btn-link text-muted btn-sm text-decoration-none" data-bs-dismiss="modal">Vou revisar os dados novamente</button>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    // AJUSTES DE UX - SCRIPT
+    function updateFileNameDisplay(input) {
+        const display = document.getElementById('fileNameDisplay');
+        if (input.files.length > 0) {
+            display.innerHTML = `<i class="fa-solid fa-file-csv me-1"></i> Selecionado: <b>${input.files[0].name}</b>`;
+        }
+    }
+
+    // A lógica JavaScript do PREVIEW deve injetar as classes 'row-status-new' e 'row-status-update' 
+    // nas <tr> para manter o visual premium prometido.
+</script>

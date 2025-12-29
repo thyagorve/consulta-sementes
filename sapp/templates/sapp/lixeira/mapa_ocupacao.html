@@ -1,0 +1,968 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    :root {
+        --cor-fundo: #f8fafc;
+        --cor-borda: #e2e8f0;
+    }
+    
+    .container-mapa {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid var(--cor-borda);
+        min-height: 80vh;
+        position: relative;
+        overflow: auto;
+    }
+    
+    #areaDesenho {
+        position: relative;
+        width: 100%;
+        height: 600px;
+        background: #f8fafc;
+        border: 2px dashed #cbd5e1;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        overflow: hidden;
+        user-select: none;
+    }
+    
+    .retangulo-endereco {
+        position: absolute;
+        border: 2px solid;
+        border-radius: 6px;
+        cursor: move;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: rgba(0,0,0,0.8);
+        user-select: none;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        min-width: 80px;
+        min-height: 50px;
+        resize: none;
+    }
+    
+    .retangulo-endereco:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        z-index: 100 !important;
+    }
+    
+    .retangulo-endereco.sem-saldo {
+        opacity: 0.7;
+    }
+    
+    .retangulo-endereco.resizing {
+        cursor: nwse-resize;
+    }
+    
+    .painel-controles {
+        background: #f1f5f9;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .btn-mapa {
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .resize-handle {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 15px;
+        height: 15px;
+        background: #4f46e5;
+        border-radius: 2px;
+        cursor: nwse-resize;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    
+    .retangulo-endereco:hover .resize-handle {
+        opacity: 0.8;
+    }
+    
+    .resize-handle:hover {
+        opacity: 1 !important;
+        background: #4338ca;
+    }
+    
+    .btn-acoes-retangulo {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        display: none;
+        gap: 2px;
+        z-index: 101;
+    }
+    
+    .retangulo-endereco:hover .btn-acoes-retangulo {
+        display: flex;
+    }
+    
+    .btn-acao-ret {
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        border-radius: 3px;
+    }
+    
+    .info-endereco {
+        position: absolute;
+        bottom: 2px;
+        left: 2px;
+        font-size: 9px;
+        background: rgba(255,255,255,0.9);
+        padding: 1px 4px;
+        border-radius: 3px;
+        display: none;
+        z-index: 100;
+    }
+    
+    .retangulo-endereco:hover .info-endereco {
+        display: block;
+    }
+    
+    .legenda {
+        display: flex;
+        gap: 20px;
+        margin-top: 20px;
+        padding-top: 10px;
+        border-top: 1px solid #dee2e6;
+        flex-wrap: wrap;
+    }
+    
+    .item-legenda {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .cor-legenda {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+    }
+    
+    /* Linhas do armazém */
+    .linha-armazem {
+        position: absolute;
+        background-color: #94a3b8;
+        z-index: 1;
+    }
+    
+    .linha-horizontal {
+        height: 1px;
+        width: 100%;
+        left: 0;
+    }
+    
+    .linha-vertical {
+        width: 1px;
+        height: 100%;
+        top: 0;
+    }
+    
+    /* Seletor de armazém */
+    .seletor-armazem {
+        background: #e2e8f0;
+        border-radius: 6px;
+        padding: 0.5rem;
+        margin-bottom: 1rem;
+    }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 fw-bold text-dark mb-1">📊 Mapa de Ocupação</h2>
+            <p class="text-muted mb-0">Arraste, redimensione e gerencie os endereços do armazém</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button id="btnDesenharLinhas" class="btn btn-outline-secondary">
+                <i class="fas fa-ruler-combined me-1"></i> Desenhar Linhas
+            </button>
+            <button id="btnSalvarPosicoes" class="btn btn-success">
+                <i class="fas fa-save me-1"></i> Salvar Mapa
+            </button>
+        </div>
+    </div>
+    
+    <!-- Seletor de Armazém -->
+    <div class="seletor-armazem">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Selecionar Armazém:</label>
+                <select id="selectArmazem" class="form-select">
+                    <option value="1">Armazém 1 (Principal)</option>
+                    <option value="2">Armazém 2</option>
+                    <option value="3">Armazém 3</option>
+                </select>
+            </div>
+            <div class="col-md-8">
+                <div class="d-flex gap-2">
+                    <button id="btnNovoArmazem" class="btn btn-outline-primary">
+                        <i class="fas fa-warehouse me-1"></i> Novo Armazém
+                    </button>
+                    <button id="btnSalvarArmazem" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Salvar Layout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Painel de Controles -->
+    <div class="painel-controles">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Novo Endereço:</label>
+                <input type="text" id="inputEndereco" class="form-control" 
+                       placeholder="Ex: A001, B203..." maxlength="20">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Largura:</label>
+                <input type="number" id="inputLargura" class="form-control" value="120" min="50" max="500">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Altura:</label>
+                <input type="number" id="inputAltura" class="form-control" value="60" min="30" max="300">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Cor (Vazio):</label>
+                <input type="color" id="corPadrao" class="form-control form-control-color" value="#CCCCCC">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Cor (Com Saldo):</label>
+                <input type="color" id="corPositivo" class="form-control form-control-color" value="#10b981">
+            </div>
+            <div class="col-md-1">
+                <button id="btnAdicionarRetangulo" class="btn btn-primary w-100">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Status -->
+        <div class="mt-3 row g-3">
+            <div class="col-auto">
+                <div class="d-flex align-items-center">
+                    <div class="cor-legenda me-2" style="background-color: #10b981;"></div>
+                    <small class="text-muted">Com saldo: <span id="countComSaldo">0</span></small>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="d-flex align-items-center">
+                    <div class="cor-legenda me-2" style="background-color: #CCCCCC;"></div>
+                    <small class="text-muted">Sem saldo: <span id="countSemSaldo">0</span></small>
+                </div>
+            </div>
+            <div class="col-auto">
+                <small class="text-muted">Total: <span id="countTotal">0</span> endereços</small>
+            </div>
+            <div class="col-auto ms-auto">
+                <button id="btnAtualizarCores" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-sync-alt me-1"></i> Atualizar Cores
+                </button>
+                <button id="btnLimparMapa" class="btn btn-sm btn-outline-danger ms-2">
+                    <i class="fas fa-trash me-1"></i> Limpar Tudo
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Área do Mapa -->
+    <div class="container-mapa">
+        <div id="areaDesenho">
+            <!-- Linhas do armazém serão adicionadas aqui via JavaScript -->
+            {% for mapa in mapeamentos %}
+            <div class="retangulo-endereco"
+                 data-id="{{ mapa.id }}"
+                 data-endereco="{{ mapa.endereco }}"
+                 data-cor-padrao="{{ mapa.cor_padrao }}"
+                 data-cor-positivo="{{ mapa.cor_positivo }}"
+                 style="left: {{ mapa.pos_x }}px; 
+                        top: {{ mapa.pos_y }}px;
+                        width: {{ mapa.largura }}px; 
+                        height: {{ mapa.altura }}px;
+                        background-color: {{ mapa.cor_atual }};
+                        border-color: {{ mapa.cor_atual }};
+                        z-index: 10;">
+                
+                {{ mapa.endereco }}
+                
+                <!-- Ações do retângulo -->
+                <div class="btn-acoes-retangulo">
+                    <button class="btn-acao-ret btn btn-sm btn-danger btn-excluir-retangulo" 
+                            title="Excluir" data-endereco="{{ mapa.endereco }}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="btn-acao-ret btn btn-sm btn-warning btn-editar-retangulo" 
+                            title="Editar" data-endereco="{{ mapa.endereco }}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </div>
+                
+                <!-- Informações -->
+                <div class="info-endereco">
+                    {{ mapa.largura }}x{{ mapa.altura }}
+                </div>
+                
+                <!-- Handle para redimensionar -->
+                <div class="resize-handle"></div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted py-5">
+                <i class="fas fa-map-marked-alt fa-3x mb-3"></i>
+                <p>Nenhum endereço configurado</p>
+                <p class="small">Use o painel acima para adicionar seu primeiro endereço</p>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Dicas de uso -->
+        <div class="mt-3">
+            <div class="alert alert-light border">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold"><i class="fas fa-mouse-pointer me-2"></i> Como usar:</h6>
+                        <ul class="small mb-0">
+                            <li><strong>Arrastar:</strong> Clique e arraste para mover</li>
+                            <li><strong>Redimensionar:</strong> Use o canto inferior direito</li>
+                            <li><strong>Excluir:</strong> Passe o mouse e clique no botão vermelho</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6 class="fw-bold"><i class="fas fa-save me-2"></i> Para salvar:</h6>
+                        <ul class="small mb-0">
+                            <li>Posições são salvas apenas ao clicar em <strong>"Salvar Mapa"</strong></li>
+                            <li>Clique em <strong>"Atualizar Cores"</strong> para verificar saldos</li>
+                            <li>Use <strong>"Desenhar Linhas"</strong> para marcar corredores</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Desenhar Linhas -->
+<div class="modal fade" id="modalDesenharLinhas" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-ruler me-2"></i> Desenhar Linhas do Armazém</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Tipo de Linha:</label>
+                    <select id="selectTipoLinha" class="form-select">
+                        <option value="horizontal">Horizontal (Corredor)</option>
+                        <option value="vertical">Vertical (Prateleira)</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Posição (px do topo ou esquerda):</label>
+                    <input type="number" id="inputPosicaoLinha" class="form-control" value="100" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Comprimento (px - 0 = toda a área):</label>
+                    <input type="number" id="inputComprimentoLinha" class="form-control" value="0" min="0">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Cor da Linha:</label>
+                    <input type="color" id="corLinha" class="form-control form-control-color" value="#94a3b8">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-info" id="btnAdicionarLinha">Adicionar Linha</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let retanguloAtivo = null;
+    let offsetX = 0, offsetY = 0;
+    let modoArrasto = false;
+    let modoResize = false;
+    let resizeHandle = null;
+    let startWidth = 0, startHeight = 0, startX = 0, startY = 0;
+    let armazemAtual = 1;
+    let modificado = false;
+    
+    // ===== INICIALIZAÇÃO =====
+    inicializarMapa();
+    atualizarContadores();
+    atualizarCoresPorSaldo(); // Apenas ao carregar
+    
+    // ===== EVENT LISTENERS PRINCIPAIS =====
+    
+    // Botão adicionar retângulo
+    document.getElementById('btnAdicionarRetangulo').addEventListener('click', criarNovoRetangulo);
+    
+    // Botão salvar posições
+    document.getElementById('btnSalvarPosicoes').addEventListener('click', salvarPosicoes);
+    
+    // Botão atualizar cores (APENAS MANUAL)
+    document.getElementById('btnAtualizarCores').addEventListener('click', function() {
+        atualizarCoresPorSaldo();
+        mostrarMensagem('✅ Cores atualizadas!', 'success');
+    });
+    
+    // Botão desenhar linhas
+    document.getElementById('btnDesenharLinhas').addEventListener('click', function() {
+        new bootstrap.Modal(document.getElementById('modalDesenharLinhas')).show();
+    });
+    
+    // Botão adicionar linha
+    document.getElementById('btnAdicionarLinha').addEventListener('click', adicionarLinha);
+    
+    // Botão limpar mapa
+    document.getElementById('btnLimparMapa').addEventListener('click', function() {
+        if (confirm('Tem certeza que deseja limpar TODO o mapa? Esta ação não pode ser desfeita.')) {
+            document.getElementById('areaDesenho').innerHTML = '';
+            atualizarContadores();
+            mostrarMensagem('🗑️ Mapa limpo!', 'info');
+        }
+    });
+    
+    // Seletor de armazém
+    document.getElementById('selectArmazem').addEventListener('change', function() {
+        armazemAtual = this.value;
+        mostrarMensagem(`📦 Armazém ${armazemAtual} selecionado`, 'info');
+    });
+    
+    // ===== FUNÇÕES DE INICIALIZAÇÃO =====
+    
+    function inicializarMapa() {
+        // Adiciona eventos a todos os retângulos existentes
+        document.querySelectorAll('.retangulo-endereco').forEach(ret => {
+            configurarEventosRetangulo(ret);
+        });
+        
+        // Adiciona eventos aos botões de ação existentes
+        document.querySelectorAll('.btn-excluir-retangulo').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const endereco = this.dataset.endereco;
+                excluirRetangulo(endereco);
+            });
+        });
+        
+        // Enter no campo de endereço
+        document.getElementById('inputEndereco').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                criarNovoRetangulo();
+            }
+        });
+        
+        // Avisar antes de sair se houver modificações não salvas
+        window.addEventListener('beforeunload', function(e) {
+            if (modificado) {
+                e.preventDefault();
+                e.returnValue = 'Você tem alterações não salvas no mapa. Deseja realmente sair?';
+            }
+        });
+    }
+    
+    function configurarEventosRetangulo(ret) {
+        // Eventos de arrastar
+        ret.addEventListener('mousedown', iniciarArrasto);
+        
+        // Eventos de redimensionamento
+        const handle = ret.querySelector('.resize-handle');
+        if (handle) {
+            handle.addEventListener('mousedown', iniciarResize);
+        }
+        
+        // Eventos dos botões de ação (se já não tiver)
+        const btnExcluir = ret.querySelector('.btn-excluir-retangulo');
+        const btnEditar = ret.querySelector('.btn-editar-retangulo');
+        
+        if (btnExcluir && !btnExcluir.hasEventListener) {
+            btnExcluir.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const endereco = this.dataset.endereco || ret.dataset.endereco;
+                excluirRetangulo(endereco);
+            });
+            btnExcluir.hasEventListener = true;
+        }
+        
+        if (btnEditar && !btnEditar.hasEventListener) {
+            btnEditar.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const endereco = this.dataset.endereco || ret.dataset.endereco;
+                editarRetangulo(endereco);
+            });
+            btnEditar.hasEventListener = true;
+        }
+    }
+    
+    // ===== FUNCIONALIDADE DE ARRASTAR =====
+    
+    function iniciarArrasto(e) {
+        if (e.target.classList.contains('resize-handle') || 
+            e.target.classList.contains('btn-excluir-retangulo') ||
+            e.target.classList.contains('btn-editar-retangulo')) {
+            return;
+        }
+        
+        retanguloAtivo = e.currentTarget;
+        modoArrasto = true;
+        
+        const rect = retanguloAtivo.getBoundingClientRect();
+        offsetX = e.clientX - rect.left;
+        offsetY = e.clientY - rect.top;
+        
+        retanguloAtivo.style.zIndex = 1000;
+        document.addEventListener('mousemove', moverRetangulo);
+        document.addEventListener('mouseup', pararArrasto);
+        
+        e.preventDefault();
+    }
+    
+    function moverRetangulo(e) {
+        if (!retanguloAtivo || !modoArrasto) return;
+        
+        const area = document.getElementById('areaDesenho');
+        const areaRect = area.getBoundingClientRect();
+        
+        let x = e.clientX - areaRect.left - offsetX;
+        let y = e.clientY - areaRect.top - offsetY;
+        
+        // Limitar dentro da área
+        x = Math.max(0, Math.min(x, areaRect.width - retanguloAtivo.offsetWidth));
+        y = Math.max(0, Math.min(y, areaRect.height - retanguloAtivo.offsetHeight));
+        
+        retanguloAtivo.style.left = x + 'px';
+        retanguloAtivo.style.top = y + 'px';
+    }
+    
+    function pararArrasto() {
+        if (!retanguloAtivo || !modoArrasto) return;
+        
+        retanguloAtivo.style.zIndex = 10;
+        retanguloAtivo = null;
+        modoArrasto = false;
+        modificado = true;
+        
+        document.removeEventListener('mousemove', moverRetangulo);
+        document.removeEventListener('mouseup', pararArrasto);
+    }
+    
+    // ===== FUNCIONALIDADE DE REDIMENSIONAMENTO =====
+    
+    function iniciarResize(e) {
+        modoResize = true;
+        resizeHandle = e.currentTarget;
+        retanguloAtivo = resizeHandle.closest('.retangulo-endereco');
+        
+        const rect = retanguloAtivo.getBoundingClientRect();
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = rect.width;
+        startHeight = rect.height;
+        
+        retanguloAtivo.classList.add('resizing');
+        document.addEventListener('mousemove', redimensionarRetangulo);
+        document.addEventListener('mouseup', pararResize);
+        
+        e.stopPropagation();
+        e.preventDefault();
+    }
+    
+    function redimensionarRetangulo(e) {
+        if (!modoResize || !retanguloAtivo) return;
+        
+        const area = document.getElementById('areaDesenho');
+        const areaRect = area.getBoundingClientRect();
+        
+        // Calcular nova largura e altura
+        let newWidth = startWidth + (e.clientX - startX);
+        let newHeight = startHeight + (e.clientY - startY);
+        
+        // Limitar tamanhos mínimos e máximos
+        newWidth = Math.max(50, Math.min(newWidth, 500));
+        newHeight = Math.max(30, Math.min(newHeight, 300));
+        
+        // Limitar para não sair da área
+        const currentX = parseInt(retanguloAtivo.style.left) || 0;
+        const currentY = parseInt(retanguloAtivo.style.top) || 0;
+        
+        if (currentX + newWidth > areaRect.width) {
+            newWidth = areaRect.width - currentX;
+        }
+        
+        if (currentY + newHeight > areaRect.height) {
+            newHeight = areaRect.height - currentY;
+        }
+        
+        // Aplicar novos tamanhos
+        retanguloAtivo.style.width = newWidth + 'px';
+        retanguloAtivo.style.height = newHeight + 'px';
+        
+        // Atualizar info de tamanho
+        const info = retanguloAtivo.querySelector('.info-endereco');
+        if (info) {
+            info.textContent = `${Math.round(newWidth)}x${Math.round(newHeight)}`;
+        }
+    }
+    
+    function pararResize() {
+        if (!modoResize) return;
+        
+        modoResize = false;
+        if (retanguloAtivo) {
+            retanguloAtivo.classList.remove('resizing');
+        }
+        modificado = true;
+        
+        document.removeEventListener('mousemove', redimensionarRetangulo);
+        document.removeEventListener('mouseup', pararResize);
+    }
+    
+    // ===== CRIAÇÃO DE NOVO RETÂNGULO =====
+    
+    function criarNovoRetangulo() {
+        const endereco = document.getElementById('inputEndereco').value.trim();
+        const largura = parseInt(document.getElementById('inputLargura').value) || 120;
+        const altura = parseInt(document.getElementById('inputAltura').value) || 60;
+        const corPadrao = document.getElementById('corPadrao').value || '#CCCCCC';
+        const corPositivo = document.getElementById('corPositivo').value || '#10b981';
+        
+        if (!endereco) {
+            mostrarMensagem('❌ Digite um código de endereço!', 'danger');
+            document.getElementById('inputEndereco').focus();
+            return;
+        }
+        
+        // Verificar se endereço já existe
+        const enderecosExistentes = Array.from(document.querySelectorAll('.retangulo-endereco'))
+            .map(ret => ret.dataset.endereco);
+        
+        if (enderecosExistentes.includes(endereco)) {
+            mostrarMensagem('❌ Este endereço já existe no mapa!', 'warning');
+            return;
+        }
+        
+        const area = document.getElementById('areaDesenho');
+        
+        // Criar elemento
+        const novoRet = document.createElement('div');
+        novoRet.className = 'retangulo-endereco';
+        novoRet.innerHTML = `
+            ${endereco}
+            <div class="btn-acoes-retangulo">
+                <button class="btn-acao-ret btn btn-sm btn-danger btn-excluir-retangulo" 
+                        title="Excluir" data-endereco="${endereco}">
+                    <i class="fas fa-times"></i>
+                </button>
+                <button class="btn-acao-ret btn btn-sm btn-warning btn-editar-retangulo" 
+                        title="Editar" data-endereco="${endereco}">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </div>
+            <div class="info-endereco">
+                ${largura}x${altura}
+            </div>
+            <div class="resize-handle"></div>
+        `;
+        
+        // Posição aleatória inicial (evitando cantos)
+        const x = 50 + Math.random() * (area.offsetWidth - largura - 100);
+        const y = 50 + Math.random() * (area.offsetHeight - altura - 100);
+        
+        novoRet.style.left = x + 'px';
+        novoRet.style.top = y + 'px';
+        novoRet.style.width = largura + 'px';
+        novoRet.style.height = altura + 'px';
+        novoRet.style.backgroundColor = corPadrao;
+        novoRet.style.borderColor = corPadrao;
+        
+        novoRet.dataset.endereco = endereco;
+        novoRet.dataset.corPadrao = corPadrao;
+        novoRet.dataset.corPositivo = corPositivo;
+        novoRet.dataset.armazem = armazemAtual;
+        
+        // Configurar eventos
+        configurarEventosRetangulo(novoRet);
+        area.appendChild(novoRet);
+        
+        // Salvar no servidor
+        salvarRetanguloIndividual({
+            endereco: endereco,
+            pos_x: Math.round(x),
+            pos_y: Math.round(y),
+            largura: largura,
+            altura: altura,
+            cor_padrao: corPadrao,
+            cor_positivo: corPositivo,
+            armazem: armazemAtual
+        });
+        
+        // Limpar campo
+        document.getElementById('inputEndereco').value = '';
+        document.getElementById('inputEndereco').focus();
+        
+        // Atualizar contadores
+        atualizarContadores();
+        modificado = true;
+        
+        mostrarMensagem(`✅ Endereço ${endereco} adicionado ao Armazém ${armazemAtual}`, 'success');
+    }
+    
+    // ===== SALVAR POSIÇÕES =====
+    
+    function salvarPosicoes() {
+        const retangulos = document.querySelectorAll('.retangulo-endereco');
+        const dados = [];
+        
+        retangulos.forEach(ret => {
+            dados.push({
+                endereco: ret.dataset.endereco,
+                pos_x: parseInt(ret.style.left) || 0,
+                pos_y: parseInt(ret.style.top) || 0,
+                largura: parseInt(ret.style.width) || 120,
+                altura: parseInt(ret.style.height) || 60,
+                cor_padrao: ret.dataset.corPadrao || '#CCCCCC',
+                cor_positivo: ret.dataset.corPositivo || '#10b981',
+                armazem: ret.dataset.armazem || armazemAtual
+            });
+        });
+        
+        fetch('{% url "sapp:salvar_posicoes_mapa" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify(dados)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarMensagem('✅ Mapa salvo com sucesso!', 'success');
+                modificado = false;
+            } else {
+                mostrarMensagem('❌ Erro ao salvar: ' + (data.error || 'Desconhecido'), 'danger');
+            }
+        })
+        .catch(error => {
+            mostrarMensagem('❌ Erro de conexão: ' + error.message, 'danger');
+        });
+    }
+    
+    // ===== ATUALIZAR CORES BASEADO NO SALDO =====
+    
+    function atualizarCoresPorSaldo() {
+        fetch('{% url "sapp:api_status_enderecos" %}')
+            .then(res => res.json())
+            .then(dados => {
+                let comSaldo = 0;
+                let semSaldo = 0;
+                
+                document.querySelectorAll('.retangulo-endereco').forEach(ret => {
+                    const endereco = ret.dataset.endereco;
+                    const status = dados[endereco];
+                    
+                    if (status && status.tem_saldo) {
+                        ret.style.backgroundColor = ret.dataset.corPositivo || '#10b981';
+                        ret.style.borderColor = ret.dataset.corPositivo || '#10b981';
+                        ret.classList.remove('sem-saldo');
+                        ret.title = `Endereço: ${endereco}\nStatus: COM SALDO\nArmazém: ${ret.dataset.armazem || 1}`;
+                        comSaldo++;
+                    } else {
+                        ret.style.backgroundColor = ret.dataset.corPadrao || '#CCCCCC';
+                        ret.style.borderColor = ret.dataset.corPadrao || '#CCCCCC';
+                        ret.classList.add('sem-saldo');
+                        ret.title = `Endereço: ${endereco}\nStatus: SEM SALDO\nArmazém: ${ret.dataset.armazem || 1}`;
+                        semSaldo++;
+                    }
+                });
+                
+                // Atualizar contadores
+                document.getElementById('countComSaldo').textContent = comSaldo;
+                document.getElementById('countSemSaldo').textContent = semSaldo;
+                document.getElementById('countTotal').textContent = comSaldo + semSaldo;
+            })
+            .catch(error => {
+                console.error('Erro ao atualizar cores:', error);
+                mostrarMensagem('❌ Erro ao atualizar cores', 'danger');
+            });
+    }
+    
+    // ===== DESENHAR LINHAS DO ARMAZÉM =====
+    
+    function adicionarLinha() {
+        const tipo = document.getElementById('selectTipoLinha').value;
+        const posicao = parseInt(document.getElementById('inputPosicaoLinha').value);
+        const comprimento = parseInt(document.getElementById('inputComprimentoLinha').value);
+        const cor = document.getElementById('corLinha').value;
+        
+        const area = document.getElementById('areaDesenho');
+        const linha = document.createElement('div');
+        linha.className = `linha-armazem ${tipo === 'horizontal' ? 'linha-horizontal' : 'linha-vertical'}`;
+        
+        if (tipo === 'horizontal') {
+            linha.style.top = posicao + 'px';
+            if (comprimento > 0) {
+                linha.style.width = comprimento + 'px';
+                linha.style.left = '50%';
+                linha.style.transform = 'translateX(-50%)';
+            }
+        } else {
+            linha.style.left = posicao + 'px';
+            if (comprimento > 0) {
+                linha.style.height = comprimento + 'px';
+                linha.style.top = '50%';
+                linha.style.transform = 'translateY(-50%)';
+            }
+        }
+        
+        linha.style.backgroundColor = cor;
+        area.appendChild(linha);
+        
+        bootstrap.Modal.getInstance(document.getElementById('modalDesenharLinhas')).hide();
+        mostrarMensagem('📐 Linha adicionada ao mapa', 'info');
+    }
+    
+    // ===== EXCLUSÃO DE RETÂNGULOS =====
+    
+    function excluirRetangulo(endereco) {
+        if (!confirm(`Tem certeza que deseja excluir o endereço ${endereco}?`)) {
+            return;
+        }
+        
+        const ret = document.querySelector(`[data-endereco="${endereco}"]`);
+        if (ret) {
+            ret.remove();
+            mostrarMensagem(`✅ Endereço ${endereco} removido`, 'info');
+            atualizarContadores();
+            modificado = true;
+        }
+    }
+    
+    function editarRetangulo(endereco) {
+        const ret = document.querySelector(`[data-endereco="${endereco}"]`);
+        if (ret) {
+            const novoEndereco = prompt('Digite o novo código do endereço:', endereco);
+            if (novoEndereco && novoEndereco !== endereco) {
+                // Verificar se novo endereço já existe
+                const enderecosExistentes = Array.from(document.querySelectorAll('.retangulo-endereco'))
+                    .map(r => r.dataset.endereco)
+                    .filter(addr => addr !== endereco);
+                
+                if (enderecosExistentes.includes(novoEndereco)) {
+                    mostrarMensagem('❌ Este endereço já existe!', 'warning');
+                    return;
+                }
+                
+                ret.dataset.endereco = novoEndereco;
+                ret.textContent = novoEndereco + ret.textContent.substring(endereco.length);
+                mostrarMensagem(`✅ Endereço alterado para ${novoEndereco}`, 'success');
+                modificado = true;
+            }
+        }
+    }
+    
+    // ===== FUNÇÕES AUXILIARES =====
+    
+    function salvarRetanguloIndividual(dados) {
+        fetch('{% url "sapp:salvar_retangulo" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify(dados)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.id) {
+                const ret = document.querySelector(`[data-endereco="${dados.endereco}"]`);
+                if (ret) {
+                    ret.dataset.id = data.id;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao salvar retângulo:', error);
+        });
+    }
+    
+    function atualizarContadores() {
+        const total = document.querySelectorAll('.retangulo-endereco').length;
+        const comSaldo = document.querySelectorAll('.retangulo-endereco:not(.sem-saldo)').length;
+        const semSaldo = total - comSaldo;
+        
+        document.getElementById('countTotal').textContent = total;
+        document.getElementById('countComSaldo').textContent = comSaldo;
+        document.getElementById('countSemSaldo').textContent = semSaldo;
+    }
+    
+    function getCSRFToken() {
+        const name = 'csrftoken';
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    
+    function mostrarMensagem(texto, tipo = 'info') {
+        // Remove mensagens anteriores
+        const mensagensAntigas = document.querySelectorAll('.mensagem-flutuante');
+        mensagensAntigas.forEach(msg => msg.remove());
+        
+        // Cria nova mensagem
+        const mensagem = document.createElement('div');
+        mensagem.className = `mensagem-flutuante alert alert-${tipo} alert-dismissible fade show`;
+        mensagem.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 300px;
+        `;
+        mensagem.innerHTML = `
+            ${texto}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(mensagem);
+        
+        // Auto-remove após 5 segundos
+        setTimeout(() => {
+            if (mensagem.parentNode) {
+                mensagem.remove();
+            }
+        }, 5000);
+    }
+    
+    console.log('✅ Mapa de ocupação inicializado!');
+});
+</script>
+{% endblock %}

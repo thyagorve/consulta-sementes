@@ -1,0 +1,291 @@
+<!-- templates/sapp/editor_mapa.html -->
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    /* ESTILOS GERAIS */
+    .toolbar-btn {
+        width: 40px;
+        height: 40px;
+        border: 2px solid #dee2e6;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+    
+    .toolbar-btn:hover, .toolbar-btn.active {
+        border-color: #0d6efd;
+        background: #e8f4ff;
+    }
+    
+    .elemento-item {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .elemento-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .elemento-item.active {
+        background-color: #0d6efd !important;
+        color: white !important;
+    }
+    
+    #meuCanvas {
+        border: 2px solid #dee2e6;
+        background: #f8f9fa;
+        cursor: crosshair;
+        display: block;
+    }
+    
+    .ponto-controle {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background: white;
+        border: 2px solid #0d6efd;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+    }
+</style>
+
+<div class="container-fluid py-3">
+    <!-- CABEÇALHO -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h3 mb-1">🎨 Editor de Mapa - Armazém {{ armazem.numero }}</h1>
+            <p class="text-muted mb-0">Arraste, redimensione e edite elementos do mapa</p>
+        </div>
+        <div class="d-flex gap-2">
+            <select id="selectArmazem" class="form-select" style="width: 200px;">
+                {% for a in armazens_disponiveis %}
+                <option value="{% url 'sapp:editor_mapa_admin' a.numero %}" 
+                        {% if a.numero == armazem.numero %}selected{% endif %}>
+                    Armazém {{ a.numero }} - {{ a.nome }}
+                </option>
+                {% endfor %}
+            </select>
+            <button id="btnSalvar" class="btn btn-success">
+                <i class="fas fa-save me-1"></i> Salvar
+            </button>
+            <a href="{% url 'sapp:mapa_canvas' armazem.numero %}" class="btn btn-info">
+                <i class="fas fa-eye me-1"></i> Visualizar
+            </a>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- BARRA LATERAL DE FERRAMENTAS -->
+        <div class="col-md-3">
+            <!-- FERRAMENTAS -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0"><i class="fas fa-tools me-2"></i> Ferramentas</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button class="toolbar-btn active" data-tool="select" title="Selecionar">
+                            <i class="fas fa-mouse-pointer"></i>
+                        </button>
+                        <button class="toolbar-btn" data-tool="rectangle" title="Criar Retângulo">
+                            <i class="fas fa-square"></i>
+                        </button>
+                        <button class="toolbar-btn" data-tool="line" title="Criar Linha">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <button class="toolbar-btn" data-tool="text" title="Adicionar Texto">
+                            <i class="fas fa-font"></i>
+                        </button>
+                        <button class="toolbar-btn text-danger" data-tool="delete" title="Excluir">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    
+                    <!-- PROPRIEDADES -->
+                    <div class="mb-3">
+                        <label class="form-label small">Cor do Preenchimento</label>
+                        <input type="color" id="corPreenchimento" class="form-control form-control-color" value="#CCCCCC">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small">Cor da Borda</label>
+                        <input type="color" id="corBorda" class="form-control form-control-color" value="#000000">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small">Espessura: <span id="espessuraValor">2</span>px</label>
+                        <input type="range" id="espessuraBorda" class="form-range" min="1" max="10" value="2">
+                    </div>
+                    
+                    <!-- CONFIGURAÇÃO DE TEXTO -->
+                    <div id="painelTexto" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label small">Texto</label>
+                            <input type="text" id="inputTexto" class="form-control" placeholder="Digite o texto...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Tamanho da Fonte</label>
+                            <select id="tamanhoFonte" class="form-select">
+                                <option value="12">12px</option>
+                                <option value="14" selected>14px</option>
+                                <option value="16">16px</option>
+                                <option value="18">18px</option>
+                                <option value="20">20px</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- IDENTIFICADOR -->
+                    <div class="mb-3">
+                        <label class="form-label small">Identificador</label>
+                        <input type="text" id="inputIdentificador" class="form-control" placeholder="Ex: A001, Corredor">
+                        <button id="btnAplicarIdentificador" class="btn btn-sm btn-primary w-100 mt-2">
+                            <i class="fas fa-tag me-1"></i> Aplicar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- LISTA DE ELEMENTOS -->
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="fas fa-list me-2"></i> Elementos ({{ elementos.count }})</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush" id="listaElementos" style="max-height: 300px; overflow-y: auto;">
+                        {% for elemento in elementos %}
+                        <div class="list-group-item list-group-item-action elemento-item" data-id="{{ elemento.id }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <small class="text-muted d-block">{{ elemento.get_tipo_display }}</small>
+                                    <strong>{{ elemento.identificador|default:"Sem nome" }}</strong>
+                                    <div class="small text-muted">
+                                        {{ elemento.pos_x }}x{{ elemento.pos_y }} ({{ elemento.largura }}x{{ elemento.altura }})
+                                    </div>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger btn-excluir" data-id="{{ elemento.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-3 text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Nenhum elemento criado
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ÁREA DE DESENHO -->
+        <div class="col-md-9">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Área de Desenho ({{ armazem.largura_canvas }}x{{ armazem.altura_canvas }}px)</h6>
+                        <div class="small text-muted" id="coordenadas">X: 0, Y: 0</div>
+                    </div>
+                </div>
+                <div class="card-body p-2">
+                    <div class="position-relative" style="overflow: auto; max-height: 600px;">
+                        <canvas id="meuCanvas" 
+                                width="{{ armazem.largura_canvas }}" 
+                                height="{{ armazem.altura_canvas }}">
+                        </canvas>
+                        
+                        <!-- PONTOS DE CONTROLE (invisíveis inicialmente) -->
+                        <div id="pontosControle" style="position: absolute; top: 0; left: 0; pointer-events: none;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE CONFIRMAÇÃO -->
+<div class="modal fade" id="modalConfirmacao">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Ação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalMensagem">Tem certeza que deseja excluir este elemento?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmarExclusao">Excluir</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// DADOS INICIAIS
+const CONFIG = {
+    armazem: {
+        id: {{ armazem.id }},
+        numero: {{ armazem.numero }},
+        largura: {{ armazem.largura_canvas }},
+        altura: {{ armazem.altura_canvas }}
+    },
+    urls: {
+        salvar: "{% url 'sapp:salvar_todos_elementos' %}",
+        csrf: "{{ csrf_token }}"
+    }
+};
+
+// ELEMENTOS DO BANCO
+let elementos = [
+    {% for elemento in elementos %}
+    {
+        id: {{ elemento.id }},
+        tipo: "{{ elemento.tipo }}",
+        pos_x: {{ elemento.pos_x }},
+        pos_y: {{ elemento.pos_y }},
+        largura: {{ elemento.largura }},
+        altura: {{ elemento.altura }},
+        cor_preenchimento: "{{ elemento.cor_preenchimento }}",
+        cor_borda: "{{ elemento.cor_borda }}",
+        espessura_borda: {{ elemento.espessura_borda }},
+        conteudo_texto: "{{ elemento.conteudo_texto|escapejs }}",
+        fonte_nome: "{{ elemento.fonte_nome }}",
+        fonte_tamanho: {{ elemento.fonte_tamanho }},
+        texto_negrito: {{ elemento.texto_negrito|yesno:"true,false" }},
+        texto_italico: {{ elemento.texto_italico|yesno:"true,false" }},
+        texto_direcao: "{{ elemento.texto_direcao }}",
+        linha_tipo: "{{ elemento.linha_tipo }}",
+        identificador: "{{ elemento.identificador|escapejs }}"
+    },
+    {% endfor %}
+];
+
+// ESTADO DO EDITOR
+const estado = {
+    ferramenta: 'select',
+    elementoSelecionado: null,
+    desenhando: false,
+    inicioX: 0,
+    inicioY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    redimensionando: false,
+    pontoRedimensionamento: null,
+    modificado: false,
+    modoTexto: false
+};
+</script>
+
+<!-- SCRIPT PRINCIPAL DO EDITOR -->
+<script src="{% static 'sapp/js/editor_mapa_completo.js' %}"></script>
+
+{% endblock %}

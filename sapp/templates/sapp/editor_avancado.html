@@ -1,0 +1,677 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    /* VARIÁVEIS DE CORES */
+    :root {
+        --cor-primaria: #4f46e5;
+        --cor-hover: #eef2ff;
+        --bg-editor: #333333; /* Fundo escuro atrás do papel */
+        --bg-canvas: #ffffff; /* Papel branco */
+    }
+
+    /* === CORREÇÃO 2: AJUSTE DE LAYOUT PARA NÃO FICAR ESCONDIDO NO MENU === */
+    .editor-wrapper {
+        padding-top: 20px; /* Empurra para baixo do menu base */
+        height: calc(100vh - 60px); /* Altura total menos o menu */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; /* Evita scroll na página inteira */
+    }
+
+    /* BARRA DE TÍTULO */
+    .editor-toolbar {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px 8px 0 0;
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0; /* Não encolhe */
+    }
+
+    /* ÁREA PRINCIPAL (SIDEBARS + CANVAS) */
+    .editor-main {
+        display: flex;
+        flex: 1; /* Ocupa o resto da altura */
+        border: 1px solid #ddd;
+        border-top: none;
+        overflow: hidden;
+        background: white;
+    }
+
+    /* === SIDEBAR ESQUERDA (FERRAMENTAS + LISTA) === */
+    .sidebar-left {
+        width: 260px;
+        background: #f8f9fa;
+        border-right: 1px solid #ddd;
+        display: flex;
+        flex-direction: column;
+        z-index: 5;
+    }
+
+    /* GRUPO DE FERRAMENTAS */
+    .tools-panel {
+        padding: 15px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        border-bottom: 1px solid #e0e0e0;
+        background: white;
+    }
+
+    .tool-btn {
+        height: 50px;
+        border: 1px solid #ccc;
+        background: white;
+        border-radius: 6px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #555;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+    
+    .tool-btn i { font-size: 16px; margin-bottom: 2px; }
+    .tool-btn:hover { background: var(--cor-hover); border-color: var(--cor-primaria); color: var(--cor-primaria); }
+    .tool-btn.active { background: var(--cor-primaria); color: white; border-color: var(--cor-primaria); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+
+    /* === LISTA DE ITENS (CAMADAS) === */
+    .layers-header {
+        padding: 10px 15px;
+        font-weight: bold;
+        font-size: 12px;
+        text-transform: uppercase;
+        color: #666;
+        background: #f1f1f1;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .layers-list {
+        flex: 1; /* Ocupa o espaço restante abaixo das ferramentas */
+        overflow-y: auto;
+        padding: 5px;
+    }
+
+    .layer-item {
+        background: white;
+        border: 1px solid #eee;
+        padding: 8px 10px;
+        margin-bottom: 4px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        font-size: 13px;
+        transition: 0.1s;
+    }
+
+    .layer-item:hover { background-color: #f8f9fa; border-color: #ccc; }
+    .layer-item.selected { 
+        background-color: var(--cor-hover); 
+        border-left: 4px solid var(--cor-primaria);
+        font-weight: 600;
+    }
+
+    /* ÁREA DO CANVAS (CENTRO) */
+    .canvas-viewport {
+        flex: 1;
+        background-color: var(--bg-editor);
+        overflow: auto; /* Barras de rolagem automáticas */
+        position: relative;
+        display: flex;
+        justify-content: center; /* Centraliza o papel horizontalmente */
+        align-items: flex-start; /* Topo alinhado */
+        padding: 50px;
+        
+        /* Grid de fundo do editor (pontinhos) */
+        background-image: radial-gradient(#555 1px, transparent 1px);
+        background-size: 20px 20px;
+    }
+
+    #meuCanvas {
+        background-color: var(--bg-canvas);
+        box-shadow: 0 0 30px rgba(0,0,0,0.5); /* Sombra para destacar o papel */
+        cursor: default;
+    }
+
+    /* SIDEBAR DIREITA (PROPRIEDADES) */
+    .sidebar-right {
+        width: 300px;
+        background: white;
+        border-left: 1px solid #ddd;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .prop-group {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+    
+    label { font-size: 11px; font-weight: bold; color: #555; margin-bottom: 2px; display: block; }
+</style>
+
+<div class="container-fluid editor-wrapper">
+    <!-- BARRA DE TOPO -->
+    <div class="editor-toolbar">
+        <div>
+            <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-drafting-compass text-primary me-2"></i>Editor: Armazém {{ armazem.numero }}</h5>
+            <small class="text-muted" id="statusMsg">Pronto para editar</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/mapa-armazem/{{ armazem.numero }}/" class="btn btn-outline-secondary btn-sm" target="_blank">
+                <i class="fas fa-eye me-1"></i> Ver Mapa
+            </a>
+            <button id="btnSalvar" class="btn btn-success btn-sm px-4 fw-bold shadow-sm">
+                <i class="fas fa-save me-1"></i> SALVAR TUDO
+            </button>
+        </div>
+    </div>
+
+    <!-- ÁREA DE TRABALHO -->
+    <div class="editor-main">
+        
+        <!-- COLUNA ESQUERDA: FERRAMENTAS E LISTA -->
+        <div class="sidebar-left">
+            <!-- 1. Botões -->
+            <div class="tools-panel">
+                <div class="tool-btn active" onclick="setFerramenta('selecionar')" title="Mover e Selecionar (V)">
+                    <i class="fas fa-mouse-pointer"></i> <span>Mover</span>
+                </div>
+                <div class="tool-btn" onclick="setFerramenta('retangulo')" title="Criar Endereço/Lote (R)">
+                    <i class="fas fa-vector-square"></i> <span>Endereço</span>
+                </div>
+                <div class="tool-btn" onclick="setFerramenta('texto')" title="Criar Texto (T)">
+                    <i class="fas fa-font"></i> <span>Texto</span>
+                </div>
+                <div class="tool-btn text-danger" onclick="excluirSelecionado()" title="Excluir Item (Del)">
+                    <i class="fas fa-trash"></i> <span>Excluir</span>
+                </div>
+            </div>
+
+            <!-- 2. Cabeçalho Lista -->
+            <div class="layers-header">
+                <span>Itens Criados</span>
+                <span class="badge bg-secondary" id="countItens">0</span>
+            </div>
+
+            <!-- 3. Lista de Itens (Scrollável) -->
+            <div class="layers-list" id="listaCamadas">
+                <!-- Preenchido via Javascript -->
+            </div>
+        </div>
+
+        <!-- COLUNA CENTRAL: CANVAS -->
+        <div class="canvas-viewport" id="viewport">
+            <canvas id="meuCanvas" width="{{ armazem.largura_canvas }}" height="{{ armazem.altura_canvas }}"></canvas>
+            
+            <!-- Zoom Flutuante -->
+            <div style="position: absolute; bottom: 20px; right: 340px; background: white; padding: 5px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: flex; gap: 5px; align-items: center;">
+                <button class="btn btn-sm btn-light rounded-circle" onclick="alterarZoom(-0.1)"><i class="fas fa-minus"></i></button>
+                <span class="small fw-bold px-2" id="zoomLabel">100%</span>
+                <button class="btn btn-sm btn-light rounded-circle" onclick="alterarZoom(0.1)"><i class="fas fa-plus"></i></button>
+            </div>
+        </div>
+
+        <!-- COLUNA DIREITA: PROPRIEDADES -->
+        <div class="sidebar-right">
+            <h6 class="fw-bold mb-3 border-bottom pb-2">Propriedades</h6>
+            
+            <div id="painelNenhum" class="text-center text-muted py-5">
+                <i class="fas fa-arrow-left mb-3"></i>
+                <p class="small">Selecione um item na lista ou no desenho para editar.</p>
+            </div>
+
+            <div id="painelPropriedades" style="display: none;">
+                <!-- Destaque para Endereço -->
+                <div class="prop-group border-start border-4 border-primary shadow-sm bg-white">
+                    <label class="text-primary fw-bold text-uppercase">VÍNCULO (ENDEREÇO)</label>
+                    <input type="text" id="propId" class="form-control fw-bold border-primary" placeholder="Ex: A-01-01" autocomplete="off">
+                    <small class="text-muted d-block mt-1" style="font-size: 10px; line-height: 1.2;">
+                        <i class="fas fa-info-circle"></i> Digite exatamente igual ao cadastro do estoque.
+                    </small>
+                </div>
+
+                <div class="prop-group">
+                    <label>Dimensões</label>
+                    <div class="row g-2">
+                        <div class="col-6"><label>Largura</label><input type="number" id="propW" class="form-control form-control-sm"></div>
+                        <div class="col-6"><label>Altura</label><input type="number" id="propH" class="form-control form-control-sm"></div>
+                        <div class="col-6"><label>X</label><input type="number" id="propX" class="form-control form-control-sm"></div>
+                        <div class="col-6"><label>Y</label><input type="number" id="propY" class="form-control form-control-sm"></div>
+                    </div>
+                    <div class="mt-2">
+                        <label>Rotação: <span id="rotVal">0</span>°</label>
+                        <input type="range" id="propRot" class="form-range" min="0" max="360" step="90">
+                    </div>
+                </div>
+
+                <!-- Painel Extra para Texto -->
+                <div id="divTextoExtras" class="prop-group" style="display: none;">
+                    <label>Conteúdo do Texto</label>
+                    <input type="text" id="propTexto" class="form-control mb-2">
+                    <label>Tamanho da Fonte</label>
+                    <input type="number" id="propFontSize" class="form-control form-control-sm" value="14">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ================= CONFIGURAÇÃO =================
+const CONFIG = {
+    csrf: "{{ csrf_token }}",
+    urlSalvar: "{% url 'sapp:salvar_todos_elementos' %}",
+    armazemId: {{ armazem.id }},
+    snap: 10 // Grade de 10px
+};
+
+// Carrega dados do Django
+let elementos = [
+    {% for el in elementos %}
+    {
+        id: {{ el.id|default:"null" }},
+        tipo: "{{ el.tipo }}",
+        x: {{ el.pos_x }},
+        y: {{ el.pos_y }},
+        w: {{ el.largura }},
+        h: {{ el.altura }},
+        rot: {{ el.rotacao|default:0 }},
+        id_texto: "{{ el.identificador|escapejs }}",
+        texto: "{{ el.conteudo_texto|default:''|escapejs }}",
+        fontSize: {{ el.fonte_tamanho|default:14 }},
+        z: {{ el.ordem_z|default:0 }}
+    },
+    {% endfor %}
+];
+
+const app = {
+    canvas: document.getElementById('meuCanvas'),
+    ctx: document.getElementById('meuCanvas').getContext('2d'),
+    tool: 'selecionar',
+    zoom: 1.0,
+    selectedIdx: -1,
+    isDragging: false,
+    startMouse: {x:0, y:0},
+    dragOffset: {x:0, y:0}
+};
+
+// ================= FUNÇÕES PRINCIPAIS =================
+
+function draw() {
+    app.ctx.clearRect(0, 0, app.canvas.width, app.canvas.height);
+    
+    // Grid Visual (opcional, ajuda a alinhar)
+    drawGridLines();
+
+    // Ordena por Z-Index
+    elementos.forEach((el, idx) => {
+        app.ctx.save();
+        
+        // Rotação
+        if (el.rot) {
+            const cx = el.x + el.w/2;
+            const cy = el.y + el.h/2;
+            app.ctx.translate(cx, cy);
+            app.ctx.rotate(el.rot * Math.PI / 180);
+            app.ctx.translate(-cx, -cy);
+        }
+
+        const isSel = (idx === app.selectedIdx);
+
+        if (el.tipo === 'RETANGULO') {
+            app.ctx.fillStyle = isSel ? '#e0e7ff' : '#f3f4f6'; // Azul claro se sel, cinza se não
+            app.ctx.fillRect(el.x, el.y, el.w, el.h);
+            
+            app.ctx.strokeStyle = isSel ? '#4f46e5' : '#6b7280'; // Borda azul ou cinza escuro
+            app.ctx.lineWidth = isSel ? 2 : 1;
+            app.ctx.strokeRect(el.x, el.y, el.w, el.h);
+            
+            // Texto do ID
+            if (el.id_texto) {
+                app.ctx.fillStyle = '#111827';
+                app.ctx.font = 'bold 11px Arial';
+                app.ctx.textAlign = 'center';
+                app.ctx.textBaseline = 'middle';
+                // Corta se for muito longo
+                const label = el.id_texto.length > 10 ? el.id_texto.substring(0,8)+'..' : el.id_texto;
+                app.ctx.fillText(label, el.x + el.w/2, el.y + el.h/2);
+            }
+        } else if (el.tipo === 'TEXTO') {
+            app.ctx.font = `${el.fontSize}px Arial`;
+            app.ctx.fillStyle = isSel ? '#4f46e5' : '#000';
+            app.ctx.fillText(el.texto || 'Texto', el.x, el.y + el.fontSize);
+            
+            if (isSel) {
+                const metrics = app.ctx.measureText(el.texto || 'Texto');
+                app.ctx.strokeStyle = '#4f46e5';
+                app.ctx.setLineDash([2, 2]);
+                app.ctx.strokeRect(el.x - 2, el.y, metrics.width + 4, el.fontSize + 4);
+                app.ctx.setLineDash([]);
+            }
+        }
+        app.ctx.restore();
+    });
+}
+
+function drawGridLines() {
+    app.ctx.strokeStyle = '#f0f0f0';
+    app.ctx.lineWidth = 0.5;
+    const step = 50;
+    app.ctx.beginPath();
+    for (let x=0; x<=app.canvas.width; x+=step) { app.ctx.moveTo(x,0); app.ctx.lineTo(x, app.canvas.height); }
+    for (let y=0; y<=app.canvas.height; y+=step) { app.ctx.moveTo(0,y); app.ctx.lineTo(app.canvas.width, y); }
+    app.ctx.stroke();
+}
+
+// ATUALIZA A LISTA LATERAL
+function updateLayerList() {
+    const list = document.getElementById('listaCamadas');
+    list.innerHTML = '';
+    document.getElementById('countItens').innerText = elementos.length;
+
+    // Loop reverso para mostrar o topo primeiro
+    elementos.slice().reverse().forEach((el, revIndex) => {
+        const realIndex = elementos.length - 1 - revIndex;
+        
+        const item = document.createElement('div');
+        item.className = `layer-item ${realIndex === app.selectedIdx ? 'selected' : ''}`;
+        
+        let icon = el.tipo === 'RETANGULO' ? '<i class="fas fa-square text-secondary"></i>' : '<i class="fas fa-font text-dark"></i>';
+        let name = el.id_texto || el.texto || (el.tipo === 'RETANGULO' ? 'Sem Nome' : 'Texto');
+        
+        item.innerHTML = `
+            <div class="d-flex align-items-center gap-2" style="flex:1; overflow:hidden;">
+                ${icon} <span class="text-truncate">${name}</span>
+            </div>
+            <button class="btn btn-sm text-danger p-0" onclick="deleteItemList(${realIndex}, event)" title="Excluir"><i class="fas fa-times"></i></button>
+        `;
+        
+        item.onclick = () => {
+            app.selectedIdx = realIndex;
+            setFerramenta('selecionar'); // Força troca para seleção ao clicar na lista
+            updateUI();
+            draw();
+            updateLayerList(); // Atualiza para mostrar seleção
+        };
+        list.appendChild(item);
+    });
+}
+
+function deleteItemList(index, e) {
+    e.stopPropagation();
+    if(confirm('Tem certeza que deseja excluir?')) {
+        elementos.splice(index, 1);
+        app.selectedIdx = -1;
+        draw();
+        updateUI();
+        updateLayerList();
+    }
+}
+
+// ================= FERRAMENTAS E MOUSE =================
+function setFerramenta(nome) {
+    app.tool = nome;
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.tool-btn[onclick="setFerramenta('${nome}')"]`).classList.add('active');
+    app.canvas.style.cursor = nome === 'selecionar' ? 'default' : 'crosshair';
+}
+
+function getMousePos(e) {
+    const rect = app.canvas.getBoundingClientRect();
+    return {
+        x: (e.clientX - rect.left) / app.zoom,
+        y: (e.clientY - rect.top) / app.zoom
+    };
+}
+
+function snap(val) { return Math.round(val / CONFIG.snap) * CONFIG.snap; }
+
+// --- EVENTOS DO CANVAS ---
+app.canvas.addEventListener('mousedown', (e) => {
+    const pos = getMousePos(e);
+    
+    if (app.tool === 'selecionar') {
+        let clicked = -1;
+        // Hit test reverso (topo primeiro)
+        for (let i = elementos.length - 1; i >= 0; i--) {
+            const el = elementos[i];
+            if (pos.x >= el.x && pos.x <= el.x + el.w && pos.y >= el.y && pos.y <= el.y + el.h) {
+                clicked = i;
+                break;
+            }
+        }
+        
+        app.selectedIdx = clicked;
+        if (clicked !== -1) {
+            app.isDragging = true;
+            app.dragOffset = { x: pos.x - elementos[clicked].x, y: pos.y - elementos[clicked].y };
+        }
+        updateUI();
+        updateLayerList();
+
+    } else if (app.tool === 'retangulo') {
+        app.isDragging = true;
+        app.startMouse = pos;
+        const novo = {
+            tipo: 'RETANGULO', x: snap(pos.x), y: snap(pos.y), w: 0, h: 0, rot: 0, id_texto: '', z: elementos.length
+        };
+        elementos.push(novo);
+        app.selectedIdx = elementos.length - 1;
+    
+    } else if (app.tool === 'texto') {
+        elementos.push({
+            tipo: 'TEXTO', x: pos.x, y: pos.y, w: 50, h: 20, texto: 'Novo Texto', fontSize: 14, rot: 0, z: elementos.length
+        });
+        app.selectedIdx = elementos.length - 1;
+        setFerramenta('selecionar'); // Volta para seleção
+        updateUI();
+        updateLayerList();
+    }
+    draw();
+});
+
+window.addEventListener('mousemove', (e) => {
+    if (!app.isDragging || app.selectedIdx === -1) return;
+    const pos = getMousePos(e);
+    const el = elementos[app.selectedIdx];
+
+    if (app.tool === 'selecionar') {
+        let nx = pos.x - app.dragOffset.x;
+        let ny = pos.y - app.dragOffset.y;
+        if (!e.shiftKey) { nx = snap(nx); ny = snap(ny); } // Magnetismo
+        el.x = nx; el.y = ny;
+        updateInputs(); // Atualiza números na lateral
+        
+    } else if (app.tool === 'retangulo') {
+        let w = pos.x - app.startMouse.x;
+        let h = pos.y - app.startMouse.y;
+        if (!e.shiftKey) { w = snap(w); h = snap(h); }
+        el.w = w; el.h = h;
+    }
+    draw();
+});
+
+window.addEventListener('mouseup', () => {
+    if (app.isDragging) {
+        app.isDragging = false;
+        if (app.selectedIdx !== -1) {
+            const el = elementos[app.selectedIdx];
+            // Corrige dimensões negativas
+            if (el.w < 0) { el.x += el.w; el.w = Math.abs(el.w); }
+            if (el.h < 0) { el.y += el.h; el.h = Math.abs(el.h); }
+            // Tamanho mínimo
+            if (el.tipo === 'RETANGULO' && el.w < 10) { el.w = 50; el.h = 50; }
+            
+            updateUI();
+            updateLayerList();
+            document.getElementById('statusMsg').innerText = "Alterações não salvas *";
+            document.getElementById('statusMsg').classList.add('text-danger');
+        }
+    }
+});
+
+// ================= UI E INPUTS =================
+function updateUI() {
+    const hasSel = app.selectedIdx !== -1;
+    document.getElementById('painelPropriedades').style.display = hasSel ? 'block' : 'none';
+    document.getElementById('painelNenhum').style.display = hasSel ? 'none' : 'block';
+    
+    if (hasSel) updateInputs();
+}
+
+function updateInputs() {
+    const el = elementos[app.selectedIdx];
+    // Inputs gerais
+    document.getElementById('propId').value = el.id_texto || '';
+    document.getElementById('propW').value = Math.round(el.w);
+    document.getElementById('propH').value = Math.round(el.h);
+    document.getElementById('propX').value = Math.round(el.x);
+    document.getElementById('propY').value = Math.round(el.y);
+    document.getElementById('propRot').value = el.rot;
+    document.getElementById('rotVal').innerText = el.rot;
+
+    // Específicos
+    const isText = el.tipo === 'TEXTO';
+    document.getElementById('divTextoExtras').style.display = isText ? 'block' : 'none';
+    if (isText) {
+        document.getElementById('propTexto').value = el.texto;
+        document.getElementById('propFontSize').value = el.fontSize;
+    }
+}
+
+// LISTENERS DOS CAMPOS (ATUALIZAM EM TEMPO REAL)
+const inputs = {
+    'propId': (val) => { elementos[app.selectedIdx].id_texto = val; updateLayerList(); },
+    'propW': (val) => elementos[app.selectedIdx].w = parseInt(val),
+    'propH': (val) => elementos[app.selectedIdx].h = parseInt(val),
+    'propX': (val) => elementos[app.selectedIdx].x = parseInt(val),
+    'propY': (val) => elementos[app.selectedIdx].y = parseInt(val),
+    'propRot': (val) => { elementos[app.selectedIdx].rot = parseInt(val); document.getElementById('rotVal').innerText = val; },
+    'propTexto': (val) => { elementos[app.selectedIdx].texto = val; updateLayerList(); },
+    'propFontSize': (val) => elementos[app.selectedIdx].fontSize = parseInt(val),
+};
+
+for (const [id, func] of Object.entries(inputs)) {
+    document.getElementById(id).addEventListener('input', (e) => {
+        if (app.selectedIdx !== -1) {
+            func(e.target.value);
+            draw();
+        }
+    });
+}
+
+function excluirSelecionado() {
+    if (app.selectedIdx !== -1 && confirm('Excluir item selecionado?')) {
+        elementos.splice(app.selectedIdx, 1);
+        app.selectedIdx = -1;
+        draw();
+        updateUI();
+        updateLayerList();
+    }
+}
+
+function alterarZoom(delta) {
+    app.zoom = Math.max(0.5, Math.min(3, app.zoom + delta));
+    document.getElementById('zoomLabel').innerText = Math.round(app.zoom * 100) + "%";
+    app.canvas.style.transform = `scale(${app.zoom})`;
+    app.canvas.style.transformOrigin = "top left";
+}
+
+// === CORREÇÃO 1: ATALHOS INTELIGENTES ===
+document.addEventListener('keydown', (e) => {
+    // Se o usuário estiver digitando em um input, IGNORA os atalhos
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        return; // Sai da função e permite digitar a letra
+    }
+
+    const key = e.key.toLowerCase();
+    if (key === 'delete') excluirSelecionado();
+    if (key === 'v') setFerramenta('selecionar');
+    if (key === 'r') setFerramenta('retangulo');
+    if (key === 't') setFerramenta('texto');
+    // Salvar com Ctrl+S
+    if ((e.ctrlKey || e.metaKey) && key === 's') {
+        e.preventDefault();
+        salvarTudo();
+    }
+});
+
+// SALVAR
+document.getElementById('btnSalvar').onclick = salvarTudo;
+
+async function salvarTudo() {
+    const btn = document.getElementById('btnSalvar');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    btn.disabled = true;
+
+    try {
+        const payload = {
+            armazem_id: CONFIG.armazemId,
+            elementos: elementos.map((el, i) => ({
+                id: el.id,
+                tipo: el.tipo,
+                pos_x: Math.round(el.x), 
+                pos_y: Math.round(el.y),
+                largura: Math.round(el.w), 
+                altura: Math.round(el.h),
+                rotacao: el.rot,
+                
+                // === CORREÇÃO IMPORTANTE AQUI ===
+                // Estamos mapeando a variável interna 'el.cor' para o nome que o banco espera 'cor_preenchimento'
+                cor_preenchimento: el.cor || '#CCCCCC', 
+                cor_borda: '#000000', // Padrão
+                // ================================
+
+                identificador: el.id_texto,
+                conteudo_texto: el.texto,
+                fonte_tamanho: el.fontSize,
+                ordem_z: i
+            }))
+        };
+
+        const res = await fetch(CONFIG.urlSalvar, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CONFIG.csrf},
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        
+        if (data.success) {
+            document.getElementById('statusMsg').innerText = "Salvo com sucesso!";
+            document.getElementById('statusMsg').className = 'text-success fw-bold';
+            // Recarrega para garantir que os IDs e cores fiquem sincronizados
+            setTimeout(() => location.reload(), 500); 
+        } else {
+            alert('Erro ao salvar no servidor: ' + data.error);
+        }
+    } catch (e) {
+        alert('Erro de conexão ou Javascript.');
+        console.error(e);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+// INICIALIZAÇÃO
+updateLayerList();
+draw();
+</script>
+{% endblock %}

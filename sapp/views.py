@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash
+from django.core.serializers.json import DjangoJSONEncoder 
 # Adicione no topo com os outros imports
 import datetime
 from django import forms  #
@@ -2150,83 +2151,158 @@ def transferir(request, id):
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                qtd = int(request.POST.get('quantidade'))
-                novo_end = request.POST.get('novo_endereco').strip().upper()
+                qtd = int(request.POST.get('quantidade', 0))
+                novo_end = request.POST.get('novo_endereco', '').strip().upper()
                 
-                # Validação de saldo
-                if qtd > origem.saldo: 
-                    messages.error(request, f"Saldo insuficiente. Disponível: {origem.saldo}")
+                # Validações básicas
+                if not novo_end:
+                    messages.error(request, "❌ Novo endereço é obrigatório!")
                     return redirect('sapp:lista_estoque')
                 
-                # 1. Retira da Origem
+                if qtd <= 0:
+                    messages.error(request, "❌ Quantidade deve ser maior que zero!")
+                    return redirect('sapp:lista_estoque')
+                
+                if qtd > origem.saldo:
+                    messages.error(request, f"❌ Saldo insuficiente. Disponível: {origem.saldo}")
+                    return redirect('sapp:lista_estoque')
+                
+                # 1. Retira da Origem (atualiza saída)
                 origem.saida += qtd
-                origem.save() # Saldo é recalculado automaticamente no save()
+                origem.save()  # Saldo é recalculado automaticamente no save()
                 
-                # 2. Tratamento da Espécie (A CORREÇÃO ESTÁ AQUI)
-                especie_id_form = request.POST.get('especie')
-                
-                if especie_id_form:
-                    # Se o usuário escolheu uma espécie no form, buscamos o objeto pelo ID
-                    objeto_especie = get_object_or_404(Especie, id=especie_id_form)
+                # 2. BUSCAR OBJETOS RELACIONADOS (igual ao editar)
+                # Espécie
+                novo_especie_id = request.POST.get('especie')
+                if novo_especie_id and novo_especie_id.strip() != '':
+                    obj_especie = get_object_or_404(Especie, id=novo_especie_id)
                 else:
-                    # Se não escolheu, mantém a espécie do lote original
-                    objeto_especie = origem.especie
-
-                # 3. Cria o lote de Destino
+                    obj_especie = origem.especie
+                
+                # Cultivar
+                cultivar_id = request.POST.get('cultivar')
+                if cultivar_id and cultivar_id.strip() != '':
+                    obj_cultivar = get_object_or_404(Cultivar, id=cultivar_id)
+                else:
+                    obj_cultivar = origem.cultivar
+                
+                # Peneira
+                peneira_id = request.POST.get('peneira')
+                if peneira_id and peneira_id.strip() != '':
+                    obj_peneira = get_object_or_404(Peneira, id=peneira_id)
+                else:
+                    obj_peneira = origem.peneira
+                
+                # Categoria
+                categoria_id = request.POST.get('categoria')
+                if categoria_id and categoria_id.strip() != '':
+                    obj_categoria = get_object_or_404(Categoria, id=categoria_id)
+                else:
+                    obj_categoria = origem.categoria
+                
+                # Tratamento
+                tratamento_id = request.POST.get('tratamento')
+                if tratamento_id and tratamento_id.strip() != '':
+                    obj_tratamento = get_object_or_404(Tratamento, id=tratamento_id)
+                else:
+                    obj_tratamento = origem.tratamento
+                
+                # 3. Processar peso unitário (igual ao editar)
+                peso_raw = request.POST.get('peso_unitario', origem.peso_unitario or '0')
+                try:
+                    peso_raw = str(peso_raw).replace(',', '.')
+                    if peso_raw.count('.') > 1:
+                        partes = peso_raw.split('.')
+                        peso_raw = f"{partes[0]}.{''.join(partes[1:])}"
+                    novo_peso = Decimal(peso_raw)
+                except:
+                    novo_peso = origem.peso_unitario or Decimal('0.00')
+                
+                # 4. Cria o lote de Destino
                 destino = Estoque.objects.create(
-                    lote=origem.lote, 
-                    endereco=novo_end, 
-                    entrada=qtd, 
+                    lote=origem.lote,
+                    endereco=novo_end,
+                    entrada=qtd,
                     saldo=qtd,
-                    
-                    # Chaves Estrangeiras (IDs)
-                    cultivar_id=request.POST.get('cultivar') or origem.cultivar_id,
-                    peneira_id=request.POST.get('peneira') or origem.peneira_id,
-                    categoria_id=request.POST.get('categoria') or origem.categoria_id,
-                    tratamento_id=request.POST.get('tratamento') or origem.tratamento_id,
-                    
-                    # CORREÇÃO: Passando o Objeto Espécie, não o ID
-                    especie=objeto_especie, 
-                    
-                    # Campos de Texto
-                    produto=request.POST.get('produto', origem.produto),
-                    cliente=request.POST.get('cliente', origem.cliente),
-                    empresa=request.POST.get('empresa', origem.empresa),
-                    az=request.POST.get('az', origem.az),
-                    peso_unitario=processar_decimal(request.POST.get('peso_unitario', origem.peso_unitario)),
-                    embalagem=request.POST.get('embalagem', origem.embalagem),
                     conferente=request.user,
-                    origem_destino=f"Transf. de {origem.endereco}",
-                    observacao=request.POST.get('observacao', '')
+                    origem_destino=f"Transferência de {origem.endereco}",
+                    
+                    # Campos de texto com fallback
+                    produto=request.POST.get('produto', origem.produto or ''),
+                    cliente=request.POST.get('cliente', origem.cliente or ''),
+                    empresa=request.POST.get('empresa', origem.empresa or ''),
+                    az=request.POST.get('az', origem.az or ''),
+                    peso_unitario=novo_peso,
+                    embalagem=request.POST.get('embalagem', origem.embalagem),
+                    observacao=request.POST.get('observacao', origem.observacao or ''),
+                    
+                    # Foreign Keys (Objetos, não IDs)
+                    especie=obj_especie,
+                    cultivar=obj_cultivar,
+                    peneira=obj_peneira,
+                    categoria=obj_categoria,
+                    tratamento=obj_tratamento,
                 )
                 
-                # 4. Históricos
+                # 5. Históricos (Saída da origem)
                 hist_saida = HistoricoMovimentacao.objects.create(
-                    estoque=origem, 
-                    usuario=request.user, 
-                    tipo='Transferência (Saída)', 
-                    descricao=f"Para {novo_end} (-{qtd})"
+                    estoque=origem,
+                    usuario=request.user,
+                    tipo='Transferência (Saída)',
+                    descricao=f"Transferido para {novo_end} ({destino.lote}) - Quantidade: {qtd} {origem.embalagem}"
                 )
                 
-                HistoricoMovimentacao.objects.create(
-                    estoque=destino, 
-                    usuario=request.user, 
-                    tipo='Transferência (Entrada)', 
-                    descricao=f"De {origem.endereco} (+{qtd})"
+                # 6. Histórico (Entrada no destino)
+                hist_entrada = HistoricoMovimentacao.objects.create(
+                    estoque=destino,
+                    usuario=request.user,
+                    tipo='Transferência (Entrada)',
+                    descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem}"
                 )
                 
-                # Salvar fotos na saída (origem)
+                # 7. Salvar fotos na saída (origem)
                 for f in request.FILES.getlist('fotos'):
                     FotoMovimentacao.objects.create(historico=hist_saida, arquivo=f)
                     
-                messages.success(request, "Transferência concluída com sucesso!")
+                messages.success(request, f"✅ Transferência concluída! {qtd} unidades transferidas para {novo_end}")
                 
         except Exception as e:
-            # Imprime o erro no terminal para ajudar a debugar se acontecer de novo
-            print(f"ERRO TRANSFERENCIA: {e}") 
-            messages.error(request, f"Erro ao transferir: {e}")
+            import traceback
+            print(f"❌ ERRO NA TRANSFERÊNCIA: {e}")
+            print(traceback.format_exc())
+            messages.error(request, f"❌ Erro ao transferir: {str(e)}")
             
     return redirect('sapp:lista_estoque')
+# No seu views.py
+from django.http import JsonResponse
+
+@login_required
+def detalhes_estoque_api(request, id):
+    """API para retornar dados de um item do estoque"""
+    try:
+        item = Estoque.objects.get(id=id)
+        data = {
+            'id': item.id,
+            'lote': item.lote,
+            'endereco': item.endereco,
+            'saldo': item.saldo,
+            'entrada': item.entrada,
+            'produto': item.produto,
+            'cliente': item.cliente,
+            'empresa': item.empresa,
+            'az': item.az,
+            'peso_unitario': str(item.peso_unitario) if item.peso_unitario else '',
+            'embalagem': item.embalagem,
+            'observacao': item.observacao or '',
+            'especie_id': item.especie.id if item.especie else '',
+            'cultivar_id': item.cultivar.id if item.cultivar else '',
+            'peneira_id': item.peneira.id if item.peneira else '',
+            'categoria_id': item.categoria.id if item.categoria else '',
+            'tratamento_id': item.tratamento.id if item.tratamento else '',
+        }
+        return JsonResponse(data)
+    except Estoque.DoesNotExist:
+        return JsonResponse({'error': 'Item não encontrado'}, status=404)
 
 @login_required
 def nova_entrada(request):
@@ -2937,45 +3013,6 @@ def debug_estoque_status(request):
 
 # ========== APIs para frontend ==========
 
-# No final do views.py
-@login_required
-def api_buscar_dados_lote(request):
-    """API para buscar dados de um lote específico"""
-    item_id = request.GET.get('item_id')
-    
-    if item_id:
-        try:
-            item = Estoque.objects.select_related(
-                'cultivar', 'peneira', 'categoria', 'tratamento', 'especie'
-            ).get(id=item_id)
-            
-            data = {
-                'encontrado': True,
-                'lote': item.lote,
-                'produto': item.produto or '',
-                'saldo': item.saldo,
-                'az': item.az or '',
-                'empresa': item.empresa or '',
-                'cliente': item.cliente or '',
-                'peso_unitario': str(item.peso_unitario) if item.peso_unitario else '0',
-                'embalagem': item.embalagem or 'BAG',
-                
-                # --- CORREÇÃO AQUI: Enviar o ID ou Nome, não o objeto ---
-                'especie_id': item.especie.id if item.especie else None,
-                'especie_nome': item.especie.nome if item.especie else 'SOJA',
-                
-                'observacao': item.observacao or '',
-                # IDs para selects
-                'cultivar_id': item.cultivar.id if item.cultivar else None,
-                'peneira_id': item.peneira.id if item.peneira else None,
-                'categoria_id': item.categoria.id if item.categoria else None,
-                'tratamento_id': item.tratamento.id if item.tratamento else None,
-            }
-            return JsonResponse(data)
-        except Estoque.DoesNotExist:
-            pass
-    
-    return JsonResponse({'encontrado': False})
 
 
 @login_required
@@ -3543,32 +3580,45 @@ def pagina_rascunho(request):
 
     return render(request, 'sapp/pagina_rascunho.html', context)
 
-
-
 @login_required
 def api_buscar_dados_lote(request):
-    """API para buscar detalhes de um lote"""
+    """API única e robusta para buscar dados do lote para edição ou transferência"""
     item_id = request.GET.get('item_id')
     
     try:
-        lote = Estoque.objects.get(id=item_id)
-        return JsonResponse({
+        # Buscamos o item com todos os relacionamentos para evitar múltiplas consultas
+        item = Estoque.objects.select_related(
+            'cultivar', 'peneira', 'categoria', 'tratamento', 'especie'
+        ).get(id=item_id)
+        
+        # O segredo é enviar os IDs brutos para os Selects e os valores formatados para os inputs de texto
+        data = {
             'encontrado': True,
-            'lote': lote.lote,
-            'cultivar_nome': lote.cultivar.nome if lote.cultivar else '',
-            'peneira_nome': lote.peneira.nome if lote.peneira else '',
-            'categoria_nome': lote.categoria.nome if lote.categoria else '',
-            'endereco': lote.endereco,
-            'az': lote.az,
-            'cliente': lote.cliente,
-            'empresa': lote.empresa,
-            'embalagem': lote.get_embalagem_display(),
-            'tratamento': lote.tratamento,
-            'saldo': lote.saldo,
-            'observacao': lote.observacao
-        })
+            'id': item.id,
+            'lote': item.lote,
+            'endereco': item.endereco,
+            'saldo': item.saldo,
+            'entrada': item.entrada,
+            'produto': item.produto or '',
+            'cliente': item.cliente or '',
+            'empresa': item.empresa or '',
+            'az': item.az or '',
+            'peso_unitario': str(item.peso_unitario).replace(',', '.') if item.peso_unitario else '0.00',
+            'embalagem': item.embalagem,
+            'observacao': item.observacao or '',
+            
+            # IDs essenciais para os campos <select> do modal
+            'especie_id': item.especie.id if item.especie else '',
+            'cultivar_id': item.cultivar.id if item.cultivar else '',
+            'peneira_id': item.peneira.id if item.peneira else '',
+            'categoria_id': item.categoria.id if item.categoria else '',
+            'tratamento_id': item.tratamento.id if item.tratamento else '',
+        }
+        return JsonResponse(data)
     except Estoque.DoesNotExist:
-        return JsonResponse({'encontrado': False})    
+        return JsonResponse({'encontrado': False, 'erro': 'Lote não encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'encontrado': False, 'erro': str(e)}, status=500)
 
 
 @login_required
@@ -3655,3 +3705,458 @@ def api_autocomplete_nova_entrada(request):
     return JsonResponse(resultados, safe=False)
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from django.contrib.admin.views.decorators import staff_member_required 
+
+
+
+
+
+@staff_member_required
+def api_status_enderecos(request):
+    enderecos = MapeamentoEndereco.objects.filter(ativo=True)
+    resultado = {}
+    
+    for mapa in enderecos:
+        tem_saldo = Estoque.objects.filter(
+            endereco=mapa.endereco, 
+            saldo__gt=0
+        ).exists()
+        
+        resultado[mapa.endereco] = {
+            'tem_saldo': tem_saldo,
+            'cor_padrao': mapa.cor_padrao,
+            'cor_positivo': mapa.cor_positivo
+        }
+    
+    return JsonResponse(resultado)
+
+    
+
+
+
+
+
+
+
+
+
+
+# sapp/views.py
+from django.contrib.admin.views.decorators import staff_member_required
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import ArmazemLayout, ElementoMapa, Estoque
+import json
+
+
+# ============================================================================
+# APIs PARA O CANVAS (ADMIN APENAS)
+# ============================================================================
+
+
+
+
+def verificar_estoque_endereco(request, endereco):
+    """API para verificar se existe estoque em um endereço"""
+    if request.method == 'GET':
+        try:
+            # Decodifica o endereço (pode ter espaços ou caracteres especiais)
+            endereco_decodificado = endereco
+            
+            # Verifica se há estoque
+            tem_estoque = Estoque.objects.filter(
+                endereco__iexact=endereco_decodificado,
+                saldo__gt=0
+            ).exists()
+            
+            # Verifica se existe cadastro (mesmo com saldo zero)
+            existe_cadastro = Estoque.objects.filter(
+                endereco__iexact=endereco_decodificado
+            ).exists()
+            
+            return JsonResponse({
+                'success': True,
+                'endereco': endereco_decodificado,
+                'tem_estoque': tem_estoque,
+                'existe_cadastro': existe_cadastro,
+                'mensagem': f'Endereço {endereco_decodificado} tem estoque' if tem_estoque else f'Endereço {endereco_decodificado} está vazio'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False, 
+                'error': str(e),
+                'endereco': endereco
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Método não permitido'})
+
+
+
+def exportar_mapa_json(request, armazem_numero):
+    """Exporta o layout do mapa como JSON"""
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Acesso negado'}, status=403)
+    
+    armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero)
+    elementos = armazem.elementos.all().order_by('ordem_z')
+    
+    dados = {
+        'armazem': {
+            'id': armazem.id,
+            'numero': armazem.numero,
+            'nome': armazem.nome,
+            'largura_canvas': armazem.largura_canvas,
+            'altura_canvas': armazem.altura_canvas,
+        },
+        'elementos': [
+            {
+                'id': elem.id,
+                'tipo': elem.tipo,
+                'pos_x': elem.pos_x,
+                'pos_y': elem.pos_y,
+                'largura': elem.largura,
+                'altura': elem.altura,
+                'cor_preenchimento': elem.cor_preenchimento,
+                'cor_borda': elem.cor_borda,
+                'espessura_borda': elem.espessura_borda,
+                'conteudo_texto': elem.conteudo_texto,
+                'fonte_nome': elem.fonte_nome,
+                'fonte_tamanho': elem.fonte_tamanho,
+                'texto_negrito': elem.texto_negrito,
+                'texto_italico': elem.texto_italico,
+                'texto_direcao': elem.texto_direcao,
+                'linha_tipo': elem.linha_tipo,
+                'identificador': elem.identificador,
+                'ordem_z': elem.ordem_z,
+            }
+            for elem in elementos
+        ],
+        'total_elementos': elementos.count(),
+        'exportado_em': timezone.now().isoformat()
+    }
+    
+    return JsonResponse(dados, json_dumps_params={'indent': 2})
+
+@staff_member_required
+@csrf_exempt
+def importar_mapa_json(request, armazem_numero):
+    """Importa layout do mapa a partir de JSON"""
+    if request.method == 'POST':
+        try:
+            armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero)
+            data = json.loads(request.body)
+            
+            # Limpa elementos existentes
+            ElementoMapa.objects.filter(armazem=armazem).delete()
+            
+            # Cria novos elementos
+            elementos_criados = []
+            for idx, elem_data in enumerate(data.get('elementos', [])):
+                elemento = ElementoMapa.objects.create(
+                    armazem=armazem,
+                    tipo=elem_data.get('tipo', 'RETANGULO'),
+                    pos_x=elem_data.get('pos_x', 0),
+                    pos_y=elem_data.get('pos_y', 0),
+                    largura=elem_data.get('largura', 100),
+                    altura=elem_data.get('altura', 60),
+                    cor_preenchimento=elem_data.get('cor_preenchimento', '#CCCCCC'),
+                    cor_borda=elem_data.get('cor_borda', '#000000'),
+                    espessura_borda=elem_data.get('espessura_borda', 2),
+                    conteudo_texto=elem_data.get('conteudo_texto', ''),
+                    fonte_nome=elem_data.get('fonte_nome', 'Arial'),
+                    fonte_tamanho=elem_data.get('fonte_tamanho', 14),
+                    texto_negrito=elem_data.get('texto_negrito', False),
+                    texto_italico=elem_data.get('texto_italico', False),
+                    texto_direcao=elem_data.get('texto_direcao', 'horizontal'),
+                    linha_tipo=elem_data.get('linha_tipo', 'solida'),
+                    identificador=elem_data.get('identificador', ''),
+                    ordem_z=elem_data.get('ordem_z', idx + 1),
+                )
+                elementos_criados.append(elemento.id)
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Mapa importado com sucesso! {len(elementos_criados)} elementos criados.',
+                'armazem': armazem.numero,
+                'total_elementos': len(elementos_criados)
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método não permitido'})
+
+# ============================================================================
+# VIEW DE FALLBACK (para compatibilidade)
+# ============================================================================
+
+
+
+
+# sapp/views.py
+def lista_armazens(request):
+    """Lista todos os armazéns disponíveis"""
+    armazens = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
+    
+    context = {
+        'armazens': armazens,
+        'is_admin': request.user.is_staff,
+        'titulo_pagina': 'Mapas dos Armazéns'
+    }
+    return render(request, 'sapp/lista_armazens.html', context)
+
+
+
+
+# sapp/views.py
+@staff_member_required
+def criar_armazem(request):
+    if request.method == 'POST':
+        form = ArmazemLayoutForm(request.POST)
+        if form.is_valid():
+            armazem = form.save()
+            messages.success(request, f'Armazém {armazem.numero} criado com sucesso!')
+            return redirect('sapp:lista_armazens')
+    else:
+        form = ArmazemLayoutForm()
+    
+    context = {
+        'form': form,
+        'titulo_pagina': 'Criar Novo Armazém'
+    }
+    return render(request, 'sapp/criar_armazem.html', context)
+
+
+
+# sapp/views.py - ADICIONE/MODIFIQUE ESTAS FUNÇÕES
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import ArmazemLayout, ElementoMapa, Estoque
+import json
+from django.utils import timezone
+
+# ============================================================================
+# EDITOR DE MAPA (ADMIN)
+# ============================================================================
+
+
+
+
+
+# No arquivo sapp/views.py
+
+@login_required
+def mapa_ocupacao_canvas(request, armazem_numero=1):
+    # 1. Busca Armazém e Elementos
+    armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero, ativo=True)
+    elementos_db = armazem.elementos.all().order_by('ordem_z')
+    armazens_disponiveis = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
+    
+    # 2. Busca Estoque com Saldo > 0
+    itens_estoque = Estoque.objects.filter(saldo__gt=0)
+
+    # 3. Mapeia Estoque (Normalizando Endereço: Tira espaços e põe Maiúsculo)
+    dados_ocupacao = {}
+    
+    for item in itens_estoque:
+        if item.endereco:
+            # A MÁGICA: .strip().upper() garante que " a-01" seja igual a "A-01"
+            chave = item.endereco.strip().upper()
+            
+            if chave not in dados_ocupacao:
+                dados_ocupacao[chave] = []
+            
+            dados_ocupacao[chave].append({
+                'lote': item.lote,
+                'produto': str(item.produto or 'S/ Produto'),
+                'qtd': float(item.saldo),
+                'embalagem': str(item.embalagem),
+                'cliente': str(item.cliente or '-')
+            })
+
+    # 4. Prepara Elementos para o Mapa (Já definindo a cor aqui)
+    elementos_render = []
+    
+    for el in elementos_db:
+        # Dados básicos
+        item_dict = {
+            'tipo': el.tipo,
+            'x': el.pos_x, 'y': el.pos_y, 'w': el.largura, 'h': el.altura, 'rot': el.rotacao,
+            'texto': el.conteudo_texto,
+            'id': el.identificador
+        }
+
+        # SE FOR RETÂNGULO: Verifica se deve pintar
+        if el.tipo == 'RETANGULO' and el.identificador:
+            chave_mapa = el.identificador.strip().upper() # Normaliza também
+            
+            if chave_mapa in dados_ocupacao:
+                # TEM ESTOQUE -> VERDE
+                item_dict['cor'] = '#10b981' 
+                item_dict['stroke'] = '#065f46'
+                item_dict['ocupado'] = True
+            else:
+                # VAZIO -> CINZA (Ou a cor que você escolheu no editor)
+                item_dict['cor'] = el.cor_preenchimento or '#f3f4f6'
+                item_dict['stroke'] = el.cor_borda or '#9ca3af'
+                item_dict['ocupado'] = False
+        else:
+            # TEXTOS e LINHAS -> Cor original
+            item_dict['cor'] = el.cor_preenchimento
+            item_dict['stroke'] = el.cor_borda
+            item_dict['ocupado'] = False
+
+        elementos_render.append(item_dict)
+
+    # 5. Renderiza
+    context = {
+        'armazem': armazem,
+        'armazens_disponiveis': armazens_disponiveis,
+        'elementos_json': json.dumps(elementos_render, cls=DjangoJSONEncoder),
+        'dados_ocupacao_json': json.dumps(dados_ocupacao, cls=DjangoJSONEncoder),
+        'is_admin': request.user.is_staff,
+    }
+    
+    return render(request, 'sapp/mapa_visualizacao.html', context)
+
+@staff_member_required
+@csrf_exempt
+def salvar_todos_elementos(request):
+    """
+    API: Recebe o JSON completo do editor e salva no banco.
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            armazem_id = data.get('armazem_id')
+            elementos_data = data.get('elementos', [])
+            
+            armazem = ArmazemLayout.objects.get(id=armazem_id)
+            
+            # Estratégia Segura: 
+            # 1. Limpar elementos atuais deste armazém (para remover os excluídos)
+            # 2. Recriar tudo baseado no que veio do editor
+            # Isso evita "lixo" no banco de dados.
+            
+            ElementoMapa.objects.filter(armazem=armazem).delete()
+            
+            novos_objetos = []
+            for idx, item in enumerate(elementos_data):
+                novo = ElementoMapa(
+                    armazem=armazem,
+                    tipo=item.get('tipo', 'RETANGULO'),
+                    pos_x=item.get('pos_x'),
+                    pos_y=item.get('pos_y'),
+                    largura=item.get('largura'),
+                    altura=item.get('altura'),
+                    rotacao=item.get('rotacao', 0),
+                    ordem_z=idx, # A ordem que vem do array é a ordem visual
+                    
+                    # Dados visuais
+                    cor_preenchimento=item.get('cor_preenchimento'),
+                    conteudo_texto=item.get('conteudo_texto', ''),
+                    fonte_tamanho=item.get('fonte_tamanho', 14),
+                    
+                    # O MAIS IMPORTANTE: O ENDEREÇO
+                    identificador=item.get('identificador', '').strip().upper() 
+                )
+                novos_objetos.append(novo)
+            
+            # Bulk create é muito mais rápido
+            ElementoMapa.objects.bulk_create(novos_objetos)
+            
+            return JsonResponse({'success': True, 'total': len(novos_objetos)})
+            
+        except Exception as e:
+            print(f"Erro ao salvar mapa: {e}")
+            return JsonResponse({'success': False, 'error': str(e)})
+            
+    return JsonResponse({'success': False, 'error': 'Método inválido'})
+
+# ============================================================================
+# FUNÇÕES AUXILIARES
+# ============================================================================
+
+def lista_armazens(request):
+    """Lista todos os armazéns disponíveis"""
+    armazens = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
+    
+    context = {
+        'armazens': armazens,
+        'is_admin': request.user.is_staff,
+        'titulo_pagina': 'Mapas dos Armazéns'
+    }
+    return render(request, 'sapp/lista_armazens.html', context)
+
+@staff_member_required
+@csrf_exempt
+def criar_armazens_automaticos(request):
+    """API para criar armazéns automaticamente"""
+    if request.method == 'POST':
+        try:
+            armazens_padrao = [
+                {'numero': 1, 'nome': 'Armazém Principal', 'largura_canvas': 1200, 'altura_canvas': 800},
+                {'numero': 2, 'nome': 'Armazém Secundário', 'largura_canvas': 1000, 'altura_canvas': 600},
+                {'numero': 3, 'nome': 'Armazém de Reserva', 'largura_canvas': 800, 'altura_canvas': 500},
+            ]
+            
+            criados = []
+            for data in armazens_padrao:
+                armazem, created = ArmazemLayout.objects.get_or_create(
+                    numero=data['numero'],
+                    defaults=data
+                )
+                if created:
+                    criados.append(f"Armazém {armazem.numero} - {armazem.nome}")
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'{len(criados)} armazéns criados com sucesso!',
+                'armazens': criados
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método não permitido'})
+
+
+@staff_member_required
+def editor_avancado(request, armazem_numero=1):
+    """
+    Carrega a interface do Editor Gráfico Avançado.
+    """
+    armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero, ativo=True)
+    
+    # Carrega elementos ordenados para desenhar na ordem certa (z-index)
+    elementos = armazem.elementos.all().order_by('ordem_z')
+    
+    context = {
+        'armazem': armazem,
+        'elementos': elementos,
+        'titulo_pagina': f'Editor Gráfico - Armazém {armazem.numero}',
+    }
+    
+    return render(request, 'sapp/editor_avancado.html', context)

@@ -226,3 +226,20 @@ class MudarSenhaForm(forms.Form):
             raise forms.ValidationError("As senhas não coincidem.")
         
         return cleaned_data
+    
+    
+    
+# sapp/forms.py
+from django import forms
+from .models import ArmazemLayout
+
+class ArmazemLayoutForm(forms.ModelForm):
+    class Meta:
+        model = ArmazemLayout
+        fields = ['numero', 'nome', 'largura_canvas', 'altura_canvas', 'ativo']
+        widgets = {
+            'numero': forms.NumberInput(attrs={'class': 'form-control'}),
+            'nome': forms.TextInput(attrs={'class': 'form-control'}),
+            'largura_canvas': forms.NumberInput(attrs={'class': 'form-control'}),
+            'altura_canvas': forms.NumberInput(attrs={'class': 'form-control'}),
+        }

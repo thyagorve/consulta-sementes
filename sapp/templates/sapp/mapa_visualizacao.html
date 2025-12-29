@@ -1,0 +1,304 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- CONTAINER PRINCIPAL: Flexbox para ocupar altura total sem scroll -->
+<div class="d-flex flex-column h-100 p-3" style="height: calc(100vh - 60px) !important; overflow: hidden;">
+    
+    <!-- BARRA DE CONTROLE -->
+    <div class="card shadow-sm mb-3 flex-shrink-0">
+        <div class="card-body p-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h5 class="mb-0 fw-bold"><i class="fas fa-warehouse text-primary me-2"></i>{{ armazem.nome }}</h5>
+                <div class="text-muted small">
+                    <span id="statsTotal">0</span> posições | 
+                    <span id="statsOcupados" class="text-success fw-bold">0</span> ocupadas
+                </div>
+            </div>
+            
+            <div class="d-flex gap-3 align-items-center flex-wrap">
+                <!-- LEGENDA -->
+                <div class="d-none d-md-flex align-items-center small border-end pe-3 me-2">
+                    <div class="d-flex align-items-center me-3">
+                        <span style="width: 12px; height: 12px; background: #10b981; border: 1px solid #047857; border-radius: 2px; margin-right: 5px;"></span>
+                        <span>Ocupado</span>
+                    </div>
+                    <div class="d-flex align-items-center me-3">
+                        <span style="width: 12px; height: 12px; background: #f3f4f6; border: 1px solid #9ca3af; border-radius: 2px; margin-right: 5px;"></span>
+                        <span>Vazio</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-exclamation-circle text-danger me-1"></i>
+                        <span>Multi-Lote</span>
+                    </div>
+                </div>
+
+                <!-- BOTÕES -->
+                <button id="btnAlternarLabel" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-tag me-1"></i> <span id="textoBotaoAlternar">Ver Produtos</span>
+                </button>
+                
+                <button onclick="location.reload()" class="btn btn-outline-secondary btn-sm" title="Atualizar">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                
+                <!-- PROTEÇÃO ADMIN: Só aparece se for staff/superuser -->
+                {% if is_admin %}
+                <a href="/editor-mapa/{{ armazem.numero }}/" class="btn btn-warning btn-sm fw-bold shadow-sm">
+                    <i class="fas fa-pen-ruler me-1"></i> Editor
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ÁREA DO MAPA (FIT SCREEN) -->
+    <!-- Este container ocupa o resto da tela e centraliza o canvas -->
+    <div class="card shadow-sm border-0 bg-light flex-fill overflow-hidden position-relative">
+        <div class="card-body p-2 d-flex justify-content-center align-items-center h-100 w-100 bg-secondary bg-opacity-10">
+            
+            <!-- CANVAS RESPONSIVO -->
+            <!-- max-width/height garante que ele nunca estoure a tela -->
+            <canvas id="mapaCanvas"></canvas>
+            
+            <!-- TOOLTIP FLUTUANTE -->
+            <div id="tooltipMapa" class="tooltip-mapa"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Estilo Responsivo do Canvas */
+    #mapaCanvas {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        display: block;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        background-color: white;
+        cursor: crosshair;
+    }
+
+    /* Estilo do Tooltip */
+    .tooltip-mapa {
+        position: fixed; /* Fixado na janela */
+        display: none;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        padding: 0;
+        width: 260px;
+        z-index: 9999;
+        pointer-events: none;
+        font-family: system-ui, -apple-system, sans-serif;
+        text-align: left;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // DADOS VINDOS DO PYTHON
+    const LAYOUT_ELEMENTS = {{ elementos_json|safe }};
+    const STOCK_DATA = {{ dados_ocupacao_json|safe }};
+    
+    const canvas = document.getElementById('mapaCanvas');
+    const ctx = canvas.getContext('2d');
+    const tooltip = document.getElementById('tooltipMapa');
+    
+    // RESOLUÇÃO INTERNA (Alta qualidade)
+    // Se o Python mandar 0, usamos um padrão para não quebrar
+    canvas.width = {{ armazem.largura_canvas|default:1000 }};
+    canvas.height = {{ armazem.altura_canvas|default:600 }};
+
+    let estado = { mostrarProduto: false };
+
+    // ===============================================
+    // DESENHAR MAPA
+    // ===============================================
+    function desenharMapa() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let totalPosicoes = 0;
+        let totalOcupados = 0;
+
+        LAYOUT_ELEMENTS.forEach(el => {
+            ctx.save();
+            
+            // Rotação
+            if (el.rot) {
+                const cx = el.x + el.w/2;
+                const cy = el.y + el.h/2;
+                ctx.translate(cx, cy);
+                ctx.rotate(el.rot * Math.PI / 180);
+                ctx.translate(-cx, -cy);
+            }
+
+            if (el.tipo === 'RETANGULO') {
+                totalPosicoes++;
+                if (el.ocupado) totalOcupados++;
+
+                // Fundo (Fallback para cinza se não tiver cor)
+                ctx.fillStyle = el.cor || '#e5e7eb';
+                ctx.fillRect(el.x, el.y, el.w, el.h);
+
+                // Dados de Estoque
+                const chave = el.id ? el.id.trim().toUpperCase() : '';
+                const dadosItem = STOCK_DATA[chave];
+                const temMultiplos = dadosItem && dadosItem.length > 1;
+
+                // Borda
+                if (temMultiplos) {
+                    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
+                } else {
+                    ctx.strokeStyle = el.stroke || '#999'; ctx.lineWidth = 1;
+                }
+                ctx.strokeRect(el.x, el.y, el.w, el.h);
+
+                // Texto
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Cor do Texto
+                let corTexto = el.ocupado ? '#ffffff' : '#374151';
+                if(el.cor === '#10b981') corTexto = '#ffffff';
+                ctx.fillStyle = corTexto;
+                
+                // Tamanho da Fonte
+                let fontSize = Math.min(el.h / 2.5, 14);
+                ctx.font = `bold ${fontSize}px Arial`;
+
+                let textoExibicao = el.id; 
+
+                // Lógica de alternar label
+                if (estado.mostrarProduto && el.ocupado && dadosItem && dadosItem.length > 0) {
+                    if(temMultiplos) {
+                        textoExibicao = "VÁRIOS";
+                    } else {
+                        textoExibicao = dadosItem[0].produto.substring(0, 12);
+                    }
+                }
+
+                if(textoExibicao) ctx.fillText(textoExibicao, el.x + el.w/2, el.y + el.h/2);
+
+                // Alerta Multiplos
+                if (temMultiplos) {
+                    const padding = 6;
+                    ctx.beginPath();
+                    ctx.arc(el.x + el.w - padding, el.y + padding, 4, 0, 2*Math.PI);
+                    ctx.fillStyle = '#dc2626'; ctx.fill();
+                    ctx.fillStyle = 'white'; ctx.font = 'bold 7px Arial';
+                    ctx.fillText('!', el.x + el.w - padding, el.y + padding);
+                }
+
+            } else if (el.tipo === 'TEXTO') {
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#000000';
+                ctx.textAlign = 'left';
+                ctx.fillText(el.texto || '', el.x, el.y + 14);
+            }
+
+            ctx.restore();
+        });
+
+        document.getElementById('statsTotal').innerText = totalPosicoes;
+        document.getElementById('statsOcupados').innerText = totalOcupados;
+    }
+
+    // ===============================================
+    // INTERAÇÃO (TOOLTIP)
+    // ===============================================
+    canvas.addEventListener('mousemove', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        
+        // Conversão de escala para responsividade
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        
+        let achou = false;
+
+        // Loop Reverso (pega o elemento de cima)
+        for (let i = LAYOUT_ELEMENTS.length - 1; i >= 0; i--) {
+            const el = LAYOUT_ELEMENTS[i];
+            
+            if (el.tipo === 'RETANGULO' && x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) {
+                
+                const chave = el.id ? el.id.trim().toUpperCase() : '';
+                const itens = STOCK_DATA[chave];
+
+                let html = `<div style="background:#f8fafc; padding:10px; border-bottom:1px solid #e2e8f0;">
+                                <strong style="color:#1e293b; font-size:14px;">Endereço: ${el.id || 'N/A'}</strong>
+                            </div>
+                            <div style="padding:10px;">`;
+                
+                if (itens && itens.length > 0) {
+                    if (itens.length > 1) {
+                        html += `<div class="alert alert-danger p-1 mb-2" style="font-size:11px;">
+                                    <i class="fas fa-exclamation-triangle"></i> MÚLTIPLOS LOTES
+                                 </div>`;
+                    }
+                    itens.forEach(item => {
+                        html += `
+                            <div style="margin-bottom:8px; border-bottom:1px dashed #e2e8f0; padding-bottom:5px;">
+                                <span class="badge bg-primary">${item.lote}</span>
+                                <div style="font-weight:bold; color:#0f172a; margin-top:3px; font-size:13px;">${item.produto}</div>
+                                <div style="font-size:11px; color:#64748b;">
+                                    Qtd: <strong>${item.qtd}</strong> ${item.embalagem} | ${item.cliente}
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<div style="color:#94a3b8; font-style:italic; text-align:center;">Posição Vazia</div>`;
+                }
+                html += `</div>`;
+
+                tooltip.innerHTML = html;
+                tooltip.style.display = 'block';
+
+                // Lógica para Tooltip não sair da tela
+                const ttWidth = 260; 
+                const ttHeight = tooltip.offsetHeight || 200; 
+                const padding = 15;
+
+                let leftPos = e.clientX + padding;
+                let topPos = e.clientY + padding;
+
+                if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - padding;
+                if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - padding;
+
+                tooltip.style.left = leftPos + 'px';
+                tooltip.style.top = topPos + 'px';
+                
+                achou = true;
+                break;
+            }
+        }
+        if (!achou) tooltip.style.display = 'none';
+    });
+
+    document.getElementById('btnAlternarLabel').addEventListener('click', function() {
+        estado.mostrarProduto = !estado.mostrarProduto;
+        const btnTexto = document.getElementById('textoBotaoAlternar');
+        if (estado.mostrarProduto) {
+            btnTexto.innerText = "Ver Endereços";
+            this.classList.replace('btn-outline-primary', 'btn-primary');
+        } else {
+            btnTexto.innerText = "Ver Produtos";
+            this.classList.replace('btn-primary', 'btn-outline-primary');
+        }
+        desenharMapa();
+    });
+
+    // Redesenha se redimensionar a janela
+    window.addEventListener('resize', desenharMapa);
+
+    // Inicia
+    desenharMapa();
+});
+</script>
+{% endblock %}

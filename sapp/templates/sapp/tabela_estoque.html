@@ -524,6 +524,7 @@
                     <div class="text-center py-2 bg-light rounded border mb-3">
                         <small class="text-muted text-uppercase fw-bold">Saldo Atual</small>
                         <div class="fs-2 fw-bold text-dark" id="transf_saldo_atual">0</div>
+                        <small class="text-muted" id="transf_endereco_atual">Endereço: </small>
                     </div>
 
                     <div class="row mb-3 p-3 bg-warning bg-opacity-10 rounded border border-warning">
@@ -534,46 +535,105 @@
                     </div>
 
                     <div class="row g-2">
-                        <div class="col-12"><h6 class="text-muted border-bottom pb-1">Dados do Item (Editar se necessário)</h6></div>
-                        <div class="col-4"><label>Lote</label><input type="text" class="form-control bg-light" id="transf_lote_display" readonly></div>
-                        <div class="col-8"><label>Produto</label><input type="text" name="produto" id="transf_produto" class="form-control"></div>
+                        <div class="col-12">
+                            <h6 class="text-muted border-bottom pb-1">
+                                <i class="fas fa-info-circle me-1"></i>Dados do Item (Editar se necessário)
+                                <small class="text-muted ms-2">Tudo abaixo já está preenchido com os dados atuais do lote</small>
+                            </h6>
+                        </div>
                         
-                        <!-- CAMPO ESPÉCIE -->
-                        <div class="col-6">
+                        <!-- Linha 1 -->
+                        <div class="col-3"><label>Lote</label><input type="text" class="form-control bg-light" id="transf_lote_display" readonly></div>
+                        <div class="col-9"><label>Produto</label><input type="text" name="produto" id="transf_produto" class="form-control"></div>
+                        
+                        <!-- Linha 2 -->
+                        <div class="col-4">
                             <label>Espécie</label>
                             <select name="especie" id="transf_especie" class="form-select">
                                 <option value="">Selecione...</option>
                                 {% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}
                             </select>
                         </div>
-
-                        <div class="col-6"><label>Cliente</label><input type="text" name="cliente" id="transf_cliente" class="form-control"></div>
-                        <div class="col-4"><label>Peso</label><input type="text" name="peso_unitario" id="transf_peso" class="form-control"></div>
-                        <div class="col-4"><label>Emb.</label><select name="embalagem" id="transf_embalagem" class="form-select"><option value="BAG">BAG</option><option value="SC">Saco</option></select></div>
+                        <div class="col-4"><label>Cliente</label><input type="text" name="cliente" id="transf_cliente" class="form-control"></div>
                         <div class="col-4"><label>Empresa</label><input type="text" name="empresa" id="transf_empresa" class="form-control"></div>
+                        
+                        <!-- Linha 3 -->
+                        <div class="col-3"><label>Peso Unitário</label><input type="text" name="peso_unitario" id="transf_peso" class="form-control"></div>
+                        <div class="col-3"><label>Embalagem</label>
+                            <select name="embalagem" id="transf_embalagem" class="form-select">
+                                <option value="BAG">BAG</option>
+                                <option value="SC">Saco</option>
+                                <option value="CX">Caixa</option>
+                                <option value="FD">Fardo</option>
+                                <option value="PL">Pallets</option>
+                            </select>
+                        </div>
+                        <div class="col-3"><label>Saldo</label><input type="text" id="transf_saldo" class="form-control bg-light" readonly></div>
+                        <div class="col-3"><label>Entrada</label><input type="text" id="transf_entrada" class="form-control bg-light" readonly></div>
                         
                         <div class="col-12 mt-2">
                             <a class="text-primary text-decoration-none small fw-bold" data-bs-toggle="collapse" href="#advancedFields">
                                 <i class="fas fa-cog me-1"></i> Dados Técnicos (Cultivar, Peneira...)
                             </a>
-                            <div class="collapse mt-2" id="advancedFields">
+                            <div class="collapse show mt-2" id="advancedFields">
                                 <div class="row g-2 bg-light p-3 rounded border">
-                                    <div class="col-6"><label>Cultivar</label><select name="cultivar" id="transf_cultivar" class="form-select">{% for c in all_cultivares %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
-                                    <div class="col-6"><label>Peneira</label><select name="peneira" id="transf_peneira" class="form-select">{% for p in all_peneiras %}<option value="{{ p.id }}">{{ p.nome }}</option>{% endfor %}</select></div>
-                                    <div class="col-6"><label>Categoria</label><select name="categoria" id="transf_categoria" class="form-select">{% for c in all_categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
-                                    <div class="col-6"><label>Tratamento</label><select name="tratamento" id="transf_tratamento" class="form-select"><option value="">Nenhum</option>{% for t in all_tratamentos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}</select></div>
+                                    <div class="col-6">
+                                        <label>Cultivar</label>
+                                        <select name="cultivar" id="transf_cultivar" class="form-select">
+                                            <option value="">Selecione...</option>
+                                            {% for c in all_cultivares %}
+                                            <option value="{{ c.id }}">{{ c.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Peneira</label>
+                                        <select name="peneira" id="transf_peneira" class="form-select">
+                                            <option value="">Selecione...</option>
+                                            {% for p in all_peneiras %}
+                                            <option value="{{ p.id }}">{{ p.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Categoria</label>
+                                        <select name="categoria" id="transf_categoria" class="form-select">
+                                            <option value="">Selecione...</option>
+                                            {% for c in all_categorias %}
+                                            <option value="{{ c.id }}">{{ c.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Tratamento</label>
+                                        <select name="tratamento" id="transf_tratamento" class="form-select">
+                                            <option value="">Nenhum</option>
+                                            {% for t in all_tratamentos %}
+                                            <option value="{{ t.id }}">{{ t.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    
                     <div class="mt-3">
-                        <label>Obs</label><textarea name="observacao" id="transf_obs" class="form-control" rows="2"></textarea>
+                        <label>Observação</label>
+                        <textarea name="observacao" id="transf_obs" class="form-control" rows="2" placeholder="Adicione observações sobre a transferência..."></textarea>
                     </div>
-                    <div class="mt-2"><label>Fotos</label><input type="file" name="fotos" class="form-control" multiple></div>
+                    
+                    <div class="mt-2">
+                        <label><i class="fas fa-camera me-1"></i> Fotos da Transferência</label>
+                        <input type="file" name="fotos" class="form-control" multiple accept="image/*">
+                        <small class="text-muted">Opcional: Adicione fotos do lote sendo transferido</small>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-warning fw-bold text-white">Confirmar Transferência</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-white">
+                        <i class="fas fa-exchange-alt me-1"></i>Confirmar Transferência
+                    </button>
                 </div>
             </form>
         </div>
@@ -698,47 +758,80 @@
         }
     });
 
-    // 4. PREENCHER MODAL TRANSFERÊNCIA
-    function abrirModalTransferencia(id) {
-        const form = document.getElementById('formTransferencia');
-        const urlTransferir = "{% url 'sapp:transferir' 0 %}".replace('0', id);
-        form.action = urlTransferir;
-        form.reset();
+// Substitua a função abrirModalTransferencia no seu <script> por esta:
+function abrirModalTransferencia(id) {
+    const modalEl = document.getElementById('modalTransferencia');
+    const form = document.getElementById('formTransferencia');
+    
+    // 1. Define a URL de destino do formulário
+    const urlTransferir = "{% url 'sapp:transferir' 0 %}".replace('0', id);
+    form.action = urlTransferir;
+    
+    // 2. Limpa o formulário antes de preencher
+    form.reset();
 
-        const urlApi = "{% url 'sapp:api_buscar_dados_lote' %}";
+    const urlApi = "{% url 'sapp:api_buscar_dados_lote' %}";
 
-        fetch(`${urlApi}?item_id=${id}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.encontrado) {
-                    document.getElementById('transf_item_id').value = id;
-                    document.getElementById('transf_lote_display').value = data.lote;
-                    document.getElementById('transf_saldo_atual').innerText = data.saldo;
-                    document.getElementById('transf_quantidade').value = data.saldo;
-                    document.getElementById('transf_quantidade').max = data.saldo;
-                    
-                    document.getElementById('transf_produto').value = data.produto || '';
-                    document.getElementById('transf_empresa').value = data.empresa || '';
-                    document.getElementById('transf_cliente').value = data.cliente || '';
-                    document.getElementById('transf_az').value = data.az || '';
-                    document.getElementById('transf_peso').value = data.peso_unitario;
-                    document.getElementById('transf_embalagem').value = data.embalagem || 'BAG';
-                    document.getElementById('transf_obs').value = data.observacao || '';
-                    
-                    if(data.especie_id) document.getElementById('transf_especie').value = data.especie_id;
-                    if(data.cultivar_id) document.getElementById('transf_cultivar').value = data.cultivar_id;
-                    if(data.peneira_id) document.getElementById('transf_peneira').value = data.peneira_id;
-                    if(data.categoria_id) document.getElementById('transf_categoria').value = data.categoria_id;
-                    if(data.tratamento_id) document.getElementById('transf_tratamento').value = data.tratamento_id;
+    // 3. Busca os dados via AJAX
+    fetch(`${urlApi}?item_id=${id}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.encontrado) {
+                // Preenchimento de campos de texto e hidden
+                document.getElementById('transf_item_id').value = id;
+                document.getElementById('transf_lote_display').value = data.lote;
+                document.getElementById('transf_saldo_atual').innerText = data.saldo;
+                document.getElementById('transf_endereco_atual').textContent = 'Endereço atual: ' + data.endereco;
+                
+                document.getElementById('transf_produto').value = data.produto;
+                document.getElementById('transf_cliente').value = data.cliente;
+                document.getElementById('transf_empresa').value = data.empresa;
+                document.getElementById('transf_az').value = data.az;
+                document.getElementById('transf_peso').value = data.peso_unitario;
+                document.getElementById('transf_obs').value = data.observacao;
+                
+                // Campos de leitura (readonly)
+                document.getElementById('transf_saldo').value = data.saldo;
+                document.getElementById('transf_entrada').value = data.entrada;
+                
+                // Quantidade padrão sugerida (o saldo total)
+                const inputQtd = document.getElementById('transf_quantidade');
+                inputQtd.value = data.saldo;
+                inputQtd.max = data.saldo;
 
-                    new bootstrap.Modal(document.getElementById('modalTransferencia')).show();
-                } else {
-                    alert('Erro ao buscar dados do lote.');
-                }
-            })
-            .catch(err => console.error(err));
-    }
+                // 4. Preenchimento de Selects (Importante: usar os IDs da API)
+                const preencherSelect = (id, valor) => {
+                    const el = document.getElementById(id);
+                    if (el && valor) {
+                        el.value = valor;
+                    }
+                };
 
+                preencherSelect('transf_especie', data.especie_id);
+                preencherSelect('transf_cultivar', data.cultivar_id);
+                preencherSelect('transf_peneira', data.peneira_id);
+                preencherSelect('transf_categoria', data.categoria_id);
+                preencherSelect('transf_tratamento', data.tratamento_id);
+                preencherSelect('transf_embalagem', data.embalagem);
+
+                // 5. Abre o modal usando o Bootstrap
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+                
+                // Foco no campo de novo endereço após carregar
+                setTimeout(() => {
+                    form.querySelector('input[name="novo_endereco"]').focus();
+                }, 500);
+                
+            } else {
+                alert('Erro: ' + (data.erro || 'Não foi possível carregar os dados do lote.'));
+            }
+        })
+        .catch(err => {
+            console.error('Erro na requisição:', err);
+            alert('Erro de conexão ao buscar dados do lote.');
+        });
+}
     // AUTO FOCUS EM INPUTS DE MODAL
     document.addEventListener('shown.bs.modal', function(event) {
         const firstInput = event.target.querySelector('input:not([type="hidden"]), select, textarea');
