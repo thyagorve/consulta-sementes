@@ -116,6 +116,10 @@ urlpatterns = [
     path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
     path('editor-mapa/<int:armazem_numero>/', views.editor_avancado, name='editor_avancado'),
     path('api/salvar-mapa-completo/', views.salvar_todos_elementos, name='salvar_todos_elementos'),
+    
+    path('armazem/editar-config/<int:armazem_id>/', views.editar_config_armazem, name='editar_config_armazem'),
+
+    
 ]
 
 # ============================================================================

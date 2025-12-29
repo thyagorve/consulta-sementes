@@ -3926,24 +3926,39 @@ def lista_armazens(request):
 
 
 
-# sapp/views.py
 @staff_member_required
 def criar_armazem(request):
+    """Cria um novo AZ e redireciona para o editor dele"""
     if request.method == 'POST':
-        form = ArmazemLayoutForm(request.POST)
-        if form.is_valid():
-            armazem = form.save()
-            messages.success(request, f'Armazém {armazem.numero} criado com sucesso!')
-            return redirect('sapp:lista_armazens')
-    else:
-        form = ArmazemLayoutForm()
-    
-    context = {
-        'form': form,
-        'titulo_pagina': 'Criar Novo Armazém'
-    }
-    return render(request, 'sapp/criar_armazem.html', context)
+        numero = request.POST.get('numero')
+        nome = request.POST.get('nome')
+        largura = request.POST.get('largura_canvas', 1200)
+        altura = request.POST.get('altura_canvas', 800)
+        
+        novo_az = ArmazemLayout.objects.create(
+            numero=numero,
+            nome=nome,
+            largura_canvas=largura,
+            altura_canvas=altura
+        )
+        messages.success(request, f"Armazém {novo_az.numero} criado com sucesso!")
+        return redirect('sapp:editor_avancado', armazem_numero=novo_az.numero)
+    return redirect('sapp:lista_armazens')
 
+@staff_member_required
+def editar_config_armazem(request, armazem_id):
+    """Edita as configurações (tamanho/nome) de um AZ existente"""
+    if request.method == 'POST':
+        armazem = get_object_or_404(ArmazemLayout, id=armazem_id)
+        armazem.numero = request.POST.get('numero')
+        armazem.nome = request.POST.get('nome')
+        armazem.largura_canvas = request.POST.get('largura_canvas')
+        armazem.altura_canvas = request.POST.get('altura_canvas')
+        armazem.save()
+        
+        messages.success(request, "Configurações do mapa atualizadas!")
+        return redirect('sapp:editor_avancado', armazem_numero=armazem.numero)
+    return redirect('sapp:lista_armazens')
 
 
 # sapp/views.py - ADICIONE/MODIFIQUE ESTAS FUNÇÕES
@@ -4145,18 +4160,16 @@ def criar_armazens_automaticos(request):
 
 @staff_member_required
 def editor_avancado(request, armazem_numero=1):
-    """
-    Carrega a interface do Editor Gráfico Avançado.
-    """
     armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero, ativo=True)
-    
-    # Carrega elementos ordenados para desenhar na ordem certa (z-index)
     elementos = armazem.elementos.all().order_by('ordem_z')
+    
+    # ADICIONE ESTA LINHA ABAIXO se não tiver:
+    armazens_disponiveis = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
     
     context = {
         'armazem': armazem,
         'elementos': elementos,
+        'armazens_disponiveis': armazens_disponiveis, # ENVIE PARA O CONTEXTO
         'titulo_pagina': f'Editor Gráfico - Armazém {armazem.numero}',
     }
-    
     return render(request, 'sapp/editor_avancado.html', context)

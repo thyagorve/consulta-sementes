@@ -8,11 +8,27 @@
     <!-- BARRA DE CONTROLE -->
     <div class="card shadow-sm mb-3 flex-shrink-0">
         <div class="card-body p-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-                <h5 class="mb-0 fw-bold"><i class="fas fa-warehouse text-primary me-2"></i>{{ armazem.nome }}</h5>
-                <div class="text-muted small">
-                    <span id="statsTotal">0</span> posições | 
-                    <span id="statsOcupados" class="text-success fw-bold">0</span> ocupadas
+            
+            <!-- TITULO E SELETOR DE ARMAZÉM -->
+            <div class="d-flex align-items-center gap-3">
+                <div>
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-warehouse text-primary me-2"></i>{{ armazem.nome }}</h5>
+                    <div class="text-muted small">
+                        <span id="statsTotal">0</span> posições | 
+                        <span id="statsOcupados" class="text-success fw-bold">0</span> ocupadas
+                    </div>
+                </div>
+
+                <!-- SELETOR DE OUTROS AZ -->
+                <div class="input-group input-group-sm" style="width: 220px;">
+                    <label class="input-group-text bg-light" for="selectAZ"><i class="fas fa-exchange-alt"></i></label>
+                    <select class="form-select fw-bold border-primary" id="selectAZ" onchange="location.href='/mapa-armazem/'+this.value+'/'">
+                        {% for az in armazens_disponiveis %}
+                            <option value="{{ az.numero }}" {% if az.numero == armazem.numero %}selected{% endif %}>
+                                {{ az.nome }} (AZ {{ az.numero }})
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
             </div>
             
@@ -35,7 +51,7 @@
 
                 <!-- BOTÕES -->
                 <button id="btnAlternarLabel" class="btn btn-outline-primary btn-sm">
-                    <i class="fas fa-tag me-1"></i> <span id="textoBotaoAlternar">Ver Produtos</span>
+                    <i class="fas fa-tag me-1"></i> <span id="textoBotaoAlternar">Ver Lote</span>
                 </button>
                 
                 <button onclick="location.reload()" class="btn btn-outline-secondary btn-sm" title="Atualizar">
@@ -176,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if(temMultiplos) {
                         textoExibicao = "VÁRIOS";
                     } else {
-                        textoExibicao = dadosItem[0].produto.substring(0, 12);
+                        textoExibicao = dadosItem[0].lote.substring(0, 12);
                     }
                 }
 
@@ -245,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         html += `
                             <div style="margin-bottom:8px; border-bottom:1px dashed #e2e8f0; padding-bottom:5px;">
                                 <span class="badge bg-primary">${item.lote}</span>
-                                <div style="font-weight:bold; color:#0f172a; margin-top:3px; font-size:13px;">${item.produto}</div>
+                                
                                 <div style="font-size:11px; color:#64748b;">
                                     Qtd: <strong>${item.qtd}</strong> ${item.embalagem} | ${item.cliente}
                                 </div>
