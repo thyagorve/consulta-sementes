@@ -3212,426 +3212,133 @@ def api_ultimas_movimentacoes(request):
     })
     
     
-    
-# No sapp/views.py
 @login_required
 def pagina_rascunho(request):
-    """
-    Página completa de Gestão de Empenhos (Rascunho).
-    Versão corrigida com validações e campos adicionais.
-    """
-    
+    user = request.user
+    # A MARCA que você pediu para identificar a origem no histórico
+    MARCA_ORIGEM = "[BATCH-RASCUNHO]"
+
     if request.method == 'POST':
-        # 1. ADICIONAR UM LOTE AO RASCUNHO
-        if 'empenhar_lote' in request.POST:
-            try:
-                lote_id = request.POST.get('lote_id')
-                quantidade = int(request.POST.get('quantidade', 0))
-                nome_empenho = request.POST.get('nome_empenho', '').strip()
-                observacao = request.POST.get('observacao', '')
-                
-                lote = Estoque.objects.get(id=lote_id)
-                
-                if quantidade > lote.saldo:
-                    messages.error(request, f"Erro: Quantidade ({quantidade}) maior que saldo ({lote.saldo}).")
-                    return redirect('sapp:pagina_rascunho')
-                
-                if quantidade <= 0:
-                    messages.error(request, "Quantidade deve ser maior que zero.")
-                    return redirect('sapp:pagina_rascunho')
-
-                status_rascunho, _ = EmpenhoStatus.objects.get_or_create(nome='Rascunho')
-                empenho, _ = Empenho.objects.get_or_create(
-                    usuario=request.user, 
-                    status=status_rascunho, 
-                    observacao=nome_empenho,
-                    defaults={'tipo_movimentacao': 'EXPEDICAO'}
-                )
-                ItemEmpenho.objects.create(
-                    empenho=empenho, estoque=lote, quantidade=quantidade,
-                    endereco_origem=lote.endereco, observacao=observacao
-                )
-                messages.success(request, "Lote adicionado ao rascunho!")
-            except Exception as e:
-                messages.error(request, f"Erro ao empenhar: {str(e)}")
-            return redirect('sapp:pagina_rascunho')
-
-        # 2. EXCLUIR UM EMPENHO ESPECÍFICO
-        elif 'excluir_empenho' in request.POST:
-            try:
-                empenho_id = request.POST.get('empenho_id')
-                Empenho.objects.filter(id=empenho_id, usuario=request.user).delete()
-                messages.success(request, "Rascunho excluído com sucesso.")
-            except Exception as e:
-                messages.error(request, f"Erro ao excluir: {str(e)}")
-            return redirect('sapp:pagina_rascunho')
-
-        # 3. AÇÕES EM MASSA
-        elif 'acao_tipo' in request.POST:
-            try:
-                acao = request.POST.get('acao_tipo')
-                origem_acao = request.POST.get('origem_acao', 'linhas')
-                
-                with transaction.atomic():
-                    if origem_acao == 'linhas':
-                        ids_str = request.POST.get('ids_lotes', '')
-                        if not ids_str:
-                            messages.warning(request, "Nenhum lote selecionado.")
-                            return redirect('sapp:pagina_rascunho')
-                        
-                        ids_lotes = [int(id) for id in ids_str.split(',') if id]
-                        lotes_processados = 0
-                        
-                        for lote_id in ids_lotes:
-                            try:
-                                origem = Estoque.objects.get(id=lote_id)
-                                itens_empenho = ItemEmpenho.objects.filter(
-                                    estoque=origem,
-                                    empenho__usuario=request.user,
-                                    empenho__status__nome='Rascunho'
-                                )
-                                
-                                qtd_total = sum(i.quantidade for i in itens_empenho)
-                                
-                                if qtd_total > 0:
-                                    if acao == 'excluir':
-                                        empenhos_ids = itens_empenho.values_list('empenho_id', flat=True).distinct()
-                                        Empenho.objects.filter(id__in=empenhos_ids).delete()
-                                        lotes_processados += 1
-                                    
-                                    elif acao == 'transferir':
-                                        novo_end = request.POST.get('novo_endereco', '').strip().upper()
-                                        if not novo_end:
-                                            messages.error(request, "Endereço de destino é obrigatório.")
-                                            return redirect('sapp:pagina_rascunho')
-                                        
-                                        # Valida se quantidade é menor ou igual ao saldo
-                                        if qtd_total > origem.saldo:
-                                            messages.error(request, 
-                                                         f"Quantidade empenhada ({qtd_total}) maior que saldo ({origem.saldo}) do lote {origem.lote}")
-                                            continue
-                                        
-                                        origem.saida += qtd_total
-                                        origem.save()
-                                        
-                                        obs_global = request.POST.get('obs_global', '')
-                                        tratamento = request.POST.get('tratamento', origem.tratamento)
-                                        cliente = request.POST.get('cliente_transferencia', origem.cliente)
-                                        
-                                        destino = Estoque.objects.create(
-                                            lote=origem.lote,
-                                            endereco=novo_end,
-                                            az=request.POST.get('az', origem.az),
-                                            entrada=qtd_total,
-                                            saldo=qtd_total,
-                                            cultivar=origem.cultivar,
-                                            peneira=origem.peneira,
-                                            categoria=origem.categoria,
-                                            tratamento=tratamento,
-                                            especie=origem.especie,
-                                            produto=origem.produto,
-                                            cliente=cliente,
-                                            empresa=origem.empresa,
-                                            peso_unitario=origem.peso_unitario,
-                                            embalagem=origem.embalagem,
-                                            conferente=request.user,
-                                            origem_destino=f"Transf. de {origem.endereco}",
-                                            observacao=f"Transferido em lote. {obs_global}"
-                                        )
-                                        
-                                        HistoricoMovimentacao.objects.create(
-                                            estoque=origem, usuario=request.user, 
-                                            tipo='Transferência (Saída)', 
-                                            descricao=f"Transferido para {novo_end} (-{qtd_total}) {obs_global}"
-                                        )
-                                        HistoricoMovimentacao.objects.create(
-                                            estoque=destino, usuario=request.user, 
-                                            tipo='Transferência (Entrada)', 
-                                            descricao=f"Recebido de {origem.endereco} (+{qtd_total}) {obs_global}"
-                                        )
-                                        
-                                        empenhos_ids = itens_empenho.values_list('empenho_id', flat=True).distinct()
-                                        Empenho.objects.filter(id__in=empenhos_ids).delete()
-                                        lotes_processados += 1
-                                    
-                                    elif acao == 'expedir':
-                                        numero_carga = request.POST.get('numero_carga', '').strip()
-                                        cliente = request.POST.get('cliente', '').strip()
-                                        
-                                        if not numero_carga:
-                                            messages.error(request, "Número da carga é obrigatório.")
-                                            return redirect('sapp:pagina_rascunho')
-                                        
-                                        if not cliente:
-                                            messages.error(request, "Cliente é obrigatório para expedição.")
-                                            return redirect('sapp:pagina_rascunho')
-                                        
-                                        # Valida se quantidade é menor ou igual ao saldo
-                                        if qtd_total > origem.saldo:
-                                            messages.error(request, 
-                                                         f"Quantidade empenhada ({qtd_total}) maior que saldo ({origem.saldo}) do lote {origem.lote}")
-                                            continue
-                                        
-                                        origem.saida += qtd_total
-                                        origem.save()
-                                        
-                                        obs_global = request.POST.get('obs_global', '')
-                                        
-                                        HistoricoMovimentacao.objects.create(
-                                            estoque=origem, usuario=request.user, 
-                                            tipo='Expedição', 
-                                            descricao=f"Expedido em lote para {cliente} (-{qtd_total}) {obs_global}",
-                                            numero_carga=numero_carga,
-                                            motorista=request.POST.get('motorista'),
-                                            placa=request.POST.get('placa'),
-                                            cliente=cliente
-                                        )
-                                        
-                                        empenhos_ids = itens_empenho.values_list('empenho_id', flat=True).distinct()
-                                        Empenho.objects.filter(id__in=empenhos_ids).delete()
-                                        lotes_processados += 1
-                            
-                            except Estoque.DoesNotExist:
-                                continue
-                        
-                        if lotes_processados > 0:
-                            messages.success(request, f"Processados {lotes_processados} lotes com sucesso.")
-                        else:
-                            messages.warning(request, "Nenhum lote foi processado.")
-                    
-                    elif origem_acao == 'cards':
-                        empenhos_ids_str = request.POST.get('empenhos_ids', '')
-                        if not empenhos_ids_str:
-                            messages.warning(request, "Nenhum card selecionado.")
-                            return redirect('sapp:pagina_rascunho')
-                        
-                        empenhos_ids = [int(id) for id in empenhos_ids_str.split(',') if id]
-                        cards_processados = 0
-                        
-                        for empenho_id in empenhos_ids:
-                            try:
-                                empenho = Empenho.objects.get(
-                                    id=empenho_id, 
-                                    usuario=request.user,
-                                    status__nome='Rascunho'
-                                )
-                                
-                                if acao == 'excluir':
-                                    empenho.delete()
-                                    cards_processados += 1
-                                
-                                elif acao == 'transferir' or acao == 'expedir':
-                                    itens_empenho = empenho.itens.all()
-                                    itens_processados = 0
-                                    
-                                    for item in itens_empenho:
-                                        origem = item.estoque
-                                        quantidade = item.quantidade
-                                        
-                                        if quantidade <= origem.saldo:
-                                            origem.saida += quantidade
-                                            origem.save()
-                                            
-                                            obs_global = request.POST.get('obs_global', '')
-                                            
-                                            if acao == 'transferir':
-                                                novo_end = request.POST.get('novo_endereco', '').strip().upper()
-                                                if not novo_end:
-                                                    messages.error(request, "Endereço de destino é obrigatório.")
-                                                    return redirect('sapp:pagina_rascunho')
-                                                
-                                                tratamento = request.POST.get('tratamento', origem.tratamento)
-                                                cliente = request.POST.get('cliente_transferencia', origem.cliente)
-                                                
-                                                destino = Estoque.objects.create(
-                                                    lote=origem.lote,
-                                                    endereco=novo_end,
-                                                    az=request.POST.get('az', origem.az),
-                                                    entrada=quantidade,
-                                                    saldo=quantidade,
-                                                    cultivar=origem.cultivar,
-                                                    peneira=origem.peneira,
-                                                    categoria=origem.categoria,
-                                                    tratamento=tratamento,
-                                                    especie=origem.especie,
-                                                    produto=origem.produto,
-                                                    cliente=cliente,
-                                                    empresa=origem.empresa,
-                                                    peso_unitario=origem.peso_unitario,
-                                                    embalagem=origem.embalagem,
-                                                    conferente=request.user,
-                                                    origem_destino=f"Transf. de {origem.endereco}",
-                                                    observacao=f"Transferido via empenho {empenho.observacao}. {obs_global}"
-                                                )
-                                                
-                                                HistoricoMovimentacao.objects.create(
-                                                    estoque=origem, usuario=request.user, 
-                                                    tipo='Transferência (Saída)', 
-                                                    descricao=f"Transferido para {novo_end} via empenho {empenho.observacao} (-{quantidade})"
-                                                )
-                                                HistoricoMovimentacao.objects.create(
-                                                    estoque=destino, usuario=request.user, 
-                                                    tipo='Transferência (Entrada)', 
-                                                    descricao=f"Recebido de {origem.endereco} via empenho {empenho.observacao} (+{quantidade})"
-                                                )
-                                            
-                                            elif acao == 'expedir':
-                                                numero_carga = request.POST.get('numero_carga', '').strip()
-                                                cliente_exped = request.POST.get('cliente', '').strip()
-                                                
-                                                if not numero_carga:
-                                                    messages.error(request, "Número da carga é obrigatório.")
-                                                    return redirect('sapp:pagina_rascunho')
-                                                
-                                                if not cliente_exped:
-                                                    messages.error(request, "Cliente é obrigatório para expedição.")
-                                                    return redirect('sapp:pagina_rascunho')
-                                                
-                                                HistoricoMovimentacao.objects.create(
-                                                    estoque=origem, usuario=request.user, 
-                                                    tipo='Expedição', 
-                                                    descricao=f"Expedido via empenho {empenho.observacao} para {cliente_exped} (-{quantidade})",
-                                                    numero_carga=numero_carga,
-                                                    motorista=request.POST.get('motorista'),
-                                                    placa=request.POST.get('placa'),
-                                                    cliente=cliente_exped
-                                                )
-                                            
-                                            itens_processados += 1
-                                    
-                                    if itens_processados > 0:
-                                        empenho.delete()
-                                        cards_processados += 1
-                            
-                            except Empenho.DoesNotExist:
-                                continue
-                        
-                        if cards_processados > 0:
-                            messages.success(request, f"Processados {cards_processados} cards com sucesso.")
-                        else:
-                            messages.warning(request, "Nenhum card foi processado.")
-                
-            except Exception as e:
-                messages.error(request, f"Erro ao processar ação: {str(e)}")
-            
-            return redirect('sapp:pagina_rascunho')
-    
-    # ==========================================
-    # LÓGICA GET (EXIBIÇÃO)
-    # ==========================================
-    estoque_query = Estoque.objects.filter(saldo__gt=0).select_related(
-        'cultivar', 'peneira', 'categoria', 'especie'
-    ).order_by('endereco')
-    
-    # Filtros
-    f_lote = request.GET.get('filtro_lote', '').strip()
-    f_cultivar = request.GET.get('filtro_cultivar', '').strip()
-    f_peneira = request.GET.get('filtro_peneira', '').strip()
-    f_categoria = request.GET.get('filtro_categoria', '').strip()
-    f_endereco = request.GET.get('filtro_endereco', '').strip()
-    f_cliente = request.GET.get('filtro_cliente', '').strip()
-    busca = request.GET.get('busca', '').strip()
-    embalagem = request.GET.get('embalagem', '').strip()
-    
-    if f_lote: 
-        estoque_query = estoque_query.filter(lote__icontains=f_lote)
-    if f_cultivar: 
-        estoque_query = estoque_query.filter(cultivar__nome__icontains=f_cultivar)
-    if f_peneira: 
-        estoque_query = estoque_query.filter(peneira__nome__icontains=f_peneira)
-    if f_categoria: 
-        estoque_query = estoque_query.filter(categoria__nome__icontains=f_categoria)
-    if f_endereco: 
-        estoque_query = estoque_query.filter(endereco__icontains=f_endereco)
-    if f_cliente: 
-        estoque_query = estoque_query.filter(cliente__icontains=f_cliente)
-    if embalagem:
-        estoque_query = estoque_query.filter(embalagem=embalagem)
-    
-    if busca:
-        estoque_query = estoque_query.filter(
-            Q(lote__icontains=busca) | 
-            Q(produto__icontains=busca) |
-            Q(cliente__icontains=busca) |
-            Q(tratamento__icontains=busca) |
-            Q(id__in=ItemEmpenho.objects.filter(
-                empenho__observacao__icontains=busca
-            ).values_list('estoque_id', flat=True))
-        )
-
-    # Paginação
-    try:
-        page_size = int(request.GET.get('page_size', 25))
-    except: 
-        page_size = 25
-    
-    paginator = Paginator(estoque_query, page_size)
-    estoque_page = paginator.get_page(request.GET.get('page', 1))
-
-    # Montagem dos dados
-    lotes_com_empenho = []
-    
-    # Busca empenhos apenas dos lotes visíveis
-    itens_empenhados = ItemEmpenho.objects.filter(
-        estoque__in=estoque_page, 
-        empenho__status__nome='Rascunho',
-        empenho__usuario=request.user
-    ).select_related('empenho')
-
-    for item in estoque_page:
-        meus_itens = [i for i in itens_empenhados if i.estoque_id == item.id]
-        qtd_emp = sum(i.quantidade for i in meus_itens)
+        # 1. EXCLUIR CARD OU ITEM
+        if 'excluir_card' in request.POST:
+            Empenho.objects.filter(id=request.POST.get('empenho_id'), usuario=user).delete()
+            messages.success(request, "Card excluído.")
         
-        lotes_com_empenho.append({
-            'lote': item,
-            'saldo_total': item.saldo,
-            'empenhado': qtd_emp,
-            'disponivel': item.saldo - qtd_emp,
-            'empenhos': meus_itens
+        elif 'excluir_item' in request.POST:
+            ItemEmpenho.objects.filter(id=request.POST.get('item_id'), empenho__usuario=user).delete()
+            messages.success(request, "Item removido.")
+
+        # 2. ADICIONAR AO RASCUNHO (INDIVIDUAL)
+        elif 'empenhar_lote' in request.POST:
+            lote_id = request.POST.get('lote_id')
+            qtd = int(request.POST.get('quantidade', 0))
+            nome_card = request.POST.get('nome_empenho', '').strip().upper()
+            lote_obj = get_object_or_404(Estoque, id=lote_id)
+            
+            status_obj, _ = EmpenhoStatus.objects.get_or_create(id=1, defaults={'nome': 'Rascunho'})
+            empenho, _ = Empenho.objects.get_or_create(usuario=user, observacao=nome_card, status=status_obj)
+            
+            item_emp, created = ItemEmpenho.objects.get_or_create(
+                empenho=empenho, estoque=lote_obj,
+                defaults={'quantidade': qtd}
+            )
+            if not created:
+                item_emp.quantidade += qtd
+                item_emp.save()
+            messages.success(request, "Adicionado ao rascunho!")
+
+        # 3. PROCESSAR CARD (TRANSFERIR OU EXPEDIR) - IGUAL À PÁGINA INDIVIDUAL
+        elif request.POST.get('origem_acao') == 'cards':
+            acao = request.POST.get('acao_tipo')
+            empenho_id = request.POST.get('empenho_id')
+            obs_global = request.POST.get('obs_global', '').strip()
+            
+            try:
+                with transaction.atomic():
+                    empenho = get_object_or_404(Empenho, id=empenho_id, usuario=user)
+                    
+                    for item_rascunho in empenho.itens.all():
+                        origem = item_rascunho.estoque
+                        qtd = item_rascunho.quantidade
+
+                        if acao == 'transferir':
+                            n_end = request.POST.get('novo_endereco', '').strip().upper()
+                            n_az = request.POST.get('az', '').strip().upper() or origem.az
+                            
+                            # LÓGICA DE SOMA (MESMA DA INDIVIDUAL)
+                            destino = Estoque.objects.filter(
+                                lote=origem.lote, produto=origem.produto, cultivar=origem.cultivar,
+                                peneira=origem.peneira, categoria=origem.categoria,
+                                tratamento=origem.tratamento, especie=origem.especie,
+                                endereco=n_end, az=n_az, empresa=origem.empresa, embalagem=origem.embalagem
+                            ).first()
+
+                            if destino:
+                                destino.entrada += qtd
+                                if obs_global: # CONCATENA COMENTÁRIOS
+                                    destino.observacao = f"{destino.observacao or ''}\n{MARCA_ORIGEM} {obs_global}".strip()
+                                destino.save()
+                            else:
+                                destino = Estoque.objects.create(
+                                    lote=origem.lote, produto=origem.produto, cultivar=origem.cultivar,
+                                    peneira=origem.peneira, categoria=origem.categoria, tratamento=origem.tratamento,
+                                    especie=origem.especie, endereco=n_end, az=n_az, entrada=qtd,
+                                    peso_unitario=origem.peso_unitario, embalagem=origem.embalagem,
+                                    conferente=user, empresa=origem.empresa, cliente=origem.cliente,
+                                    observacao=f"{MARCA_ORIGEM} {obs_global}"
+                                )
+
+                            origem.saida += qtd
+                            origem.save()
+                            
+                            HistoricoMovimentacao.objects.create(
+                                estoque=origem, usuario=user, tipo='Transferência (Saída)',
+                                descricao=f"{MARCA_ORIGEM} Transferido {qtd}un via Card '{empenho.observacao}' para {n_end}."
+                            )
+                            HistoricoMovimentacao.objects.create(
+                                estoque=destino, usuario=user, tipo='Transferência (Entrada)',
+                                descricao=f"{MARCA_ORIGEM} Recebido {qtd}un via Card '{empenho.observacao}' de {origem.endereco}."
+                            )
+
+                        elif acao == 'expedir':
+                            carga = request.POST.get('numero_carga', '')
+                            cliente_f = request.POST.get('cliente', '')
+                            placa = request.POST.get('placa', '')
+                            
+                            origem.saida += qtd
+                            origem.save()
+
+                            desc_hist = f"{MARCA_ORIGEM} Expedição Card: {empenho.observacao}. Carga: {carga}. Cliente: {cliente_f}"
+                            hist = HistoricoMovimentacao.objects.create(
+                                estoque=origem, usuario=user, tipo='Expedição',
+                                descricao=desc_hist, numero_carga=carga, cliente=cliente_f, placa=placa
+                            )
+                            # Fotos
+                            for f in request.FILES.getlist('fotos'):
+                                FotoMovimentacao.objects.create(historico=hist, arquivo=f)
+
+                    empenho.delete()
+                    messages.success(request, "Processamento em lote concluído!")
+            except Exception as e: messages.error(request, f"Erro: {str(e)}")
+        
+        return redirect('sapp:pagina_rascunho')
+
+    # GET
+    estoque_qs = Estoque.objects.filter(saldo__gt=0).select_related('cultivar', 'peneira', 'categoria', 'tratamento', 'especie')
+    lotes_contexto = []
+    empenhos_sessao = ItemEmpenho.objects.filter(empenho__usuario=user)
+    
+    for item in estoque_qs:
+        meus_itens = empenhos_sessao.filter(estoque=item)
+        qtd_emp = sum(i.quantidade for i in meus_itens)
+        lotes_contexto.append({
+            'lote': item, 'empenhado': qtd_emp, 'disponivel': item.saldo - qtd_emp, 'itens_empenho': meus_itens
         })
 
-    # Totais
-    total_saldo = estoque_query.aggregate(Sum('saldo'))['saldo__sum'] or 0
-    total_bags = estoque_query.filter(embalagem='BAG').aggregate(Sum('saldo'))['saldo__sum'] or 0
-    total_sc = estoque_query.filter(embalagem='SC').aggregate(Sum('saldo'))['saldo__sum'] or 0
-    total_sc_convertido = (total_bags * 25) + total_sc
-    
-    # Empenhos do usuário
-    todos_empenhos_usuario = Empenho.objects.filter(
-        usuario=request.user, 
-        status__nome='Rascunho'
-    ).prefetch_related('itens__estoque').order_by('-id')
-    
-    # REMOVA ESTA LINHA PROBLEMÁTICA:
-    # Não é necessário calcular saldo_afetado aqui, ele será calculado pela propriedade no template
-
-    # Preserva filtros
-    params = request.GET.copy()
-    if 'page' in params: 
-        del params['page']
-
-    context = {
-        'lotes': lotes_com_empenho,
-        'estoque': estoque_page,
-        'todos_empenhos': todos_empenhos_usuario,
-        'url_filtros': '&' + params.urlencode() if params else '',
-        
-        'filtro_lote': f_lote, 
-        'filtro_cultivar': f_cultivar,
-        'filtro_peneira': f_peneira, 
-        'filtro_categoria': f_categoria,
-        'filtro_endereco': f_endereco, 
-        'filtro_cliente': f_cliente,
-        'busca': busca,
-        'embalagem': embalagem,
-        
-        'total_lotes': estoque_query.count(),
-        'total_saldo': total_saldo,
-        'total_sc_convertido': total_sc_convertido,
-        'page_sizes': [25, 50, 100, 200]
-    }
-
-    return render(request, 'sapp/pagina_rascunho.html', context)
+    return render(request, 'sapp/pagina_rascunho.html', {
+        'lotes': lotes_contexto,
+        'cards': Empenho.objects.filter(usuario=user, status__id=1).prefetch_related('itens'),
+    })
 
 @login_required
 def api_buscar_dados_lote(request):
