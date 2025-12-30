@@ -2218,7 +2218,7 @@ def transferir(request, id):
                 except:
                     novo_peso = origem.peso_unitario or Decimal('0.00')
                 
-                # 4. VERIFICAR SE JÁ EXISTE REGISTRO IDÊNTICO NO NOVO ENDEREÇO
+                # 4. VERIFICAR SE JÁ EXISTE REGISTRO IDÊNTICO NO NOVO ENDEREÇO COM SALDO POSITIVO
                 # Campos técnicos para comparação
                 campos_tecnicos = {
                     'lote': origem.lote,
@@ -2231,22 +2231,43 @@ def transferir(request, id):
                     'empresa': request.POST.get('empresa', origem.empresa or ''),
                     'cliente': request.POST.get('cliente', origem.cliente or ''),
                     'endereco': novo_end,
+                    'saldo__gt': 0,  # 🔥 CRÍTICO: APENAS REGISTROS COM SALDO POSITIVO!
                 }
                 
-                # Buscar registro existente com todos os campos técnicos idênticos
+                # Buscar registro existente com todos os campos técnicos idênticos E COM SALDO POSITIVO
                 destino_existente = Estoque.objects.filter(**campos_tecnicos).first()
                 
                 if destino_existente:
-                    # 5. SE EXISTIR: SOMAR AO REGISTRO EXISTENTE (CONSOLIDAR)
+                    # 5. SE EXISTIR E TIVER SALDO POSITIVO: SOMAR AO REGISTRO EXISTENTE
+                    saldo_anterior = destino_existente.saldo
                     destino_existente.entrada += qtd
                     destino_existente.saldo += qtd
+                    
+                    # Atualizar campos que podem ter mudado
+                    destino_existente.peso_unitario = novo_peso
+                    destino_existente.empresa = request.POST.get('empresa', destino_existente.empresa or '')
+                    destino_existente.cliente = request.POST.get('cliente', destino_existente.cliente or '')
+                    destino_existente.az = request.POST.get('az', destino_existente.az or '')
                     destino_existente.conferente = request.user
+                    
+                    # Atualizar observação
+                    obs_atual = destino_existente.observacao or ''
+                    nova_obs = request.POST.get('observacao', '')
+                    if nova_obs:
+                        if obs_atual:
+                            destino_existente.observacao = f"{obs_atual}\n[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
+                        else:
+                            destino_existente.observacao = f"[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
+                    
                     destino_existente.save()
                     
                     destino = destino_existente
-                    mensagem_tipo = "somado ao registro existente"
+                    mensagem_tipo = f"somado ao registro existente (Saldo anterior: {saldo_anterior})"
                 else:
-                    # 6. SE NÃO EXISTIR: CRIAR NOVO REGISTRO
+                    # 6. SE NÃO EXISTIR OU SE EXISTIR MAS ESTIVER ZERADO: CRIAR NOVO REGISTRO
+                    # Primeiro, verificar se existe algum registro zerado no mesmo endereço
+                    # (para manter o histórico limpo, não reativamos registros zerados)
+                    
                     destino = Estoque.objects.create(
                         lote=origem.lote,
                         endereco=novo_end,
@@ -2286,7 +2307,7 @@ def transferir(request, id):
                     estoque=destino,
                     usuario=request.user,
                     tipo='Transferência (Entrada)',
-                    descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem}"
+                    descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem} | Novo saldo: {destino.saldo}"
                 )
                 
                 # 9. Salvar fotos na saída (origem)
@@ -2302,6 +2323,9 @@ def transferir(request, id):
             messages.error(request, f"❌ Erro ao transferir: {str(e)}")
             
     return redirect('sapp:lista_estoque')
+
+
+
 # No seu views.py
 from django.http import JsonResponse
 
