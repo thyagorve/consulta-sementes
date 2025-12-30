@@ -2,14 +2,14 @@
 {% load static %}
 
 {% block content %}
-<!-- CONTAINER PRINCIPAL: Flexbox para ocupar altura total sem scroll -->
+<!-- CONTAINER PRINCIPAL -->
 <div class="d-flex flex-column h-100 p-3" style="height: calc(100vh - 60px) !important; overflow: hidden;">
     
     <!-- BARRA DE CONTROLE -->
     <div class="card shadow-sm mb-3 flex-shrink-0">
         <div class="card-body p-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
             
-            <!-- TITULO E SELETOR DE ARMAZÉM -->
+            <!-- TITULO E SELETOR -->
             <div class="d-flex align-items-center gap-3">
                 <div>
                     <h5 class="mb-0 fw-bold"><i class="fas fa-warehouse text-primary me-2"></i>{{ armazem.nome }}</h5>
@@ -19,7 +19,6 @@
                     </div>
                 </div>
 
-                <!-- SELETOR DE OUTROS AZ -->
                 <div class="input-group input-group-sm" style="width: 220px;">
                     <label class="input-group-text bg-light" for="selectAZ"><i class="fas fa-exchange-alt"></i></label>
                     <select class="form-select fw-bold border-primary" id="selectAZ" onchange="location.href='/mapa-armazem/'+this.value+'/'">
@@ -49,16 +48,21 @@
                     </div>
                 </div>
 
-                <!-- BOTÕES -->
-                <button id="btnAlternarLabel" class="btn btn-outline-primary btn-sm">
-                    <i class="fas fa-tag me-1"></i> <span id="textoBotaoAlternar">Ver Lote</span>
-                </button>
+                <!-- BOTÕES DE VISUALIZAÇÃO -->
+                <div class="btn-group btn-group-sm">
+                    <button id="btnToggleEndereco" class="btn btn-outline-secondary">
+                        <i class="fas fa-map-marker-alt me-1"></i> Ver Endereço
+                    </button>
+                    <button id="btnToggleLote" class="btn btn-outline-primary">
+                        <i class="fas fa-tag me-1"></i> Ver Lote
+                    </button>
+                </div>
                 
                 <button onclick="location.reload()" class="btn btn-outline-secondary btn-sm" title="Atualizar">
                     <i class="fas fa-sync-alt"></i>
                 </button>
                 
-                <!-- PROTEÇÃO ADMIN: Só aparece se for staff/superuser -->
+                <!-- EDITOR -->
                 {% if is_admin %}
                 <a href="/editor-mapa/{{ armazem.numero }}/" class="btn btn-warning btn-sm fw-bold shadow-sm">
                     <i class="fas fa-pen-ruler me-1"></i> Editor
@@ -68,23 +72,38 @@
         </div>
     </div>
 
-    <!-- ÁREA DO MAPA (FIT SCREEN) -->
-    <!-- Este container ocupa o resto da tela e centraliza o canvas -->
+    <!-- ÁREA DO MAPA -->
     <div class="card shadow-sm border-0 bg-light flex-fill overflow-hidden position-relative">
         <div class="card-body p-2 d-flex justify-content-center align-items-center h-100 w-100 bg-secondary bg-opacity-10">
-            
-            <!-- CANVAS RESPONSIVO -->
-            <!-- max-width/height garante que ele nunca estoure a tela -->
             <canvas id="mapaCanvas"></canvas>
-            
-            <!-- TOOLTIP FLUTUANTE -->
+            <!-- Tooltip -->
             <div id="tooltipMapa" class="tooltip-mapa"></div>
         </div>
     </div>
 </div>
 
+<!-- MODAL PARA SELEÇÃO DE MÚLTIPLOS LOTES -->
+<div class="modal fade" id="modalMultiplosLotes" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Selecionar Lote</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="p-3 bg-light border-bottom">
+                    <small class="text-muted fw-bold">ENDEREÇO:</small>
+                    <h4 class="mb-0 fw-bold text-dark" id="modalEnderecoTitulo">A-00-00</h4>
+                </div>
+                <div class="list-group list-group-flush" id="listaLotesModal">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
-    /* Estilo Responsivo do Canvas */
     #mapaCanvas {
         max-width: 100%;
         max-height: 100%;
@@ -93,12 +112,11 @@
         display: block;
         box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         background-color: white;
-        cursor: crosshair;
+        cursor: pointer;
     }
 
-    /* Estilo do Tooltip */
     .tooltip-mapa {
-        position: fixed; /* Fixado na janela */
+        position: fixed;
         display: none;
         background: white;
         border: 1px solid #cbd5e1;
@@ -115,24 +133,21 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // DADOS VINDOS DO PYTHON
     const LAYOUT_ELEMENTS = {{ elementos_json|safe }};
     const STOCK_DATA = {{ dados_ocupacao_json|safe }};
     
     const canvas = document.getElementById('mapaCanvas');
     const ctx = canvas.getContext('2d');
     const tooltip = document.getElementById('tooltipMapa');
+    const modalEl = document.getElementById('modalMultiplosLotes');
+    const bsModal = new bootstrap.Modal(modalEl);
     
-    // RESOLUÇÃO INTERNA (Alta qualidade)
-    // Se o Python mandar 0, usamos um padrão para não quebrar
     canvas.width = {{ armazem.largura_canvas|default:1000 }};
     canvas.height = {{ armazem.altura_canvas|default:600 }};
 
-    let estado = { mostrarProduto: false };
+    let estado = { mostrarEndereco: false, mostrarLote: false };
 
-    // ===============================================
-    // DESENHAR MAPA
-    // ===============================================
+    // --- DESENHO DO MAPA ---
     function desenharMapa() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -141,8 +156,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
         LAYOUT_ELEMENTS.forEach(el => {
             ctx.save();
-            
-            // Rotação
             if (el.rot) {
                 const cx = el.x + el.w/2;
                 const cy = el.y + el.h/2;
@@ -153,16 +166,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (el.tipo === 'RETANGULO') {
                 totalPosicoes++;
-                if (el.ocupado) totalOcupados++;
-
-                // Fundo (Fallback para cinza se não tiver cor)
-                ctx.fillStyle = el.cor || '#e5e7eb';
-                ctx.fillRect(el.x, el.y, el.w, el.h);
-
-                // Dados de Estoque
                 const chave = el.id ? el.id.trim().toUpperCase() : '';
                 const dadosItem = STOCK_DATA[chave];
+                const estaOcupado = dadosItem && dadosItem.length > 0;
                 const temMultiplos = dadosItem && dadosItem.length > 1;
+
+                if (estaOcupado) totalOcupados++;
+
+                // Cor
+                let fillStyle = el.cor || '#e5e7eb';
+                if (estaOcupado && el.cor_ocupado) fillStyle = el.cor_ocupado;
+                else if (estaOcupado) fillStyle = '#10b981'; 
+
+                ctx.fillStyle = fillStyle;
+                ctx.fillRect(el.x, el.y, el.w, el.h);
 
                 // Borda
                 if (temMultiplos) {
@@ -173,30 +190,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.strokeRect(el.x, el.y, el.w, el.h);
 
                 // Texto
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // Cor do Texto
-                let corTexto = el.ocupado ? '#ffffff' : '#374151';
-                if(el.cor === '#10b981') corTexto = '#ffffff';
-                ctx.fillStyle = corTexto;
-                
-                // Tamanho da Fonte
-                let fontSize = Math.min(el.h / 2.5, 14);
-                ctx.font = `bold ${fontSize}px Arial`;
-
-                let textoExibicao = el.id; 
-
-                // Lógica de alternar label
-                if (estado.mostrarProduto && el.ocupado && dadosItem && dadosItem.length > 0) {
-                    if(temMultiplos) {
-                        textoExibicao = "VÁRIOS";
-                    } else {
-                        textoExibicao = dadosItem[0].lote.substring(0, 12);
-                    }
+                let textoParaExibir = "";
+                if (estado.mostrarLote && estaOcupado) {
+                    if (temMultiplos) textoParaExibir = "VÁRIOS";
+                    else textoParaExibir = dadosItem[0].lote.substring(0, 10);
+                } else if (estado.mostrarEndereco && el.id) {
+                    textoParaExibir = el.id;
                 }
 
-                if(textoExibicao) ctx.fillText(textoExibicao, el.x + el.w/2, el.y + el.h/2);
+                if (textoParaExibir) {
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    let corTexto = (fillStyle === '#10b981' || estaOcupado) ? '#ffffff' : '#374151';
+                    ctx.fillStyle = corTexto;
+                    let fontSize = Math.min(el.h / 2.5, 14);
+                    ctx.font = `bold ${fontSize}px Arial`;
+                    ctx.fillText(textoParaExibir, el.x + el.w/2, el.y + el.h/2);
+                }
 
                 // Alerta Multiplos
                 if (temMultiplos) {
@@ -205,6 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     ctx.arc(el.x + el.w - padding, el.y + padding, 4, 0, 2*Math.PI);
                     ctx.fillStyle = '#dc2626'; ctx.fill();
                     ctx.fillStyle = 'white'; ctx.font = 'bold 7px Arial';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText('!', el.x + el.w - padding, el.y + padding);
                 }
 
@@ -214,7 +225,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.textAlign = 'left';
                 ctx.fillText(el.texto || '', el.x, el.y + 14);
             }
-
             ctx.restore();
         });
 
@@ -222,98 +232,161 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('statsOcupados').innerText = totalOcupados;
     }
 
-    // ===============================================
-    // INTERAÇÃO (TOOLTIP)
-    // ===============================================
+    // --- CONTROLES BOTÕES ---
+    const btnEnd = document.getElementById('btnToggleEndereco');
+    const btnLote = document.getElementById('btnToggleLote');
+
+    btnEnd.addEventListener('click', () => {
+        estado.mostrarEndereco = !estado.mostrarEndereco;
+        estado.mostrarLote = false; 
+        atualizarBotoes(); desenharMapa();
+    });
+
+    btnLote.addEventListener('click', () => {
+        estado.mostrarLote = !estado.mostrarLote;
+        estado.mostrarEndereco = false; 
+        atualizarBotoes(); desenharMapa();
+    });
+
+    function atualizarBotoes() {
+        if(estado.mostrarEndereco) btnEnd.classList.replace('btn-outline-secondary', 'btn-secondary');
+        else btnEnd.classList.replace('btn-secondary', 'btn-outline-secondary');
+
+        if(estado.mostrarLote) btnLote.classList.replace('btn-outline-primary', 'btn-primary');
+        else btnLote.classList.replace('btn-primary', 'btn-outline-primary');
+    }
+
+    // --- INTERAÇÃO (DUPLO CLIQUE + TOOLTIP) ---
+    
+    // 1. Tooltip Hover
     canvas.addEventListener('mousemove', function(e) {
+        // Se o modal estiver aberto, não mostra tooltip
+        if(modalEl.classList.contains('show')) return;
+
         const rect = canvas.getBoundingClientRect();
-        
-        // Conversão de escala para responsividade
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-        
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         
         let achou = false;
 
-        // Loop Reverso (pega o elemento de cima)
         for (let i = LAYOUT_ELEMENTS.length - 1; i >= 0; i--) {
             const el = LAYOUT_ELEMENTS[i];
-            
             if (el.tipo === 'RETANGULO' && x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) {
-                
                 const chave = el.id ? el.id.trim().toUpperCase() : '';
                 const itens = STOCK_DATA[chave];
 
-                let html = `<div style="background:#f8fafc; padding:10px; border-bottom:1px solid #e2e8f0;">
-                                <strong style="color:#1e293b; font-size:14px;">Endereço: ${el.id || 'N/A'}</strong>
+                let html = `<div style="background:#f8fafc; padding:8px 10px; border-bottom:1px solid #e2e8f0;">
+                                <strong style="color:#1e293b; font-size:13px;">${el.id || 'N/A'}</strong>
+                                <span style="float:right; font-size:10px; color:#64748b; margin-top:2px;">Clique 2x</span>
                             </div>
                             <div style="padding:10px;">`;
                 
                 if (itens && itens.length > 0) {
                     if (itens.length > 1) {
-                        html += `<div class="alert alert-danger p-1 mb-2" style="font-size:11px;">
+                        html += `<div class="alert alert-danger p-1 mb-2 text-center" style="font-size:10px; font-weight:bold;">
                                     <i class="fas fa-exclamation-triangle"></i> MÚLTIPLOS LOTES
                                  </div>`;
                     }
                     itens.forEach(item => {
                         html += `
-                            <div style="margin-bottom:8px; border-bottom:1px dashed #e2e8f0; padding-bottom:5px;">
-                                <span class="badge bg-primary">${item.lote}</span>
-                                
-                                <div style="font-size:11px; color:#64748b;">
-                                    Qtd: <strong>${item.qtd}</strong> ${item.embalagem} | ${item.cliente}
+                            <div style="margin-bottom:6px; border-bottom:1px dashed #e2e8f0; padding-bottom:4px;">
+                                <span class="badge bg-primary" style="font-size:11px;">${item.lote}</span>
+                                <div style="font-size:11px; color:#475569; margin-top:2px;">
+                                    <strong>${item.qtd}</strong> ${item.embalagem}
                                 </div>
                             </div>
                         `;
                     });
                 } else {
-                    html += `<div style="color:#94a3b8; font-style:italic; text-align:center;">Posição Vazia</div>`;
+                    html += `<div style="color:#94a3b8; font-style:italic; text-align:center; font-size:12px;">Posição Vazia</div>`;
                 }
                 html += `</div>`;
 
                 tooltip.innerHTML = html;
                 tooltip.style.display = 'block';
-
-                // Lógica para Tooltip não sair da tela
+                
+                // Posicionamento Tooltip
                 const ttWidth = 260; 
-                const ttHeight = tooltip.offsetHeight || 200; 
-                const padding = 15;
-
-                let leftPos = e.clientX + padding;
-                let topPos = e.clientY + padding;
-
-                if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - padding;
-                if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - padding;
-
+                const ttHeight = tooltip.offsetHeight || 150; 
+                let leftPos = e.clientX + 15;
+                let topPos = e.clientY + 15;
+                if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - 15;
+                if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - 15;
                 tooltip.style.left = leftPos + 'px';
                 tooltip.style.top = topPos + 'px';
                 
                 achou = true;
+                canvas.style.cursor = 'pointer';
                 break;
             }
         }
-        if (!achou) tooltip.style.display = 'none';
-    });
-
-    document.getElementById('btnAlternarLabel').addEventListener('click', function() {
-        estado.mostrarProduto = !estado.mostrarProduto;
-        const btnTexto = document.getElementById('textoBotaoAlternar');
-        if (estado.mostrarProduto) {
-            btnTexto.innerText = "Ver Endereços";
-            this.classList.replace('btn-outline-primary', 'btn-primary');
-        } else {
-            btnTexto.innerText = "Ver Produtos";
-            this.classList.replace('btn-primary', 'btn-outline-primary');
+        if (!achou) {
+            tooltip.style.display = 'none';
+            canvas.style.cursor = 'default';
         }
-        desenharMapa();
     });
 
-    // Redesenha se redimensionar a janela
-    window.addEventListener('resize', desenharMapa);
+    // 2. Duplo Clique
+    canvas.addEventListener('dblclick', function(e) {
+        // Esconde tooltip imediatamente ao dar duplo clique
+        tooltip.style.display = 'none';
 
-    // Inicia
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+
+        for (let i = LAYOUT_ELEMENTS.length - 1; i >= 0; i--) {
+            const el = LAYOUT_ELEMENTS[i];
+            
+            if (el.tipo === 'RETANGULO' && x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) {
+                const chave = el.id ? el.id.trim().toUpperCase() : '';
+                const itens = STOCK_DATA[chave];
+                
+                // === CORREÇÃO DA URL AQUI (lista_estoque) ===
+                const baseUrl = "{% url 'sapp:lista_estoque' %}"; 
+
+                if (!itens || itens.length === 0) {
+                    window.location.href = `${baseUrl}?busca=${encodeURIComponent(chave)}`;
+                } else if (itens.length === 1) {
+                    window.location.href = `${baseUrl}?busca=${encodeURIComponent(itens[0].lote)}`;
+                } else {
+                    abrirModalMultiplos(chave, itens, baseUrl);
+                }
+                break;
+            }
+        }
+    });
+
+    function abrirModalMultiplos(endereco, itens, baseUrl) {
+        // Garante que o tooltip sumiu
+        tooltip.style.display = 'none';
+
+        document.getElementById('modalEnderecoTitulo').innerText = endereco;
+        const lista = document.getElementById('listaLotesModal');
+        lista.innerHTML = '';
+
+        itens.forEach(item => {
+            const link = document.createElement('a');
+            link.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3';
+            link.href = `${baseUrl}?busca=${encodeURIComponent(item.lote)}`;
+            link.innerHTML = `
+                <div>
+                    <div class="fw-bold text-primary">${item.lote}</div>
+                    <small class="text-muted">${item.cliente || 'Sem cliente'}</small>
+                </div>
+                <span class="badge bg-secondary rounded-pill">${item.qtd} ${item.embalagem}</span>
+            `;
+            lista.appendChild(link);
+        });
+
+        bsModal.show();
+    }
+
+    window.addEventListener('resize', desenharMapa);
     desenharMapa();
 });
 </script>
