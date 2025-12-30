@@ -235,9 +235,11 @@
                         <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
                             <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">🕒 Linha do Tempo</h6>
                             <div class="timeline" style="max-height: 350px; overflow-y: auto;">
-                                {% for h in item.historico.all %}
+                                {% with historico_filtrado=item.historico.all|dictsortreversed:"data_hora" %}
+                                {% for h in historico_filtrado %}
+                                {% if h.tipo == 'Entrada' or h.tipo == 'Transferência (Entrada)' or h.tipo == 'Transferência (Saída)' %}
                                 <div class="timeline-item">
-                                    <div class="timeline-dot {% if 'Entrada' in h.tipo %}entrada{% elif 'Saída' in h.tipo %}saida{% endif %}"></div>
+                                    <div class="timeline-dot {% if 'Entrada' in h.tipo %}entrada{% elif 'Saída' in h.tipo or 'Expedição' in h.tipo %}saida{% endif %}"></div>
                                     
                                     <div class="d-flex justify-content-between align-items-start mb-1">
                                         <div>
@@ -264,9 +266,11 @@
                                     </div>
                                     {% endif %}
                                 </div>
+                                {% endif %}
                                 {% empty %}
                                 <div class="text-center text-muted py-4">Nenhum histórico registrado.</div>
                                 {% endfor %}
+                                {% endwith %}
                             </div>
                         </div>
                     </div>
@@ -516,7 +520,7 @@
                 <h5 class="modal-title"><i class="fas fa-exchange-alt me-2"></i>Transferir e Ajustar</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="formTransferencia" method="POST" enctype="multipart/form-data">
+            <form id="formTransferencia" method="POST" action="{% url 'sapp:transferir' 0 %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 <input type="hidden" name="item_id" id="transf_item_id">
                 <div class="modal-body">
@@ -758,81 +762,82 @@
         }
     });
 
-// Substitua a função abrirModalTransferencia no seu <script> por esta:
-function abrirModalTransferencia(id) {
-    const modalEl = document.getElementById('modalTransferencia');
-    const form = document.getElementById('formTransferencia');
-    
-    // 1. Define a URL de destino do formulário
-    const urlTransferir = "{% url 'sapp:transferir' 0 %}".replace('0', id);
-    form.action = urlTransferir;
-    
-    // 2. Limpa o formulário antes de preencher
-    form.reset();
+    // 4. FUNÇÃO PARA ABRIR MODAL DE TRANSFERÊNCIA (ATUALIZADA)
+    function abrirModalTransferencia(id) {
+        const modalEl = document.getElementById('modalTransferencia');
+        const form = document.getElementById('formTransferencia');
+        
+        // Define a URL de destino do formulário
+        const urlTransferir = "{% url 'sapp:transferir' 0 %}".replace('0', id);
+        form.action = urlTransferir;
+        
+        // Limpa o formulário antes de preencher
+        form.reset();
 
-    const urlApi = "{% url 'sapp:api_buscar_dados_lote' %}";
+        const urlApi = "{% url 'sapp:api_buscar_dados_lote' %}";
 
-    // 3. Busca os dados via AJAX
-    fetch(`${urlApi}?item_id=${id}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.encontrado) {
-                // Preenchimento de campos de texto e hidden
-                document.getElementById('transf_item_id').value = id;
-                document.getElementById('transf_lote_display').value = data.lote;
-                document.getElementById('transf_saldo_atual').innerText = data.saldo;
-                document.getElementById('transf_endereco_atual').textContent = 'Endereço atual: ' + data.endereco;
-                
-                document.getElementById('transf_produto').value = data.produto;
-                document.getElementById('transf_cliente').value = data.cliente;
-                document.getElementById('transf_empresa').value = data.empresa;
-                document.getElementById('transf_az').value = data.az;
-                document.getElementById('transf_peso').value = data.peso_unitario;
-                document.getElementById('transf_obs').value = data.observacao;
-                
-                // Campos de leitura (readonly)
-                document.getElementById('transf_saldo').value = data.saldo;
-                document.getElementById('transf_entrada').value = data.entrada;
-                
-                // Quantidade padrão sugerida (o saldo total)
-                const inputQtd = document.getElementById('transf_quantidade');
-                inputQtd.value = data.saldo;
-                inputQtd.max = data.saldo;
+        // Busca os dados via AJAX
+        fetch(`${urlApi}?item_id=${id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.encontrado) {
+                    // Preenchimento de campos de texto e hidden
+                    document.getElementById('transf_item_id').value = id;
+                    document.getElementById('transf_lote_display').value = data.lote;
+                    document.getElementById('transf_saldo_atual').innerText = data.saldo;
+                    document.getElementById('transf_endereco_atual').textContent = 'Endereço atual: ' + data.endereco;
+                    
+                    document.getElementById('transf_produto').value = data.produto;
+                    document.getElementById('transf_cliente').value = data.cliente;
+                    document.getElementById('transf_empresa').value = data.empresa;
+                    document.getElementById('transf_az').value = data.az;
+                    document.getElementById('transf_peso').value = data.peso_unitario;
+                    document.getElementById('transf_obs').value = data.observacao;
+                    
+                    // Campos de leitura (readonly)
+                    document.getElementById('transf_saldo').value = data.saldo;
+                    document.getElementById('transf_entrada').value = data.entrada;
+                    
+                    // Quantidade padrão sugerida (o saldo total)
+                    const inputQtd = document.getElementById('transf_quantidade');
+                    inputQtd.value = data.saldo;
+                    inputQtd.max = data.saldo;
 
-                // 4. Preenchimento de Selects (Importante: usar os IDs da API)
-                const preencherSelect = (id, valor) => {
-                    const el = document.getElementById(id);
-                    if (el && valor) {
-                        el.value = valor;
-                    }
-                };
+                    // Preenchimento de Selects
+                    const preencherSelect = (id, valor) => {
+                        const el = document.getElementById(id);
+                        if (el && valor) {
+                            el.value = valor;
+                        }
+                    };
 
-                preencherSelect('transf_especie', data.especie_id);
-                preencherSelect('transf_cultivar', data.cultivar_id);
-                preencherSelect('transf_peneira', data.peneira_id);
-                preencherSelect('transf_categoria', data.categoria_id);
-                preencherSelect('transf_tratamento', data.tratamento_id);
-                preencherSelect('transf_embalagem', data.embalagem);
+                    preencherSelect('transf_especie', data.especie_id);
+                    preencherSelect('transf_cultivar', data.cultivar_id);
+                    preencherSelect('transf_peneira', data.peneira_id);
+                    preencherSelect('transf_categoria', data.categoria_id);
+                    preencherSelect('transf_tratamento', data.tratamento_id);
+                    preencherSelect('transf_embalagem', data.embalagem);
 
-                // 5. Abre o modal usando o Bootstrap
-                const modal = new bootstrap.Modal(modalEl);
-                modal.show();
-                
-                // Foco no campo de novo endereço após carregar
-                setTimeout(() => {
-                    form.querySelector('input[name="novo_endereco"]').focus();
-                }, 500);
-                
-            } else {
-                alert('Erro: ' + (data.erro || 'Não foi possível carregar os dados do lote.'));
-            }
-        })
-        .catch(err => {
-            console.error('Erro na requisição:', err);
-            alert('Erro de conexão ao buscar dados do lote.');
-        });
-}
-    // AUTO FOCUS EM INPUTS DE MODAL
+                    // Abre o modal usando o Bootstrap
+                    const modal = new bootstrap.Modal(modalEl);
+                    modal.show();
+                    
+                    // Foco no campo de novo endereço após carregar
+                    setTimeout(() => {
+                        form.querySelector('input[name="novo_endereco"]').focus();
+                    }, 500);
+                    
+                } else {
+                    alert('Erro: ' + (data.erro || 'Não foi possível carregar os dados do lote.'));
+                }
+            })
+            .catch(err => {
+                console.error('Erro na requisição:', err);
+                alert('Erro de conexão ao buscar dados do lote.');
+            });
+    }
+
+    // 5. AUTO FOCUS EM INPUTS DE MODAL
     document.addEventListener('shown.bs.modal', function(event) {
         const firstInput = event.target.querySelector('input:not([type="hidden"]), select, textarea');
         if (firstInput) firstInput.focus();

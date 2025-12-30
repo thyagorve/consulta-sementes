@@ -2171,7 +2171,7 @@ def transferir(request, id):
                 origem.saida += qtd
                 origem.save()  # Saldo é recalculado automaticamente no save()
                 
-                # 2. BUSCAR OBJETOS RELACIONADOS (igual ao editar)
+                # 2. BUSCAR OBJETOS RELACIONADOS
                 # Espécie
                 novo_especie_id = request.POST.get('especie')
                 if novo_especie_id and novo_especie_id.strip() != '':
@@ -2207,7 +2207,7 @@ def transferir(request, id):
                 else:
                     obj_tratamento = origem.tratamento
                 
-                # 3. Processar peso unitário (igual ao editar)
+                # 3. Processar peso unitário
                 peso_raw = request.POST.get('peso_unitario', origem.peso_unitario or '0')
                 try:
                     peso_raw = str(peso_raw).replace(',', '.')
@@ -2218,41 +2218,70 @@ def transferir(request, id):
                 except:
                     novo_peso = origem.peso_unitario or Decimal('0.00')
                 
-                # 4. Cria o lote de Destino
-                destino = Estoque.objects.create(
-                    lote=origem.lote,
-                    endereco=novo_end,
-                    entrada=qtd,
-                    saldo=qtd,
-                    conferente=request.user,
-                    origem_destino=f"Transferência de {origem.endereco}",
-                    
-                    # Campos de texto com fallback
-                    produto=request.POST.get('produto', origem.produto or ''),
-                    cliente=request.POST.get('cliente', origem.cliente or ''),
-                    empresa=request.POST.get('empresa', origem.empresa or ''),
-                    az=request.POST.get('az', origem.az or ''),
-                    peso_unitario=novo_peso,
-                    embalagem=request.POST.get('embalagem', origem.embalagem),
-                    observacao=request.POST.get('observacao', origem.observacao or ''),
-                    
-                    # Foreign Keys (Objetos, não IDs)
-                    especie=obj_especie,
-                    cultivar=obj_cultivar,
-                    peneira=obj_peneira,
-                    categoria=obj_categoria,
-                    tratamento=obj_tratamento,
-                )
+                # 4. VERIFICAR SE JÁ EXISTE REGISTRO IDÊNTICO NO NOVO ENDEREÇO
+                # Campos técnicos para comparação
+                campos_tecnicos = {
+                    'lote': origem.lote,
+                    'cultivar': obj_cultivar,
+                    'especie': obj_especie,
+                    'peneira': obj_peneira,
+                    'categoria': obj_categoria,
+                    'tratamento': obj_tratamento,
+                    'embalagem': request.POST.get('embalagem', origem.embalagem),
+                    'empresa': request.POST.get('empresa', origem.empresa or ''),
+                    'cliente': request.POST.get('cliente', origem.cliente or ''),
+                    'endereco': novo_end,
+                }
                 
-                # 5. Históricos (Saída da origem)
+                # Buscar registro existente com todos os campos técnicos idênticos
+                destino_existente = Estoque.objects.filter(**campos_tecnicos).first()
+                
+                if destino_existente:
+                    # 5. SE EXISTIR: SOMAR AO REGISTRO EXISTENTE (CONSOLIDAR)
+                    destino_existente.entrada += qtd
+                    destino_existente.saldo += qtd
+                    destino_existente.conferente = request.user
+                    destino_existente.save()
+                    
+                    destino = destino_existente
+                    mensagem_tipo = "somado ao registro existente"
+                else:
+                    # 6. SE NÃO EXISTIR: CRIAR NOVO REGISTRO
+                    destino = Estoque.objects.create(
+                        lote=origem.lote,
+                        endereco=novo_end,
+                        entrada=qtd,
+                        saldo=qtd,
+                        conferente=request.user,
+                        origem_destino=f"Transferência de {origem.endereco}",
+                        
+                        # Campos de texto com fallback
+                        produto=request.POST.get('produto', origem.produto or ''),
+                        cliente=request.POST.get('cliente', origem.cliente or ''),
+                        empresa=request.POST.get('empresa', origem.empresa or ''),
+                        az=request.POST.get('az', origem.az or ''),
+                        peso_unitario=novo_peso,
+                        embalagem=request.POST.get('embalagem', origem.embalagem),
+                        observacao=request.POST.get('observacao', origem.observacao or ''),
+                        
+                        # Foreign Keys (Objetos, não IDs)
+                        especie=obj_especie,
+                        cultivar=obj_cultivar,
+                        peneira=obj_peneira,
+                        categoria=obj_categoria,
+                        tratamento=obj_tratamento,
+                    )
+                    mensagem_tipo = "criado no novo endereço"
+                
+                # 7. Históricos (Saída da origem)
                 hist_saida = HistoricoMovimentacao.objects.create(
                     estoque=origem,
                     usuario=request.user,
                     tipo='Transferência (Saída)',
-                    descricao=f"Transferido para {novo_end} ({destino.lote}) - Quantidade: {qtd} {origem.embalagem}"
+                    descricao=f"Transferido para {novo_end} ({destino.lote}) - Quantidade: {qtd} {origem.embalagem} | {mensagem_tipo}"
                 )
                 
-                # 6. Histórico (Entrada no destino)
+                # 8. Histórico (Entrada no destino)
                 hist_entrada = HistoricoMovimentacao.objects.create(
                     estoque=destino,
                     usuario=request.user,
@@ -2260,11 +2289,11 @@ def transferir(request, id):
                     descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem}"
                 )
                 
-                # 7. Salvar fotos na saída (origem)
+                # 9. Salvar fotos na saída (origem)
                 for f in request.FILES.getlist('fotos'):
                     FotoMovimentacao.objects.create(historico=hist_saida, arquivo=f)
                     
-                messages.success(request, f"✅ Transferência concluída! {qtd} unidades transferidas para {novo_end}")
+                messages.success(request, f"✅ Transferência concluída! {qtd} unidades {mensagem_tipo} em {novo_end}")
                 
         except Exception as e:
             import traceback
