@@ -440,7 +440,7 @@
 
     <!-- CARDS DE RESUMO -->
     <div class="row mb-4" id="statsRow">
-        <div class="col-md-4 mb-2">
+        <div class="col-md-3 mb-2">
             <div class="summary-card border-primary p-3 d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted small fw-bold text-uppercase">Lotes Visíveis</div>
@@ -451,7 +451,26 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
+
+
+
+
+        <div class="col-md-3 mb-2">
+            <div class="summary-card border-primary p-3 d-flex justify-content-between align-items-center">
+               <div class="d-flex align-items-center">
+                    <div class="bg-primary rounded-circle p-3 me-3"><i class="fa-solid fa-users text-white"></i></div>
+                    <div><h4 class="mb-0 text-primary" id="statClientes">0</h4><small class="text-muted">Clientes Únicos</small></div>
+                </div>
+                <div class="summary-icon bg-primary">
+                    <i class="fas fa-cubes"></i>
+                </div>
+            </div>
+        </div>
+
+
+
+
+        <div class="col-md-3 mb-2">
             <div class="summary-card border-success p-3 d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted small fw-bold text-uppercase">Saldo Disponível (Total)</div>
@@ -462,7 +481,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-2">
+        <div class="col-md-3 mb-2">
             <div class="summary-card border-warning p-3 d-flex justify-content-between align-items-center">
                 <div>
                     <div class="text-muted small fw-bold text-uppercase">Total Empenhado</div>
@@ -1078,21 +1097,30 @@ function calculateStats() {
     let count = 0;
     let sumSaldo = 0;
     let sumEmp = 0;
+    let clientes = new Set();
 
     const rows = document.querySelectorAll('#tableBody tr');
     rows.forEach(row => {
-        if(row.style.display !== 'none') {
+        if (row.style.display !== 'none') {
             count++;
-            // Col 13 = Saldo, Col 14 = Empenhado
-            sumSaldo += parsePtBrFloat(row.children[13].textContent);
+
+            sumSaldo += parsePtBrFloat(row.children[15].textContent);
             sumEmp += parsePtBrFloat(row.children[14].textContent);
+
+            // Coluna Cliente = índice 8
+            const cliente = row.children[8].textContent.trim();
+            if (cliente && cliente !== '-') {
+                clientes.add(cliente);
+            }
         }
     });
 
     document.getElementById('statLotes').textContent = count.toLocaleString('pt-BR');
     document.getElementById('statSaldo').textContent = sumSaldo.toLocaleString('pt-BR');
     document.getElementById('statEmpenhado').textContent = sumEmp.toLocaleString('pt-BR');
+    document.getElementById('statClientes').textContent = clientes.size.toLocaleString('pt-BR');
 }
+
 
 function parsePtBrFloat(str) {
     if(!str) return 0;
