@@ -98,6 +98,7 @@ class Estoque(models.Model):
     def __str__(self): return f"{self.lote} - {self.cultivar.nome} ({self.saldo} unidades)"
 
 class HistoricoMovimentacao(models.Model):
+    quantidade = models.IntegerField(default=0)
     estoque = models.ForeignKey(Estoque, on_delete=models.SET_NULL, related_name='historico', null=True, blank=True)
     lote_ref = models.CharField(max_length=100, default="--")
     usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)

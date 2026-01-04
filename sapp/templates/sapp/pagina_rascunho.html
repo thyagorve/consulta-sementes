@@ -1,10 +1,10 @@
 {% extends 'sapp/base.html' %}
-{% load static humanize %}
+{% load static humanize l10n %}
 
 {% block content %}
 <style>
     /* =========================================
-       1. ESTILOS GERAIS E LAYOUT
+       1. ESTILOS GERAIS
        ========================================= */
     :root {
         --primary-gradient: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
@@ -12,12 +12,10 @@
         --active-gradient: linear-gradient(135deg, #1f6a36 0%, #16572b 100%);
         --border-color: #e2e8f0;
         --bg-light: #f8fafc;
+        --card-width: 260px;
     }
 
-    .container-fluid {
-        padding: 20px;
-        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    }
+    .container-fluid { padding: 20px; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 
     /* HEADER */
     .page-header {
@@ -29,501 +27,262 @@
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
 
-    /* =========================================
-       2. CARDS SUPERIORES (RASCUNHOS)
-       ========================================= */
+    /* CARDS */
     #sectionCards {
         background: var(--bg-light);
-        padding: 20px;
+        padding: 15px;
         border-radius: 8px;
         margin-bottom: 20px;
         border: 1px solid var(--border-color);
         transition: all 0.3s ease;
     }
+    #sectionCards.hidden { display: none; }
 
-    #sectionCards.hidden {
-        display: none;
+    .cards-wrapper-container { display: flex; align-items: center; gap: 10px; }
+
+    .cards-scroll-area {
+        display: flex; gap: 15px; overflow-x: auto; padding: 5px 5px 15px 5px;
+        scroll-behavior: smooth; flex: 1; scrollbar-width: thin;
     }
+    .cards-scroll-area::-webkit-scrollbar { height: 6px; }
+    .cards-scroll-area::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 4px; }
+
+    .scroll-btn {
+        background: white; border: 1px solid var(--border-color); border-radius: 50%;
+        width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+        cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 2; flex-shrink: 0;
+    }
+    .scroll-btn:hover { background: #f1f5f9; transform: scale(1.1); }
 
     .draft-card {
-        background: white;
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        padding: 15px;
-        height: 100%;
-        transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-
-    .draft-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    }
-
-    .draft-card.active {
-        border: 2px solid #2f8f4e;
-        background-color: #f0fdf4;
-    }
-
-    .card-badge {
-        background: var(--primary-gradient);
-        color: white;
-        padding: 2px 10px;
-        border-radius: 12px;
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-
-    .lote-list-preview {
-        max-height: 80px;
-        overflow-y: auto;
-        font-size: 0.75rem;
-        margin-top: 8px;
-        border-top: 1px solid #eee;
-        padding-top: 4px;
-    }
-
-    /* =========================================
-       3. CARDS DE RESUMO (STATS)
-       ========================================= */
-    .summary-card {
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        background: white;
-        transition: transform 0.2s;
-        height: 100%;
-        border-top-width: 4px;
-    }
-
-    .summary-card:hover {
-        transform: translateY(-2px);
-    }
-
-    .summary-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-        color: white;
-    }
-
-    /* =========================================
-       4. TABELA AVANÇADA E CONTAINER
-       ========================================= */
-    .table-container {
-        position: relative; /* Base para o popup absolute */
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        border: 1px solid var(--border-color);
-        margin-bottom: 30px;
-        overflow: visible; /* Importante para não cortar sombras, mas scroll é na table-responsive */
-    }
-
-    .table-responsive {
-        max-height: 70vh;
-        overflow: auto; /* Scroll bar nativa */
-        border-radius: 8px;
-    }
-
-    .table-advanced {
-        width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
-        min-width: 1800px; /* Garante scroll horizontal se necessário */
-        font-size: 0.85rem;
-    }
-
-    /* HEADER DA TABELA */
-    .table-advanced th {
-        background: var(--primary-gradient);
-        color: white;
-        font-weight: 600;
-        padding: 12px 8px;
-        position: sticky;
-        top: 0;
-        z-index: 20; /* Maior que o conteúdo */
-        white-space: nowrap;
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
-        cursor: pointer;
-        user-select: none;
-        transition: background 0.2s;
-    }
-
-    .table-advanced th:hover {
-        background: var(--hover-gradient);
-    }
-
-    .table-advanced th.filter-active {
-        background: var(--active-gradient);
-    }
-
-    .table-advanced th i.fa-filter {
-        margin-left: 5px;
-        opacity: 0.7;
-        font-size: 0.75rem;
-    }
-
-    .table-advanced th.filter-active i.fa-filter,
-    .table-advanced th:hover i.fa-filter {
-        opacity: 1;
-    }
-
-    /* CONTEÚDO DA TABELA */
-    .table-advanced td {
-        padding: 8px;
-        vertical-align: middle;
-        border-bottom: 1px solid var(--border-color);
-        border-right: 1px solid #f1f5f9;
-        white-space: nowrap;
-        color: #334155;
-    }
-
-    .table-advanced tr:hover td {
-        background-color: #f8fafc;
-    }
-
-    /* Celulas Específicas */
-    .col-actions {
-        position: sticky;
-        right: 0;
-        background: white;
-        z-index: 10;
-        border-left: 2px solid #e2e8f0;
-        text-align: center;
-        width: 100px;
-    }
-    .table-advanced th:last-child {
-        position: sticky;
-        right: 0;
-        z-index: 30;
-    }
-
-    .tag-rascunho {
-        display: inline-flex;
-        align-items: center;
-        background: #ecfdf5;
-        color: #047857;
-        border: 1px solid #a7f3d0;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 0.7rem;
-        margin: 1px;
-    }
-
-    .btn-delete-item {
-        color: #ef4444;
-        margin-left: 4px;
-        cursor: pointer;
-        background: none;
-        border: none;
-        padding: 0;
-        font-size: 0.7rem;
-    }
-
-    /* =========================================
-       5. POPUP DE FILTRO (ESTILO EXCEL)
-       ========================================= */
-    .excel-popup {
-        position: absolute;
-        background: white;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
-        width: 280px;
-        z-index: 1000;
-        font-family: 'Segoe UI', sans-serif;
-        display: flex;
-        flex-direction: column;
-        animation: fadeIn 0.15s ease-out;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-5px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .excel-popup-header {
-        padding: 10px;
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
-        border-radius: 6px 6px 0 0;
-    }
-
-    .excel-search {
-        width: 100%;
-        padding: 6px 10px;
-        border: 1px solid #cbd5e1;
-        border-radius: 4px;
-        font-size: 0.85rem;
-    }
-    .excel-search:focus {
-        outline: none;
-        border-color: #2f8f4e;
-        box-shadow: 0 0 0 2px rgba(47, 143, 78, 0.1);
-    }
-
-    .excel-list {
-        max-height: 250px;
-        overflow-y: auto;
-        padding: 6px;
-    }
-
-    .excel-option {
-        display: flex;
-        align-items: center;
-        padding: 6px 8px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 0.85rem;
-        color: #334155;
-    }
-
-    .excel-option:hover {
-        background-color: #f1f5f9;
-    }
-
-    .excel-option input[type="checkbox"] {
-        margin-right: 8px;
-        accent-color: #2f8f4e;
-        width: 16px;
-        height: 16px;
-    }
-
-    .excel-option-label {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        flex: 1;
-    }
-
-    .excel-footer {
-        padding: 10px;
-        border-top: 1px solid #e2e8f0;
-        background: #f8fafc;
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-        border-radius: 0 0 6px 6px;
-    }
-
-    .excel-btn {
-        flex: 1;
-        padding: 6px;
-        font-size: 0.75rem;
-        border-radius: 4px;
-        border: 1px solid transparent;
-        font-weight: 500;
+        background: white; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;
+        min-width: var(--card-width); max-width: var(--card-width);
+        display: flex; flex-direction: column; justify-content: space-between; position: relative;
         transition: all 0.2s;
     }
+    .draft-card:hover { transform: translateY(-2px); box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.1); }
+    .draft-card.active { border: 2px solid #2f8f4e; background-color: #f0fdf4; box-shadow: 0 0 0 4px rgba(47, 143, 78, 0.1); }
+    .draft-card.has-error { border: 2px solid #ef4444; background-color: #fef2f2; }
 
-    .btn-apply { background: #2f8f4e; color: white; }
-    .btn-apply:hover { background: #267a41; }
+    .card-badge {
+        background: var(--primary-gradient); color: white; padding: 2px 10px; border-radius: 12px;
+        font-size: 0.75rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
+    }
+    .card-total-badge { background: #334155; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; }
+    .lote-list-preview { max-height: 60px; overflow-y: auto; font-size: 0.7rem; margin-top: 8px; border-top: 1px solid #eee; padding-top: 4px; }
+
+    /* STATS */
+    .summary-card {
+        border: 1px solid var(--border-color); border-radius: 8px; background: white;
+        transition: transform 0.2s; height: 100%; border-top-width: 4px; padding: 15px;
+    }
+    .summary-card:hover { transform: translateY(-2px); }
+    .summary-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; }
+
+    /* TABELA */
+    .table-container { background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid var(--border-color); margin-bottom: 30px; }
+    .table-responsive { max-height: 65vh; overflow: auto; border-radius: 8px; }
+    .table-advanced { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1800px; font-size: 0.85rem; }
     
+    .table-advanced th {
+        background: var(--primary-gradient); color: white; font-weight: 600; padding: 10px 8px;
+        position: sticky; top: 0; z-index: 20; white-space: nowrap; cursor: pointer; border-right: 1px solid rgba(255,255,255,0.1);
+        user-select: none;
+    }
+    .table-advanced th:hover { background: var(--hover-gradient); }
+    .table-advanced td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); border-right: 1px solid #f1f5f9; white-space: nowrap; vertical-align: middle; color: #334155; }
+    
+    .tag-rascunho {
+        display: inline-flex; align-items: center; background: #ecfdf5; color: #047857;
+        border: 1px solid #a7f3d0; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin: 1px;
+    }
+    .tag-rascunho.inconsistente { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; font-weight: bold; }
+    
+    .btn-delete-item { color: #ef4444; margin-left: 5px; cursor: pointer; background: none; border: none; padding: 0; }
+    .col-actions { position: sticky; right: 0; background: white; z-index: 10; border-left: 2px solid #e2e8f0; text-align: center; width: 80px; }
+    .table-advanced th:last-child { position: sticky; right: 0; z-index: 30; }
+
+    /* POPUP EXCEL */
+    .excel-popup {
+        position: fixed; background: white; border: 1px solid #cbd5e1; border-radius: 6px;
+        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.25); width: 280px; z-index: 9999;
+        font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column;
+        animation: fadeIn 0.15s ease-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .excel-popup-header { padding: 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0; }
+    .excel-search { width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.8rem; outline: none; }
+    .excel-search:focus { border-color: #2f8f4e; box-shadow: 0 0 0 2px rgba(47, 143, 78, 0.2); }
+    
+    .excel-list { max-height: 250px; overflow-y: auto; padding: 4px; background: #fff; }
+    .excel-option { display: flex; align-items: center; padding: 4px 6px; border-radius: 3px; cursor: pointer; font-size: 0.8rem; color: #334155; }
+    .excel-option:hover { background-color: #f1f5f9; }
+    .excel-option.selected { background-color: #f0fdf4; color: #166534; font-weight: 500; }
+    
+    .excel-footer { padding: 8px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: space-between; gap: 8px; border-radius: 0 0 6px 6px; }
+    .excel-btn { flex: 1; padding: 4px; font-size: 0.75rem; border-radius: 4px; border: 1px solid transparent; cursor: pointer; }
+    .btn-apply { background: #2f8f4e; color: white; }
     .btn-clear { background: #fff; border-color: #cbd5e1; color: #64748b; }
-    .btn-clear:hover { background: #f1f5f9; color: #334155; }
 
-    .popup-actions {
-        display: flex;
-        gap: 5px;
-        padding: 4px 10px;
-        border-bottom: 1px solid #e2e8f0;
-    }
-    .link-action {
-        font-size: 0.75rem;
-        color: #2563eb;
-        text-decoration: none;
-        cursor: pointer;
-    }
-    .link-action:hover { text-decoration: underline; }
-
-    /* UTILS */
-    .hidden { display: none !important; }
+    /* Utils */
     .badge-filter-count {
-        position: absolute;
-        top: 2px;
-        right: 2px;
-        background: #ef4444;
-        color: white;
-        font-size: 10px;
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        position: absolute; top: 2px; right: 2px; background: #ef4444; color: white;
+        font-size: 9px; width: 14px; height: 14px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
     }
 </style>
 
 <div class="container-fluid">
-    
     <!-- HEADER -->
     <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i>Centro de Movimentações</h4>
-            <small class="opacity-75">Rascunho & Empenho em Lote</small>
+            <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Centro de Movimentações</h5>
+            <small class="opacity-75">Gestão Profissional de Lotes</small>
         </div>
         <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-light" onclick="resetAllFilters()">
+            <button class="btn btn-sm btn-outline-light" onclick="window.Sistema.resetFilters()">
                 <i class="fas fa-broom me-1"></i> Limpar Filtros
             </button>
-            <button class="btn btn-sm btn-outline-light" onclick="toggleCards()">
-                <i class="fas fa-eye-slash me-1"></i> <span id="btnToggleText">Ocultar Cards</span>
+            <button class="btn btn-sm btn-outline-light" onclick="window.Sistema.toggleCards(this)">
+                <i class="fas fa-eye-slash me-1"></i> <span>Cards</span>
             </button>
         </div>
     </div>
 
-    <!-- SESSÃO DE CARDS (RASCUNHOS) -->
+    <!-- CARDS HORIZONTAIS -->
     <div id="sectionCards">
-        <div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 row-cols-xl-6 g-3">
-            {% for c in cards %}
-            <div class="col">
-                <div class="draft-card" data-card-name="{{ c.observacao }}">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="fw-bold text-muted small text-uppercase">
+                <i class="fas fa-clipboard-list me-1"></i> Rascunhos Ativos
+            </div>
+            <div class="card-total-badge" id="cardsCounterBadge">{{ cards.count }} Cards</div>
+        </div>
+
+        <div class="cards-wrapper-container">
+            <button class="scroll-btn" onclick="window.Sistema.scrollCards(-300)"><i class="fas fa-chevron-left"></i></button>
+            
+            <div class="cards-scroll-area" id="cardsContainer">
+                {% for c in cards %}
+                <div class="draft-card" id="card_{{ c.id }}" data-card-name="{{ c.observacao }}">
+                    <!-- Indicador de Erro Injetado via JS -->
+                    <div class="error-indicator text-danger fw-bold small mb-1" style="display:none;">
+                        <i class="fas fa-exclamation-triangle animate__animated animate__flash"></i> VERIFICAR ITENS
+                    </div>
+
                     <div>
                         <div class="d-flex justify-content-between align-items-start mb-2">
-                            <span class="card-badge" title="{{ c.observacao }}">{{ c.observacao|truncatechars:15 }}</span>
-                            <form method="POST" onsubmit="return confirm('Tem certeza que deseja EXCLUIR este card inteiro?');">
+                            <span class="card-badge" title="{{ c.observacao }}">{{ c.observacao }}</span>
+                            <form method="POST" onsubmit="return confirm('Tem certeza que deseja EXCLUIR todo o card?');">
                                 {% csrf_token %}
                                 <input type="hidden" name="excluir_card" value="1">
                                 <input type="hidden" name="empenho_id" value="{{ c.id }}">
-                                <button type="submit" class="btn btn-link text-danger p-0 border-0">
+                                <button type="submit" class="btn btn-link text-danger p-0 border-0" title="Excluir Card">
                                     <i class="fas fa-times-circle"></i>
                                 </button>
                             </form>
                         </div>
-                        <div class="small text-muted mb-1">
-                            <i class="fas fa-box me-1"></i> {{ c.itens.count }} Lotes
-                        </div>
-                        <div class="small text-muted">
-                            <i class="fas fa-weight-hanging me-1"></i> {{ c.saldo_afetado }} Und
+                        <div class="small text-muted mb-1 d-flex justify-content-between">
+                            <span><i class="fas fa-box me-1"></i> {{ c.total_itens }} Lotes</span>
+                            <span><i class="fas fa-weight-hanging me-1"></i> {{ c.saldo_afetado|default:0|intcomma }} Un</span>
                         </div>
                         
-                        <!-- Mini Preview -->
+                        <!-- Preview -->
                         <div class="lote-list-preview">
-                            {% for item in c.itens.all|slice:":5" %}
+                            {% for item in c.itens.all|slice:":4" %}
                             <div class="d-flex justify-content-between">
-                                <span class="text-truncate">{{ item.estoque.lote }}</span>
-                                <b>{{ item.quantidade }}</b>
+                                <span class="text-truncate" style="max-width: 140px;" title="{{ item.estoque.lote }}">{{ item.estoque.lote }}</span>
+                                <span class="fw-bold">{{ item.quantidade }}</span>
                             </div>
                             {% endfor %}
-                            {% if c.itens.count > 5 %}
-                            <div class="text-center text-muted fst-italic">+{{ c.itens.count|add:"-5" }}...</div>
+                            {% if c.itens.count > 4 %}
+                            <div class="text-center text-muted fst-italic" style="font-size:0.65rem">+{{ c.itens.count|add:"-4" }} outros...</div>
                             {% endif %}
                         </div>
                     </div>
 
-                    <div class="mt-3 d-flex flex-column gap-2">
-                        <button class="btn btn-sm btn-outline-success w-100" onclick="filterByCard('{{ c.observacao }}', this)">
-                            <i class="fas fa-filter me-1"></i> Filtrar Tabela
+                    <div class="mt-2 d-flex flex-column gap-2">
+                        <button class="btn btn-sm btn-outline-success w-100 btn-filter-card" onclick="window.Sistema.filterByCard('{{ c.observacao }}', this)">
+                            <i class="fas fa-filter me-1"></i> Filtrar
                         </button>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-warning w-50" 
-                                    onclick="openModalMass('transferir', '{{ c.id }}', '{{ c.observacao }}')" title="Transferir">
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-outline-warning w-50 btn-action-card" 
+                                    onclick="window.Sistema.openModalMass('transferir', '{{ c.id }}', '{{ c.observacao }}')" 
+                                    title="Transferir">
                                 <i class="fas fa-exchange-alt"></i>
                             </button>
-                            <button class="btn btn-sm btn-outline-danger w-50" 
-                                    onclick="openModalMass('expedir', '{{ c.id }}', '{{ c.observacao }}')" title="Expedir">
+                            <button class="btn btn-sm btn-outline-danger w-50 btn-action-card" 
+                                    onclick="window.Sistema.openModalMass('expedir', '{{ c.id }}', '{{ c.observacao }}')" 
+                                    title="Expedir">
                                 <i class="fas fa-truck"></i>
                             </button>
                         </div>
                     </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+
+            <button class="scroll-btn" onclick="window.Sistema.scrollCards(300)"><i class="fas fa-chevron-right"></i></button>
         </div>
     </div>
 
-    <!-- CARDS DE RESUMO -->
-    <div class="row mb-4" id="statsRow">
-        <div class="col-md-3 mb-2">
-            <div class="summary-card border-primary p-3 d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted small fw-bold text-uppercase">Lotes Visíveis</div>
-                    <div class="h3 mb-0 fw-bold text-primary" id="statLotes">0</div>
-                </div>
-                <div class="summary-icon bg-primary">
-                    <i class="fas fa-cubes"></i>
-                </div>
+    <!-- STATS -->
+    <div class="row g-2 mb-3" id="statsRow">
+        <div class="col-6 col-md-3">
+            <div class="summary-card border-primary d-flex align-items-center justify-content-between p-3">
+                <div><h4 class="mb-0 text-primary" id="statLotes">0</h4><small class="text-muted">Lotes Visíveis</small></div>
+                <div class="summary-icon bg-primary"><i class="fas fa-cubes"></i></div>
             </div>
         </div>
-
-
-
-
-        <div class="col-md-3 mb-2">
-            <div class="summary-card border-primary p-3 d-flex justify-content-between align-items-center">
-               <div class="d-flex align-items-center">
-                    <div class="bg-primary rounded-circle p-3 me-3"><i class="fa-solid fa-users text-white"></i></div>
-                    <div><h4 class="mb-0 text-primary" id="statClientes">0</h4><small class="text-muted">Clientes Únicos</small></div>
-                </div>
-                <div class="summary-icon bg-primary">
-                    <i class="fas fa-cubes"></i>
-                </div>
+        <div class="col-6 col-md-3">
+            <div class="summary-card border-primary d-flex align-items-center justify-content-between p-3">
+                <div><h4 class="mb-0 text-primary" id="statClientes">0</h4><small class="text-muted">Clientes Únicos</small></div>
+                <div class="summary-icon bg-primary"><i class="fas fa-users"></i></div>
             </div>
         </div>
-
-
-
-
-        <div class="col-md-3 mb-2">
-            <div class="summary-card border-success p-3 d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted small fw-bold text-uppercase">Saldo Disponível (Total)</div>
-                    <div class="h3 mb-0 fw-bold text-success" id="statSaldo">0</div>
-                </div>
-                <div class="summary-icon bg-success">
-                    <i class="fas fa-coins"></i>
-                </div>
+        <div class="col-6 col-md-3">
+            <div class="summary-card border-success d-flex align-items-center justify-content-between p-3">
+                <div><h4 class="mb-0 text-success" id="statSaldo">0</h4><small class="text-muted">Saldo Disp.</small></div>
+                <div class="summary-icon bg-success"><i class="fas fa-coins"></i></div>
             </div>
         </div>
-        <div class="col-md-3 mb-2">
-            <div class="summary-card border-warning p-3 d-flex justify-content-between align-items-center">
-                <div>
-                    <div class="text-muted small fw-bold text-uppercase">Total Empenhado</div>
-                    <div class="h3 mb-0 fw-bold text-warning" id="statEmpenhado">0</div>
-                </div>
-                <div class="summary-icon bg-warning">
-                    <i class="fas fa-clipboard-check"></i>
-                </div>
+        <div class="col-6 col-md-3">
+            <div class="summary-card border-warning d-flex align-items-center justify-content-between p-3">
+                <div><h4 class="mb-0 text-warning" id="statEmpenhado">0</h4><small class="text-muted">Total em Rascunho</small></div>
+                <div class="summary-icon bg-warning"><i class="fas fa-file-signature"></i></div>
             </div>
         </div>
     </div>
 
-    <!-- TABELA PRINCIPAL -->
+    <!-- TABELA -->
     <div class="table-container">
         <div class="table-responsive">
             <table class="table-advanced" id="mainTable">
                 <thead>
                     <tr>
-                        <!-- Definição de Colunas: Index 0 a 17 -->
-                        <th onclick="toggleFilter(0, this)">AZ <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(1, this)">Lote <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(2, this)">Cultivar <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(3, this)">Peneira <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(4, this)">Categoria <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(5, this)">Espécie <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(6, this)">Tratamento <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(7, this)">Embalagem <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(8, this)">Cliente <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(9, this)">Empresa <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(10, this)">Endereço <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(11, this)">Peso Unit. <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(12, this)">Peso Total <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(13, this)">Saldo <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(14, this)">Empenhado <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(15, this)" class="bg-success text-white">Disponível <i class="fas fa-filter"></i></th>
-                        <th onclick="toggleFilter(16, this)">Rascunhos <i class="fas fa-filter"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(0, this)">AZ <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(1, this)">Lote <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(2, this)">Cultivar <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(3, this)">Peneira <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(4, this)">Categoria <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(5, this)">Espécie <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(6, this)">Tratamento <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(7, this)">Emb. <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(8, this)">Cliente <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(9, this)">Empresa <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(10, this)">Endereço <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(11, this)">Peso Un. <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(12, this)">Peso Tot. <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(13, this)">Saldo <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(14, this)">Empenho <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(15, this)" class="bg-success border-success text-white">Disp. <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                        <th onclick="window.Sistema.toggleFilter(16, this)">Rascunhos <i class="fas fa-filter text-white-50 ms-1"></i></th>
                         <th class="col-actions">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     {% for item in lotes %}
-                    <tr class="align-middle">
+                    <tr>
                         <td>{{ item.lote.az|default:"-" }}</td>
                         <td class="fw-bold text-primary">{{ item.lote.lote }}</td>
                         <td>{{ item.lote.cultivar.nome }}</td>
@@ -535,20 +294,24 @@
                         <td>{{ item.lote.cliente|default:"-" }}</td>
                         <td>{{ item.lote.empresa|default:"-" }}</td>
                         <td><span class="badge bg-light text-dark border">{{ item.lote.endereco }}</span></td>
-                        <td>{{ item.lote.peso_unitario|default:"0" }}</td>
-                        <td>{{ item.lote.peso_total|default:"0" }}</td>
                         
-                        <td class="fw-bold">{{ item.lote.saldo|intcomma }}</td>
-                        <td class="text-warning fw-bold">{{ item.empenhado|intcomma }}</td>
-                        <td class="text-success fw-bold">{{ item.disponivel|intcomma }}</td>
+                        <td data-value="{{ item.lote.peso_unitario }}">{{ item.lote.peso_unitario|default:"0" }}</td>
+                        <td data-value="{{ item.lote.peso_total }}">{{ item.lote.peso_total|default:"0" }}</td>
                         
-                        <!-- Rascunhos (Lista de tags) -->
-                        <td data-raw-rascunhos="{% for r in item.itens_empenho %}{{ r.empenho.observacao }}|{% endfor %}">
-                            <div class="d-flex flex-wrap" style="max-width: 250px;">
+                        <td class="fw-bold" data-value="{{ item.lote.saldo }}">{{ item.lote.saldo|intcomma }}</td>
+                        <td class="text-warning fw-bold" data-value="{{ item.empenhado }}">{{ item.empenhado|intcomma }}</td>
+                        <td class="text-success fw-bold" data-value="{{ item.disponivel }}">{{ item.disponivel|intcomma }}</td>
+                        
+                        <!-- Coluna Rascunhos -->
+                        <td data-raw-rascunhos="{% for r in item.itens_empenho %}{{ r.empenho.observacao }}{% if not forloop.last %}|{% endif %}{% endfor %}">
+                            <div class="d-flex flex-wrap gap-1" style="max-width: 250px;">
                                 {% for r in item.itens_empenho %}
-                                <span class="tag-rascunho">
+                                <span class="tag-rascunho {% if r.inconsistente %}inconsistente{% endif %}"
+                                      data-card-ref="{{ r.empenho.observacao }}"
+                                      title="Card: {{ r.empenho.observacao }}">
+                                    {% if r.inconsistente %}<i class="fas fa-exclamation-circle me-1"></i>{% endif %}
                                     {{ r.empenho.observacao }}: {{ r.quantidade }}
-                                    <form method="POST" class="d-inline">
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('Remover item?');">
                                         {% csrf_token %}
                                         <input type="hidden" name="excluir_item" value="1">
                                         <input type="hidden" name="item_id" value="{{ r.id }}">
@@ -560,10 +323,18 @@
                         </td>
 
                         <td class="col-actions">
-                            <button class="btn btn-sm btn-outline-success border-0" 
-                                    onclick="openModalIndividual('{{ item.lote.id }}', '{{ item.lote.lote }}', {{ item.disponivel|stringformat:'d' }})">
-                                <i class="fas fa-plus-circle fa-lg"></i>
-                            </button>
+                            {% if item.tem_inconsistencia %}
+                                <button class="btn btn-sm btn-outline-danger border-0" disabled title="Corrija os rascunhos em excesso primeiro">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            {% else %}
+                                <!-- Garantindo chamada segura ao JS -->
+                                <button class="btn btn-sm btn-outline-success border-0" 
+                                        onclick="window.Sistema.openModalIndividual('{{ item.lote.id }}', '{{ item.lote.lote }}', {{ item.disponivel|unlocalize }})"
+                                        title="Adicionar a Card">
+                                    <i class="fas fa-plus-circle fa-lg"></i>
+                                </button>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -573,12 +344,14 @@
     </div>
 </div>
 
+<!-- !!! MOVI OS MODAIS PARA O FINAL ABSOLUTO DO BLOCK CONTENT PARA GARANTIR VISIBILIDADE !!! -->
+
 <!-- MODAL INDIVIDUAL -->
 <div class="modal fade" id="modalIndividual" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Adicionar ao Rascunho</h5>
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Adicionar ao Rascunho</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST">
@@ -586,18 +359,26 @@
                 <input type="hidden" name="empenhar_lote" value="1">
                 <input type="hidden" name="lote_id" id="ind_lote_id">
                 <div class="modal-body">
-                    <div class="alert alert-light border">
-                        Lote: <strong id="ind_lote_nome" class="text-primary"></strong><br>
-                        Disponível: <strong id="ind_lote_disp" class="text-success"></strong>
+                    <div class="alert alert-light border border-success d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted d-block">LOTE</small>
+                            <strong id="ind_lote_nome" class="fs-5 text-dark">...</strong>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted d-block">DISPONÍVEL</small>
+                            <strong id="ind_lote_disp" class="fs-4 text-success">...</strong>
+                        </div>
                     </div>
+                    
                     <div class="mb-3">
-                        <label class="form-label">Quantidade</label>
-                        <input type="number" name="quantidade" id="ind_qtd" class="form-control" min="1" required>
+                        <label class="form-label fw-bold">Quantidade</label>
+                        <input type="number" name="quantidade" id="ind_qtd" class="form-control form-control-lg text-center fw-bold" min="1" required>
                     </div>
+
                     <div class="mb-3">
-                        <label class="form-label">Nome do Card (Rascunho)</label>
-                        <input type="text" name="nome_empenho" class="form-control text-uppercase" placeholder="Ex: EXPEDICAO_ABC" required list="cards_existentes">
-                        <datalist id="cards_existentes">
+                        <label class="form-label">Selecionar Card / Criar Novo</label>
+                        <input type="text" name="nome_empenho" class="form-control text-uppercase" placeholder="Digite o nome (Ex: CARGA SP)" required list="cards_list" autocomplete="off">
+                        <datalist id="cards_list">
                             {% for c in cards %}
                             <option value="{{ c.observacao }}">
                             {% endfor %}
@@ -605,529 +386,474 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">Adicionar</button>
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success px-4 fw-bold">Salvar</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- MODAL EM MASSA (TRANSFERIR / EXPEDIR) -->
+<!-- MODAL MASSA -->
 <div class="modal fade" id="modalMassa" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header text-white" id="headerMassa">
-                <h5 class="modal-title" id="titleMassa">Ação em Massa</h5>
+                <h5 class="modal-title" id="titleMassa">Processar Lote</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            
-            <form method="POST" enctype="multipart/form-data" id="formMassa">
+            <form method="POST" id="formMassa">
                 {% csrf_token %}
                 <input type="hidden" name="origem_acao" value="cards">
-                <input type="hidden" name="acao_tipo" id="acao_tipo"> <!-- transferir ou expedir -->
+                <input type="hidden" name="acao_tipo" id="acao_tipo">
                 <input type="hidden" name="empenho_id" id="mass_empenho_id">
 
                 <div class="modal-body">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-info-circle me-1"></i> Card: <strong id="mass_card_name"></strong>
+                    <div class="alert alert-warning mb-3">
+                        Card Selecionado: <strong id="mass_card_name" class="d-block mt-1 fs-5"></strong>
                     </div>
 
-                    <!-- CAMPOS TRANSFERÊNCIA -->
-                    <div id="blockTransfer">
-                        <h6 class="border-bottom pb-2 mb-3 text-warning">Dados da Transferência</h6>
+                    <!-- Campos Transferencia -->
+                    <div id="blockTransfer" class="d-none animate__animated animate__fadeIn">
+                        <h6 class="text-warning border-bottom pb-2 mb-3">Dados de Destino (Transferência Interna)</h6>
                         <div class="row g-2">
-                            <div class="col-md-8">
-                                <label class="form-label">Novo Endereço <span class="text-danger">*</span></label>
-                                <input type="text" name="novo_endereco" id="field_novo_end" class="form-control" required>
+                            <div class="col-8">
+                                <label class="form-label small">Novo Endereço *</label>
+                                <input type="text" name="novo_endereco" class="form-control">
                             </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Novo AZ</label>
-                                <input type="text" name="az" id="field_az" class="form-control">
+                            <div class="col-4">
+                                <label class="form-label small">Novo AZ</label>
+                                <input type="text" name="az" class="form-control">
                             </div>
                         </div>
                     </div>
 
-                    <!-- CAMPOS EXPEDIÇÃO -->
-                    <div id="blockExped">
-                        <h6 class="border-bottom pb-2 mb-3 text-danger">Dados da Expedição</h6>
+                    <!-- Campos Expedição -->
+                    <div id="blockExped" class="d-none animate__animated animate__fadeIn">
+                        <h6 class="text-danger border-bottom pb-2 mb-3">Dados de Faturamento (Saída)</h6>
                         <div class="mb-2">
-                            <label class="form-label">Número da Carga/Pedido <span class="text-danger">*</span></label>
-                            <input type="text" name="numero_carga" id="field_carga" class="form-control" required>
+                            <label class="form-label small">Nº Pedido / Carga *</label>
+                            <input type="text" name="numero_carga" class="form-control" placeholder="Ex: PED-1234">
                         </div>
-                        <div class="row g-2 mb-2">
-                            <div class="col-md-6">
-                                <label class="form-label">Cliente</label>
-                                <input type="text" name="cliente" id="field_cliente" class="form-control">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Cliente Destino</label>
+                                <input type="text" name="cliente" class="form-control">
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Placa Veículo</label>
-                                <input type="text" name="placa" id="field_placa" class="form-control">
+                            <div class="col-6">
+                                <label class="form-label small">Placa do Veículo</label>
+                                <input type="text" name="placa" class="form-control">
                             </div>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Fotos (Opcional)</label>
-                            <input type="file" name="fotos" id="field_fotos" class="form-control" multiple accept="image/*">
                         </div>
                     </div>
 
                     <div class="mt-3">
-                        <label class="form-label">Observação Global</label>
+                        <label class="form-label small">Observação Geral</label>
                         <textarea name="obs_global" class="form-control" rows="2"></textarea>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="submit" class="btn btn-primary fw-bold">Confirmar</button>
+                    <button type="submit" class="btn btn-primary fw-bold px-4" id="btnConfirmMass">Confirmar Ação</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- ======================= JS SCRIPT ======================== -->
 <script>
-/**
- * ESTADO GLOBAL
- * Mantemos o estado fora do DOMContentLoaded para acessibilidade global
- */
-var AppState = {
-    activeCardFilter: null,
-    columnFilters: {} // Formato: { colIndex: ["valor1", "valor2"] }
-};
+    /**
+     * Objeto Principal Sistema - CORRIGIDO
+     */
+    const Sistema = {
+        state: {
+            filters: {},    
+            cardFilter: null,
+            openPopup: null
+        },
 
-/**
- * INICIALIZAÇÃO
- */
-document.addEventListener('DOMContentLoaded', function() {
-    // Calcular estatísticas iniciais
-    calculateStats();
+        init() {
+            // Inicialização segura
+            this.updateStats();
+            this.checkInconsistencies();
+            
+            // Listener Global para fechar popups
+            document.addEventListener('click', (e) => {
+                if (this.state.openPopup && 
+                    !e.target.closest('.excel-popup') && 
+                    !e.target.closest('th')) {
+                    this.closeAllPopups();
+                }
+            });
+            console.log('Sistema Inicializado.');
+        },
 
-    // Evento Global para fechar Popups
-    document.addEventListener('click', function(e) {
-        if (!e.target.closest('.excel-popup') && !e.target.closest('th')) {
-            closeAllPopups();
-        }
-    });
-
-    // Fechar popups ao rolar a tabela
-    const tableResp = document.querySelector('.table-responsive');
-    if (tableResp) {
-        tableResp.addEventListener('scroll', closeAllPopups);
-    }
-});
-
-/**
- * FUNÇÕES DE INTERFACE (UI)
- */
-function toggleCards() {
-    const sec = document.getElementById('sectionCards');
-    const txt = document.getElementById('btnToggleText');
-    if(sec && txt) {
-        sec.classList.toggle('hidden');
-        txt.textContent = sec.classList.contains('hidden') ? 'Exibir Cards' : 'Ocultar Cards';
-    }
-}
-
-/**
- * FUNÇÕES DE MODAL - Usando getOrCreateInstance para robustez
- */
-function openModalIndividual(id, nome, disp) {
-    const el = document.getElementById('modalIndividual');
-    if(!el) return;
-
-    // Elementos do form
-    const inputId = document.getElementById('ind_lote_id');
-    const nomeEl = document.getElementById('ind_lote_nome');
-    const dispEl = document.getElementById('ind_lote_disp');
-    const qtdEl = document.getElementById('ind_qtd');
-
-    // Setar valores
-    if(inputId) inputId.value = id;
-    if(nomeEl) nomeEl.textContent = nome;
-    if(dispEl) dispEl.textContent = disp;
-    if(qtdEl) {
-        qtdEl.max = disp;
-        qtdEl.value = '';
-    }
-
-    // Abrir Modal de forma segura
-    const modal = bootstrap.Modal.getOrCreateInstance(el);
-    modal.show();
-}
-
-function openModalMass(tipo, id, nome) {
-    const el = document.getElementById('modalMassa');
-    if(!el) return;
-
-    // Elementos
-    const form = document.getElementById('formMassa');
-    const title = document.getElementById('titleMassa');
-    const header = document.getElementById('headerMassa');
-    const cardName = document.getElementById('mass_card_name');
-    const inputAcao = document.getElementById('acao_tipo');
-    const inputId = document.getElementById('mass_empenho_id');
-    
-    const blkTrans = document.getElementById('blockTransfer');
-    const blkExped = document.getElementById('blockExped');
-
-    // Resetar e Configurar
-    form.reset();
-    if(inputId) inputId.value = id;
-    if(cardName) cardName.textContent = nome;
-    if(inputAcao) inputAcao.value = tipo;
-
-    // Lógica de Exibição
-    if (tipo === 'transferir') {
-        title.innerHTML = '<i class="fas fa-exchange-alt me-2"></i>Transferir Lotes';
-        header.className = 'modal-header bg-warning text-dark border-0';
-        
-        blkTrans.style.display = 'block';
-        blkExped.style.display = 'none';
-        
-        toggleRequired(blkTrans, true);
-        toggleRequired(blkExped, false);
-    } else {
-        title.innerHTML = '<i class="fas fa-truck me-2"></i>Expedir Carga';
-        header.className = 'modal-header bg-danger text-white border-0';
-        
-        blkTrans.style.display = 'none';
-        blkExped.style.display = 'block';
-        
-        toggleRequired(blkTrans, false);
-        toggleRequired(blkExped, true);
-    }
-
-    const modal = bootstrap.Modal.getOrCreateInstance(el);
-    modal.show();
-}
-
-function toggleRequired(container, isRequired) {
-    if(!container) return;
-    const inputs = container.querySelectorAll('input, select, textarea');
-    inputs.forEach(inp => {
-        inp.disabled = !isRequired;
-        // Apenas inputs que originalmente eram required devem ser manipulados, 
-        // mas aqui vamos simplificar garantindo que disabled inputs não validam
-    });
-}
-
-/**
- * LÓGICA DE FILTRO (CORE)
- */
-function filterByCard(cardName, btn) {
-    if (AppState.activeCardFilter === cardName) {
-        AppState.activeCardFilter = null;
-        document.querySelectorAll('.draft-card').forEach(c => c.classList.remove('active'));
-    } else {
-        AppState.activeCardFilter = cardName;
-        document.querySelectorAll('.draft-card').forEach(c => c.classList.remove('active'));
-        if(btn) btn.closest('.draft-card').classList.add('active');
-    }
-    applyAllFilters();
-}
-
-function resetAllFilters() {
-    AppState.activeCardFilter = null;
-    AppState.columnFilters = {};
-    
-    document.querySelectorAll('.draft-card').forEach(c => c.classList.remove('active'));
-    document.querySelectorAll('.badge-filter-count').forEach(b => b.remove());
-    document.querySelectorAll('th').forEach(th => th.classList.remove('filter-active'));
-    
-    applyAllFilters();
-}
-
-function applyAllFilters() {
-    const rows = document.querySelectorAll('#tableBody tr');
-    
-    rows.forEach(row => {
-        let isVisible = true;
-
-        // 1. Filtro de Card
-        if (AppState.activeCardFilter) {
-            const raw = row.children[16].getAttribute('data-raw-rascunhos') || '';
-            // Verifica token exato "NOME|"
-            if (!raw.includes(AppState.activeCardFilter + '|')) {
-                isVisible = false;
+        // --- HELPER SAFE SET ---
+        // Impede que o script trave se o HTML não tiver sido renderizado perfeitamente
+        setSafeText(id, text) {
+            const el = document.getElementById(id);
+            if(el) {
+                el.innerText = text;
+            } else {
+                console.warn('Elemento HTML não encontrado:', id);
             }
-        }
+        },
 
-        // 2. Filtros de Coluna
-        if (isVisible) {
-            for (const [colIndex, values] of Object.entries(AppState.columnFilters)) {
-                if (!checkRowAgainstFilter(row, parseInt(colIndex), values)) {
-                    isVisible = false;
-                    break;
+        setSafeVal(id, val) {
+            const el = document.getElementById(id);
+            if(el) {
+                el.value = val;
+            } else {
+                console.warn('Input HTML não encontrado:', id);
+            }
+        },
+
+        scrollCards(offset) {
+            const c = document.getElementById('cardsContainer');
+            if(c) c.scrollBy({ left: offset, behavior: 'smooth' });
+        },
+
+        toggleCards(btn) {
+            const section = document.getElementById('sectionCards');
+            const span = btn.querySelector('span');
+            const icon = btn.querySelector('i');
+            
+            if(!section) return;
+
+            if (section.classList.contains('hidden')) {
+                section.classList.remove('hidden');
+                if(span) span.textContent = 'Cards';
+                if(icon) icon.className = 'fas fa-eye-slash me-1';
+                btn.classList.add('btn-outline-light');
+                btn.classList.remove('btn-danger');
+            } else {
+                section.classList.add('hidden');
+                if(span) span.textContent = 'Mostrar';
+                if(icon) icon.className = 'fas fa-eye me-1';
+                btn.classList.remove('btn-outline-light');
+                btn.classList.add('btn-danger');
+            }
+        },
+
+        checkInconsistencies() {
+            const badRefs = new Set();
+            document.querySelectorAll('.tag-rascunho.inconsistente').forEach(el => {
+                if(el.dataset.cardRef) badRefs.add(el.dataset.cardRef);
+            });
+
+            document.querySelectorAll('.draft-card').forEach(card => {
+                const name = card.dataset.cardName;
+                const errDiv = card.querySelector('.error-indicator');
+                
+                if (badRefs.has(name)) {
+                    card.classList.add('has-error');
+                    if(errDiv) errDiv.style.display = 'block';
+                    card.querySelectorAll('.btn-action-card').forEach(b => {
+                        b.disabled = true;
+                        b.title = "Corrija os erros antes de prosseguir";
+                    });
+                } else {
+                    card.classList.remove('has-error');
+                    if(errDiv) errDiv.style.display = 'none';
+                    card.querySelectorAll('.btn-action-card').forEach(b => b.disabled = false);
+                }
+            });
+        },
+
+        // --- FILTERS ---
+        toggleFilter(colIndex, thElement) {
+            if (this.state.openPopup === colIndex) {
+                this.closeAllPopups();
+                return;
+            }
+            this.closeAllPopups();
+            
+            const popup = document.createElement('div');
+            popup.className = 'excel-popup';
+            popup.dataset.col = colIndex;
+            
+            const values = this.getUniqueColumnValues(colIndex);
+            const activeFilters = this.state.filters[colIndex] || [];
+            
+            let listHtml = '';
+            if (values.length === 0) {
+                listHtml = '<div class="p-2 text-center text-muted small">Sem dados</div>';
+            } else {
+                values.forEach(v => {
+                    const isChecked = activeFilters.includes(v);
+                    const vSafe = v === '' ? '(Vazio)' : v;
+                    listHtml += `
+                        <div class="excel-option ${isChecked ? 'selected' : ''}" onclick="this.querySelector('input').click()">
+                            <input type="checkbox" value="${v.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation()">
+                            <span class="ms-2 text-truncate">${vSafe}</span>
+                        </div>`;
+                });
+            }
+
+            popup.innerHTML = `
+                <div class="excel-popup-header">
+                    <input type="text" class="excel-search" placeholder="Buscar..." onkeyup="window.Sistema.filterPopupList(this)">
+                </div>
+                <div class="excel-list">${listHtml}</div>
+                <div class="excel-footer">
+                    <button class="excel-btn btn-clear" onclick="window.Sistema.clearColFilter(${colIndex})">Limpar</button>
+                    <button class="excel-btn btn-apply" onclick="window.Sistema.applyColFilter(${colIndex})">Aplicar</button>
+                </div>
+            `;
+
+            document.body.appendChild(popup);
+            this.state.openPopup = colIndex;
+
+            const rect = thElement.getBoundingClientRect();
+            popup.style.top = (rect.bottom + window.scrollY + 2) + 'px';
+            if (rect.left + 280 > window.innerWidth) {
+                popup.style.left = (window.innerWidth - 290) + 'px';
+            } else {
+                popup.style.left = (rect.left + window.scrollX) + 'px';
+            }
+        },
+
+        filterPopupList(input) {
+            const term = input.value.toLowerCase();
+            const container = input.closest('.excel-popup-header').nextElementSibling; // div.excel-list
+            container.querySelectorAll('.excel-option').forEach(div => {
+                const text = div.textContent.toLowerCase();
+                div.style.display = text.includes(term) ? 'flex' : 'none';
+            });
+        },
+
+        getUniqueColumnValues(colIndex) {
+            const values = new Set();
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                let cell = row.children[colIndex];
+                if(!cell) return;
+                
+                let val = '';
+                if (colIndex === 16) {
+                   val = cell.getAttribute('data-raw-rascunhos') || '';
+                   if(val.includes('|')) {
+                       val.split('|').forEach(part => values.add(part.trim()));
+                       return;
+                   }
+                } else {
+                   val = cell.textContent.trim();
+                }
+                values.add(val);
+            });
+            return Array.from(values).sort();
+        },
+
+        applyColFilter(colIndex) {
+            const popup = document.querySelector('.excel-popup[data-col="'+colIndex+'"]');
+            if(!popup) return;
+            const checkboxes = popup.querySelectorAll('input[type="checkbox"]:checked');
+            const selected = Array.from(checkboxes).map(cb => cb.value);
+            if (selected.length > 0) this.state.filters[colIndex] = selected;
+            else delete this.state.filters[colIndex];
+            this.closeAllPopups();
+            this.runTableFilter();
+        },
+
+        clearColFilter(colIndex) {
+            delete this.state.filters[colIndex];
+            this.closeAllPopups();
+            this.runTableFilter();
+        },
+
+        closeAllPopups() {
+            document.querySelectorAll('.excel-popup').forEach(el => el.remove());
+            this.state.openPopup = null;
+        },
+
+        filterByCard(cardName, btnElement) {
+            if (this.state.cardFilter === cardName) {
+                this.state.cardFilter = null;
+                document.querySelectorAll('.draft-card').forEach(c => c.classList.remove('active'));
+                if(btnElement) {
+                    btnElement.classList.replace('btn-success', 'btn-outline-success');
+                    btnElement.innerHTML = '<i class="fas fa-filter me-1"></i> Filtrar';
+                }
+            } else {
+                this.state.cardFilter = cardName;
+                document.querySelectorAll('.draft-card').forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.btn-filter-card').forEach(b => {
+                     b.classList.replace('btn-success', 'btn-outline-success');
+                     b.innerHTML = '<i class="fas fa-filter me-1"></i> Filtrar';
+                });
+                
+                if(btnElement) {
+                    const card = btnElement.closest('.draft-card');
+                    if(card) card.classList.add('active');
+                    btnElement.classList.replace('btn-outline-success', 'btn-success');
+                    btnElement.innerHTML = '<i class="fas fa-check me-1"></i> Ativo';
                 }
             }
-        }
+            this.runTableFilter();
+        },
 
-        row.style.display = isVisible ? '' : 'none';
-    });
+        resetFilters() {
+            this.state.filters = {};
+            this.state.cardFilter = null;
+            document.querySelectorAll('.draft-card').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.btn-filter-card').forEach(b => {
+                 b.classList.replace('btn-success', 'btn-outline-success');
+                 b.innerHTML = '<i class="fas fa-filter me-1"></i> Filtrar';
+            });
+            this.runTableFilter();
+        },
 
-    calculateStats();
-    updateHeaderIcons();
-}
+        runTableFilter() {
+            const rows = document.querySelectorAll('#tableBody tr');
+            rows.forEach(row => {
+                let show = true;
+                if (this.state.cardFilter) {
+                    const td = row.querySelector('td[data-raw-rascunhos]');
+                    const rawRascunho = td ? td.getAttribute('data-raw-rascunhos') : '';
+                    if (!rawRascunho.includes(this.state.cardFilter)) show = false;
+                }
+                if (show) {
+                    for (const [colIdx, allowedValues] of Object.entries(this.state.filters)) {
+                        const idx = parseInt(colIdx);
+                        const cell = row.children[idx];
+                        if(!cell) continue;
 
-// Verifica uma linha contra um filtro específico
-function checkRowAgainstFilter(row, colIndex, allowedValues) {
-    // Se filtro vazio (por segurança), passa
-    if (!allowedValues || allowedValues.length === 0) return true;
-    if (allowedValues.includes('__NONE__')) return false; 
+                        let val = '';
+                        if (idx === 16) {
+                             val = cell.getAttribute('data-raw-rascunhos');
+                             const intersection = allowedValues.some(av => val.includes(av));
+                             if (!intersection) { show = false; break; }
+                        } else {
+                            val = cell.textContent.trim();
+                            if (!allowedValues.includes(val)) { show = false; break; }
+                        }
+                    }
+                }
+                row.style.display = show ? '' : 'none';
+            });
+            this.updateBadges();
+            this.updateStats();
+        },
 
-    // Coluna 16 (Rascunhos) é especial (contém lista)
-    if (colIndex === 16) {
-        const raw = row.children[16].getAttribute('data-raw-rascunhos') || '';
-        // Se a linha tem ALGUM dos valores permitidos
-        return allowedValues.some(val => raw.includes(val + '|'));
-    } 
-    
-    // Colunas normais (texto exato)
-    const cellValue = row.children[colIndex].textContent.trim();
-    return allowedValues.includes(cellValue);
-}
+        updateBadges() {
+            document.querySelectorAll('.badge-filter-count').forEach(e => e.remove());
+            for (const colIdx in this.state.filters) {
+                const count = this.state.filters[colIdx].length;
+                const th = document.querySelectorAll('.table-advanced th')[colIdx];
+                if(th) th.innerHTML += `<span class="badge-filter-count">${count}</span>`;
+            }
+        },
 
-/**
- * POPUP EXCEL
- */
-function toggleFilter(colIndex, th) {
-    // Se já existe, fecha e sai
-    const existing = document.querySelector(`.excel-popup[data-col="${colIndex}"]`);
-    if (existing) {
-        existing.remove();
-        return;
-    }
+        updateStats() {
+            let vis = 0;
+            let sumSaldo = 0;
+            let sumEmp = 0;
+            const clients = new Set();
+            document.querySelectorAll('#tableBody tr').forEach(r => {
+                if (r.style.display !== 'none') {
+                    vis++;
+                    const getNum = (idx) => {
+                        const cell = r.children[idx];
+                        if(!cell) return 0;
+                        let txt = cell.innerText.replace(/\./g, '').replace(',', '.');
+                        return parseFloat(txt) || 0;
+                    }
+                    sumSaldo += getNum(15); 
+                    sumEmp += getNum(14); 
+                    
+                    const cellCli = r.children[8];
+                    if(cellCli) {
+                        const cli = cellCli.innerText.trim();
+                        if(cli && cli !== '-') clients.add(cli);
+                    }
+                }
+            });
+            const fmt = (n) => n.toLocaleString('pt-BR');
+            this.setSafeText('statLotes', fmt(vis));
+            this.setSafeText('statClientes', fmt(clients.size));
+            this.setSafeText('statSaldo', fmt(sumSaldo));
+            this.setSafeText('statEmpenhado', fmt(sumEmp));
+        },
 
-    closeAllPopups();
-
-    // 1. Obter valores únicos INTELIGENTES (Adaptive)
-    // Devemos pegar valores das linhas que passariam por TODOS os filtros, EXCETO o desta coluna
-    const uniqueValues = getAdaptiveUniqueValues(colIndex);
-    
-    // 2. Estado atual da seleção
-    const currentSelection = AppState.columnFilters[colIndex] || [];
-    
-    // 3. Construir HTML
-    let listHTML = '';
-    uniqueValues.forEach(val => {
-        // Se seleção vazia, tudo marcado. Senão, checar se está na lista.
-        const isChecked = (currentSelection.length === 0 || currentSelection.includes(val)) ? 'checked' : '';
-        const displayVal = val === '' ? '(Vazio)' : val;
-        
-        listHTML += `
-            <label class="excel-option">
-                <input type="checkbox" class="filter-chk" value="${val}" ${isChecked}>
-                <span>${displayVal}</span>
-            </label>
-        `;
-    });
-
-    if(uniqueValues.length === 0) {
-        listHTML = '<div class="p-2 text-muted small text-center">Sem dados disponíveis</div>';
-    }
-
-    const popup = document.createElement('div');
-    popup.className = 'excel-popup';
-    popup.setAttribute('data-col', colIndex);
-    popup.innerHTML = `
-        <div class="excel-popup-header">
-            <input type="text" class="excel-search" placeholder="Buscar..." onkeyup="filterPopupList(this)">
-            <div class="popup-actions">
-                <span class="link-action" onclick="setPopupChecks(this, true)">Todos</span>
-                <span class="text-muted mx-1">|</span>
-                <span class="link-action" onclick="setPopupChecks(this, false)">Nenhum</span>
-            </div>
-        </div>
-        <div class="excel-list">
-            ${listHTML}
-        </div>
-        <div class="excel-footer">
-            <button class="excel-btn btn-clear" onclick="clearColumnFilter(${colIndex})">Limpar</button>
-            <button class="excel-btn btn-apply" onclick="confirmPopupFilter(${colIndex})">Aplicar</button>
-        </div>
-    `;
-
-    document.querySelector('.table-container').appendChild(popup);
-
-    // 4. Posicionamento
-    const rect = th.getBoundingClientRect();
-    const containerRect = document.querySelector('.table-container').getBoundingClientRect();
-    
-    popup.style.top = (rect.bottom - containerRect.top) + 'px';
-    
-    // Evitar que saia pela direita
-    let leftPos = rect.left - containerRect.left;
-    if(leftPos + 280 > containerRect.width) {
-        leftPos = (rect.right - containerRect.left) - 280;
-    }
-    popup.style.left = leftPos + 'px';
-}
-
-function getAdaptiveUniqueValues(targetColIndex) {
-    const values = new Set();
-    const rows = document.querySelectorAll('#tableBody tr');
-
-    rows.forEach(row => {
-        // Verifica se a linha passa pelo filtro de Card
-        let passesCard = true;
-        if (AppState.activeCardFilter) {
-            const raw = row.children[16].getAttribute('data-raw-rascunhos') || '';
-            if (!raw.includes(AppState.activeCardFilter + '|')) passesCard = false;
-        }
-
-        if (!passesCard) return; // Pula linha
-
-        // Verifica filtros das OUTRAS colunas
-        let passesOtherCols = true;
-        for (const [colIndex, filterVals] of Object.entries(AppState.columnFilters)) {
-            if (parseInt(colIndex) === targetColIndex) continue; // Ignora a própria coluna
+        // --- MODALS (Onde o erro ocorria) ---
+        // Agora usamos this.setSafeText para garantir que não exploda
+        openModalIndividual(id, lote, saldoDisp) {
+            console.log('Open Modal Ind:', id, lote, saldoDisp);
+            this.setSafeVal('ind_lote_id', id);
+            this.setSafeText('ind_lote_nome', lote);
             
-            if (!checkRowAgainstFilter(row, parseInt(colIndex), filterVals)) {
-                passesOtherCols = false;
-                break;
+            // Verificação extra para saldo
+            const dispTexto = saldoDisp ? saldoDisp.toLocaleString('pt-BR') : '0';
+            this.setSafeText('ind_lote_disp', dispTexto);
+            
+            const inputQtd = document.getElementById('ind_qtd');
+            if(inputQtd) {
+                inputQtd.value = '';
+                inputQtd.max = saldoDisp;
+                inputQtd.placeholder = 'Máx: ' + dispTexto;
             }
-        }
-
-        if (passesOtherCols) {
-            // Se a linha é válida para exibição neste contexto, captura o valor
-            if (targetColIndex === 16) {
-                // Rascunhos: Splitar valores
-                const raw = row.children[16].getAttribute('data-raw-rascunhos') || '';
-                raw.split('|').forEach(v => {
-                    if(v) values.add(v);
-                });
+            
+            // Abre Modal com Bootstrap
+            const elModal = document.getElementById('modalIndividual');
+            if(elModal) {
+                const modal = new bootstrap.Modal(elModal);
+                modal.show();
+                setTimeout(() => { if(inputQtd) inputQtd.focus(); }, 500);
             } else {
-                values.add(row.children[targetColIndex].textContent.trim());
+                console.error('ERRO CRÍTICO: modalIndividual não encontrado no DOM');
+            }
+        },
+
+        openModalMass(acao, idCard, nomeCard) {
+            console.log('Open Modal Mass:', acao, idCard);
+            this.setSafeVal('acao_tipo', acao);
+            this.setSafeVal('mass_empenho_id', idCard);
+            this.setSafeText('mass_card_name', nomeCard);
+            
+            const header = document.getElementById('headerMassa');
+            const title = document.getElementById('titleMassa');
+            const blkTrans = document.getElementById('blockTransfer');
+            const blkExped = document.getElementById('blockExped');
+            const btn = document.getElementById('btnConfirmMass');
+            
+            // Reseta requires
+            document.querySelectorAll('#modalMassa input').forEach(i => i.required = false);
+
+            if(header && title && blkTrans && blkExped && btn) {
+                if (acao === 'transferir') {
+                    header.className = 'modal-header bg-warning text-dark';
+                    title.innerHTML = '<i class="fas fa-exchange-alt me-2"></i>Transferência em Massa';
+                    blkTrans.classList.remove('d-none');
+                    blkExped.classList.add('d-none');
+                    
+                    const inpEnd = blkTrans.querySelector('input[name="novo_endereco"]');
+                    if(inpEnd) inpEnd.required = true;
+                    btn.className = 'btn btn-warning fw-bold px-4';
+                } else { 
+                    header.className = 'modal-header bg-danger text-white';
+                    title.innerHTML = '<i class="fas fa-truck me-2"></i>Faturamento / Expedição';
+                    blkTrans.classList.add('d-none');
+                    blkExped.classList.remove('d-none');
+                    
+                    const inpCarga = blkExped.querySelector('input[name="numero_carga"]');
+                    if(inpCarga) inpCarga.required = true;
+                    btn.className = 'btn btn-danger fw-bold px-4';
+                }
+            }
+            
+            const elModal = document.getElementById('modalMassa');
+            if(elModal) {
+                const modal = new bootstrap.Modal(elModal);
+                modal.show();
             }
         }
-    });
+    };
 
-    // Ordenação
-    return Array.from(values).sort((a, b) => {
-        // Tenta ordenar numérico
-        const na = parseFloat(a.replace(/\./g, '').replace(',', '.'));
-        const nb = parseFloat(b.replace(/\./g, '').replace(',', '.'));
-        if(!isNaN(na) && !isNaN(nb)) return na - nb;
-        return a.localeCompare(b);
-    });
-}
-
-function filterPopupList(input) {
-    const term = input.value.toLowerCase();
-    const items = input.closest('.excel-popup').querySelectorAll('.excel-option');
-    items.forEach(item => {
-        const txt = item.querySelector('span').textContent.toLowerCase();
-        item.style.display = txt.includes(term) ? 'flex' : 'none';
-    });
-}
-
-function setPopupChecks(btn, checked) {
-    const popup = btn.closest('.excel-popup');
-    const items = popup.querySelectorAll('.excel-option');
-    items.forEach(item => {
-        if(item.style.display !== 'none') {
-            item.querySelector('input').checked = checked;
-        }
-    });
-}
-
-function confirmPopupFilter(colIndex) {
-    const popup = document.querySelector(`.excel-popup[data-col="${colIndex}"]`);
-    if(!popup) return;
-
-    const checkboxes = popup.querySelectorAll('.filter-chk');
-    const checked = [];
-    let totalVisible = 0;
-
-    checkboxes.forEach(chk => {
-        // Considera apenas o que está marcado E visível (caso haja busca)
-        // Mas a lógica Excel padrão pega tudo marcado. Vamos pegar tudo marcado.
-        if(chk.checked) checked.push(chk.value);
-        totalVisible++;
-    });
-
-    if (checked.length === 0) {
-        // Nada selecionado = Filtro que esconde tudo
-        AppState.columnFilters[colIndex] = ['__NONE__']; 
-    } else if (checked.length === totalVisible) {
-        // Tudo selecionado = Remove filtro
-        delete AppState.columnFilters[colIndex];
-    } else {
-        AppState.columnFilters[colIndex] = checked;
-    }
-
-    closeAllPopups();
-    applyAllFilters();
-}
-
-function clearColumnFilter(colIndex) {
-    delete AppState.columnFilters[colIndex];
-    closeAllPopups();
-    applyAllFilters();
-}
-
-function closeAllPopups() {
-    document.querySelectorAll('.excel-popup').forEach(p => p.remove());
-}
-
-function updateHeaderIcons() {
-    // Limpa icons antigos
-    document.querySelectorAll('.badge-filter-count').forEach(e => e.remove());
-    document.querySelectorAll('th').forEach(th => th.classList.remove('filter-active'));
-
-    // Adiciona novos
-    Object.entries(AppState.columnFilters).forEach(([colIndex, vals]) => {
-        if (vals.includes('__NONE__') || vals.length > 0) {
-            const th = document.querySelectorAll('#mainTable thead th')[colIndex];
-            if(th) {
-                th.classList.add('filter-active');
-                const badge = document.createElement('span');
-                badge.className = 'badge-filter-count';
-                badge.textContent = vals.includes('__NONE__') ? 0 : vals.length;
-                th.appendChild(badge);
-            }
-        }
-    });
-}
-
-/**
- * ESTATÍSTICAS
- */
-function calculateStats() {
-    let count = 0;
-    let sumSaldo = 0;
-    let sumEmp = 0;
-    let clientes = new Set();
-
-    const rows = document.querySelectorAll('#tableBody tr');
-    rows.forEach(row => {
-        if (row.style.display !== 'none') {
-            count++;
-
-            sumSaldo += parsePtBrFloat(row.children[15].textContent);
-            sumEmp += parsePtBrFloat(row.children[14].textContent);
-
-            // Coluna Cliente = índice 8
-            const cliente = row.children[8].textContent.trim();
-            if (cliente && cliente !== '-') {
-                clientes.add(cliente);
-            }
-        }
-    });
-
-    document.getElementById('statLotes').textContent = count.toLocaleString('pt-BR');
-    document.getElementById('statSaldo').textContent = sumSaldo.toLocaleString('pt-BR');
-    document.getElementById('statEmpenhado').textContent = sumEmp.toLocaleString('pt-BR');
-    document.getElementById('statClientes').textContent = clientes.size.toLocaleString('pt-BR');
-}
-
-
-function parsePtBrFloat(str) {
-    if(!str) return 0;
-    // Remove pontos de milhar, troca vírgula por ponto
-    const clean = str.replace(/\./g, '').replace(',', '.');
-    const val = parseFloat(clean);
-    return isNaN(val) ? 0 : val;
-}
+    // Garante que Sistema está globalmente disponível antes do clique
+    window.Sistema = Sistema;
+    
+    // Inicia ao carregar
+    document.addEventListener('DOMContentLoaded', () => window.Sistema.init());
 </script>
 {% endblock %}

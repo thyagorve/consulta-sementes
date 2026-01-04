@@ -2070,6 +2070,7 @@ def gestao_estoque(request):
 
 @login_required
 def registrar_saida(request, id):
+    print("veia aqui1 na função registrar_saida")
     item = get_object_or_404(Estoque, id=id)
     if request.method == 'POST':
         try:
@@ -2438,6 +2439,7 @@ def nova_entrada(request):
 
 @login_required
 def nova_saida(request):
+    print("veio aqui na função  nova_saida")
     """Registra uma nova saída geral (para qualquer lote)"""
     if request.method == 'POST':
         try:
@@ -3211,79 +3213,147 @@ def api_ultimas_movimentacoes(request):
         'movimentacoes': data
     })
     
-    
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import transaction, models
+from django.db.models import Q
+
+from .models import (
+    Estoque,
+    Empenho,
+    ItemEmpenho,
+    EmpenhoStatus,
+    HistoricoMovimentacao
+)
+
+
 @login_required
 def pagina_rascunho(request):
     user = request.user
-    MARCA_ORIGEM = "[BATCH-RASCUNHO]"
+    MARCA_ORIGEM = "[REP]"
 
-    # =========================
-    # POST (ações já existentes)
-    # =========================
+    # =====================================================
+    # POST (AÇÕES)
+    # =====================================================
     if request.method == 'POST':
 
+        # -------------------------
+        # EXCLUIR CARD
+        # -------------------------
         if 'excluir_card' in request.POST:
             Empenho.objects.filter(
                 id=request.POST.get('empenho_id'),
                 usuario=user
             ).delete()
-            messages.success(request, "Card excluído.")
+            messages.success(request, "Card excluído com sucesso.")
+            return redirect('sapp:pagina_rascunho')
 
-        elif 'excluir_item' in request.POST:
+        # -------------------------
+        # EXCLUIR ITEM DO CARD
+        # -------------------------
+        if 'excluir_item' in request.POST:
             ItemEmpenho.objects.filter(
                 id=request.POST.get('item_id'),
                 empenho__usuario=user
             ).delete()
-            messages.success(request, "Item removido.")
+            messages.success(request, "Item removido do rascunho.")
+            return redirect('sapp:pagina_rascunho')
 
-        elif 'empenhar_lote' in request.POST:
+        # -------------------------
+        # ADICIONAR AO RASCUNHO
+        # -------------------------
+        if 'empenhar_lote' in request.POST:
             lote_id = request.POST.get('lote_id')
             qtd = int(request.POST.get('quantidade', 0))
             nome_card = request.POST.get('nome_empenho', '').strip().upper()
 
-            lote_obj = get_object_or_404(Estoque, id=lote_id)
+            lote = get_object_or_404(Estoque, id=lote_id)
 
-            status_obj, _ = EmpenhoStatus.objects.get_or_create(
-                id=1,
-                defaults={'nome': 'Rascunho'}
+            if qtd <= 0:
+                messages.error(request, "Quantidade inválida.")
+                return redirect('sapp:pagina_rascunho')
+
+            ja_empenhado = (
+                ItemEmpenho.objects
+                .filter(empenho__usuario=user, estoque=lote)
+                .aggregate(total=models.Sum('quantidade'))['total'] or 0
+            )
+
+            if ja_empenhado + qtd > lote.saldo:
+                messages.error(
+                    request,
+                    f"Saldo insuficiente. Disponível: {lote.saldo}. "
+                    f"Já empenhado: {ja_empenhado}."
+                )
+                return redirect('sapp:pagina_rascunho')
+
+            status, _ = EmpenhoStatus.objects.get_or_create(
+                id=1, defaults={'nome': 'Rascunho'}
             )
 
             empenho, _ = Empenho.objects.get_or_create(
                 usuario=user,
                 observacao=nome_card,
-                status=status_obj
+                status=status
             )
 
-            item_emp, created = ItemEmpenho.objects.get_or_create(
+            item, _ = ItemEmpenho.objects.get_or_create(
                 empenho=empenho,
-                estoque=lote_obj,
-                defaults={'quantidade': qtd}
+                estoque=lote,
+                defaults={'quantidade': 0}
             )
 
-            if not created:
-                item_emp.quantidade += qtd
-                item_emp.save()
+            item.quantidade += qtd
+            item.save()
 
-            messages.success(request, "Adicionado ao rascunho!")
+            messages.success(request, "Lote adicionado ao rascunho.")
+            return redirect('sapp:pagina_rascunho')
 
-        elif request.POST.get('origem_acao') == 'cards':
+        # -------------------------
+        # TRANSFERIR / EXPEDIR EM MASSA
+        # -------------------------
+        if request.POST.get('origem_acao') == 'cards':
             acao = request.POST.get('acao_tipo')
             empenho_id = request.POST.get('empenho_id')
             obs_global = request.POST.get('obs_global', '').strip()
 
             try:
                 with transaction.atomic():
+
                     empenho = get_object_or_404(
                         Empenho, id=empenho_id, usuario=user
                     )
 
-                    for item_rascunho in empenho.itens.all():
-                        origem = item_rascunho.estoque
-                        qtd = item_rascunho.quantidade
+                    # 🔒 BLOQUEIO DE CONCORRÊNCIA + VALIDAÇÃO FINAL
+                    itens = (
+                        empenho.itens
+                        .select_related('estoque')
+                        .select_for_update()
+                    )
 
+                    for item in itens:
+                        item.estoque.refresh_from_db()
+                        if item.quantidade > item.estoque.saldo:
+                            raise Exception(
+                                f"Lote {item.estoque.lote} tem apenas "
+                                f"{item.estoque.saldo} disponível "
+                                f"(solicitado {item.quantidade})."
+                            )
+
+                    for item in itens:
+                        origem = item.estoque
+                        qtd = item.quantidade
+
+                        # =====================
+                        # TRANSFERÊNCIA
+                        # =====================
                         if acao == 'transferir':
-                            n_end = request.POST.get('novo_endereco', '').strip().upper()
-                            n_az = request.POST.get('az', '').strip().upper() or origem.az
+                            novo_end = request.POST.get('novo_endereco', '').strip().upper()
+                            novo_az = request.POST.get('az', '').strip().upper() or origem.az
+
+                            if not novo_end:
+                                raise Exception("Novo endereço não informado.")
 
                             destino = Estoque.objects.filter(
                                 lote=origem.lote,
@@ -3293,19 +3363,14 @@ def pagina_rascunho(request):
                                 categoria=origem.categoria,
                                 tratamento=origem.tratamento,
                                 especie=origem.especie,
-                                endereco=n_end,
-                                az=n_az,
+                                endereco=novo_end,
+                                az=novo_az,
                                 empresa=origem.empresa,
                                 embalagem=origem.embalagem
                             ).first()
 
                             if destino:
                                 destino.entrada += qtd
-                                if obs_global:
-                                    destino.observacao = (
-                                        f"{destino.observacao or ''}\n"
-                                        f"{MARCA_ORIGEM} {obs_global}"
-                                    ).strip()
                                 destino.save()
                             else:
                                 destino = Estoque.objects.create(
@@ -3316,8 +3381,8 @@ def pagina_rascunho(request):
                                     categoria=origem.categoria,
                                     tratamento=origem.tratamento,
                                     especie=origem.especie,
-                                    endereco=n_end,
-                                    az=n_az,
+                                    endereco=novo_end,
+                                    az=novo_az,
                                     entrada=qtd,
                                     peso_unitario=origem.peso_unitario,
                                     embalagem=origem.embalagem,
@@ -3329,107 +3394,94 @@ def pagina_rascunho(request):
 
                             origem.saida += qtd
                             origem.save()
-
                             HistoricoMovimentacao.objects.create(
                                 estoque=origem,
                                 usuario=user,
+                                quantidade=qtd,  # <--- ADICIONADO
                                 tipo='Transferência (Saída)',
-                                descricao=f"{MARCA_ORIGEM} Transferido {qtd} un."
+                                descricao=f"{MARCA_ORIGEM} Transferido {qtd} un para {novo_end}."
                             )
 
                             HistoricoMovimentacao.objects.create(
                                 estoque=destino,
                                 usuario=user,
+                                quantidade=qtd,  # <--- ADICIONADO
                                 tipo='Transferência (Entrada)',
-                                descricao=f"{MARCA_ORIGEM} Recebido {qtd} un."
+                                descricao=f"{MARCA_ORIGEM} Recebido {qtd} un de {origem.endereco}."
                             )
 
+                            # 2. EXPEDIÇÃO (Correção: adicionar quantidade=qtd)
                         elif acao == 'expedir':
-                            origem.saida += qtd
-                            origem.save()
+                                origem.saida += qtd
+                                origem.save()
+
+                                HistoricoMovimentacao.objects.create(
+                                    estoque=origem,
+                                    usuario=user,
+                                    quantidade=qtd,  # <--- ADICIONADO
+                                    tipo='Expedição',
+                                    descricao=f"{MARCA_ORIGEM} Expedido {qtd} un. {obs_global}",
+                                    numero_carga=request.POST.get('numero_carga'),
+                                    cliente=request.POST.get('cliente'),
+                                    placa=request.POST.get('placa')
+                                )
 
                     empenho.delete()
-                    messages.success(request, "Processamento em lote concluído!")
+                    messages.success(request, "Ação em lote realizada com sucesso.")
 
             except Exception as e:
-                messages.error(request, f"Erro: {str(e)}")
+                messages.error(request, f"Erro ao processar: {str(e)}")
 
-        return redirect('sapp:pagina_rascunho')
+            return redirect('sapp:pagina_rascunho')
 
-    # =========================
-    # GET — BASE DE DADOS
-    # =========================
+    # =====================================================
+    # GET (DADOS)
+    # =====================================================
+    ids_rascunhos = ItemEmpenho.objects.filter(
+        empenho__usuario=user
+    ).values_list('estoque_id', flat=True)
 
     estoque_qs = (
         Estoque.objects
-        .filter(saldo__gt=0)
-        .select_related(
-            'cultivar',
-            'peneira',
-            'categoria',
-            'tratamento',
-            'especie'
-        )
+        .filter(Q(saldo__gt=0) | Q(id__in=ids_rascunhos))
+        .select_related('cultivar', 'peneira', 'categoria', 'tratamento', 'especie')
+        .order_by('lote', 'endereco')
     )
 
-    # 🔹 AQUI ENTRAM SEUS FILTROS (exemplo)
-    cultivar_id = request.GET.get('cultivar')
-    if cultivar_id:
-        estoque_qs = estoque_qs.filter(cultivar_id=cultivar_id)
-
-    categoria_id = request.GET.get('categoria')
-    if categoria_id:
-        estoque_qs = estoque_qs.filter(categoria_id=categoria_id)
-
-    peneira_id = request.GET.get('peneira')
-    if peneira_id:
-        estoque_qs = estoque_qs.filter(peneira_id=peneira_id)
-
-    busca = request.GET.get('busca')
-    if busca:
-        estoque_qs = estoque_qs.filter(
-            Q(lote__icontains=busca) |
-            Q(endereco__icontains=busca) |
-            Q(cliente__icontains=busca)
-        )
-
-    # =========================
-    # 🔥 CARD CLIENTES ÚNICOS (FILTRADO)
-    # =========================
-    clientes_unicos = (
-        estoque_qs
-        .exclude(cliente__isnull=True)
-        .values('cliente')
-        .distinct()
-        .count()
+    todos_itens = (
+        ItemEmpenho.objects
+        .filter(empenho__usuario=user)
+        .select_related('empenho')
     )
 
-    # =========================
-    # LÓGICA DE EMPENHO (INALTERADA)
-    # =========================
     lotes_contexto = []
-    empenhos_sessao = ItemEmpenho.objects.filter(empenho__usuario=user)
 
-    for item in estoque_qs:
-        meus_itens = empenhos_sessao.filter(estoque=item)
-        qtd_emp = sum(i.quantidade for i in meus_itens)
+    for lote in estoque_qs:
+        itens = [i for i in todos_itens if i.estoque_id == lote.id]
+        empenhado = sum(i.quantidade for i in itens)
+
+        for i in itens:
+            i.inconsistente = i.quantidade > lote.saldo
 
         lotes_contexto.append({
-            'lote': item,
-            'empenhado': qtd_emp,
-            'disponivel': item.saldo - qtd_emp,
-            'itens_empenho': meus_itens
+            'lote': lote,
+            'empenhado': empenhado,
+            'disponivel': lote.saldo - empenhado,
+            'itens_empenho': itens,
+            'tem_inconsistencia': any(i.inconsistente for i in itens)
         })
 
-    # =========================
-    # CONTEXTO FINAL
-    # =========================
+    cards = (
+        Empenho.objects
+        .filter(usuario=user, status__id=1)
+        .prefetch_related('itens', 'itens__estoque')
+    )
+
     return render(request, 'sapp/pagina_rascunho.html', {
         'lotes': lotes_contexto,
-        'cards': Empenho.objects.filter(usuario=user, status__id=1).prefetch_related('itens'),
-        'clientes_unicos': clientes_unicos,
-        'busca': busca,
+        'cards': cards,
     })
+
 
 @login_required
 def api_buscar_dados_lote(request):
