@@ -2070,80 +2070,156 @@ def gestao_estoque(request):
 
 @login_required
 def registrar_saida(request, id):
-    print("veia aqui1 na função registrar_saida")
+    print("🔍 [REGISTRAR SAÍDA] Iniciando processamento da expedição")
+    
     item = get_object_or_404(Estoque, id=id)
+    
     if request.method == 'POST':
         try:
             with transaction.atomic():
                 # 1. Captura de Dados
                 qtd = int(request.POST.get('quantidade_saida', 0))
-                carga = request.POST.get('numero_carga')
-                motorista = request.POST.get('motorista')
-                placa = request.POST.get('placa')
-                cliente = request.POST.get('cliente')
-                ordem = request.POST.get('ordem_entrega')
-                obs = request.POST.get('observacao')
+                carga = request.POST.get('numero_carga', '')
+                motorista = request.POST.get('motorista', '')
+                placa = request.POST.get('placa', '')
+                cliente = request.POST.get('cliente', '')
+                obs = request.POST.get('observacao', '')
                 fotos = request.FILES.getlist('fotos')
 
-                # 2. Validação Rigorosa (Obrigatoriedade)
-                erros = []
-                if qtd <= 0: erros.append("Quantidade inválida.")
-                if qtd > item.saldo: erros.append("Saldo insuficiente.")
-                if not motorista: erros.append("Motorista é obrigatório.")
-                if not placa: erros.append("Placa é obrigatória.")
-                if not carga: erros.append("Número da Carga é obrigatório.")
-                if not fotos: erros.append("Pelo menos uma foto é obrigatória na expedição.")
+                print(f"📦 Dados recebidos:")
+                print(f"   Quantidade: {qtd}")
+                print(f"   Carga: {carga}")
+                print(f"   Motorista: {motorista}")
+                print(f"   Placa: {placa}")
+                print(f"   Cliente: {cliente}")
+                print(f"   Obs: {obs}")
+                print(f"   Fotos recebidas: {len(fotos)}")
 
+                # 2. Validação Rigorosa
+                erros = []
+                if qtd <= 0: 
+                    erros.append("❌ Quantidade inválida.")
+                if qtd > item.saldo: 
+                    erros.append(f"❌ Saldo insuficiente. Disponível: {item.saldo}.")
+                if not motorista.strip(): 
+                    erros.append("❌ Motorista é obrigatório.")
+                if not placa.strip(): 
+                    erros.append("❌ Placa é obrigatória.")
+                if not carga.strip(): 
+                    erros.append("❌ Número da Carga é obrigatório.")
+                
+                # Fotos são obrigatórias para expedição
+                if len(fotos) == 0:
+                    erros.append("❌ Pelo menos uma foto é obrigatória na expedição.")
+                
                 if erros:
-                    for e in erros: messages.error(request, f"❌ {e}")
+                    for e in erros: 
+                        print(f"⚠️ {e}")
+                        messages.error(request, e)
                     return redirect('sapp:lista_estoque')
 
-                # 3. Processamento
+                # 3. Salvar estado anterior para histórico
                 saldo_anterior = item.saldo
+                print(f"💰 Saldo anterior: {saldo_anterior}")
+
+                # 4. Processamento da Saída
                 item.saida += qtd
                 item.saldo = item.entrada - item.saida
                 item.conferente = request.user
+                item.data_ultima_saida = timezone.now()
+                
+                # Atualizar peso total
+                if item.peso_unitario and item.peso_unitario > 0:
+                    item.peso_total = Decimal(str(item.saldo)) * Decimal(str(item.peso_unitario))
+                    item.peso_total = item.peso_total.quantize(Decimal('0.01'))
+                
+                # Atualizar observação
+                obs_historico = f"[EXPEDIÇÃO {timezone.now().strftime('%d/%m/%Y %H:%M')}] Carga: {carga}, Motorista: {motorista}"
+                if obs:
+                    obs_historico += f" | Obs: {obs}"
+                
+                if item.observacao:
+                    item.observacao += f"\n\n{obs_historico}"
+                else:
+                    item.observacao = obs_historico
+                
                 item.save()
+                print(f"✅ Item atualizado: {item.lote} | Saldo anterior: {saldo_anterior} → Novo saldo: {item.saldo}")
 
-                # 4. Descrição Rica em HTML para o Histórico
+                # 5. Descrição Rica em HTML para o Histórico
                 desc_html = f"""
                     <div class="d-flex flex-column gap-1">
                         <div class="d-flex justify-content-between border-bottom pb-1">
-                            <span><strong>Qtd:</strong> <span class="text-danger">-{qtd}</span></span>
+                            <span><strong>Qtd Expedida:</strong> <span class="text-danger">-{qtd}</span></span>
                             <span><strong>Saldo Restante:</strong> {item.saldo}</span>
                         </div>
                         <div class="small text-muted mt-1">
                             <i class="fas fa-truck"></i> <strong>Carga:</strong> {carga} | <strong>Placa:</strong> {placa}<br>
                             <i class="fas fa-id-card"></i> <strong>Motorista:</strong> {motorista}<br>
                             <i class="fas fa-building"></i> <strong>Cliente:</strong> {cliente or 'N/A'}<br>
-                            <i class="fas fa-clipboard-list"></i> <strong>Ordem:</strong> {ordem or 'N/A'}
+                            <i class="fas fa-user"></i> <strong>Responsável:</strong> {request.user.get_full_name() or request.user.username}<br>
+                            <i class="fas fa-clock"></i> <strong>Data/Hora:</strong> {timezone.now().strftime('%d/%m/%Y %H:%M')}
                         </div>
-                        {f'<div class="mt-1 p-1 bg-light rounded small">Obs: {obs}</div>' if obs else ''}
+                        {f'<div class="mt-1 p-1 bg-light rounded small"><strong>Obs:</strong> {obs}</div>' if obs else ''}
                     </div>
                 """
 
+                print(f"📝 Criando histórico de movimentação...")
+
+                # 6. Criar histórico de movimentação
                 historico = HistoricoMovimentacao.objects.create(
                     estoque=item,
                     usuario=request.user,
                     tipo='Expedição',
                     descricao=desc_html,
+                    quantidade=qtd,
                     numero_carga=carga,
                     motorista=motorista,
                     placa=placa,
-                    cliente=cliente,
-                    ordem_entrega=ordem
+                    cliente=cliente
                 )
 
-                # 5. Salvar Fotos
-                for f in fotos:
-                    FotoMovimentacao.objects.create(historico=historico, arquivo=f)
+                print(f"✅ Histórico criado: ID {historico.id}")
 
-                messages.success(request, f"✅ Expedição da Carga {carga} registrada com sucesso!")
+                # 7. **CORREÇÃO CRÍTICA: Salvar Fotos**
+                fotos_salvas = 0
+                for foto in fotos:
+                    try:
+                        # CORREÇÃO AQUI: Use o objeto 'historico' diretamente
+                        FotoMovimentacao.objects.create(
+                            historico=historico,  # Usando o objeto já salvo
+                            arquivo=foto,
+                            legenda=f"Expedição {carga} - {item.lote} - {timezone.now().strftime('%d/%m/%Y')}"
+                        )
+                        fotos_salvas += 1
+                        print(f"📸 Foto salva: {foto.name} (ID: {historico.id})")
+                    except Exception as foto_error:
+                        print(f"⚠️ Erro ao salvar foto {foto.name}: {foto_error}")
+                        # Não falha a operação por causa de uma foto
+
+                print(f"✅ Fotos salvas: {fotos_salvas}/{len(fotos)}")
+
+                # 8. Mensagem de sucesso
+                mensagem_sucesso = f"✅ Expedição da Carga {carga} registrada com sucesso!"
+                if fotos_salvas < len(fotos):
+                    mensagem_sucesso += f" ({fotos_salvas}/{len(fotos)} fotos salvas)"
+                
+                messages.success(request, mensagem_sucesso)
+                print(f"🎉 Expedição concluída com sucesso!")
+                
+                # 9. DEBUG: Verificar se fotos foram realmente salvas
+                fotos_salvas_query = FotoMovimentacao.objects.filter(historico=historico).count()
+                print(f"🔍 DEBUG - Fotos no banco para histórico {historico.id}: {fotos_salvas_query}")
 
         except Exception as e:
-            messages.error(request, f"Erro crítico: {e}")
+            import traceback
+            print(f"💥 ERRO CRÍTICO NA EXPEDIÇÃO:")
+            print(f"   Mensagem: {str(e)}")
+            print(f"   Traceback: {traceback.format_exc()}")
+            messages.error(request, f"❌ Erro crítico ao registrar expedição: {str(e)}")
             
     return redirect('sapp:lista_estoque')
+
 
 @login_required
 def transferir(request, id):

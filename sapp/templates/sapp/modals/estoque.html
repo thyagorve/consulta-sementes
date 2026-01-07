@@ -1,0 +1,344 @@
+<!-- === MODAL NOVA ENTRADA === -->
+<div class="modal fade" id="modalNovaEntrada" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Nova Entrada</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'sapp:nova_entrada' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6 position-relative">
+                            <label class="form-label fw-bold text-primary">Número do Lote *</label>
+                            <input type="text" name="lote" id="inputLoteEntrada" class="form-control form-control-lg border-primary" autocomplete="off" required placeholder="Digite para buscar...">
+                            <ul id="listaSugestoesLote" class="suggestions-list" style="display:none;"></ul>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-primary">Quantidade *</label>
+                            <input type="number" name="entrada" class="form-control form-control-lg border-primary" required min="1">
+                        </div>
+
+                        <!-- SELECTS COM BUSCA (SELECT2) -->
+                        <div class="col-md-6"><label>Cultivar *</label><select name="cultivar" class="form-control select2-modal" required><option value="">Selecione...</option>{% for c in all_cultivares %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Espécie *</label><select name="especie" class="form-control select2-modal"><option value="">Selecione...</option>{% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Peneira *</label><select name="peneira" class="form-control select2-modal" required><option value="">Selecione...</option>{% for p in all_peneiras %}<option value="{{ p.id }}">{{ p.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Categoria *</label><select name="categoria" class="form-control select2-modal" required><option value="">Selecione...</option>{% for c in all_categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}</select></div>
+                        <div class="col-md-6"><label>Tratamento</label><select name="tratamento" class="form-control select2-modal"><option value="">Nenhum</option>{% for t in all_tratamentos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}</select></div>
+
+                        <div class="col-md-6"><label>Endereço *</label><input type="text" name="endereco" class="form-control" required></div>
+                        <div class="col-md-6"><label>Embalagem</label><select name="embalagem" class="form-control select2-modal"><option value="BAG">Big Bag</option><option value="SC">Saco</option></select></div>
+                        
+                        <div class="col-md-6"><label>Produto</label><input type="text" name="produto" class="form-control"></div>
+                        <div class="col-md-6"><label>Cliente</label><input type="text" name="cliente" class="form-control"></div>
+                        <div class="col-md-4"><label>Peso Unit. (kg)</label><input type="text" name="peso_unitario" class="form-control"></div>
+                        <div class="col-md-4"><label>Armazém (AZ)</label><input type="text" name="az" class="form-control"></div>
+                        <div class="col-md-4"><label>Empresa</label><input type="text" name="empresa" class="form-control"></div>
+                        
+                        <div class="col-12"><label>Origem/Destino</label><input type="text" name="origem_destino" class="form-control"></div>
+                        <div class="col-12"><label>Fotos</label><input type="file" name="fotos" class="form-control" multiple accept="image/*"></div>
+                        <div class="col-12"><label>Obs</label><textarea name="observacao" class="form-control" rows="2"></textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Entrada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- === MODAL TRANSFERÊNCIA === -->
+<div class="modal fade" id="modalTransferencia" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title"><i class="fas fa-exchange-alt me-2"></i>Transferir e Ajustar</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="formTransferencia" method="POST" action="{% url 'sapp:transferir' 0 %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="item_id" id="transf_item_id">
+                <div class="modal-body">
+                    <!-- SALDO DESTAQUE -->
+                    <div class="text-center py-2 bg-light rounded border mb-3">
+                        <small class="text-muted text-uppercase fw-bold">Saldo Atual</small>
+                        <div class="fs-2 fw-bold text-dark" id="transf_saldo_atual">0</div>
+                        <small class="text-muted" id="transf_endereco_atual">Endereço: </small>
+                    </div>
+
+                    <div class="row mb-3 p-3 bg-warning bg-opacity-10 rounded border border-warning">
+                        <div class="col-12 mb-2"><h6 class="text-warning fw-bold border-bottom border-warning pb-2">Destino da Transferência</h6></div>
+                        <div class="col-6 mb-2"><label class="fw-bold">Novo Endereço *</label><input type="text" name="novo_endereco" class="form-control border-warning" required></div>
+                        <div class="col-3 mb-2"><label class="fw-bold">Qtd *</label><input type="number" name="quantidade" id="transf_quantidade" class="form-control border-warning fw-bold" required min="1"></div>
+                        <div class="col-3 mb-2"><label>AZ</label><input type="text" name="az" id="transf_az" class="form-control"></div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <h6 class="text-muted border-bottom pb-1">
+                                <i class="fas fa-info-circle me-1"></i>Dados do Item (Editar se necessário)
+                                <small class="text-muted ms-2">Tudo abaixo já está preenchido com os dados atuais do lote</small>
+                            </h6>
+                        </div>
+                        
+                        <!-- Linha 1 -->
+                        <div class="col-3"><label>Lote</label><input type="text" class="form-control bg-light" id="transf_lote_display" readonly></div>
+                        <div class="col-9"><label>Produto</label><input type="text" name="produto" id="transf_produto" class="form-control"></div>
+                        
+                        <!-- Linha 2 -->
+                        <div class="col-4">
+                            <label>Espécie</label>
+                            <select name="especie" id="transf_especie" class="form-select">
+                                <option value="">Selecione...</option>
+                                {% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-4"><label>Cliente</label><input type="text" name="cliente" id="transf_cliente" class="form-control"></div>
+                        <div class="col-4"><label>Empresa</label><input type="text" name="empresa" id="transf_empresa" class="form-control"></div>
+                        
+                        <!-- Linha 3 -->
+                        <div class="col-3"><label>Peso Unitário</label><input type="text" name="peso_unitario" id="transf_peso" class="form-control"></div>
+                        <div class="col-3"><label>Embalagem</label>
+                            <select name="embalagem" id="transf_embalagem" class="form-select">
+                                <option value="BAG">BAG</option>
+                                <option value="SC">Saco</option>
+                                <option value="CX">Caixa</option>
+                                <option value="FD">Fardo</option>
+                                <option value="PL">Pallets</option>
+                            </select>
+                        </div>
+                        <div class="col-3"><label>Saldo</label><input type="text" id="transf_saldo" class="form-control bg-light" readonly></div>
+                        <div class="col-3"><label>Entrada</label><input type="text" id="transf_entrada" class="form-control bg-light" readonly></div>
+                        
+                        <div class="col-12 mt-2">
+                            <a class="text-primary text-decoration-none small fw-bold" data-bs-toggle="collapse" href="#advancedFields">
+                                <i class="fas fa-cog me-1"></i> Dados Técnicos (Cultivar, Peneira...)
+                            </a>
+                            <div class="collapse show mt-2" id="advancedFields">
+                                <div class="row g-2 bg-light p-3 rounded border">
+                                    <div class="col-6">
+                                        <label>Cultivar</label>
+                                        <select name="cultivar" id="transf_cultivar" class="form-select">
+                                            <option value="">Selecione...</option>
+                                            {% for c in all_cultivares %}
+                                            <option value="{{ c.id }}">{{ c.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Peneira</label>
+                                        <select name="peneira" id="transf_peneira" class="form-select">
+                                            <option value="">Selecione...</option>
+                                            {% for p in all_peneiras %}
+                                            <option value="{{ p.id }}">{{ p.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Categoria</label>
+                                        <select name="categoria" id="transf_categoria" class="form-select">
+                                            <option value="">Selecione...</option>
+                                            {% for c in all_categorias %}
+                                            <option value="{{ c.id }}">{{ c.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label>Tratamento</label>
+                                        <select name="tratamento" id="transf_tratamento" class="form-select">
+                                            <option value="">Nenhum</option>
+                                            {% for t in all_tratamentos %}
+                                            <option value="{{ t.id }}">{{ t.nome }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label>Observação</label>
+                        <textarea name="observacao" id="transf_obs" class="form-control" rows="2" placeholder="Adicione observações sobre a transferência..."></textarea>
+                    </div>
+                    
+                    <div class="mt-2">
+                        <label><i class="fas fa-camera me-1"></i> Fotos da Transferência</label>
+                        <input type="file" name="fotos" class="form-control" multiple accept="image/*">
+                        <small class="text-muted">Opcional: Adicione fotos do lote sendo transferido</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-white">
+                        <i class="fas fa-exchange-alt me-1"></i>Confirmar Transferência
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAIS DENTRO DO LOOP -->
+{% for item in estoque %}
+    <!-- 3. MODAL DE SAÍDA (EXPEDIÇÃO) -->
+    <div class="modal fade" id="modalSaida{{ item.id }}" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="fas fa-truck me-2"></i>Expedição - {{ item.lote }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{% url 'sapp:registrar_saida' item.id %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="modal-body">
+                        <div class="text-center py-3 bg-danger bg-opacity-10 rounded border border-danger mb-3">
+                            <small class="text-danger text-uppercase fw-bold">Saldo Disponível</small>
+                            <div class="fs-1 fw-bold text-danger">{{ item.saldo }}</div>
+                            <small class="text-muted">{{ item.embalagem }}</small>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6"><label class="fw-bold">Qtd Saída *</label><input type="number" name="quantidade_saida" class="form-control border-danger fw-bold" max="{{ item.saldo }}" min="1" required></div>
+                            <div class="col-6"><label>Nº Carga *</label><input type="text" name="numero_carga" class="form-control" required></div>
+                            <div class="col-6"><label>Motorista *</label><input type="text" name="motorista" class="form-control" required></div>
+                            <div class="col-6"><label>Placa *</label><input type="text" name="placa" class="form-control" required></div>
+                            <div class="col-12"><label>Cliente</label><input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}"></div>
+                            <div class="col-12"><label>Fotos (Obrigatório)</label><input type="file" name="fotos" class="form-control" multiple required></div>
+                            <div class="col-12"><label>Observação</label><textarea name="observacao" class="form-control" rows="2"></textarea></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-danger">Confirmar Saída</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. MODAL DE EDITAR (COMPLETO E TURBINADO) -->
+    <div class="modal fade" id="modalEditar{{ item.id }}" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Lote {{ item.lote }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{% url 'sapp:editar' item.id %}">
+                    {% csrf_token %}
+                    <div class="modal-body text-start">
+                        
+                        <!-- Seção 1: Dados Principais -->
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fas fa-box me-1"></i> Dados do Lote</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Número do Lote</label>
+                                <input type="text" name="lote" class="form-control bg-light" value="{{ item.lote }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Armazém (AZ)</label>
+                                <input type="text" name="az" class="form-control" value="{{ item.az|default:'' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold">Endereço</label>
+                                <input type="text" name="endereco" class="form-control border-primary" value="{{ item.endereco }}" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Espécie</label>
+                                <select name="especie" class="form-select select2-modal">
+                                    <option value="">Selecione...</option>
+                                    {% for e in all_especies %}
+                                    <option value="{{ e.id }}" {% if item.especie_id == e.id %}selected{% endif %}>{{ e.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Embalagem</label>
+                                <select name="embalagem" class="form-select">
+                                    <option value="BAG" {% if item.embalagem == 'BAG' %}selected{% endif %}>Big Bag</option>
+                                    <option value="SC" {% if item.embalagem == 'SC' %}selected{% endif %}>Saco</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Seção 2: Classificação -->
+                        <h6 class="fw-bold text-success border-bottom pb-2 mb-3"><i class="fas fa-leaf me-1"></i> Classificação Técnica</h6>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-3">
+                                <label class="form-label">Cultivar</label>
+                                <select name="cultivar" class="form-select select2-modal">
+                                    {% for c in all_cultivares %}
+                                    <option value="{{ c.id }}" {% if c.id == item.cultivar.id %}selected{% endif %}>{{ c.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Peneira</label>
+                                <select name="peneira" class="form-select select2-modal">
+                                    {% for p in all_peneiras %}
+                                    <option value="{{ p.id }}" {% if p.id == item.peneira.id %}selected{% endif %}>{{ p.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Categoria</label>
+                                <select name="categoria" class="form-select select2-modal">
+                                    {% for c in all_categorias %}
+                                    <option value="{{ c.id }}" {% if c.id == item.categoria.id %}selected{% endif %}>{{ c.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Tratamento</label>
+                                <select name="tratamento" class="form-select select2-modal">
+                                    <option value="">Sem Tratamento</option>
+                                    {% for t in all_tratamentos %}
+                                    <option value="{{ t.id }}" {% if t.id == item.tratamento.id %}selected{% endif %}>{{ t.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Seção 3: Logística e Info -->
+                        <h6 class="fw-bold text-info border-bottom pb-2 mb-3"><i class="fas fa-truck me-1"></i> Logística e Informações</h6>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Produto / Descrição</label>
+                                <input type="text" name="produto" class="form-control" value="{{ item.produto|default:'' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Cliente / Proprietário</label>
+                                <input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Empresa</label>
+                                <input type="text" name="empresa" class="form-control" value="{{ item.empresa|default:'' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Peso Unitário (kg)</label>
+                                <input type="text" name="peso_unitario" class="form-control" value="{{ item.peso_unitario }}">
+                            </div>
+                         
+                            <div class="col-md-3">
+                                <label class="form-label">Origem/Destino</label>
+                                <input type="text" name="origem_destino" class="form-control" value="{{ item.origem_destino|default:'' }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Observações</label>
+                                <textarea name="observacao" class="form-control" rows="2">{{ item.observacao|default:'' }}</textarea>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endfor %}
