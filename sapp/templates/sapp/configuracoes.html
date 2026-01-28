@@ -2,203 +2,655 @@
 {% load static %}
 
 {% block content %}
-<!-- Garante que os ícones carreguem -->
+<!-- Ícones Font-Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
-    /* --- Estilo Personalizado das Abas --- */
-    .nav-tabs { border-bottom: 2px solid #dee2e6; }
-    
-    .nav-tabs .nav-link {
-        color: #495057; background-color: #f8f9fa; margin-right: 4px;
-        border: 1px solid #dee2e6; border-bottom: none;
-        border-radius: 8px 8px 0 0; font-weight: 500; padding: 12px 20px;
-        transition: all 0.2s ease;
+    /* --- Variáveis de Design --- */
+    :root {
+        --primary-color: #198754;
+        --primary-dark: #146c43;
+        --primary-light: #d1e7dd;
+        --primary-gradient: linear-gradient(135deg, #198754 0%, #20c997 100%);
+        --secondary-gradient: linear-gradient(135deg, #20c997 0%, #198754 100%);
+        --soft-bg: #f8faf9;
+        --card-bg: #ffffff;
+        --card-shadow: 0 12px 40px rgba(25, 135, 84, 0.08);
+        --card-shadow-hover: 0 20px 50px rgba(25, 135, 84, 0.15);
+        --hover-shadow: 0 15px 35px rgba(25, 135, 84, 0.2);
+        --border-radius: 16px;
+        --border-radius-sm: 10px;
+        --text-main: #1a2a27;
+        --text-secondary: #2d4a3e;
+        --text-muted: #6c8379;
+        --border-color: #e2eae6;
+        --success-light: #d4edda;
+        --warning-light: #fff3cd;
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    
-    .nav-tabs .nav-link:hover { background-color: #e9ecef; transform: translateY(-2px); }
+
+    /* --- Reset e Base --- */
+    body {
+        background: linear-gradient(135deg, #f8faf9 0%, #edf7f1 100%);
+        color: var(--text-main);
+        font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        min-height: 100vh;
+        background-attachment: fixed;
+    }
+
+    .container-fluid {
+        padding: 0 1rem;
+    }
+
+    /* --- Container Principal --- */
+    .config-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+
+    /* --- Cabeçalho --- */
+    .header-section {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%);
+        padding: 2rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        margin-bottom: 2.5rem;
+        border-left: 8px solid var(--primary-color);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .header-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100px;
+        height: 100px;
+        background: linear-gradient(135deg, rgba(25, 135, 84, 0.05) 0%, transparent 100%);
+        border-radius: 0 0 0 100px;
+    }
+
+    .header-section .bg-success {
+        background: var(--primary-gradient) !important;
+        box-shadow: 0 10px 25px rgba(25, 135, 84, 0.3);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .header-section .bg-success::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
+        transform: rotate(45deg);
+        animation: shine 3s infinite;
+    }
+
+    @keyframes shine {
+        0% { transform: translateX(-100%) rotate(45deg); }
+        100% { transform: translateX(100%) rotate(45deg); }
+    }
+
+    .header-section .bg-success:hover {
+        transform: rotate(5deg) scale(1.05);
+        box-shadow: 0 15px 35px rgba(25, 135, 84, 0.4);
+    }
+
+    /* --- Sistema de Abas (Navegação) --- */
+    .nav-tabs-wrapper {
+        margin-bottom: -1px;
+        background: var(--card-bg);
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+        padding: 0.75rem 0.75rem 0;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.02);
+        position: relative;
+        z-index: 10;
+    }
+
+    .nav-tabs-wrapper::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
+    }
+
+    .nav-tabs {
+        border-bottom: none !important;
+        gap: 8px;
+        display: flex;
+        flex-wrap: nowrap;
+        padding-bottom: 2px;
+    }
+
+    .nav-tabs .nav-item {
+        margin-bottom: 0;
+        position: relative;
+    }
+
+    .nav-tabs .nav-link {
+        border: none !important;
+        background: linear-gradient(135deg, #f8faf9 0%, #edf2f7 100%) !important;
+        color: var(--text-secondary) !important;
+        font-weight: 600;
+        padding: 16px 28px;
+        border-radius: 12px 12px 0 0 !important;
+        transition: var(--transition);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: relative;
+        overflow: hidden;
+        border-bottom: 3px solid transparent !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .nav-tabs .nav-link::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: var(--primary-gradient);
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .nav-tabs .nav-link:hover {
+        background: linear-gradient(135deg, #ffffff 0%, #f0f7f4 100%) !important;
+        color: var(--primary-dark) !important;
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(25, 135, 84, 0.15);
+        border-bottom: 3px solid var(--primary-light) !important;
+    }
+
+    .nav-tabs .nav-link:hover::before {
+        transform: translateY(0);
+    }
 
     .nav-tabs .nav-link.active {
-        color: #fff; background-color: #198754;
-        border-color: #198754 #198754 #fff; border-top: 3px solid #146c43;
-        font-weight: 600; box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+        background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%) !important;
+        color: var(--primary-dark) !important;
+        box-shadow: 0 -5px 25px rgba(25, 135, 84, 0.1), 0 10px 30px rgba(25, 135, 84, 0.15);
+        transform: translateY(-8px);
+        z-index: 2;
+        border-bottom: 3px solid var(--primary-color) !important;
     }
-    
-    .tab-content { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 0 0 8px 8px; background: white; }
 
-    /* --- Scrollbar Customizada --- */
+    .nav-tabs .nav-link.active::before {
+        transform: translateY(0);
+    }
+
+    .nav-tabs .nav-link.active i {
+        color: var(--primary-color) !important;
+        transform: scale(1.2);
+    }
+
+    .nav-tabs .nav-link i {
+        transition: var(--transition);
+        font-size: 1.1em;
+    }
+
+    /* --- Conteúdo das Abas --- */
+    .tab-content {
+        background: var(--card-bg);
+        border-radius: 0 var(--border-radius) var(--border-radius) var(--border-radius);
+        padding: 2.5rem;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--border-color);
+        min-height: 500px;
+        position: relative;
+        z-index: 1;
+        margin-top: -1px;
+    }
+
+    .tab-content::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--primary-light), transparent);
+    }
+
+    /* --- Inputs e Forms --- */
+    .form-control, .form-select {
+        border-radius: var(--border-radius-sm);
+        padding: 14px 18px;
+        border: 2px solid #e8f0eb;
+        transition: var(--transition);
+        font-size: 0.95rem;
+        background: #fafdfb;
+        color: var(--text-main);
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.15);
+        background: #ffffff;
+        transform: translateY(-2px);
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    /* --- Botões Customizados --- */
+    .btn-success {
+        background: var(--primary-gradient);
+        border: none;
+        padding: 15px 30px;
+        border-radius: var(--border-radius-sm);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: var(--transition);
+        box-shadow: 0 8px 20px rgba(25, 135, 84, 0.25);
+        color: #ffffff !important;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-success::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .btn-success:hover {
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 12px 30px rgba(25, 135, 84, 0.4);
+    }
+
+    .btn-success:hover::before {
+        left: 100%;
+    }
+
+    .btn-outline-danger {
+        border: 2px solid #dc3545;
+        color: #dc3545;
+        font-weight: 600;
+        padding: 8px 16px;
+        border-radius: 8px;
+        transition: var(--transition);
+    }
+
+    .btn-outline-danger:hover {
+        background: #dc3545;
+        color: white;
+        transform: scale(1.05);
+        box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
+    }
+
+    /* --- Cards de Usuários/Items --- */
+    .item-card {
+        background: linear-gradient(135deg, #ffffff 0%, #fafdfb 100%);
+        border: 2px solid #eef5f1;
+        border-radius: var(--border-radius-sm);
+        padding: 1.5rem;
+        transition: var(--transition);
+        height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .item-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--primary-gradient);
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .item-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: var(--card-shadow-hover);
+        transform: translateY(-5px);
+    }
+
+    .item-card:hover::before {
+        transform: translateX(0);
+    }
+
+    .user-card {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%);
+        border: 2px solid #e8f5ec;
+        border-radius: var(--border-radius-sm);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .user-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 30px rgba(25, 135, 84, 0.15);
+        border-color: var(--primary-light);
+    }
+
+    .user-card .bg-success-subtle {
+        background: linear-gradient(135deg, var(--primary-light) 0%, #e8f5ec 100%) !important;
+        color: var(--primary-dark) !important;
+        transition: var(--transition);
+    }
+
+    .user-card:hover .bg-success-subtle {
+        transform: scale(1.1) rotate(5deg);
+        background: var(--primary-gradient) !important;
+        color: white !important;
+    }
+
+    /* --- Alertas e Notificações --- */
+    .alert-warning {
+        background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+        border: 2px solid #ffd966;
+        border-radius: var(--border-radius-sm);
+        box-shadow: 0 5px 20px rgba(255, 193, 7, 0.1);
+    }
+
+    /* --- Scrollbar Personalizada --- */
     .scroll-container {
-        max-height: 350px;
+        max-height: 500px;
         overflow-y: auto;
-        padding-right: 5px;
-        border: 1px solid #f1f3f5;
-        border-radius: 6px;
-        padding: 10px;
-        background-color: #f8f9fa;
+        padding-right: 15px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--primary-color) #f0f7f4;
+    }
+
+    .scroll-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .scroll-container::-webkit-scrollbar-track {
+        background: #f0f7f4;
+        border-radius: 10px;
+        margin: 5px;
+    }
+
+    .scroll-container::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, var(--primary-color), #20c997);
+        border-radius: 10px;
+        border: 2px solid #f0f7f4;
+    }
+
+    .scroll-container::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, var(--primary-dark), var(--primary-color));
+    }
+
+    /* --- Badges e Indicadores --- */
+    .badge {
+        padding: 8px 16px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        letter-spacing: 0.5px;
+    }
+
+    .badge.bg-dark {
+        background: linear-gradient(135deg, #495057 0%, #343a40 100%) !important;
+    }
+
+    /* --- Animações --- */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .tab-pane {
+        animation: fadeIn 0.4s ease-out;
+    }
+
+    /* --- Efeitos de Foco --- */
+    .focus-ring {
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.4);
+        }
+        50% {
+            box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+        }
+    }
+
+    /* --- Responsividade Ajustada --- */
+    @media (max-width: 992px) {
+        .config-container {
+            padding: 0.5rem;
+        }
+        
+        .header-section {
+            padding: 1.5rem;
+            border-left: none;
+            border-top: 5px solid var(--primary-color);
+            text-align: center;
+        }
+        
+        .tab-content {
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+        }
+        
+        .nav-tabs .nav-link {
+            padding: 12px 20px;
+            font-size: 0.9rem;
+            gap: 8px;
+        }
+        
+        .nav-tabs-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .header-section {
+            padding: 1.2rem;
+        }
+        
+        .tab-content {
+            padding: 1.2rem;
+        }
+        
+        .nav-tabs .nav-link {
+            padding: 10px 15px;
+            font-size: 0.85rem;
+            min-width: fit-content;
+        }
+        
+        .btn-success {
+            padding: 12px 20px;
+            font-size: 0.9rem;
+        }
+    }
+
+    /* --- Efeitos de Elevação --- */
+    .elevation-1 {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     
-    /* Estilo da barra de rolagem */
-    .scroll-container::-webkit-scrollbar { width: 6px; }
-    .scroll-container::-webkit-scrollbar-track { background: #f1f1f1; }
-    .scroll-container::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
-    .scroll-container::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-
-    /* --- Badges --- */
-    .badge-item {
-        transition: all 0.2s; cursor: default;
-        display: inline-flex; align-items: center; gap: 8px;
-        font-size: 0.9rem; padding: 8px 12px;
+    .elevation-2 {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     }
-    .badge-item:hover { background-color: #e9ecef !important; transform: scale(1.02); }
+    
+    .elevation-3 {
+        box-shadow: 0 16px 48px rgba(0,0,0,0.16);
+    }
 
-    /* --- Switch --- */
-    .form-check-input:checked { background-color: #198754; border-color: #198754; }
-    .form-check-input { width: 3em; height: 1.5em; cursor: pointer; }
+    /* --- Estados de Foco --- */
+    *:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.2) !important;
+    }
 </style>
 
-<div class="container mt-4 pb-5">
-    <!-- Header Principal -->
-    <div class="d-flex align-items-center mb-4">
-        <div class="bg-success rounded-circle p-3 me-3 shadow-sm">
-            <i class="fa-solid fa-gear fa-lg text-white"></i>
-        </div>
-        <div>
-            <h2 class="mb-1 text-success fw-bold">Configurações do Sistema</h2>
-            <p class="text-muted mb-0">Gerencie cadastros auxiliares e usuários</p>
-        </div>
-    </div>
-
-    <!-- 1. Configuração Geral -->
-    <div class="row">
-        <div class="col-md-12 mb-4">
-            <div class="card border-success shadow-sm">
-                <div class="card-header bg-success text-white d-flex align-items-center">
-                    <i class="fa-solid fa-sliders me-2"></i> Configurações Gerais
-                </div>
-                <div class="card-body">
-                    <form method="POST">
-                        {% csrf_token %}
-                        <input type="hidden" name="acao" value="config_geral">
-                        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded border">
-                            <div class="form-check form-switch fs-5">
-                                {{ form_config.ocultar_esgotados }}
-                            </div>
-                            <div>
-                                <label class="form-check-label fw-bold text-dark">
-                                    Ocultar automaticamente lotes com Saldo 0
-                                </label>
-                                <small class="text-muted d-block">
-                                    Lotes esgotados não aparecerão na tabela principal, apenas no histórico.
-                                </small>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-success mt-3 px-4 fw-bold">
-                            <i class="fa-solid fa-check me-2"></i>Salvar Preferência
-                        </button>
-                    </form>
-                </div>
+<div class="container-fluid config-container mt-3 pb-5">
+    
+    <!-- Cabeçalho Principal -->
+    <div class="row mb-4">
+        <div class="col-12 d-flex align-items-center">
+            <div class="bg-success text-white rounded-3 p-3 me-3 shadow-lg">
+                <i class="fa-solid fa-gears fa-2x"></i>
+            </div>
+            <div>
+                <h2 class="mb-0 fw-bold text-dark">Configurações do Sistema</h2>
+                <p class="text-muted mb-0">Gestão de tabelas auxiliares e usuários de acesso.</p>
             </div>
         </div>
     </div>
 
-    <!-- 2. Sistema de Abas -->
-    <ul class="nav nav-tabs" id="configTabs" role="tablist">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cultivar"><i class="fa-solid fa-seedling me-2"></i>Cultivares</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#especie"><i class="fa-solid fa-leaf me-2"></i>Espécies</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#peneira"><i class="fa-solid fa-filter me-2"></i>Peneiras</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#categoria"><i class="fa-solid fa-tags me-2"></i>Categorias</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tratamento"><i class="fa-solid fa-flask me-2"></i>Tratamentos</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#conferente"><i class="fa-solid fa-user-check me-2"></i>Conferentes</button></li>
-    </ul>
+    <!-- Navegação de Abas -->
+    <div class="nav-tabs-wrapper">
+        <ul class="nav nav-tabs" id="configTabs" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#cultivar">
+                    <i class="fa-solid fa-seedling text-success-emphasis"></i> Cultivares
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#especie">
+                    <i class="fa-solid fa-leaf text-success-emphasis"></i> Espécies
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#peneira">
+                    <i class="fa-solid fa-filter text-success-emphasis"></i> Peneiras
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#categoria">
+                    <i class="fa-solid fa-tags text-success-emphasis"></i> Categorias
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tratamento">
+                    <i class="fa-solid fa-flask text-success-emphasis"></i> Tratamentos
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#conferente">
+                    <i class="fa-solid fa-user-gear text-success-emphasis"></i> Acessos / Conferentes
+                </button>
+            </li>
+        </ul>
+    </div>
 
-    <!-- 3. Conteúdo das Abas -->
-    <div class="tab-content p-4 border border-top-0 bg-white rounded-bottom" id="configTabsContent">
+    <!-- Conteúdo das Abas -->
+    <div class="tab-content" id="configTabsContent">
         
         <!-- Aba Cultivares -->
         <div class="tab-pane fade show active" id="cultivar">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Cultivar" lista=cultivares tipo="cultivar" acao_add="add_cultivar" %}
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Nova Cultivar" lista=cultivares tipo="cultivar" acao_add="add_cultivar" %}
         </div>
 
-        <!-- Aba Espécies (NOVO) -->
+        <!-- Aba Espécies -->
         <div class="tab-pane fade" id="especie">
-            <!-- Nota: Certifique-se de passar 'especies' no context da view django -->
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Espécie" lista=especies tipo="especie" acao_add="add_especie" %}
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Nova Espécie" lista=especies tipo="especie" acao_add="add_especie" %}
         </div>
         
         <!-- Aba Peneiras -->
         <div class="tab-pane fade" id="peneira">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Peneira" lista=peneiras tipo="peneira" acao_add="add_peneira" %}
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Nova Peneira" lista=peneiras tipo="peneira" acao_add="add_peneira" %}
         </div>
         
         <!-- Aba Categorias -->
         <div class="tab-pane fade" id="categoria">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Categoria" lista=categorias tipo="categoria" acao_add="add_categoria" %}
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Nova Categoria" lista=categorias tipo="categoria" acao_add="add_categoria" %}
         </div>
 
         <!-- Aba Tratamentos -->
         <div class="tab-pane fade" id="tratamento">
-            {% include 'sapp/partials/config_tab_content.html' with titulo="Adicionar Tratamento" lista=tratamentos tipo="tratamento" acao_add="add_tratamento" %}
+            {% include 'sapp/partials/config_tab_content.html' with titulo="Novo Tratamento" lista=tratamentos tipo="tratamento" acao_add="add_tratamento" %}
         </div>
         
-        <!-- Aba Conferentes -->
+        <!-- Aba Conferentes (Gerenciamento de Usuários) -->
         <div class="tab-pane fade" id="conferente">
             {% if user.is_superuser %}
-                <div class="row">
-                    <!-- Formulário Novo Usuário -->
-                    <div class="col-md-4 border-end pe-md-4">
-                        <div class="bg-light p-3 rounded border">
-                            <h5 class="text-primary mb-3"><i class="fa-solid fa-user-plus me-2"></i>Novo Acesso</h5>
+                <div class="row g-4">
+                    <!-- Formulário -->
+                    <div class="col-lg-4">
+                        <div class="p-4 rounded-3 border bg-light shadow-sm">
+                            <h5 class="fw-bold mb-3 text-success">
+                                <i class="fa-solid fa-user-plus me-2"></i>Novo Usuário
+                            </h5>
                             <form method="POST">
                                 {% csrf_token %}
                                 <input type="hidden" name="acao" value="add_conferente_user">
                                 
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold small">Login (Usuário)</label>
-                                    <input type="text" name="username" class="form-control" placeholder="ex: joao.silva" required autocomplete="off">
+                                    <label class="form-label fw-bold">Login de Acesso</label>
+                                    <input type="text" name="username" class="form-control" placeholder="ex: joao.silva" required>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold small">Nome Completo</label>
-                                    <input type="text" name="first_name" class="form-control" placeholder="Nome de exibição" required>
+                                    <label class="form-label fw-bold">Nome de Exibição</label>
+                                    <input type="text" name="first_name" class="form-control" placeholder="Nome Completo" required>
                                 </div>
                                 
-                                <button type="submit" class="btn btn-success w-100 fw-bold">
-                                    <i class="fa-solid fa-save me-2"></i>Criar Usuário
+                                <button type="submit" class="btn btn-success w-100 shadow-sm mt-2">
+                                    <i class="fa-solid fa-save me-2"></i>Cadastrar Usuário
                                 </button>
-                                <div class="alert alert-info mt-3 py-2 small mb-0">
-                                    <i class="fa-solid fa-key me-1"></i> Senha padrão: <strong>conceito</strong>
+                                
+                                <div class="mt-4 p-2 bg-white rounded border border-warning">
+                                    <small class="text-dark d-block text-center">
+                                        <i class="fa-solid fa-lock-open me-1 text-warning"></i> Senha padrão: <strong>conceito</strong>
+                                    </small>
                                 </div>
                             </form>
                         </div>
                     </div>
 
-                    <!-- Lista de Usuários (COM SCROLL) -->
-                    <div class="col-md-8 ps-md-4">
+                    <!-- Lista -->
+                    <div class="col-lg-8">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="text-secondary m-0"><i class="fa-solid fa-users me-2"></i>Usuários Ativos</h5>
-                            <span class="badge bg-secondary">{{ usuarios_conferentes|length }} cadastrados</span>
+                            <h5 class="fw-bold text-secondary mb-0">Usuários Registrados</h5>
+                            <span class="badge bg-dark rounded-pill">{{ usuarios_conferentes|length }} total</span>
                         </div>
                         
-                        <div class="scroll-container" style="max-height: 400px;">
-                            <div class="row g-2">
+                        <div class="scroll-container">
+                            <div class="row g-3">
                                 {% for u in usuarios_conferentes %}
-                                <div class="col-md-6">
-                                    <div class="p-3 border rounded bg-white shadow-sm d-flex justify-content-between align-items-center h-100">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center" style="width: 40px; height: 40px;">
-                                                <i class="fas fa-user"></i>
-                                            </div>
-                                            <div style="line-height: 1.2;">
-                                                <!-- AQUI: Usa o nome completo, se não tiver, usa o login -->
-                                                <div class="fw-bold text-dark">{{ u.get_full_name|default:u.username }}</div>
-                                                <small class="text-muted">@{{ u.username }}</small>
-                                            </div>
+                                <div class="col-md-6 col-xl-4">
+                                    <div class="user-card p-3 d-flex align-items-center">
+                                        <div class="flex-shrink-0 bg-success-subtle text-success rounded-circle d-flex justify-content-center align-items-center" style="width: 45px; height: 45px;">
+                                            <i class="fas fa-user-check"></i>
+                                        </div>
+                                        <div class="ms-3 flex-grow-1 overflow-hidden">
+                                            <h6 class="mb-0 text-truncate fw-bold text-dark">{{ u.get_full_name|default:u.username }}</h6>
+                                            <small class="text-muted">@{{ u.username }}</small>
                                         </div>
                                         
-                                        <form method="POST" onsubmit="return confirm('Remover acesso de {{ u.username }}?');">
+                                        <form method="POST" onsubmit="return confirm('Deseja realmente remover o acesso de {{ u.username }}?');" class="ms-2">
                                             {% csrf_token %}
                                             <input type="hidden" name="acao" value="delete_conferente_user">
                                             <input type="hidden" name="id_item" value="{{ u.id }}">
-                                            <button type="submit" class="btn btn-outline-danger btn-sm border-0" title="Excluir">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0">
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
                                         </form>
@@ -206,8 +658,8 @@
                                 </div>
                                 {% empty %}
                                 <div class="col-12 text-center py-5">
-                                    <i class="fa-solid fa-users-slash fa-2x text-muted mb-2"></i>
-                                    <p class="text-muted">Nenhum conferente cadastrado.</p>
+                                    <img src="https://cdn-icons-png.flaticon.com/512/5087/5087579.png" style="width: 80px; opacity: 0.5" alt="">
+                                    <p class="text-muted mt-3">Nenhum conferente encontrado.</p>
                                 </div>
                                 {% endfor %}
                             </div>
@@ -215,15 +667,28 @@
                     </div>
                 </div>
             {% else %}
-                <div class="alert alert-danger d-flex align-items-center">
-                    <i class="fas fa-lock fa-2x me-3"></i>
+                <div class="alert alert-warning p-4 border-warning d-flex align-items-center shadow-sm">
+                    <i class="fa-solid fa-triangle-exclamation fa-3x me-4 opacity-50"></i>
                     <div>
-                        <strong>Acesso Negado</strong><br>
-                        Apenas administradores podem gerenciar usuários.
+                        <h5 class="fw-bold mb-1">Restrição de Acesso</h5>
+                        <p class="mb-0 text-dark">Sua conta não possui permissões de administrador para gerenciar usuários e privilégios do sistema.</p>
                     </div>
                 </div>
             {% endif %}
         </div>
     </div>
 </div>
+
+<script>
+    // Ativa a funcionalidade de troca de abas com salvamento da última aba aberta (opcional)
+    var triggerTabList = [].slice.call(document.querySelectorAll('#configTabs button'))
+    triggerTabList.forEach(function (triggerEl) {
+        var tabTrigger = new bootstrap.Tab(triggerEl)
+        triggerEl.addEventListener('click', function (event) {
+            event.preventDefault()
+            tabTrigger.show()
+        })
+    });
+</script>
+
 {% endblock %}

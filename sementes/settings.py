@@ -4,12 +4,12 @@ from pathlib import Path
 from datetime import timedelta
 
 # ========== INICIALIZAÇÃO DO AMBIENTE ==========
-env = environ.Env()
-# Le arquivo .env se existir
-environ.Env.read_env()
-
-# ========== CONFIGURAÇÕES BÁSICAS ==========
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+
+# 🔥 leitura explícita e correta
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY WARNING: não exponha isso em produção!
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-sua-chave-secreta-provisoria-aqui')
@@ -17,7 +17,7 @@ SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-sua-chave-secreta
 # SECURITY WARNING: não execute com debug ativado em produção!
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1', 'tiagorve2.pythonanywhere.com'])
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1' ])
 
 # ========== APLICAÇÕES INSTALADAS ==========
 INSTALLED_APPS = [
@@ -82,21 +82,22 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'sementes.wsgi.application'
 
-# ========== BANCO DE DADOS POSTGRESQL ==========
-# CONFIGURAÇÃO SIMPLIFICADA
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env('DATABASE_NAME', default='sementes_db'),
+        'NAME': env('DATABASE_NAME', default='sementes'),
         'USER': env('DATABASE_USER', default='postgres'),
         'PASSWORD': env('DATABASE_PASSWORD', default='brasil10'),
         'HOST': env('DATABASE_HOST', default='localhost'),
-        'PORT': env('DATABASE_PORT', default='5432'),
-        # Configurações otimizadas
-        'CONN_MAX_AGE': 60,  # Conexões persistentes por 60 segundos
-        'CONN_HEALTH_CHECKS': True,
+        'PORT': env('DATABASE_PORT', default='5433'),
+        'CONN_MAX_AGE': 0,
+        'OPTIONS': {
+            'client_encoding': 'UTF8',
+        },
     }
 }
+
 
 # Fallback para SQLite se PostgreSQL não estiver disponível
 if not env.bool('USE_POSTGRESQL', default=True):
