@@ -2,26 +2,30 @@
 {% load static %}
 
 {% block content %}
-<!-- CONTAINER PRINCIPAL -->
-<div class="d-flex flex-column h-100 p-3" style="height: calc(100vh - 60px) !important; overflow: hidden;">
+<div class="main-wrapper d-flex flex-column" style="height: 100vh; height: -webkit-fill-available; background-color: #0f172a; overflow: hidden;">
     
-    <!-- BARRA DE CONTROLE -->
-    <div class="card shadow-sm mb-3 flex-shrink-0">
-        <div class="card-body p-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <!-- BARRA DE CONTROLE ÚNICA LINHA (ULTRA SLIM) -->
+    <nav class="navbar navbar-dark bg-glass p-2 px-3 border-bottom border-secondary border-opacity-25 flex-shrink-0">
+        <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap gap-2">
             
-            <!-- TITULO E SELETOR -->
-            <div class="d-flex align-items-center gap-3">
+            <!-- 1. IDENTIFICAÇÃO E STATUS -->
+            <div class="d-flex align-items-center gap-2 overflow-hidden">
                 <div>
-                    <h5 class="mb-0 fw-bold"><i class="fas fa-warehouse text-primary me-2"></i>{{ armazem.nome }}</h5>
-                    <div class="text-muted small">
-                        <span id="statsTotal">0</span> posições | 
-                        <span id="statsOcupados" class="text-success fw-bold">0</span> ocupadas
+                    <h5 class="mb-0 fw-bold text-white"><i class="fas fa-warehouse text-warning me-2"></i>{{ armazem.nome }}</h5>
+                    <div class="text-white-50 small d-flex align-items-center gap-2 mt-1">
+                        <span class="badge bg-dark border border-secondary text-info p-1 px-2" id="statsTotal">0</span>
+                        <span class="badge bg-dark border border-secondary text-success p-1 px-2" id="statsOcupados">0</span>
                     </div>
                 </div>
 
+                <!-- CORREÇÃO: Usando armazens_disponiveis como no original -->
                 <div class="input-group input-group-sm" style="width: 220px;">
-                    <label class="input-group-text bg-light" for="selectAZ"><i class="fas fa-exchange-alt"></i></label>
-                    <select class="form-select fw-bold border-primary" id="selectAZ" onchange="location.href='/mapa-armazem/'+this.value+'/'">
+                    <label class="input-group-text" style="background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                        <i class="fas fa-exchange-alt"></i>
+                    </label>
+                    <select class="form-select fw-bold" id="selectAZ" 
+                            style="border-color: rgba(255,255,255,0.3); background: rgba(0,0,0,0.3); color: white;"
+                            onchange="location.href='/mapa-armazem/'+this.value+'/'">
                         {% for az in armazens_disponiveis %}
                             <option value="{{ az.numero }}" {% if az.numero == armazem.numero %}selected{% endif %}>
                                 {{ az.nome }} (AZ {{ az.numero }})
@@ -30,109 +34,264 @@
                     </select>
                 </div>
             </div>
-            
-            <div class="d-flex gap-3 align-items-center flex-wrap">
-                <!-- LEGENDA -->
-                <div class="d-none d-md-flex align-items-center small border-end pe-3 me-2">
-                    <div class="d-flex align-items-center me-3">
-                        <span style="width: 12px; height: 12px; background: #10b981; border: 1px solid #047857; border-radius: 2px; margin-right: 5px;"></span>
-                        <span>Ocupado</span>
+
+            <!-- 2. BUSCA CENTRAL (EXPANSÍVEL) -->
+            <div class="flex-grow-1 mx-2 mx-md-4" style="max-width: 600px;">
+                <div class="search-container position-relative">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="campoPesquisaLote" class="search-input" placeholder="Lote, Cliente ou Endereço...">
+                    
+                    <div id="wrapperContador" class="contador-badge d-none">
+                        <span id="resultadosContador">0</span> <span class="d-none d-sm-inline">items</span>
                     </div>
-                    <div class="d-flex align-items-center me-3">
-                        <span style="width: 12px; height: 12px; background: #f3f4f6; border: 1px solid #9ca3af; border-radius: 2px; margin-right: 5px;"></span>
-                        <span>Vazio</span>
-                    </div>
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-exclamation-circle text-danger me-1"></i>
-                        <span>Multi-Lote</span>
-                    </div>
+                    
+                    <button id="btnLimparPesquisa" class="clear-search-btn" style="display: none;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. BOTÕES DE AÇÃO E VISUALIZAÇÃO -->
+            <div class="d-flex align-items-center gap-1 gap-md-2 flex-shrink-0">
+                <!-- Check de Quantidade Customizado -->
+                <div class="view-option d-none d-sm-flex">
+                    <input type="checkbox" id="btnToggleQuantidade" class="btn-check">
+                    <label class="btn btn-outline-light btn-sm border-0 py-2 fw-600 px-3" for="btnToggleQuantidade">
+                        <i class="fas fa-cubes me-1"></i> <span class="d-none d-xl-inline">VER QTDE</span>
+                    </label>
                 </div>
 
-                <!-- BOTÕES DE VISUALIZAÇÃO -->
-                <div class="btn-group btn-group-sm">
-                    <button id="btnToggleEndereco" class="btn btn-outline-secondary">
-                        <i class="fas fa-map-marker-alt me-1"></i> Ver Endereço
-                    </button>
-                    <button id="btnToggleLote" class="btn btn-outline-primary">
-                        <i class="fas fa-tag me-1"></i> Ver Lote
-                    </button>
-                </div>
-                
-                <button onclick="location.reload()" class="btn btn-outline-secondary btn-sm" title="Atualizar">
+                <div class="vr mx-1 opacity-25 text-white h-20px"></div>
+
+                <!-- Botões de ação iconográficos -->
+                <button onclick="location.reload()" class="btn btn-icon text-white" title="Atualizar">
                     <i class="fas fa-sync-alt"></i>
                 </button>
                 
-                <!-- EDITOR -->
                 {% if is_admin %}
-                <a href="/editor-mapa/{{ armazem.numero }}/" class="btn btn-warning btn-sm fw-bold shadow-sm">
-                    <i class="fas fa-pen-ruler me-1"></i> Editor
+                <a href="/editor-mapa/{{ armazem.numero }}/" class="btn btn-warning btn-sm fw-bold px-3 d-flex align-items-center gap-1 shadow-sm rounded-3">
+                    <i class="fas fa-edit"></i> <span class="d-none d-md-inline">EDITOR</span>
                 </a>
                 {% endif %}
             </div>
         </div>
-    </div>
+    </nav>
 
-    <!-- ÁREA DO MAPA -->
-    <div class="card shadow-sm border-0 bg-light flex-fill overflow-hidden position-relative">
-        <div class="card-body p-2 d-flex justify-content-center align-items-center h-100 w-100 bg-secondary bg-opacity-10">
-            <canvas id="mapaCanvas"></canvas>
-            <!-- Tooltip -->
-            <div id="tooltipMapa" class="tooltip-mapa"></div>
+    <!-- AREA DO MAPA -->
+    <main class="map-viewport position-relative overflow-auto p-2 p-md-4 d-flex align-items-center justify-content-center">
+        <!-- Overlay de Rotação Celular -->
+        <div id="landscapeSuggestion" class="orientation-overlay">
+            <div class="text-center p-4 rounded-4 bg-dark shadow-lg border border-primary">
+                <i class="fas fa-mobile-alt fa-3x mb-3 text-primary rotate-icon"></i>
+                <h5 class="text-white">Gire o celular para o lado</h5>
+                <p class="text-secondary small">Para ver o mapa completo, use o modo paisagem.</p>
+                <button class="btn btn-primary btn-sm" onclick="this.parentElement.parentElement.style.display='none'">Fechar</button>
+            </div>
         </div>
-    </div>
+
+        <div id="canvasContainer" class="position-relative shadow-2xl bg-white rounded-3 overflow-hidden">
+            <canvas id="mapaCanvas"></canvas>
+            <div id="tooltipMapa" class="tooltip-premium"></div>
+        </div>
+    </main>
 </div>
 
-<!-- MODAL PARA SELEÇÃO DE MÚLTIPLOS LOTES -->
+<!-- Modal para Multiplos Lotes -->
 <div class="modal fade" id="modalMultiplosLotes" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="fas fa-layer-group me-2"></i>Selecionar Lote</h5>
+        <div class="modal-content border-0 shadow bg-dark text-white rounded-4 overflow-hidden">
+            <div class="modal-header border-bottom border-secondary p-3">
+                <h6 class="modal-title fw-bold" id="modalEnderecoTitulo">Endereço</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0">
-                <div class="p-3 bg-light border-bottom">
-                    <small class="text-muted fw-bold">ENDEREÇO:</small>
-                    <h4 class="mb-0 fw-bold text-dark" id="modalEnderecoTitulo">A-00-00</h4>
-                </div>
-                <div class="list-group list-group-flush" id="listaLotesModal">
-                    <!-- Preenchido via JS -->
-                </div>
-            </div>
+            <div id="listaLotesModal" class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;"></div>
         </div>
     </div>
 </div>
 
 <style>
-    #mapaCanvas {
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        display: block;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        background-color: white;
-        cursor: pointer;
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+
+    body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #0f172a;
     }
 
-    .tooltip-mapa {
+    .bg-glass {
+        background: rgba(15, 23, 42, 0.85) !important;
+        backdrop-filter: blur(10px);
+    }
+
+    /* Input de busca futurista */
+    .search-container {
+        position: relative;
+        height: 40px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .search-container:focus-within {
+        background: rgba(255, 255, 255, 1);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.4);
+        transform: scale(1.01);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(255, 255, 255, 0.4);
+        pointer-events: none;
+        transition: color 0.3s;
+    }
+
+    .search-container:focus-within .search-icon { color: #6366f1; }
+
+    .search-input {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+        border: none;
+        padding-left: 42px;
+        padding-right: 90px;
+        color: #fff;
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+
+    .search-input:focus { outline: none; color: #1e293b; }
+    .search-input:focus::placeholder { color: #cbd5e1; }
+
+    .clear-search-btn {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: transparent;
+        border: none;
+        color: #ef4444;
+        font-size: 1.2rem;
+        z-index: 10;
+    }
+
+    .contador-badge {
+        position: absolute;
+        right: 40px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: #fbbf24;
+        color: #000;
+        padding: 2px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 800;
+        pointer-events: none;
+    }
+
+    /* Overlay para celular */
+    .orientation-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.8);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    @media (max-width: 992px) and (orientation: portrait) {
+        .orientation-overlay { display: flex; }
+    }
+
+    .rotate-icon {
+        animation: rotateMove 1.5s ease-in-out infinite;
+    }
+    @keyframes rotateMove {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(90deg); }
+    }
+
+    .map-viewport {
+        background-color: #0f172a;
+        flex-grow: 1;
+    }
+
+    #mapaCanvas {
+        display: block;
+        max-width: 100%;
+        cursor: crosshair;
+        background-color: white;
+        border: 1px solid #e2e8f0;
+    }
+
+    .tooltip-premium {
         position: fixed;
         display: none;
         background: white;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-        padding: 0;
-        width: 260px;
-        z-index: 9999;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        min-width: 250px;
+        z-index: 1000;
+        overflow: hidden;
         pointer-events: none;
-        font-family: system-ui, -apple-system, sans-serif;
-        text-align: left;
+        animation: fastPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes fastPop {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .btn-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .btn-icon:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); }
+
+    .line-height-1 { line-height: 1; }
+
+    /* Estilo para checkbox ativo */
+    .btn-check:checked + .btn-outline-light {
+        background-color: rgba(79, 70, 229, 0.2) !important;
+        color: white !important;
+        border-color: #6366f1 !important;
+    }
+
+    /* Estilo para o select de armazém */
+    #selectAZ {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    #selectAZ:hover {
+        background: rgba(255,255,255,0.1) !important;
+    }
+    
+    #selectAZ option {
+        background-color: #0f172a;
+        color: white;
+        padding: 8px;
+    }
+    
+    #selectAZ:focus {
+        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
+        border-color: #6366f1 !important;
+        outline: none;
     }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // CORREÇÃO: Usar as mesmas variáveis do template original
     const LAYOUT_ELEMENTS = {{ elementos_json|safe }};
     const STOCK_DATA = {{ dados_ocupacao_json|safe }};
     
@@ -142,195 +301,363 @@ document.addEventListener('DOMContentLoaded', function() {
     const modalEl = document.getElementById('modalMultiplosLotes');
     const bsModal = new bootstrap.Modal(modalEl);
     
-    canvas.width = {{ armazem.largura_canvas|default:1000 }};
-    canvas.height = {{ armazem.altura_canvas|default:600 }};
+    // Configura canvas de acordo com o JSON original
+    const CANVAS_WIDTH = {{ armazem.largura_canvas|default:1000 }};
+    const CANVAS_HEIGHT = {{ armazem.altura_canvas|default:600 }};
+    
+    canvas.width = CANVAS_WIDTH;
+    canvas.height = CANVAS_HEIGHT;
 
-    let estado = { mostrarEndereco: false, mostrarLote: false };
+    let estado = {
+        mostrarQuantidade: false,
+        termo: '',
+        encontrados: new Set()
+    };
 
-    // --- DESENHO DO MAPA ---
+    // Cache para buscas rápidas e processamento otimizado
+    let cache = {
+        posicoesComEndereco: [],
+        posicoesSemEndereco: [],
+        dadosPorEndereco: {},
+        totalPorEndereco: {},
+        indiceBusca: new Map()
+    };
+
+    // Inicializar cache - SEPARAR posições com e sem endereço
+    function inicializarCache() {
+        cache.posicoesComEndereco = [];
+        cache.posicoesSemEndereco = [];
+        cache.dadosPorEndereco = {};
+        cache.totalPorEndereco = {};
+        cache.indiceBusca.clear();
+
+        // Separar posições
+        LAYOUT_ELEMENTS.forEach((el, index) => {
+            if (el.tipo === 'RETANGULO') {
+                const chave = el.id ? el.id.trim().toUpperCase() : '';
+                if (chave && chave !== '') {
+                    cache.posicoesComEndereco.push({
+                        ...el,
+                        chave: chave,
+                        index: index
+                    });
+                } else {
+                    cache.posicoesSemEndereco.push({
+                        ...el,
+                        index: index
+                    });
+                }
+            }
+        });
+
+        // Processar STOCK_DATA apenas para posições com endereço
+        for (const [endereco, itens] of Object.entries(STOCK_DATA)) {
+            const enderecoKey = endereco.trim().toUpperCase();
+            if (itens && itens.length > 0) {
+                cache.dadosPorEndereco[enderecoKey] = itens;
+                
+                cache.totalPorEndereco[enderecoKey] = itens.reduce((total, item) => {
+                    return total + (parseInt(item.qtd) || 0);
+                }, 0);
+                
+                const termos = [];
+                itens.forEach(item => {
+                    if (item.lote) termos.push(item.lote.toLowerCase());
+                    if (item.cliente) termos.push(item.cliente.toLowerCase());
+                });
+                termos.push(enderecoKey.toLowerCase());
+                
+                cache.indiceBusca.set(enderecoKey, {
+                    termos: termos.join(' '),
+                    temMultiplos: itens.length > 1
+                });
+            }
+        }
+    }
+
+    inicializarCache();
+
+    // Elementos DOM
+    const campoPesquisa = document.getElementById('campoPesquisaLote');
+    const btnLimpar = document.getElementById('btnLimparPesquisa');
+    const wrapperContador = document.getElementById('wrapperContador');
+    const resContador = document.getElementById('resultadosContador');
+    const btnToggleQuantidade = document.getElementById('btnToggleQuantidade');
+
+    // CORREÇÃO: O select já tem onchange="location.href='/mapa-armazem/'+this.value+'/'"
+    // que está funcionando perfeitamente como no código original
+
+    // SISTEMA DE PESQUISA - busca apenas nas posições COM endereço
+    campoPesquisa.addEventListener('input', function() {
+        estado.termo = this.value.trim().toLowerCase();
+        
+        if (estado.termo.length > 0) {
+            btnLimpar.style.display = 'block';
+            wrapperContador.classList.remove('d-none');
+            
+            estado.encontrados.clear();
+            cache.indiceBusca.forEach((data, endereco) => {
+                if (data.termos.includes(estado.termo)) {
+                    estado.encontrados.add(endereco);
+                }
+            });
+            resContador.innerText = estado.encontrados.size;
+        } else {
+            btnLimpar.style.display = 'none';
+            wrapperContador.classList.add('d-none');
+            estado.encontrados.clear();
+        }
+        desenharMapa();
+    });
+
+    btnLimpar.onclick = () => { 
+        campoPesquisa.value = ''; 
+        campoPesquisa.dispatchEvent(new Event('input')); 
+    };
+
+    // Botão Ver Quantidade
+    btnToggleQuantidade.addEventListener('change', function(e) {
+        estado.mostrarQuantidade = e.target.checked;
+        desenharMapa();
+    });
+
     function desenharMapa() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+        
         let totalPosicoes = 0;
         let totalOcupados = 0;
 
-        LAYOUT_ELEMENTS.forEach(el => {
+        // 1. PRIMEIRO: Desenhar posições SEM endereço (formas decorativas)
+        cache.posicoesSemEndereco.forEach(pos => {
             ctx.save();
-            if (el.rot) {
-                const cx = el.x + el.w/2;
-                const cy = el.y + el.h/2;
+            
+            if (pos.rot) {
+                const cx = pos.x + pos.w/2;
+                const cy = pos.y + pos.h/2;
                 ctx.translate(cx, cy);
-                ctx.rotate(el.rot * Math.PI / 180);
+                ctx.rotate(pos.rot * Math.PI / 180);
                 ctx.translate(-cx, -cy);
             }
 
-            if (el.tipo === 'RETANGULO') {
-                totalPosicoes++;
-                const chave = el.id ? el.id.trim().toUpperCase() : '';
-                const dadosItem = STOCK_DATA[chave];
-                const estaOcupado = dadosItem && dadosItem.length > 0;
-                const temMultiplos = dadosItem && dadosItem.length > 1;
+            ctx.fillStyle = pos.cor || '#f8fafc';
+            ctx.fillRect(pos.x, pos.y, pos.w, pos.h);
 
-                if (estaOcupado) totalOcupados++;
+            ctx.strokeStyle = pos.stroke || '#e2e8f0';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(pos.x, pos.y, pos.w, pos.h);
 
-                // Cor
-                let fillStyle = el.cor || '#e5e7eb';
-                if (estaOcupado && el.cor_ocupado) fillStyle = el.cor_ocupado;
-                else if (estaOcupado) fillStyle = '#10b981'; 
-
-                ctx.fillStyle = fillStyle;
-                ctx.fillRect(el.x, el.y, el.w, el.h);
-
-                // Borda
-                if (temMultiplos) {
-                    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
-                } else {
-                    ctx.strokeStyle = el.stroke || '#999'; ctx.lineWidth = 1;
-                }
-                ctx.strokeRect(el.x, el.y, el.w, el.h);
-
-                // Texto
-                let textoParaExibir = "";
-                if (estado.mostrarLote && estaOcupado) {
-                    if (temMultiplos) textoParaExibir = "VÁRIOS";
-                    else textoParaExibir = dadosItem[0].lote.substring(0, 10);
-                } else if (estado.mostrarEndereco && el.id) {
-                    textoParaExibir = el.id;
-                }
-
-                if (textoParaExibir) {
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    let corTexto = (fillStyle === '#10b981' || estaOcupado) ? '#ffffff' : '#374151';
-                    ctx.fillStyle = corTexto;
-                    let fontSize = Math.min(el.h / 2.5, 14);
-                    ctx.font = `bold ${fontSize}px Arial`;
-                    ctx.fillText(textoParaExibir, el.x + el.w/2, el.y + el.h/2);
-                }
-
-                // Alerta Multiplos
-                if (temMultiplos) {
-                    const padding = 6;
-                    ctx.beginPath();
-                    ctx.arc(el.x + el.w - padding, el.y + padding, 4, 0, 2*Math.PI);
-                    ctx.fillStyle = '#dc2626'; ctx.fill();
-                    ctx.fillStyle = 'white'; ctx.font = 'bold 7px Arial';
-                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText('!', el.x + el.w - padding, el.y + padding);
-                }
-
-            } else if (el.tipo === 'TEXTO') {
-                ctx.font = '14px Arial';
-                ctx.fillStyle = '#000000';
-                ctx.textAlign = 'left';
-                ctx.fillText(el.texto || '', el.x, el.y + 14);
-            }
             ctx.restore();
+        });
+
+        // 2. DEPOIS: Desenhar posições COM endereço (funcionais)
+        cache.posicoesComEndereco.forEach(pos => {
+            totalPosicoes++;
+            
+            const chave = pos.chave;
+            const temDados = cache.dadosPorEndereco[chave];
+            if (temDados) totalOcupados++;
+            
+            ctx.save();
+            
+            if (pos.rot) {
+                const cx = pos.x + pos.w/2;
+                const cy = pos.y + pos.h/2;
+                ctx.translate(cx, cy);
+                ctx.rotate(pos.rot * Math.PI / 180);
+                ctx.translate(-cx, -cy);
+            }
+
+            const encontrado = estado.termo.length > 0 && estado.encontrados.has(chave);
+            
+            if (encontrado) {
+                ctx.fillStyle = '#fbbf24';
+            } else if (temDados) {
+                ctx.fillStyle = pos.cor_ocupado || '#10b981';
+            } else {
+                ctx.fillStyle = pos.cor || '#f1f5f9';
+            }
+            
+            ctx.fillRect(pos.x, pos.y, pos.w, pos.h);
+
+            ctx.strokeStyle = encontrado ? '#d97706' : (pos.stroke || '#cbd5e1');
+            ctx.lineWidth = encontrado ? 2 : 1;
+            ctx.strokeRect(pos.x, pos.y, pos.w, pos.h);
+
+            if (temDados && cache.indiceBusca.get(chave)?.temMultiplos) {
+                const padding = 6;
+                const radius = 4;
+                
+                ctx.beginPath();
+                ctx.arc(pos.x + pos.w - padding, pos.y + padding, radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ef4444';
+                ctx.fill();
+                
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 8px "Plus Jakarta Sans"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('!', pos.x + pos.w - padding, pos.y + padding);
+            }
+
+            if (estado.mostrarQuantidade && temDados) {
+                const quantidade = cache.totalPorEndereco[chave];
+                
+                ctx.fillStyle = encontrado ? '#92400e' : '#ffffff';
+                ctx.font = `bold ${Math.min(pos.h * 0.5, 12)}px 'Plus Jakarta Sans'`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                if (!encontrado) {
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = 2;
+                    ctx.shadowOffsetY = 1;
+                }
+                
+                ctx.fillText(quantidade.toString(), pos.x + pos.w/2, pos.y + pos.h/2);
+                
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetY = 0;
+            }
+
+            ctx.restore();
+        });
+
+        // 3. FINALMENTE: Desenhar textos
+        LAYOUT_ELEMENTS.forEach(el => {
+            if (el.tipo === 'TEXTO') {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '600 12px "Plus Jakarta Sans"';
+                ctx.fillText(el.texto || '', el.x, el.y + 10);
+            }
         });
 
         document.getElementById('statsTotal').innerText = totalPosicoes;
         document.getElementById('statsOcupados').innerText = totalOcupados;
     }
 
-    // --- CONTROLES BOTÕES ---
-    const btnEnd = document.getElementById('btnToggleEndereco');
-    const btnLote = document.getElementById('btnToggleLote');
-
-    btnEnd.addEventListener('click', () => {
-        estado.mostrarEndereco = !estado.mostrarEndereco;
-        estado.mostrarLote = false; 
-        atualizarBotoes(); desenharMapa();
-    });
-
-    btnLote.addEventListener('click', () => {
-        estado.mostrarLote = !estado.mostrarLote;
-        estado.mostrarEndereco = false; 
-        atualizarBotoes(); desenharMapa();
-    });
-
-    function atualizarBotoes() {
-        if(estado.mostrarEndereco) btnEnd.classList.replace('btn-outline-secondary', 'btn-secondary');
-        else btnEnd.classList.replace('btn-secondary', 'btn-outline-secondary');
-
-        if(estado.mostrarLote) btnLote.classList.replace('btn-outline-primary', 'btn-primary');
-        else btnLote.classList.replace('btn-primary', 'btn-outline-primary');
-    }
-
-    // --- INTERAÇÃO (DUPLO CLIQUE + TOOLTIP) ---
-    
-    // 1. Tooltip Hover
+    // Interações Hover (Tooltip) - APENAS para posições COM endereço
     canvas.addEventListener('mousemove', function(e) {
-        // Se o modal estiver aberto, não mostra tooltip
-        if(modalEl.classList.contains('show')) return;
-
+        if (modalEl.classList.contains('show')) return;
+        
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
         
-        let achou = false;
-
-        for (let i = LAYOUT_ELEMENTS.length - 1; i >= 0; i--) {
-            const el = LAYOUT_ELEMENTS[i];
-            if (el.tipo === 'RETANGULO' && x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) {
-                const chave = el.id ? el.id.trim().toUpperCase() : '';
-                const itens = STOCK_DATA[chave];
-
-                let html = `<div style="background:#f8fafc; padding:8px 10px; border-bottom:1px solid #e2e8f0;">
-                                <strong style="color:#1e293b; font-size:13px;">${el.id || 'N/A'}</strong>
-                                <span style="float:right; font-size:10px; color:#64748b; margin-top:2px;">Clique 2x</span>
-                            </div>
-                            <div style="padding:10px;">`;
-                
-                if (itens && itens.length > 0) {
-                    if (itens.length > 1) {
-                        html += `<div class="alert alert-danger p-1 mb-2 text-center" style="font-size:10px; font-weight:bold;">
-                                    <i class="fas fa-exclamation-triangle"></i> MÚLTIPLOS LOTES
-                                 </div>`;
-                    }
-                    itens.forEach(item => {
-                        html += `
-                            <div style="margin-bottom:6px; border-bottom:1px dashed #e2e8f0; padding-bottom:4px;">
-                                <span class="badge bg-primary" style="font-size:11px;">${item.lote}</span>
-                                <div style="font-size:11px; color:#475569; margin-top:2px;">
-                                    <strong>${item.qtd}</strong> ${item.embalagem}
-                                </div>
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `<div style="color:#94a3b8; font-style:italic; text-align:center; font-size:12px;">Posição Vazia</div>`;
-                }
-                html += `</div>`;
-
-                tooltip.innerHTML = html;
-                tooltip.style.display = 'block';
-                
-                // Posicionamento Tooltip
-                const ttWidth = 260; 
-                const ttHeight = tooltip.offsetHeight || 150; 
-                let leftPos = e.clientX + 15;
-                let topPos = e.clientY + 15;
-                if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - 15;
-                if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - 15;
-                tooltip.style.left = leftPos + 'px';
-                tooltip.style.top = topPos + 'px';
-                
-                achou = true;
-                canvas.style.cursor = 'pointer';
+        let elementoEncontrado = null;
+        for (let i = cache.posicoesComEndereco.length - 1; i >= 0; i--) {
+            const pos = cache.posicoesComEndereco[i];
+            if (x >= pos.x && x <= pos.x + pos.w && 
+                y >= pos.y && y <= pos.y + pos.h) {
+                elementoEncontrado = pos;
                 break;
             }
         }
-        if (!achou) {
+        
+        if (!elementoEncontrado) {
+            for (let i = cache.posicoesSemEndereco.length - 1; i >= 0; i--) {
+                const pos = cache.posicoesSemEndereco[i];
+                if (x >= pos.x && x <= pos.x + pos.w && 
+                    y >= pos.y && y <= pos.y + pos.h) {
+                    tooltip.style.display = 'none';
+                    canvas.style.cursor = 'default';
+                    return;
+                }
+            }
+        }
+        
+        if (elementoEncontrado) {
+            const chave = elementoEncontrado.chave;
+            const dados = cache.dadosPorEndereco[chave];
+            
+            let html = `
+                <div style="padding: 12px 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 800; font-size: 14px;">
+                    ${chave || 'Sem endereço'}
+                    <span style="float:right; font-size: 11px; opacity: 0.8;">
+                        <i class="fas fa-mouse-pointer me-1"></i>Clique 2x
+                    </span>
+                </div>
+                <div style="padding: 16px;">
+            `;
+            
+            if (dados && dados.length > 0) {
+                const totalQuantidade = cache.totalPorEndereco[chave] || 0;
+                
+                html += `
+                    <div style="margin-bottom: 12px; padding: 8px; background: #f0f9ff; border-radius: 8px;">
+                        <div style="font-size: 11px; color: #0ea5e9; font-weight: 600; margin-bottom: 4px;">
+                            <i class="fas fa-boxes me-1"></i>Resumo
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 12px; color: #475569;">
+                                ${dados.length} lote${dados.length > 1 ? 's' : ''}
+                            </span>
+                            <span style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 600; font-size: 11px; padding: 4px 8px; border-radius: 10px;">
+                                ${totalQuantidade} unidades
+                            </span>
+                        </div>
+                    </div>
+                `;
+                
+                dados.forEach((item, index) => {
+                    const isLast = index === dados.length - 1;
+                    html += `
+                        <div style="margin-bottom: ${isLast ? '0' : '8px'}; padding-bottom: ${isLast ? '0' : '8px'}; border-bottom: ${isLast ? 'none' : '1px dashed #e2e8f0'}">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                                <span style="background: #4f46e5; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">
+                                    ${item.lote}
+                                </span>
+                                <span style="font-size: 12px; color: #475569; font-weight: 600;">
+                                    ${item.qtd} ${item.embalagem || 'un'}
+                                </span>
+                            </div>
+                            ${item.cliente ? `
+                                <div style="font-size: 11px; color: #64748b;">
+                                    <i class="fas fa-user-tag me-1"></i>${item.cliente}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            } else {
+                html += `
+                    <div style="text-align: center; padding: 20px 0;">
+                        <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                            <i class="fas fa-box-open" style="color: #94a3b8;"></i>
+                        </div>
+                        <span style="color: #94a3b8; font-size: 13px;">Posição Vazia</span>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            
+            tooltip.innerHTML = html;
+            tooltip.style.display = 'block';
+            
+            const ttWidth = 300;
+            const ttHeight = tooltip.offsetHeight;
+            const margin = 15;
+            
+            let leftPos = e.clientX + margin;
+            let topPos = e.clientY + margin;
+            
+            if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - margin;
+            if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - margin;
+            
+            tooltip.style.left = leftPos + 'px';
+            tooltip.style.top = topPos + 'px';
+            canvas.style.cursor = 'pointer';
+        } else {
             tooltip.style.display = 'none';
             canvas.style.cursor = 'default';
         }
     });
 
-    // 2. Duplo Clique
+    // Duplo clique para navegação - APENAS para posições COM endereço
     canvas.addEventListener('dblclick', function(e) {
-        // Esconde tooltip imediatamente ao dar duplo clique
         tooltip.style.display = 'none';
 
         const rect = canvas.getBoundingClientRect();
@@ -339,15 +666,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
 
-        for (let i = LAYOUT_ELEMENTS.length - 1; i >= 0; i--) {
-            const el = LAYOUT_ELEMENTS[i];
+        for (let i = cache.posicoesComEndereco.length - 1; i >= 0; i--) {
+            const pos = cache.posicoesComEndereco[i];
             
-            if (el.tipo === 'RETANGULO' && x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) {
-                const chave = el.id ? el.id.trim().toUpperCase() : '';
-                const itens = STOCK_DATA[chave];
+            if (x >= pos.x && x <= pos.x + pos.w && 
+                y >= pos.y && y <= pos.y + pos.h) {
                 
-                // === CORREÇÃO DA URL AQUI (lista_estoque) ===
-                const baseUrl = "{% url 'sapp:lista_estoque' %}"; 
+                const chave = pos.chave;
+                const itens = cache.dadosPorEndereco[chave];
+                const baseUrl = "{% url 'sapp:lista_estoque' %}";
 
                 if (!itens || itens.length === 0) {
                     window.location.href = `${baseUrl}?busca=${encodeURIComponent(chave)}`;
@@ -356,37 +683,76 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     abrirModalMultiplos(chave, itens, baseUrl);
                 }
-                break;
+                return;
+            }
+        }
+
+        for (let i = cache.posicoesSemEndereco.length - 1; i >= 0; i--) {
+            const pos = cache.posicoesSemEndereco[i];
+            if (x >= pos.x && x <= pos.x + pos.w && 
+                y >= pos.y && y <= pos.y + pos.h) {
+                return;
             }
         }
     });
 
     function abrirModalMultiplos(endereco, itens, baseUrl) {
-        // Garante que o tooltip sumiu
         tooltip.style.display = 'none';
 
         document.getElementById('modalEnderecoTitulo').innerText = endereco;
+        
+        const quantidadeTotal = cache.totalPorEndereco[endereco] || 0;
+        
         const lista = document.getElementById('listaLotesModal');
         lista.innerHTML = '';
 
         itens.forEach(item => {
             const link = document.createElement('a');
-            link.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center p-3';
+            link.className = 'list-group-item list-group-item-action bg-dark text-white border-secondary d-flex justify-content-between align-items-center p-3';
             link.href = `${baseUrl}?busca=${encodeURIComponent(item.lote)}`;
+            link.style.transition = 'all 0.2s ease';
+            
             link.innerHTML = `
-                <div>
-                    <div class="fw-bold text-primary">${item.lote}</div>
+                <div class="d-flex flex-column">
+                    <strong style="font-size: 14px;">${item.lote}</strong>
                     <small class="text-muted">${item.cliente || 'Sem cliente'}</small>
                 </div>
-                <span class="badge bg-secondary rounded-pill">${item.qtd} ${item.embalagem}</span>
+                <span class="badge bg-primary" style="font-size: 12px; padding: 6px 10px;">
+                    ${item.qtd} ${item.embalagem || 'un'}
+                </span>
             `;
+            
+            link.addEventListener('mouseenter', () => {
+                link.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                link.style.paddingLeft = '20px';
+            });
+            
+            link.addEventListener('mouseleave', () => {
+                link.style.backgroundColor = '';
+                link.style.paddingLeft = '';
+            });
+            
             lista.appendChild(link);
         });
 
         bsModal.show();
     }
 
-    window.addEventListener('resize', desenharMapa);
+    // Redimensionamento responsivo
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            desenharMapa();
+        }, 200);
+    });
+
+    window.addEventListener('scroll', () => tooltip.style.display = 'none');
+
+    // Foco automático no campo de pesquisa
+    campoPesquisa.focus();
+
+    // Inicializar
     desenharMapa();
 });
 </script>
