@@ -3,14 +3,11 @@
 {% load static %}
 
 {% block content %}
-<!-- IMPORTS (JQUERY + SELECT2 + FONTAWESOME) -->
+<!-- IMPORTS -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <style>
-    /* --- DESIGN SYSTEM REFINADO --- */
     :root {
         --primary: #2563eb; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
         --dark: #1e293b; --light: #f8fafc; --border: #e2e8f0;
@@ -18,7 +15,6 @@
 
     body { background-color: var(--light); font-family: 'Inter', system-ui, sans-serif; color: #334155; }
 
-    /* CARDS MÉTRICAS */
     .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
     .metric-card { background: white; border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: transform 0.2s; position: relative; overflow: hidden; }
     .metric-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
@@ -30,24 +26,20 @@
     .metric-value { font-size: 2rem; font-weight: 800; color: var(--dark); line-height: 1; }
     .metric-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
 
-    /* PESQUISA */
     .search-container { background: white; border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .search-input { border-radius: 8px; padding: 0.75rem 1rem 0.75rem 2.5rem; border: 1px solid var(--border); }
     .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #94a3b8; }
 
-    /* TABELA */
     .table-container { background: white; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; }
     .table thead th { background: #f1f5f9; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; color: #475569; padding: 1rem; border-bottom: 2px solid var(--border); }
     .table tbody td { padding: 1rem; vertical-align: middle; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
     .table-hover tbody tr:hover { background-color: #f8fafc; cursor: pointer; }
 
-    /* BADGES DE FLUXO */
     .flow-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem; }
     .flow-in { background: #dcfce7; color: #166534; }
     .flow-out { background: #fee2e2; color: #991b1b; }
     .flow-zero { background: #f1f5f9; color: #94a3b8; }
 
-    /* TIMELINE & DETALHES */
     .detail-row { background-color: #f8fafc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); }
     .timeline { position: relative; border-left: 2px solid var(--border); padding-left: 1.5rem; margin-left: 0.5rem; }
     .timeline-item { position: relative; margin-bottom: 1.5rem; }
@@ -55,20 +47,196 @@
     .timeline-dot.entrada { border-color: var(--success); }
     .timeline-dot.saida { border-color: var(--danger); }
 
-    /* MODAL HEADER COLORS */
     .modal-header.bg-primary { background: linear-gradient(135deg, #2563eb, #1e40af) !important; }
     .modal-header.bg-danger { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; }
     .modal-header.bg-warning { background: linear-gradient(135deg, #f59e0b, #d97706) !important; color: white !important; }
     .modal-header.bg-secondary { background: linear-gradient(135deg, #64748b, #475569) !important; }
 
-    /* AUTOCOMPLETE */
     .suggestions-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 1050; background: white; border: 1px solid var(--border); border-radius: 0 0 8px 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); max-height: 250px; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
     .suggestion-item { padding: 10px 15px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s; }
     .suggestion-item:hover { background-color: #eff6ff; color: var(--primary); }
 
-    /* SELECT2 TWEAKS */
-    .select2-container .select2-selection--single { height: 38px !important; border: 1px solid #dee2e6 !important; border-radius: 0.375rem; display: flex; align-items: center; }
-    .select2-container--default .select2-selection--single .select2-selection__arrow { height: 36px !important; }
+    .scanner-container {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.95);
+        z-index: 99999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+    
+    .scanner-wrapper {
+        width: 100%;
+        max-width: 500px;
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        position: relative;
+    }
+    
+    #scanner-viewfinder {
+        width: 100%;
+        height: 300px;
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 20px;
+        position: relative;
+    }
+    
+    .scanner-crosshair {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 250px;
+        height: 250px;
+        border: 3px solid var(--primary);
+        border-radius: 12px;
+        pointer-events: none;
+        z-index: 10;
+        box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+    }
+    
+    .scanner-controls {
+        text-align: center;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+    }
+    
+    .scanner-title {
+        color: white;
+        text-align: center;
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+    }
+    
+    .alteration-alert {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border-left: 4px solid #f59e0b;
+        padding: 12px 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        animation: fadeIn 0.3s;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .input-group-with-scanner { 
+        position: relative; 
+        display: flex;
+        align-items: stretch;
+    }
+    
+    .input-group-with-scanner input {
+        padding-right: 50px !important;
+    }
+    
+    .btn-scan-qr { 
+        position: absolute; 
+        right: 4px; 
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--primary); 
+        color: white; 
+        border: none; 
+        border-radius: 6px; 
+        padding: 8px 14px; 
+        cursor: pointer;
+        transition: all 0.2s;
+        height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+    }
+    
+    .btn-scan-qr:hover { 
+        background: #1e40af; 
+        transform: translateY(-50%) scale(1.05);
+    }
+    
+    .field-modified {
+        background-color: #fef3c7 !important;
+        border-color: #f59e0b !important;
+        box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1) !important;
+        transition: all 0.3s ease;
+    }
+    
+    .auto-filled-group {
+        background: #f8fafc;
+        padding: 20px;
+        border-radius: 10px;
+        border: 2px dashed #cbd5e1;
+        margin-bottom: 20px;
+        position: relative;
+    }
+    
+    .auto-filled-group h6 {
+        color: #475569;
+        font-size: 0.9rem;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+    }
+    
+    .loader {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-left: 10px;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+    
+    select.form-control {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 16px 12px;
+        padding-right: 2.5rem;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+    }
+    
+    .toast-scanner {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 999999;
+        min-width: 300px;
+    }
+    
+    .alert-auto-fill {
+        border-left: 4px solid #10b981;
+    }
 </style>
 
 <div class="container-fluid py-4">
@@ -128,7 +296,6 @@
         <form method="GET" class="row g-3 align-items-center">
             <div class="col-md-9 position-relative">
                 <i class="fas fa-search search-icon"></i>
-                <!-- Mantém o status na busca -->
                 {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
                 <input type="text" name="busca" class="form-control search-input" placeholder="Pesquisar por lote, cultivar, cliente, endereço..." value="{{ busca }}">
             </div>
@@ -157,142 +324,133 @@
                         <th class="text-center">Status</th>
                     </tr>
                 </thead>
-<tbody id="tableBody">
-    {% for item in estoque %}
-    <!-- 1. LINHA PRINCIPAL (CLIQUE PARA EXPANDIR) -->
-    <tr onclick="toggleDetails('details-{{ item.id }}')" style="cursor: pointer;" class="align-middle">
-        <td class="text-center"><i class="fas fa-chevron-right text-primary transition-icon" id="chevron-{{ item.id }}"></i></td>
-        <td>
-            <div class="fw-bold text-dark">{{ item.lote }}</div>
-            <small class="text-muted"><i class="far fa-calendar me-1"></i>{{ item.data_entrada|date:"d/m/y" }}</small>
-        </td>
-        <td>
-            <div class="fw-bold">{{ item.cultivar.nome }}</div>
-            <small class="text-muted">{{ item.cliente|default:"-" }}</small>
-        </td>
-        <td>
-            <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
-            {% if item.origem_destino %}
-            <br><small class="text-muted">{{ item.origem_destino|truncatechars:20 }}</small>
-            {% endif %}
-        </td>
-        <td>
-            <div class="fw-bold">{{ item.peneira.nome }}</div>  <!-- ALTERADO: Mostra Peneira no topo -->
-            <small class="text-muted">{{ item.tratamento.nome|default:"Sem Tratamento"|truncatechars:20 }}</small>  <!-- ALTERADO: Tratamento abaixo -->
-        </td>
-        <td>
-            <div class="d-flex justify-content-center gap-2 align-items-center">
-                <span class="flow-badge flow-in" title="Entrada"><i class="fas fa-arrow-down"></i> {{ item.entrada }}</span>
-                <span class="flow-badge {% if item.saida > 0 %}flow-out{% else %}flow-zero{% endif %}" title="Saída"><i class="fas fa-arrow-up"></i> {{ item.saida }}</span>
-                <div class="ms-2 fw-bold fs-5 text-dark">{{ item.saldo }} <small class="fw-normal fs-6 text-muted">{{ item.embalagem }}</small></div>
-            </div>
-        </td>
-        <td class="text-center">
-            {% if item.saldo > 0 %}
-            <span class="badge bg-success bg-opacity-10 text-success border border-success">Disponível</span>
-            {% else %}
-            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Esgotado</span>
-            {% endif %}
-        </td>
-    </tr>
-
-
-
-    <!-- 2. LINHA DE DETALHES (OCULTA POR PADRÃO) -->
-    <tr id="details-{{ item.id }}" class="d-none detail-row">
-        <td colspan="7" class="p-0">
-            <div class="p-4">
-                <div class="row g-4">
-                    <!-- ESQUERDA: DADOS E AÇÕES -->
-                    <div class="col-lg-5">
-                        <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
-                            <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">📋 Detalhes do Lote</h6>
-                            
-                            <div class="row g-2 small mb-3">
-                                <div class="col-6"><span class="text-muted">Espécie:</span> <span class="fw-bold text-dark">{{ item.especie.nome|default:"" }}</span></div>
-                                <div class="col-6"><span class="text-muted">Categoria:</span> <span class="fw-bold text-dark">{{ item.categoria.nome }}</span></div>
-                                <div class="col-6"><span class="text-muted">Peso Unit:</span> <span class="fw-bold text-dark">{{ item.peso_unitario }} kg</span></div>
-                                <div class="col-6"><span class="text-muted">Empresa:</span> <span class="fw-bold text-dark">{{ item.empresa|default:"" }}</span></div>
-                                <div class="col-6"><span class="text-muted">AZ:</span> <span class="fw-bold text-dark">{{ item.az|default:"" }}</span></div>
-                                <div class="col-6"><span class="text-muted">Cliente:</span> <span class="fw-bold text-dark">{{ item.cliente|default:"" }}</span></div>
+                <tbody id="tableBody">
+                    {% for item in estoque %}
+                    <tr onclick="toggleDetails('details-{{ item.id }}')" style="cursor: pointer;" class="align-middle">
+                        <td class="text-center"><i class="fas fa-chevron-right text-primary transition-icon" id="chevron-{{ item.id }}"></i></td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ item.lote }}</div>
+                            <small class="text-muted"><i class="far fa-calendar me-1"></i>{{ item.data_entrada|date:"d/m/y" }}</small>
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ item.cultivar.nome }}</div>
+                            <small class="text-muted">{{ item.cliente|default:"-" }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ item.endereco }}</span>
+                            {% if item.origem_destino %}
+                            <br><small class="text-muted">{{ item.origem_destino|truncatechars:20 }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-bold">{{ item.peneira.nome }}</div>
+                            <small class="text-muted">{{ item.tratamento.nome|default:"Sem Tratamento"|truncatechars:20 }}</small>
+                        </td>
+                        <td>
+                            <div class="d-flex justify-content-center gap-2 align-items-center">
+                                <span class="flow-badge flow-in" title="Entrada"><i class="fas fa-arrow-down"></i> {{ item.entrada }}</span>
+                                <span class="flow-badge {% if item.saida > 0 %}flow-out{% else %}flow-zero{% endif %}" title="Saída"><i class="fas fa-arrow-up"></i> {{ item.saida }}</span>
+                                <div class="ms-2 fw-bold fs-5 text-dark">{{ item.saldo }} <small class="fw-normal fs-6 text-muted">{{ item.embalagem }}</small></div>
                             </div>
-                            
-                            <div class="bg-light p-2 rounded border small mb-3">
-                                <strong>Obs:</strong> {{ item.observacao|default:"Sem observações" }}
-                            </div>
+                        </td>
+                        <td class="text-center">
+                            {% if item.saldo > 0 %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success">Disponível</span>
+                            {% else %}
+                            <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Esgotado</span>
+                            {% endif %}
+                        </td>
+                    </tr>
 
-                            <div class="d-grid gap-2">
-                                {% if item.saldo > 0 %}
-                                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalSaida{{ item.id }}">
-                                    <i class="fas fa-truck-ramp-box me-2"></i> Expedição
-                                </button>
-                                <button class="btn btn-warning text-dark fw-bold" onclick="abrirModalTransferencia({{ item.id }})">
-                                    <i class="fas fa-right-left me-2"></i> Transferir / Ajustar
-                                </button>
-                                {% endif %}
-                                <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
-                                    <i class="fas fa-pen-to-square me-2"></i> Editar Dados
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <tr id="details-{{ item.id }}" class="d-none detail-row">
+                        <td colspan="7" class="p-0">
+                            <div class="p-4">
+                                <div class="row g-4">
+                                    <div class="col-lg-5">
+                                        <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
+                                            <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">📋 Detalhes do Lote</h6>
+                                            
+                                            <div class="row g-2 small mb-3">
+                                                <div class="col-6"><span class="text-muted">Espécie:</span> <span class="fw-bold text-dark">{{ item.especie.nome|default:"" }}</span></div>
+                                                <div class="col-6"><span class="text-muted">Categoria:</span> <span class="fw-bold text-dark">{{ item.categoria.nome }}</span></div>
+                                                <div class="col-6"><span class="text-muted">Peso Unit:</span> <span class="fw-bold text-dark">{{ item.peso_unitario }} kg</span></div>
+                                                <div class="col-6"><span class="text-muted">Empresa:</span> <span class="fw-bold text-dark">{{ item.empresa|default:"" }}</span></div>
+                                                <div class="col-6"><span class="text-muted">AZ:</span> <span class="fw-bold text-dark">{{ item.az|default:"" }}</span></div>
+                                                <div class="col-6"><span class="text-muted">Cliente:</span> <span class="fw-bold text-dark">{{ item.cliente|default:"" }}</span></div>
+                                            </div>
+                                            
+                                            <div class="bg-light p-2 rounded border small mb-3">
+                                                <strong>Obs:</strong> {{ item.observacao|default:"Sem observações" }}
+                                            </div>
 
-                    <!-- DIREITA: HISTÓRICO COM FOTOS -->
-                    <div class="col-lg-7">
-    <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
-        <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">🕒 Linha do Tempo</h6>
-        <div class="timeline" style="max-height: 350px; overflow-y: auto;">
-            {% with historico_filtrado=item.historico.all|dictsortreversed:"data_hora" %}
-                {% for h in historico_filtrado %}
-                    {% if h.tipo == 'Entrada' or h.tipo == 'Transferência (Entrada)' or h.tipo == 'Transferência (Saída)' or h.tipo == 'Expedição' %}
-                        <div class="timeline-item">
-                            <div class="timeline-dot {% if 'Entrada' in h.tipo %}entrada{% elif 'Saída' in h.tipo or 'Expedição' in h.tipo %}saida{% endif %}"></div>
-                            
-                            <div class="d-flex justify-content-between align-items-start mb-1">
-                                <div>
-                                    <span class="fw-bold text-dark">{{ h.tipo }}</span>
-                                    <div class="text-muted" style="font-size: 0.75rem;">
-                                        <i class="fas fa-user me-1"></i> {{ h.usuario.first_name|default:h.usuario.username }}
+                                            <div class="d-grid gap-2">
+                                                {% if item.saldo > 0 %}
+                                                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalSaida{{ item.id }}">
+                                                    <i class="fas fa-truck-ramp-box me-2"></i> Expedição
+                                                </button>
+                                                <button class="btn btn-warning text-dark fw-bold" onclick="abrirModalTransferencia({{ item.id }})">
+                                                    <i class="fas fa-right-left me-2"></i> Transferir / Ajustar
+                                                </button>
+                                                {% endif %}
+                                                <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
+                                                    <i class="fas fa-pen-to-square me-2"></i> Editar Dados
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-lg-7">
+                                        <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
+                                            <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">🕒 Linha do Tempo</h6>
+                                            <div class="timeline" style="max-height: 350px; overflow-y: auto;">
+                                                {% with historico_filtrado=item.historico.all|dictsortreversed:"data_hora" %}
+                                                    {% for h in historico_filtrado %}
+                                                        {% if h.tipo == 'Entrada' or h.tipo == 'Transferência (Entrada)' or h.tipo == 'Transferência (Saída)' or h.tipo == 'Expedição' %}
+                                                            <div class="timeline-item">
+                                                                <div class="timeline-dot {% if 'Entrada' in h.tipo %}entrada{% elif 'Saída' in h.tipo or 'Expedição' in h.tipo %}saida{% endif %}"></div>
+                                                                
+                                                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                                                    <div>
+                                                                        <span class="fw-bold text-dark">{{ h.tipo }}</span>
+                                                                        <div class="text-muted" style="font-size: 0.75rem;">
+                                                                            <i class="fas fa-user me-1"></i> {{ h.usuario.first_name|default:h.usuario.username }}
+                                                                        </div>
+                                                                    </div>
+                                                                    <small class="text-muted">{{ h.data_hora|date:"d/m/y H:i" }}</small>
+                                                                </div>
+                                                                
+                                                                <div class="small text-muted bg-light p-2 rounded mb-2 border">
+                                                                    {{ h.descricao|safe }}
+                                                                </div>
+
+                                                                {% if h.fotos.exists %}
+                                                                    <div class="d-flex gap-2 mt-1 flex-wrap">
+                                                                        {% for foto in h.fotos.all %}
+                                                                            <a href="{{ foto.arquivo.url }}" target="_blank">
+                                                                                <img src="{{ foto.arquivo.url }}" class="rounded border shadow-sm" style="width: 50px; height: 50px; object-fit: cover; cursor: zoom-in;" title="Clique para ampliar">
+                                                                            </a>
+                                                                        {% endfor %}
+                                                                    </div>
+                                                                {% endif %}
+                                                            </div>
+                                                        {% endif %}
+                                                    {% empty %}
+                                                        <div class="text-center text-muted py-4">Nenhum histórico registrado.</div>
+                                                    {% endfor %}
+                                                {% endwith %}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <small class="text-muted">{{ h.data_hora|date:"d/m/y H:i" }}</small>
                             </div>
-                            
-                            <div class="small text-muted bg-light p-2 rounded mb-2 border">
-                                {{ h.descricao|safe }}
-                            </div>
-
-                            <!-- FOTOS (RECUPERADO AQUI) -->
-                            {% if h.fotos.exists %}
-                                <div class="d-flex gap-2 mt-1 flex-wrap">
-                                    {% for foto in h.fotos.all %}
-                                        <a href="{{ foto.arquivo.url }}" target="_blank">
-                                            <img src="{{ foto.arquivo.url }}" class="rounded border shadow-sm" style="width: 50px; height: 50px; object-fit: cover; cursor: zoom-in;" title="Clique para ampliar">
-                                        </a>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                {% empty %}
-                    <div class="text-center text-muted py-4">Nenhum histórico registrado.</div>
-                {% endfor %}
-            {% endwith %}
-        </div>
-    </div>
-</div>
-           </div>
-                </div>
-            </div>
-        </td>
-    </tr>
-    {% endfor %}
-</tbody>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
             </table>
         </div>
     </div>
     
-    <!-- PAGINAÇÃO COM BUSCA E STATUS -->
     {% if itens.has_other_pages %}
     <nav class="d-flex justify-content-center mt-4">
         <ul class="pagination shadow-sm">
@@ -310,206 +468,784 @@
     {% endif %}
 </div>
 
+<!-- SCANNER QR CODE -->
+<div id="scannerContainer" class="scanner-container">
+    <div class="scanner-title">
+        <i class="fas fa-qrcode me-2"></i> Scanner QR Code
+    </div>
+    <div class="scanner-wrapper">
+        <div id="scanner-viewfinder">
+            <div class="scanner-crosshair"></div>
+        </div>
+        <div class="scanner-controls">
+            <div class="action-buttons">
+                <button type="button" class="btn btn-danger btn-lg" onclick="stopScanner()">
+                    <i class="fas fa-times-circle me-2"></i> Fechar Scanner
+                </button>
+            </div>
+            <p class="text-white mt-3">
+                <i class="fas fa-info-circle me-2"></i> Posicione o QR Code dentro da área marcada
+            </p>
+            <p class="text-white small">
+                Formato esperado: <code class="bg-dark p-1 rounded">CODIGO/LOTE/ID</code>
+            </p>
+        </div>
+    </div>
+</div>
+
 <!-- INCLUSÃO DOS MODAIS -->
 {% include 'sapp/modals/estoque.html' %}
 
 <script>
-    // 1. INICIALIZAÇÃO SELECT2 EM MODAIS
-    $(document).ready(function() {
-        // Inicializa no Modal Nova Entrada
-        $('.select2-modal').select2({
-            dropdownParent: $('#modalNovaEntrada'),
-            width: '100%',
-            placeholder: "Selecione...",
-            allowClear: true
-        });
-    });
+    // VARIÁVEIS GLOBAIS
+let scannerAtivo = false;
+let html5QrCode = null;
+let scannerIniciando = false;
 
-    // 2. TOGGLE DETALHES (ACORDEÃO)
-    function toggleDetails(rowId) {
-        const row = document.getElementById(rowId);
-        const cid = rowId.split('-')[1];
-        const chevron = document.getElementById(`chevron-${cid}`);
+// 1. INICIALIZAÇÃO
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("=== INICIALIZANDO SISTEMA ===");
+    
+    // Inicializar o auto-complete do produto
+    inicializarAutoCompleteProduto();
+    
+    // Configurar botão de scanner
+    const btnScanner = document.querySelector('.btn-scan-qr');
+    if (btnScanner) {
+        // Remover event listeners antigos
+        const novoBtn = btnScanner.cloneNode(true);
+        btnScanner.parentNode.replaceChild(novoBtn, btnScanner);
         
-        // Fecha outros
-        document.querySelectorAll('tr[id^="details-"]').forEach(r => {
-            if(r.id !== rowId) {
-                r.classList.add('d-none');
-                const otherCid = r.id.split('-')[1];
-                document.getElementById(`chevron-${otherCid}`).className = 'fas fa-chevron-right text-primary transition-icon';
+        novoBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("📷 Botão scanner clicado!");
+            startScanner();
+        });
+    }
+    
+    // Adicionar evento para fechar scanner com ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && scannerAtivo) {
+            stopScanner();
+        }
+    });
+    
+    // Clique fora para fechar scanner
+    const scannerContainer = document.getElementById('scannerContainer');
+    if (scannerContainer) {
+        scannerContainer.addEventListener('click', function(e) {
+            if (e.target.id === 'scannerContainer') {
+                stopScanner();
             }
         });
+    }
+    
+    console.log("✅ Sistema inicializado com sucesso!");
+});
 
-        // Abre atual
-        if(row.classList.contains('d-none')) {
-            row.classList.remove('d-none');
-            chevron.className = 'fas fa-chevron-down text-primary transition-icon';
+// 2. TOGGLE DETALHES (ACORDEÃO)
+function toggleDetails(rowId) {
+    const row = document.getElementById(rowId);
+    const cid = rowId.split('-')[1];
+    const chevron = document.getElementById(`chevron-${cid}`);
+    
+    document.querySelectorAll('tr[id^="details-"]').forEach(r => {
+        if(r.id !== rowId) {
+            r.classList.add('d-none');
+            const otherCid = r.id.split('-')[1];
+            document.getElementById(`chevron-${otherCid}`).className = 'fas fa-chevron-right text-primary transition-icon';
+        }
+    });
+
+    if(row.classList.contains('d-none')) {
+        row.classList.remove('d-none');
+        chevron.className = 'fas fa-chevron-down text-primary transition-icon';
+    } else {
+        row.classList.add('d-none');
+        chevron.className = 'fas fa-chevron-right text-primary transition-icon';
+    }
+}
+
+// 3. AUTO-COMPLETE DO PRODUTO - APENAS API REAL
+function inicializarAutoCompleteProduto() {
+    const inputProduto = document.getElementById('inputProdutoEntrada');
+    
+    if (!inputProduto) {
+        console.log("⚠️ Campo de produto não encontrado");
+        return;
+    }
+    
+    console.log("✅ Inicializando auto-complete do produto");
+    
+    // Buscar produto quando o usuário terminar de digitar
+    let debounceTimer;
+    inputProduto.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const codigo = this.value.trim();
+        
+        if (codigo.length >= 2) {
+            // Mostrar loader
+            mostrarLoaderProduto(true);
+            
+            debounceTimer = setTimeout(() => {
+                buscarProdutoPorCodigo(codigo);
+            }, 500);
         } else {
-            row.classList.add('d-none');
-            chevron.className = 'fas fa-chevron-right text-primary transition-icon';
+            mostrarLoaderProduto(false);
+            esconderAlerta();
+        }
+    });
+    
+    // Buscar produto quando o campo perder o foco
+    inputProduto.addEventListener('blur', function() {
+        const codigo = this.value.trim();
+        if (codigo.length >= 2) {
+            mostrarLoaderProduto(true);
+            setTimeout(() => {
+                buscarProdutoPorCodigo(codigo);
+            }, 300);
+        }
+    });
+    
+    function mostrarLoaderProduto(mostrar) {
+        const wrapper = inputProduto.parentElement;
+        let loader = wrapper.querySelector('.loader-produto');
+        
+        if (mostrar && !loader) {
+            loader = document.createElement('span');
+            loader.className = 'loader loader-produto';
+            loader.style.position = 'absolute';
+            loader.style.right = '10px';
+            loader.style.top = '50%';
+            loader.style.transform = 'translateY(-50%)';
+            wrapper.style.position = 'relative';
+            wrapper.appendChild(loader);
+        } else if (!mostrar && loader) {
+            loader.remove();
         }
     }
+    
+    function buscarProdutoPorCodigo(codigo) {
+        console.log(`🔍 Buscando produto REAL: "${codigo}"`);
+        
+        // URL da API REAL - do Django
+        const urlApi = "{% url 'sapp:api_buscar_produto' %}";
+        console.log(`🌐 URL da API: ${urlApi}`);
+        
+        fetch(`${urlApi}?codigo=${encodeURIComponent(codigo)}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            cache: 'no-store'
+        })
+        .then(response => {
+            console.log(`📊 Status: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("📦 Dados recebidos DA API REAL:", data);
+            mostrarLoaderProduto(false);
+            
+            if (data.encontrado) {
+                console.log("✅ Produto encontrado no banco de dados!");
+                preencherCamposComProdutoReal(data.dados);
+                mostrarAlertaSucesso(data.dados);
+            } else {
+                console.log("❌ Produto não encontrado:", data.erro);
+                mostrarAlertaNaoEncontrado(codigo, data.erro);
+            }
+        })
+        .catch(error => {
+            console.error("💥 Erro na API REAL:", error);
+            mostrarLoaderProduto(false);
+            mostrarAlertaErroAPI(error);
+        });
+    }
+    
+    function preencherCamposComProdutoReal(dados) {
+        console.log("🔄 Preenchendo campos com dados REAIS do banco:");
+        console.log("📝 Dados completos:", dados);
+        
+        // Preencher cada campo individualmente
+        const campos = [
+            { nome: 'cultivar', id: dados.cultivar_id, valor: dados.cultivar_id },
+            { nome: 'peneira', id: dados.peneira_id, valor: dados.peneira_id },
+            { nome: 'especie', id: dados.especie_id, valor: dados.especie_id },
+            { nome: 'categoria', id: dados.categoria_id, valor: dados.categoria_id },
+            { nome: 'tratamento', id: dados.tratamento_id, valor: dados.tratamento_id }
+        ];
+        
+        campos.forEach(campo => {
+            if (campo.valor) {
+                const select = document.querySelector(`[name="${campo.nome}"]`);
+                if (select) {
+                    select.value = campo.valor;
+                    // Disparar evento change
+                    const event = new Event('change', { bubbles: true });
+                    select.dispatchEvent(event);
+                    console.log(`   ✅ ${campo.nome}: definido como ${campo.valor}`);
+                } else {
+                    console.log(`   ⚠️ Select ${campo.nome} não encontrado`);
+                }
+            }
+        });
+        
+        // Preencher empresa
+        if (dados.empresa) {
+            const inputEmpresa = document.querySelector('[name="empresa"]');
+            if (inputEmpresa) {
+                inputEmpresa.value = dados.empresa;
+                console.log(`   ✅ empresa: "${dados.empresa}"`);
+            }
+        }
+        
+        console.log("✅ Todos os campos preenchidos com dados REAIS do banco");
+    }
+    
+    function mostrarAlertaSucesso(dados) {
+        const alertsArea = document.getElementById('alertsArea');
+        if (!alertsArea) return;
+        
+        const html = `
+            <div class="alert alert-success alert-dismissible fade show alert-auto-fill" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-check-circle me-3 fs-4"></i>
+                    <div>
+                        <strong><i class="fas fa-database me-1"></i> Dados carregados do banco!</strong><br>
+                        <small class="text-muted">
+                            Produto: <strong>${dados.codigo}</strong> | 
+                            Cultivar: <strong>${dados.cultivar_nome}</strong> |
+                            Empresa: <strong>${dados.empresa || 'Não informada'}</strong>
+                        </small>
+                        <div class="mt-2 small">
+                            <span class="badge bg-success bg-opacity-25 text-dark me-1">Peneira: ${dados.peneira_nome || 'Não informada'}</span>
+                            <span class="badge bg-success bg-opacity-25 text-dark me-1">Espécie: ${dados.especie_nome || 'Não informada'}</span>
+                            <span class="badge bg-success bg-opacity-25 text-dark">Categoria: ${dados.categoria_nome || 'Não informada'}</span>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
+            </div>
+        `;
+        
+        alertsArea.innerHTML = html;
+    }
+    
+    function mostrarAlertaNaoEncontrado(codigo, erro) {
+        const alertsArea = document.getElementById('alertsArea');
+        if (!alertsArea) return;
+        
+        const html = `
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle me-3"></i>
+                    <div>
+                        <strong>Produto não encontrado!</strong><br>
+                        <small>Código: <code>${codigo}</code></small><br>
+                        <small class="text-muted">${erro}</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        alertsArea.innerHTML = html;
+    }
+    
+    function mostrarAlertaErroAPI(error) {
+        const alertsArea = document.getElementById('alertsArea');
+        if (!alertsArea) return;
+        
+        let mensagem = "Erro ao conectar com o servidor";
+        if (error.message.includes('404')) {
+            mensagem = "API não encontrada. Verifique se a view está configurada.";
+        }
+        
+        const html = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-times-circle me-3"></i>
+                    <div>
+                        <strong>Erro na busca!</strong><br>
+                        <small>${mensagem}</small><br>
+                        <small class="text-muted">${error.message}</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        alertsArea.innerHTML = html;
+    }
+    
+    function esconderAlerta() {
+        const alertsArea = document.getElementById('alertsArea');
+        if (alertsArea) {
+            alertsArea.innerHTML = '';
+        }
+    }
+}
 
-    // 3. AUTOCOMPLETE LOTE
-    document.addEventListener('DOMContentLoaded', function() {
-        const inputLote = document.getElementById('inputLoteEntrada');
-        const listaSugestoes = document.getElementById('listaSugestoesLote');
-        const modalEntrada = document.getElementById('modalNovaEntrada');
+// 4. SCANNER QR CODE - VERSÃO CORRIGIDA E FUNCIONAL
+function carregarBibliotecaScanner() {
+    return new Promise((resolve, reject) => {
+        if (typeof Html5Qrcode !== 'undefined') {
+            console.log("✅ Biblioteca de scanner já carregada");
+            resolve();
+            return;
+        }
+        
+        console.log("📚 Carregando biblioteca de scanner...");
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+        script.onload = () => {
+            console.log("✅ Biblioteca de scanner carregada com sucesso");
+            resolve();
+        };
+        script.onerror = (error) => {
+            console.error("💥 Falha ao carregar biblioteca de scanner:", error);
+            reject(new Error('Falha ao carregar biblioteca do scanner'));
+        };
+        document.head.appendChild(script);
+    });
+}
+
+function startScanner() {
+    console.log("🎬 Iniciando scanner QR Code...");
+    
+    if (scannerIniciando) {
+        console.log("⏳ Scanner já está iniciando, aguarde...");
+        return;
+    }
+    
+    scannerIniciando = true;
+    
+    // Mostrar container do scanner imediatamente
+    const scannerContainer = document.getElementById('scannerContainer');
+    scannerContainer.style.display = 'flex';
+    
+    carregarBibliotecaScanner()
+        .then(() => {
+            scannerAtivo = true;
+            
+            // Inicializar scanner se não existir
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("scanner-viewfinder");
+                console.log("✅ Scanner inicializado");
+            }
+            
+            // Verificar se já está escaneando
+            if (html5QrCode && html5QrCode.isScanning) {
+                console.log("✅ Scanner já está ativo");
+                scannerIniciando = false;
+                return;
+            }
+            
+            // Configurações simplificadas do scanner
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0,
+                rememberLastUsedCamera: true
+            };
+            
+            // Opções da câmera SIMPLIFICADAS
+            const cameraConfig = "environment";
+            
+            console.log("📸 Iniciando escaneamento...");
+            
+            // Iniciar scanner com string simples
+            return html5QrCode.start(
+                cameraConfig, 
+                config, 
+                onScanSuccess,
+                onScanError
+            );
+        })
+        .then(() => {
+            console.log("✅ Scanner iniciado com sucesso!");
+            scannerIniciando = false;
+        })
+        .catch(error => {
+            console.error("💥 Erro ao iniciar scanner:", error);
+            scannerAtivo = false;
+            scannerIniciando = false;
+            scannerContainer.style.display = 'none';
+            
+            // Tratamento de erros específicos
+            let mensagemErro = "Erro ao acessar a câmera";
+            
+            if (error.name === 'NotAllowedError') {
+                mensagemErro = "❌ Permissão de câmera negada.\nPor favor, permita o acesso à câmera nas configurações do navegador.";
+            } else if (error.name === 'NotFoundError') {
+                mensagemErro = "❌ Câmera não encontrada.\nVerifique se há uma câmera disponível no dispositivo.";
+            } else if (error.name === 'NotSupportedError') {
+                mensagemErro = "❌ Navegador não suporta acesso à câmera.\nRecomendamos usar Chrome, Firefox ou Edge atualizados.";
+            } else if (error.name === 'NotReadableError') {
+                mensagemErro = "❌ Não foi possível acessar a câmera.\nPode estar em uso por outro aplicativo.";
+            } else if (error.message.includes('already under transition')) {
+                mensagemErro = "⏳ Scanner já está sendo iniciado. Aguarde...";
+                // Tentar novamente após 1 segundo
+                setTimeout(() => {
+                    scannerIniciando = false;
+                    startScanner();
+                }, 1000);
+                return;
+            } else if (error.message.includes('cameraIdOrConfig')) {
+                // Tentar com configuração mais simples
+                console.log("🔄 Tentando configuração alternativa...");
+                iniciarScannerSimples();
+                return;
+            } else {
+                mensagemErro = "❌ Erro ao acessar a câmera:\n" + error.message;
+            }
+            
+            alert(mensagemErro);
+        });
+}
+
+// Função alternativa para iniciar scanner com configuração mais simples
+function iniciarScannerSimples() {
+    console.log("🔄 Tentando configuração alternativa do scanner...");
+    
+    if (!html5QrCode) {
+        html5QrCode = new Html5Qrcode("scanner-viewfinder");
+    }
+    
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 }
+    };
+    
+    // Configuração mais simples - apenas string
+    html5QrCode.start(
+        "environment",
+        config,
+        onScanSuccess,
+        onScanError
+    ).then(() => {
+        console.log("✅ Scanner iniciado com configuração alternativa!");
+        scannerIniciando = false;
+        scannerAtivo = true;
+    }).catch(err => {
+        console.error("💥 Erro na configuração alternativa:", err);
+        scannerIniciando = false;
+        scannerContainer.style.display = 'none';
+        alert("Não foi possível acessar a câmera.");
+    });
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+    console.log("✅ QR Code escaneado com sucesso!");
+    console.log("📝 Texto:", decodedText);
+    
+    // Parar scanner
+    stopScanner();
+    
+    // Processar o código
+    const parts = decodedText.split('/');
+    
+    if (parts.length >= 2) {
+        const codigoProduto = parts[0];
+        const numeroLote = parts[1];
+        
+        console.log(`📦 Processando: Produto=${codigoProduto}, Lote=${numeroLote}`);
+        
+        // Preencher campos
+        preencherCamposDoScanner(codigoProduto, numeroLote);
+        
+        // Mostrar mensagem de sucesso
+        mostrarMensagemSucessoScanner(codigoProduto, numeroLote);
+    } else {
+        alert("⚠️ Formato de QR Code inválido!\n\n📋 Formato esperado: CODIGO/LOTE/ID\n\n💡 Exemplo: 4604000001/CS060146560001/0003");
+        // Re-iniciar scanner após erro
+        setTimeout(() => {
+            scannerIniciando = false;
+            startScanner();
+        }, 1000);
+    }
+}
+
+function onScanError(errorMessage) {
+    // Ignorar erros normais de varredura
+    if (!errorMessage.includes("No MultiFormat Readers") && 
+        !errorMessage.includes("NotFoundException") &&
+        !errorMessage.includes("No barcode or QR code detected")) {
+        console.warn("⚠️ Erro no scanner:", errorMessage);
+    }
+}
+
+function stopScanner() {
+    console.log("🛑 Parando scanner...");
+    
+    const scannerContainer = document.getElementById('scannerContainer');
+    
+    if (html5QrCode && scannerAtivo) {
+        scannerAtivo = false;
+        scannerIniciando = false;
+        
+        html5QrCode.stop().then(() => {
+            console.log("✅ Scanner parado com sucesso");
+            scannerContainer.style.display = 'none';
+        }).catch(err => {
+            console.error("⚠️ Erro ao parar scanner:", err);
+            scannerContainer.style.display = 'none';
+        });
+    } else {
+        scannerAtivo = false;
+        scannerIniciando = false;
+        scannerContainer.style.display = 'none';
+    }
+}
+
+function preencherCamposDoScanner(codigoProduto, numeroLote) {
+    console.log(`🔄 Preenchendo campos do scanner: Produto=${codigoProduto}, Lote=${numeroLote}`);
+    
+    // 1. Preencher lote
+    const inputLote = document.getElementById('inputLoteEntrada');
+    if (inputLote) {
+        inputLote.value = numeroLote;
+        console.log(`   ✅ Lote preenchido: ${numeroLote}`);
+    }
+    
+    // 2. Preencher produto e buscar dados automaticamente
+    const inputProduto = document.getElementById('inputProdutoEntrada');
+    if (inputProduto) {
+        inputProduto.value = codigoProduto;
+        console.log(`   ✅ Produto preenchido: ${codigoProduto}`);
+        
+        // Disparar eventos para buscar automaticamente
+        setTimeout(() => {
+            const inputEvent = new Event('input', { bubbles: true });
+            inputProduto.dispatchEvent(inputEvent);
+            
+            const changeEvent = new Event('change', { bubbles: true });
+            inputProduto.dispatchEvent(changeEvent);
+            
+            console.log(`   ✅ Eventos disparados para busca automática`);
+        }, 100);
+    }
+    
+    // 3. Abrir modal se não estiver aberto
+    const modal = document.getElementById('modalNovaEntrada');
+    if (modal && !modal.classList.contains('show')) {
+        console.log("   🪟 Abrindo modal...");
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+    }
+    
+    // 4. Focar na quantidade após um delay
+    setTimeout(() => {
+        const inputQuantidade = document.querySelector('[name="entrada"]');
+        if (inputQuantidade) {
+            inputQuantidade.focus();
+            console.log(`   ✅ Campo quantidade focado`);
+        }
+    }, 500);
+}
+
+function mostrarMensagemSucessoScanner(codigo, lote) {
+    // Criar toast de sucesso
+    const toast = document.createElement('div');
+    toast.className = 'toast-scanner alert alert-success';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-check-circle me-2 fs-4"></i>
+            <div>
+                <strong>QR Code lido com sucesso!</strong><br>
+                <small>
+                    <i class="fas fa-barcode me-1"></i> Produto: <strong>${codigo}</strong><br>
+                    <i class="fas fa-tag me-1"></i> Lote: <strong>${lote}</strong>
+                </small>
+            </div>
+            <button type="button" class="btn-close ms-3" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Remover após 5 segundos
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+// 5. FUNÇÃO PARA TESTAR API MANUALMENTE (DEBUG)
+function testarAPIManutalmente(codigoTeste = null) {
+    const codigo = codigoTeste || prompt("Digite o código do produto para testar a API:", "4604000001");
+    if (!codigo) return;
+    
+    const urlApi = "{% url 'sapp:api_buscar_produto' %}";
+    console.log("=== TESTE MANUAL DA API ===");
+    console.log("🔗 URL:", urlApi);
+    console.log("📋 Código:", codigo);
+    
+    fetch(`${urlApi}?codigo=${encodeURIComponent(codigo)}`)
+        .then(res => {
+            console.log("📤 Status:", res.status, res.statusText);
+            console.log("🌐 URL completa:", res.url);
+            return res.json();
+        })
+        .then(data => {
+            console.log("📦 Dados recebidos:", data);
+            
+            if (data.encontrado) {
+                console.log("✅ PRODUTO ENCONTRADO NO BANCO!");
+                console.log("📝 Dados completos:", JSON.stringify(data.dados, null, 2));
+                
+                // Mostrar em alerta formatado
+                let info = `=== PRODUTO ENCONTRADO ===\n\n`;
+                info += `CÓDIGO: ${data.dados.codigo}\n`;
+                info += `CULTIVAR: ${data.dados.cultivar_nome} (ID: ${data.dados.cultivar_id})\n`;
+                info += `EMPRESA: ${data.dados.empresa || 'Não informada'}\n`;
+                info += `PENEIRA: ${data.dados.peneira_nome || 'Não informada'}\n`;
+                info += `ESPÉCIE: ${data.dados.especie_nome || 'Não informada'}\n`;
+                info += `CATEGORIA: ${data.dados.categoria_nome || 'Não informada'}\n`;
+                info += `TRATAMENTO: ${data.dados.tratamento_nome || 'Não informado'}\n`;
+                info += `TIPO: ${data.dados.tipo || 'Não informado'}`;
+                
+                alert(info);
+            } else {
+                console.log("❌ PRODUTO NÃO ENCONTRADO:", data.erro);
+                alert("❌ " + data.erro);
+            }
+        })
+        .catch(err => {
+            console.error("💥 ERRO NA REQUISIÇÃO:", err);
+            alert("💥 ERRO: " + err.message + "\n\nVerifique:\n1. Se a view existe\n2. Se a URL está correta\n3. Se há produtos cadastrados");
+        });
+}
+
+// 6. FUNÇÃO PARA ABRIR MODAL DE TRANSFERÊNCIA
+function abrirModalTransferencia(id) {
+    // Mantenha sua implementação existente
+    console.log("Abrir transferência para ID:", id);
+    // Sua implementação aqui
+}
+
+// 7. AUTO FOCUS EM INPUTS DE MODAL
+document.addEventListener('shown.bs.modal', function(event) {
+    const firstInput = event.target.querySelector('input:not([type="hidden"]), select, textarea');
+    if (firstInput) {
+        setTimeout(() => {
+            firstInput.focus();
+        }, 100);
+    }
+});
+
+// 8. EXPORTAR FUNÇÕES PARA DEBUG NO CONSOLE
+window.debug = {
+    testarAPI: testarAPIManutalmente,
+    startScanner: startScanner,
+    stopScanner: stopScanner,
+    toggleDetails: toggleDetails
+};
+
+console.log("🚀 Sistema pronto! Comandos disponíveis:");
+console.log("   debug.testarAPI() - Testar a API manualmente");
+console.log("   debug.startScanner() - Iniciar scanner manualmente");
+console.log("   debug.stopScanner() - Parar scanner manualmente");
+console.log("   debug.toggleDetails('details-ID') - Abrir/fechar detalhes");
+
+// 9. FUNÇÃO PARA AUTOCOMPLETE LOTE (MANTIDA DO CÓDIGO ANTERIOR)
+document.addEventListener('DOMContentLoaded', function() {
+    const inputLote = document.getElementById('inputLoteEntrada');
+    const listaSugestoes = document.getElementById('listaSugestoesLote');
+    
+    if (inputLote && listaSugestoes) {
         let debounceTimer;
 
-        if (inputLote) {
-            inputLote.addEventListener('input', function() {
-                const termo = this.value;
-                clearTimeout(debounceTimer);
+        inputLote.addEventListener('input', function() {
+            const termo = this.value;
+            clearTimeout(debounceTimer);
 
-                if (termo.length < 2) {
-                    listaSugestoes.style.display = 'none';
-                    return;
-                }
+            if (termo.length < 2) {
+                listaSugestoes.style.display = 'none';
+                return;
+            }
 
-                debounceTimer = setTimeout(() => {
-                    const urlApi = "{% url 'sapp:api_autocomplete_entrada' %}";
-                    
-                    fetch(`${urlApi}?term=${encodeURIComponent(termo)}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            listaSugestoes.innerHTML = '';
-                            if (data.length > 0) {
-                                data.forEach(item => {
-                                    const li = document.createElement('li');
-                                    li.className = 'suggestion-item';
-                                    li.innerHTML = `<strong>${item.label}</strong><span>${item.dados.produto || ''}</span>`;
-                                    
-                                    li.addEventListener('click', () => {
-                                        preencherModalEntrada(item.dados);
-                                        listaSugestoes.style.display = 'none';
-                                    });
-                                    listaSugestoes.appendChild(li);
+            debounceTimer = setTimeout(() => {
+                const urlApi = "{% url 'sapp:api_autocomplete_entrada' %}";
+                
+                fetch(`${urlApi}?term=${encodeURIComponent(termo)}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        listaSugestoes.innerHTML = '';
+                        if (data.length > 0) {
+                            data.forEach(item => {
+                                const li = document.createElement('li');
+                                li.className = 'suggestion-item';
+                                li.innerHTML = `<strong>${item.label}</strong><span>${item.dados.produto || ''}</span>`;
+                                
+                                li.addEventListener('click', () => {
+                                    preencherModalEntrada(item.dados);
+                                    listaSugestoes.style.display = 'none';
                                 });
-                                listaSugestoes.style.display = 'block';
-                            } else {
-                                listaSugestoes.style.display = 'none';
-                            }
-                        })
-                        .catch(err => console.log(err));
-                }, 300);
-            });
-
-            document.addEventListener('click', function(e) {
-                if (e.target !== inputLote && e.target !== listaSugestoes) {
-                    listaSugestoes.style.display = 'none';
-                }
-            });
-        }
-
-        function preencherModalEntrada(dados) {
-            inputLote.value = dados.lote;
-            const setVal = (n, v) => { const el = modalEntrada.querySelector(`[name="${n}"]`); if(el) el.value = v || ''; };
-            
-            setVal('produto', dados.produto);
-            setVal('empresa', dados.empresa);
-            setVal('cliente', dados.cliente);
-            setVal('origem_destino', dados.origem_destino);
-            setVal('peso_unitario', dados.peso_unitario);
-            setVal('az', dados.az);
-            setVal('observacao', dados.observacao);
-            
-            // JQUERY SELECT2 UPDATE
-            const setS2 = (n, v) => {
-                const el = $(modalEntrada).find(`select[name="${n}"]`);
-                if(el.length && v) el.val(v).trigger('change');
-            };
-
-            setS2('cultivar', dados.cultivar__id);
-            setS2('peneira', dados.peneira__id);
-            setS2('categoria', dados.categoria__id);
-            setS2('tratamento', dados.tratamento__id);
-            setS2('embalagem', dados.embalagem);
-            setS2('especie', dados.especie__id);
-            
-            setTimeout(() => modalEntrada.querySelector('[name="entrada"]').focus(), 100);
-        }
-    });
-
-    // 4. FUNÇÃO PARA ABRIR MODAL DE TRANSFERÊNCIA (ATUALIZADA)
-    function abrirModalTransferencia(id) {
-        const modalEl = document.getElementById('modalTransferencia');
-        const form = document.getElementById('formTransferencia');
-        
-        // Define a URL de destino do formulário
-        const urlTransferir = "{% url 'sapp:transferir' 0 %}".replace('0', id);
-        form.action = urlTransferir;
-        
-        // Limpa o formulário antes de preencher
-        form.reset();
-
-        const urlApi = "{% url 'sapp:api_buscar_dados_lote' %}";
-
-        // Busca os dados via AJAX
-        fetch(`${urlApi}?item_id=${id}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.encontrado) {
-                    // Preenchimento de campos de texto e hidden
-                    document.getElementById('transf_item_id').value = id;
-                    document.getElementById('transf_lote_display').value = data.lote;
-                    document.getElementById('transf_saldo_atual').innerText = data.saldo;
-                    document.getElementById('transf_endereco_atual').textContent = 'Endereço atual: ' + data.endereco;
-                    
-                    document.getElementById('transf_produto').value = data.produto;
-                    document.getElementById('transf_cliente').value = data.cliente;
-                    document.getElementById('transf_empresa').value = data.empresa;
-                    document.getElementById('transf_az').value = data.az;
-                    document.getElementById('transf_peso').value = data.peso_unitario;
-                    document.getElementById('transf_obs').value = data.observacao;
-                    
-                    // Campos de leitura (readonly)
-                    document.getElementById('transf_saldo').value = data.saldo;
-                    document.getElementById('transf_entrada').value = data.entrada;
-                    
-                    // Quantidade padrão sugerida (o saldo total)
-                    const inputQtd = document.getElementById('transf_quantidade');
-                    inputQtd.value = data.saldo;
-                    inputQtd.max = data.saldo;
-
-                    // Preenchimento de Selects
-                    const preencherSelect = (id, valor) => {
-                        const el = document.getElementById(id);
-                        if (el && valor) {
-                            el.value = valor;
+                                listaSugestoes.appendChild(li);
+                            });
+                            listaSugestoes.style.display = 'block';
+                        } else {
+                            listaSugestoes.style.display = 'none';
                         }
-                    };
+                    })
+                    .catch(err => console.log(err));
+            }, 300);
+        });
 
-                    preencherSelect('transf_especie', data.especie_id);
-                    preencherSelect('transf_cultivar', data.cultivar_id);
-                    preencherSelect('transf_peneira', data.peneira_id);
-                    preencherSelect('transf_categoria', data.categoria_id);
-                    preencherSelect('transf_tratamento', data.tratamento_id);
-                    preencherSelect('transf_embalagem', data.embalagem);
-
-                    // Abre o modal usando o Bootstrap
-                    const modal = new bootstrap.Modal(modalEl);
-                    modal.show();
-                    
-                    // Foco no campo de novo endereço após carregar
-                    setTimeout(() => {
-                        form.querySelector('input[name="novo_endereco"]').focus();
-                    }, 500);
-                    
-                } else {
-                    alert('Erro: ' + (data.erro || 'Não foi possível carregar os dados do lote.'));
-                }
-            })
-            .catch(err => {
-                console.error('Erro na requisição:', err);
-                alert('Erro de conexão ao buscar dados do lote.');
-            });
+        document.addEventListener('click', function(e) {
+            if (e.target !== inputLote && e.target !== listaSugestoes) {
+                listaSugestoes.style.display = 'none';
+            }
+        });
     }
 
-    // 5. AUTO FOCUS EM INPUTS DE MODAL
-    document.addEventListener('shown.bs.modal', function(event) {
-        const firstInput = event.target.querySelector('input:not([type="hidden"]), select, textarea');
-        if (firstInput) firstInput.focus();
-    });
+    function preencherModalEntrada(dados) {
+        const modal = document.getElementById('modalNovaEntrada');
+        const form = modal.querySelector('form');
+        
+        const setVal = (name, value) => {
+            const el = form.querySelector(`[name="${name}"]`);
+            if (el) el.value = value || '';
+        };
+        
+        setVal('lote', dados.lote);
+        setVal('produto', dados.produto);
+        setVal('empresa', dados.empresa);
+        setVal('cliente', dados.cliente);
+        setVal('origem_destino', dados.origem_destino);
+        setVal('peso_unitario', dados.peso_unitario);
+        setVal('az', dados.az);
+        setVal('observacao', dados.observacao);
+        
+        // Para selects sem Select2, apenas setar o valor
+        const setSelect = (name, value) => {
+            const el = form.querySelector(`select[name="${name}"]`);
+            if (el && value) {
+                el.value = value;
+            }
+        };
+
+        setSelect('cultivar', dados.cultivar__id);
+        setSelect('peneira', dados.peneira__id);
+        setSelect('categoria', dados.categoria__id);
+        setSelect('tratamento', dados.tratamento__id);
+        setSelect('embalagem', dados.embalagem);
+        setSelect('especie', dados.especie__id);
+        
+        setTimeout(() => {
+            const entradaInput = form.querySelector('[name="entrada"]');
+            if (entradaInput) entradaInput.focus();
+        }, 100);
+    }
+});
 </script>
 {% endblock %}

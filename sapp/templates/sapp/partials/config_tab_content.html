@@ -1,105 +1,150 @@
-<div class="row h-100">
-    <!-- Coluna da Esquerda: Formulário de Adicionar -->
-    <div class="col-md-4 border-end pe-md-4">
-        <div class="bg-light p-3 rounded border sticky-top" style="top: 20px; z-index: 1;">
-            <h5 class="text-primary mb-3 fw-bold">{{ titulo }}</h5>
+<!-- sapp/templates/sapp/partials/config_tab_content.html -->
+<div class="produto-card">
+    <div class="row">
+        <!-- Formulário -->
+        <div class="col-lg-4">
+            <h3 class="h4 fw-bold text-success mb-3">
+                <i class="fa-solid fa-{{ icon }} me-2"></i>
+                Novo {{ titulo|slice:":-1" }}
+            </h3>
             
-            <form method="POST" class="d-flex flex-column gap-2">
+            <form method="POST" class="form-produto">
                 {% csrf_token %}
                 <input type="hidden" name="acao" value="{{ acao_add }}">
                 
-                <div class="input-group">
-                    <input type="text" name="nome" class="form-control" placeholder="Digite o nome..." required autocomplete="off">
-                    <button type="submit" class="btn btn-success" title="Adicionar">
-                        <i class="fas fa-plus"></i>
-                    </button>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nome do {{ titulo|slice:":-1" }} *</label>
+                    <input type="text" name="nome" class="form-control" 
+                           placeholder="Digite o nome..." required autocomplete="off">
+                    <small class="text-muted">Ex: Soja Intacta, Peneira 5.5, Categoria Premium</small>
                 </div>
+                
+                <button type="submit" class="btn btn-success w-100">
+                    <i class="fa-solid fa-plus me-2"></i>
+                    Adicionar {{ titulo|slice:":-1" }}
+                </button>
             </form>
             
-            <div class="mt-3 text-muted small bg-white p-2 rounded border">
-                <i class="fas fa-info-circle text-primary"></i> 
-                Digite o nome (ex: "Soja Intacta", "Peneira 5.5") e clique no botão verde para salvar.
+            <div class="mt-3 p-2 bg-info bg-opacity-10 rounded border border-info">
+                <small class="text-dark">
+                    <i class="fa-solid fa-circle-info me-1 text-info"></i>
+                    {{ titulo }} podem ser usados em múltiplos produtos do sistema.
+                </small>
             </div>
         </div>
-    </div>
-
-    <!-- Coluna da Direita: Lista de Itens Cadastrados -->
-    <div class="col-md-8 ps-md-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="text-secondary m-0">Itens Cadastrados</h5>
-            <span class="badge bg-secondary" id="count-{{ tipo }}">{{ lista|length }} itens</span>
-        </div>
-
-        <!-- CAMPO DE PESQUISA RÁPIDA -->
-        <div class="mb-3 position-relative">
-            <i class="fas fa-search position-absolute text-muted" style="left: 10px; top: 10px;"></i>
-            <input type="text" 
-                   class="form-control ps-5" 
-                   id="search-{{ tipo }}" 
-                   placeholder="Pesquisar nesta lista..." 
-                   onkeyup="filtrarLista('{{ tipo }}')">
-        </div>
-
-        <!-- LISTA COM SCROLL (BARRA DE ROLAGEM) -->
-        <div class="scroll-container" style="max-height: 400px; min-height: 200px;">
-            <div class="d-flex flex-wrap gap-2" id="list-container-{{ tipo }}">
+        
+        <!-- Lista -->
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="h4 fw-bold text-secondary mb-0">
+                    <i class="fa-solid fa-list me-2"></i>
+                    {{ titulo }} Cadastrados
+                </h3>
+                <span class="badge bg-dark">{{ lista|length }} itens</span>
+            </div>
+            
+            <!-- Campo de Pesquisa -->
+            <div class="mb-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-light">
+                        <i class="fa-solid fa-search text-muted"></i>
+                    </span>
+                    <input type="text" class="form-control" 
+                           id="search-{{ tipo }}" 
+                           placeholder="Pesquisar {{ titulo|lower }}..."
+                           onkeyup="filtrarLista('{{ tipo }}')">
+                </div>
+            </div>
+            
+            {% if lista %}
+            <div class="row g-2" id="list-container-{{ tipo }}">
                 {% for item in lista %}
-                <span class="badge bg-white text-dark border badge-item shadow-sm">
-                    <span class="item-name fw-bold">{{ item.nome }}</span>
-                    
-                    <!-- Botão de excluir -->
-                    <form method="POST" style="display:inline;" onsubmit="return confirm('Excluir {{ item.nome }}?');">
-                        {% csrf_token %}
-                        <input type="hidden" name="acao" value="delete_item">
-                        <input type="hidden" name="tipo_item" value="{{ tipo }}">
-                        <input type="hidden" name="id_item" value="{{ item.id }}">
-                        <button type="submit" class="btn btn-sm text-danger py-0 px-1 border-0 hover-danger" title="Excluir">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </form>
-                </span>
-                {% empty %}
-                <div class="text-center w-100 py-5 text-muted">
-                    <i class="fa-regular fa-folder-open fa-2x mb-2 opacity-50"></i>
-                    <p>Nenhum item cadastrado.</p>
+                <div class="col-md-6 col-lg-4 col-xl-3 item-{{ tipo }}" data-nome="{{ item.nome|lower }}">
+                    <div class="border rounded p-3 bg-white d-flex align-items-center justify-content-between shadow-sm">
+                        <div class="d-flex align-items-center">
+                            <div class="bg-success-subtle text-success rounded-circle d-flex justify-content-center align-items-center" 
+                                 style="width: 40px; height: 40px;">
+                                <i class="fa-solid fa-{{ icon }}"></i>
+                            </div>
+                            <div class="ms-3 overflow-hidden">
+                                <h6 class="mb-0 fw-bold text-dark text-truncate" title="{{ item.nome }}">
+                                    {{ item.nome }}
+                                </h6>
+                                <small class="text-muted">{{ tipo|title }}</small>
+                            </div>
+                        </div>
+                        
+                        <form method="POST" class="ms-2" 
+                              onsubmit="return confirm('Tem certeza que deseja excluir \"{{ item.nome }}\"?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="delete_item">
+                            <input type="hidden" name="tipo_item" value="{{ tipo }}">
+                            <input type="hidden" name="id_item" value="{{ item.id }}">
+                            <button type="submit" class="btn btn-sm btn-outline-danger border-0" 
+                                    title="Excluir {{ item.nome }}">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
             
-            <!-- Mensagem se a pesquisa não encontrar nada -->
+            <!-- Mensagem quando não há resultados na busca -->
             <div id="no-results-{{ tipo }}" class="text-center py-4 text-muted d-none">
-                <i class="fas fa-search me-1"></i> Nenhum item encontrado para sua busca.
+                <i class="fa-solid fa-search fa-2x mb-3 opacity-50"></i>
+                <p>Nenhum {{ titulo|slice:":-1"|lower }} encontrado para sua busca.</p>
             </div>
+            
+            {% else %}
+            <div class="text-center py-5">
+                <i class="fa-solid fa-{{ icon }} fa-3x text-muted mb-3 opacity-50"></i>
+                <h5 class="text-muted mb-2">Nenhum {{ titulo|slice:":-1"|lower }} cadastrado</h5>
+                <p class="text-muted">Adicione seu primeiro {{ titulo|slice:":-1"|lower }} usando o formulário ao lado.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
 <script>
     function filtrarLista(tipo) {
-        const input = document.getElementById('search-' + tipo);
-        const filter = input.value.toLowerCase();
-        const container = document.getElementById('list-container-' + tipo);
-        const items = container.getElementsByClassName('badge-item');
+        const searchTerm = document.getElementById('search-' + tipo).value.toLowerCase();
+        const items = document.querySelectorAll('.item-' + tipo);
+        const noResults = document.getElementById('no-results-' + tipo);
         let visibleCount = 0;
-
-        for (let i = 0; i < items.length; i++) {
-            const spanName = items[i].getElementsByClassName('item-name')[0];
-            const txtValue = spanName.textContent || spanName.innerText;
-            
-            if (txtValue.toLowerCase().indexOf(filter) > -1) {
-                items[i].style.display = "";
+        
+        items.forEach(item => {
+            const nome = item.getAttribute('data-nome');
+            if (nome.includes(searchTerm)) {
+                item.style.display = 'block';
                 visibleCount++;
             } else {
-                items[i].style.display = "none";
+                item.style.display = 'none';
+            }
+        });
+        
+        // Mostrar/ocultar mensagem de nenhum resultado
+        if (noResults) {
+            if (visibleCount === 0 && items.length > 0) {
+                noResults.classList.remove('d-none');
+            } else {
+                noResults.classList.add('d-none');
             }
         }
-
-        // Mostrar mensagem se não achar nada
-        const noResults = document.getElementById('no-results-' + tipo);
-        if (visibleCount === 0 && items.length > 0) {
-            noResults.classList.remove('d-none');
-        } else {
-            noResults.classList.add('d-none');
-        }
     }
+    
+    // Focar no campo de busca ao carregar a aba
+    document.addEventListener('DOMContentLoaded', function() {
+        // Quando uma aba é mostrada
+        document.querySelectorAll('#configTabs button[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function(event) {
+                const target = event.target.getAttribute('data-bs-target');
+                const searchInput = document.querySelector(target + ' [id^="search-"]');
+                if (searchInput) {
+                    setTimeout(() => searchInput.focus(), 100);
+                }
+            });
+        });
+    });
 </script>

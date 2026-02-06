@@ -228,3 +228,41 @@ class ItemEmpenho(models.Model):
         super().save(*args, **kwargs)
     @property
     def saldo_disponivel(self): return self.estoque.saldo - self.quantidade
+
+
+
+
+
+
+
+class Produto(models.Model):
+    cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT, verbose_name="Cultivar")
+    tipo = models.CharField(max_length=50, verbose_name="Tipo", blank=True, null=True)
+    codigo = models.CharField(max_length=50, unique=True, verbose_name="Código do Produto")
+    descricao = models.TextField(verbose_name="Descrição")
+    peneira = models.ForeignKey(Peneira, on_delete=models.PROTECT, verbose_name="Peneira", blank=True, null=True)
+    empresa = models.CharField(max_length=100, verbose_name="Empresa", blank=True, null=True)
+    especie = models.ForeignKey(Especie, on_delete=models.PROTECT, verbose_name="Espécie", blank=True, null=True)
+    categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT, verbose_name="Categoria", blank=True, null=True)
+    tratamento = models.ForeignKey(Tratamento, on_delete=models.PROTECT, verbose_name="Tratamento", blank=True, null=True)
+    ativo = models.BooleanField(default=True, verbose_name="Ativo")
+    data_cadastro = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Produto"
+        verbose_name_plural = "Produtos"
+        ordering = ['cultivar__nome', 'codigo']
+    
+    def __str__(self):
+        return f"{self.codigo} - {self.cultivar.nome}"
+    
+    def info_completa(self):
+        info = []
+        if self.tipo: info.append(f"Tipo: {self.tipo}")
+        if self.peneira: info.append(f"Peneira: {self.peneira.nome}")
+        if self.empresa: info.append(f"Empresa: {self.empresa}")
+        if self.especie: info.append(f"Espécie: {self.especie.nome}")
+        if self.categoria: info.append(f"Categoria: {self.categoria.nome}")
+        if self.tratamento: info.append(f"Tratamento: {self.tratamento.nome}")
+        return " | ".join(info)

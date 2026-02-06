@@ -2833,94 +2833,268 @@ def logout_view(request):
     return redirect('sapp:login')
 
 
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth.models import User
+from .models import (
+    Configuracao, Cultivar, Peneira, Categoria, 
+    Tratamento, Especie, Produto
+)
+from .forms import (
+    ConfiguracaoForm, NovoConferenteUserForm,
+    CultivarForm, PeneiraForm, CategoriaForm, TratamentoForm
+)
+
+# views.py - ARQUIVO COMPLETO
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.db.models import Q
+from .models import (
+    Configuracao, Cultivar, Peneira, Categoria, 
+    Tratamento, Especie, Produto, Estoque,
+    HistoricoMovimentacao, Empenho, ItemEmpenho,
+    ArmazemLayout, ElementoMapa
+)
+from .forms import (
+    ConfiguracaoForm, NovoConferenteUserForm,
+    CultivarForm, PeneiraForm, CategoriaForm, 
+    TratamentoForm, ProdutoForm, NovaEntradaForm
+)
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.db.models import Q
+from .models import (
+    Configuracao, Cultivar, Peneira, Categoria, 
+    Tratamento, Especie, Produto, Estoque
+)
+from .forms import (
+    ConfiguracaoForm, NovoConferenteUserForm,
+    CultivarForm, PeneiraForm, CategoriaForm, 
+    TratamentoForm, ProdutoForm
+)
+
 @login_required
 def configuracoes(request):
     config = Configuracao.get_solo()
     usuarios_conferentes = User.objects.filter(is_superuser=False)
+    
+    produtos = Produto.objects.select_related(
+        'cultivar', 'peneira', 'especie', 'categoria', 'tratamento'
+    ).all().order_by('-data_cadastro')
+    
+    cultivares = Cultivar.objects.all().order_by('nome')
+    peneiras = Peneira.objects.all().order_by('nome')
+    especies = Especie.objects.all().order_by('nome')
+    categorias = Categoria.objects.all().order_by('nome')
+    tratamentos = Tratamento.objects.all().order_by('nome')
 
     if request.method == 'POST':
         acao = request.POST.get('acao')
         
-        # --- Lógica de Usuários ---
-        if acao == 'add_conferente_user':
+        # ===== PRODUTOS =====
+        if acao == 'add_produto':
+            try:
+                cultivar_id = request.POST.get('cultivar')
+                codigo = request.POST.get('codigo', '').strip().upper()
+                descricao = request.POST.get('descricao', '').strip()
+                tipo = request.POST.get('tipo', '').strip()
+                empresa = request.POST.get('empresa', '').strip()
+                
+                if not cultivar_id or not codigo or not descricao:
+                    messages.error(request, "❌ Cultivar, Código e Descrição são obrigatórios!")
+                elif Produto.objects.filter(codigo=codigo).exists():
+                    messages.error(request, f"❌ Código '{codigo}' já existe!")
+                else:
+                    produto = Produto.objects.create(
+                        cultivar_id=cultivar_id,
+                        codigo=codigo,
+                        descricao=descricao,
+                        tipo=tipo if tipo else None,
+                        empresa=empresa if empresa else None,
+                        ativo=request.POST.get('ativo') == 'on'
+                    )
+                    
+                    if request.POST.get('peneira'):
+                        produto.peneira_id = request.POST.get('peneira')
+                    if request.POST.get('especie'):
+                        produto.especie_id = request.POST.get('especie')
+                    if request.POST.get('categoria'):
+                        produto.categoria_id = request.POST.get('categoria')
+                    if request.POST.get('tratamento'):
+                        produto.tratamento_id = request.POST.get('tratamento')
+                    
+                    produto.save()
+                    messages.success(request, f"✅ Produto '{produto.codigo}' cadastrado com sucesso!")
+                    
+            except Exception as e:
+                messages.error(request, f"❌ Erro ao cadastrar produto: {str(e)}")
+        
+        elif acao == 'delete_produto':
+            try:
+                produto_id = request.POST.get('id_item')
+                produto = Produto.objects.get(id=produto_id)
+                produto_codigo = produto.codigo
+                produto.delete()
+                messages.success(request, f"✅ Produto '{produto_codigo}' excluído!")
+            except Produto.DoesNotExist:
+                messages.error(request, "❌ Produto não encontrado!")
+            except Exception as e:
+                messages.error(request, f"❌ Erro ao excluir: {str(e)}")
+        
+        # ===== USUÁRIOS =====
+        elif acao == 'add_conferente_user':
             if not request.user.is_superuser:
-                messages.error(request, "Apenas Administradores podem criar usuários.")
+                messages.error(request, "❌ Apenas Administradores podem criar usuários.")
             else:
-                form = NovoConferenteUserForm(request.POST)
-                if form.is_valid():
+                username = request.POST.get('username', '').strip()
+                first_name = request.POST.get('first_name', '').strip()
+                
+                if not username or not first_name:
+                    messages.error(request, "❌ Usuário e nome são obrigatórios!")
+                elif User.objects.filter(username=username).exists():
+                    messages.error(request, f"❌ Usuário '{username}' já existe!")
+                else:
                     try:
                         u = User.objects.create_user(
-                            username=form.cleaned_data['username'], 
-                            password='conceito', 
-                            first_name=form.cleaned_data['first_name']
+                            username=username,
+                            password='conceito',
+                            first_name=first_name
                         )
-                        messages.success(request, f"Usuário '{u.username}' criado!")
+                        messages.success(request, f"✅ Usuário '{u.username}' criado! Senha: conceito")
                     except Exception as e:
-                        messages.error(request, f"Erro ao criar usuário: {e}")
+                        messages.error(request, f"❌ Erro ao criar usuário: {e}")
 
         elif acao == 'delete_conferente_user':
-             if request.user.is_superuser:
-                 try:
-                     uid = request.POST.get('id_item')
-                     u = User.objects.get(id=uid)
-                     if not u.is_superuser: 
-                         u.delete()
-                         messages.success(request, "Usuário removido.")
-                 except: pass
-
+            if request.user.is_superuser:
+                try:
+                    uid = request.POST.get('id_item')
+                    u = User.objects.get(id=uid)
+                    if not u.is_superuser: 
+                        u.delete()
+                        messages.success(request, "✅ Usuário removido.")
+                except:
+                    messages.error(request, "❌ Erro ao remover usuário.")
+        
+        # ===== CONFIGURAÇÃO GERAL =====
         elif acao == 'config_geral':
-             form = ConfiguracaoForm(request.POST, instance=config)
-             if form.is_valid(): form.save(); messages.success(request, "Salvo!")
+            form = ConfiguracaoForm(request.POST, instance=config)
+            if form.is_valid(): 
+                form.save()
+                messages.success(request, "✅ Configurações salvas!")
         
-        # --- Lógica de Cadastros Auxiliares ---
+        # ===== CADASTROS AUXILIARES =====
         elif acao == 'add_cultivar':
-             f = CultivarForm(request.POST); 
-             if f.is_valid(): f.save(); messages.success(request, "Cultivar adicionada.")
+            nome = request.POST.get('nome', '').strip()
+            if nome:
+                if not Cultivar.objects.filter(nome__iexact=nome).exists():
+                    Cultivar.objects.create(nome=nome)
+                    messages.success(request, f"✅ Cultivar '{nome}' adicionado!")
+                else:
+                    messages.warning(request, f"⚠️ Cultivar '{nome}' já existe!")
+            else:
+                messages.error(request, "❌ Nome do cultivar é obrigatório.")
         
-        elif acao == 'add_especie': # <--- NOVO: Adicionar Espécie
-             nome = request.POST.get('nome')
-             if nome:
-                 Especie.objects.get_or_create(nome=nome.strip().upper())
-                 messages.success(request, "Espécie adicionada.")
-
+        elif acao == 'add_especie':
+            nome = request.POST.get('nome', '').strip().upper()
+            if nome:
+                if not Especie.objects.filter(nome__iexact=nome).exists():
+                    Especie.objects.create(nome=nome)
+                    messages.success(request, f"✅ Espécie '{nome}' adicionada!")
+                else:
+                    messages.warning(request, f"⚠️ Espécie '{nome}' já existe!")
+            else:
+                messages.error(request, "❌ Nome da espécie é obrigatório.")
+        
         elif acao == 'add_peneira':
-             f = PeneiraForm(request.POST); 
-             if f.is_valid(): f.save(); messages.success(request, "Peneira adicionada.")
+            nome = request.POST.get('nome', '').strip()
+            if nome:
+                if not Peneira.objects.filter(nome__iexact=nome).exists():
+                    Peneira.objects.create(nome=nome)
+                    messages.success(request, f"✅ Peneira '{nome}' adicionada!")
+                else:
+                    messages.warning(request, f"⚠️ Peneira '{nome}' já existe!")
+            else:
+                messages.error(request, "❌ Nome da peneira é obrigatório.")
         
         elif acao == 'add_categoria':
-             f = CategoriaForm(request.POST); 
-             if f.is_valid(): f.save(); messages.success(request, "Categoria adicionada.")
+            nome = request.POST.get('nome', '').strip()
+            if nome:
+                if not Categoria.objects.filter(nome__iexact=nome).exists():
+                    Categoria.objects.create(nome=nome)
+                    messages.success(request, f"✅ Categoria '{nome}' adicionada!")
+                else:
+                    messages.warning(request, f"⚠️ Categoria '{nome}' já existe!")
+            else:
+                messages.error(request, "❌ Nome da categoria é obrigatório.")
         
         elif acao == 'add_tratamento':
-             f = TratamentoForm(request.POST); 
-             if f.is_valid(): f.save(); messages.success(request, "Tratamento adicionado.")
+            nome = request.POST.get('nome', '').strip()
+            if nome:
+                if not Tratamento.objects.filter(nome__iexact=nome).exists():
+                    Tratamento.objects.create(nome=nome)
+                    messages.success(request, f"✅ Tratamento '{nome}' adicionado!")
+                else:
+                    messages.warning(request, f"⚠️ Tratamento '{nome}' já existe!")
+            else:
+                messages.error(request, "❌ Nome do tratamento é obrigatório.")
         
-        # --- Lógica de Exclusão ---
+        # ===== EXCLUSÃO DE ITENS =====
         elif acao == 'delete_item':
-             tipo = request.POST.get('tipo_item')
-             uid = request.POST.get('id_item')
-             try:
-                 if tipo == 'cultivar': Cultivar.objects.get(id=uid).delete()
-                 elif tipo == 'especie': Especie.objects.get(id=uid).delete() # <--- NOVO
-                 elif tipo == 'peneira': Peneira.objects.get(id=uid).delete()
-                 elif tipo == 'categoria': Categoria.objects.get(id=uid).delete()
-                 elif tipo == 'tratamento': Tratamento.objects.get(id=uid).delete()
-                 messages.success(request, "Item removido.")
-             except Exception as e: 
-                 messages.error(request, f"Erro ao remover item (pode estar em uso): {e}")
+            tipo = request.POST.get('tipo_item')
+            item_id = request.POST.get('id_item')
+            
+            try:
+                if tipo == 'cultivar':
+                    item = Cultivar.objects.get(id=item_id)
+                    nome = item.nome
+                    item.delete()
+                    messages.success(request, f"✅ Cultivar '{nome}' removido!")
+                elif tipo == 'especie':
+                    item = Especie.objects.get(id=item_id)
+                    nome = item.nome
+                    item.delete()
+                    messages.success(request, f"✅ Espécie '{nome}' removida!")
+                elif tipo == 'peneira':
+                    item = Peneira.objects.get(id=item_id)
+                    nome = item.nome
+                    item.delete()
+                    messages.success(request, f"✅ Peneira '{nome}' removida!")
+                elif tipo == 'categoria':
+                    item = Categoria.objects.get(id=item_id)
+                    nome = item.nome
+                    item.delete()
+                    messages.success(request, f"✅ Categoria '{nome}' removida!")
+                elif tipo == 'tratamento':
+                    item = Tratamento.objects.get(id=item_id)
+                    nome = item.nome
+                    item.delete()
+                    messages.success(request, f"✅ Tratamento '{nome}' removido!")
+                else:
+                    messages.error(request, "❌ Tipo de item inválido!")
+                    
+            except Exception as e:
+                messages.error(request, f"❌ Erro ao remover item: {str(e)}")
 
         return redirect('sapp:configuracoes')
 
     context = {
         'form_config': ConfiguracaoForm(instance=config),
-        'cultivares': Cultivar.objects.all(),
-        'especies': Especie.objects.all(), # <--- Isso agora vai funcionar com o import
-        'peneiras': Peneira.objects.all(),
-        'categorias': Categoria.objects.all(),
-        'tratamentos': Tratamento.objects.all(),
+        'cultivares': cultivares,
+        'especies': especies,
+        'peneiras': peneiras,
+        'categorias': categorias,
+        'tratamentos': tratamentos,
         'usuarios_conferentes': usuarios_conferentes,
         'form_conf_user': NovoConferenteUserForm(),
+        'produtos': produtos,
     }
+    
     return render(request, 'sapp/configuracoes.html', context)
 
 
@@ -4152,3 +4326,101 @@ def editor_avancado(request, armazem_numero=1):
         'titulo_pagina': f'Editor Gráfico - Armazém {armazem.numero}',
     }
     return render(request, 'sapp/editor_avancado.html', context)
+
+
+
+# EM views.py - GARANTIR QUE ESTÁ CORRETO
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt  # Se precisar de POST, mas GET não precisa normalmente
+def api_buscar_produto(request):
+    """
+    API para buscar produto pelo código - BUSCA REAL DO BANCO DE DADOS
+    Método: GET
+    Parâmetro: codigo (string)
+    Retorno: JSON com {encontrado: bool, dados: dict, erro: string}
+    """
+    try:
+        # Log para debug
+        print("=" * 50)
+        print("API: Recebida requisição para buscar produto")
+        print(f"API: Método: {request.method}")
+        print(f"API: GET params: {dict(request.GET)}")
+        
+        # Apenas aceita GET
+        if request.method != 'GET':
+            return JsonResponse({
+                'encontrado': False,
+                'erro': 'Método não permitido. Use GET.'
+            }, status=405)
+        
+        # Pegar código da query string
+        codigo = request.GET.get('codigo', '').strip()
+        
+        if not codigo:
+            print("API: Erro - Código não fornecido")
+            return JsonResponse({
+                'encontrado': False, 
+                'erro': 'Código não fornecido'
+            }, status=400)
+        
+        print(f"API: Buscando produto com código: '{codigo}'")
+        
+        # Importar dentro da função para evitar problemas de importação circular
+        from .models import Produto
+        
+        # Buscar produto ativo pelo código
+        produto = Produto.objects.filter(codigo=codigo, ativo=True).first()
+        
+        if not produto:
+            print(f"API: Produto '{codigo}' não encontrado ou inativo")
+            return JsonResponse({
+                'encontrado': False, 
+                'erro': f'Produto "{codigo}" não encontrado ou inativo'
+            })
+        
+        print(f"API: Produto encontrado - ID: {produto.id}, Código: {produto.codigo}")
+        
+        # Preparar dados para resposta - USANDO OS CAMPOS REAIS DO SEU MODELO
+        dados = {
+            'codigo': produto.codigo,
+            'cultivar_id': str(produto.cultivar.id) if produto.cultivar else None,
+            'cultivar_nome': produto.cultivar.nome if produto.cultivar else '',
+            'peneira_id': str(produto.peneira.id) if produto.peneira else None,
+            'peneira_nome': produto.peneira.nome if produto.peneira else '',
+            'especie_id': str(produto.especie.id) if produto.especie else None,
+            'especie_nome': produto.especie.nome if produto.especie else '',
+            'categoria_id': str(produto.categoria.id) if produto.categoria else None,
+            'categoria_nome': produto.categoria.nome if produto.categoria else '',
+            'tratamento_id': str(produto.tratamento.id) if produto.tratamento else None,
+            'tratamento_nome': produto.tratamento.nome if produto.tratamento else '',
+            'empresa': produto.empresa or '',
+            'tipo': produto.tipo or '',
+            'descricao': produto.descricao or ''
+        }
+        
+        print(f"API: Dados preparados para retorno: {json.dumps(dados, indent=2, ensure_ascii=False)}")
+        
+        # Criar resposta
+        response_data = {
+            'encontrado': True, 
+            'dados': dados
+        }
+        
+        print("API: Retornando dados com sucesso")
+        print("=" * 50)
+        
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        print(f"API: ERRO INTERNO: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return JsonResponse({
+            'encontrado': False, 
+            'erro': f'Erro interno do servidor: {str(e)}'
+        }, status=500)

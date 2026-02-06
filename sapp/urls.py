@@ -84,6 +84,8 @@ urlpatterns = [
     path('api/ultimas-movimentacoes/', views.api_ultimas_movimentacoes, name='api_ultimas_movimentacoes'),
     path('api/itens-empenhos/', views.api_itens_empenhos, name='api_itens_empenhos'),
     
+
+    path('api/buscar-produto/', views.api_buscar_produto, name='api_buscar_produto'),
     # ============================================================================
     # APIs PARA MAPA (Canvas HTML5 - Sistema Novo)
     # ============================================================================
