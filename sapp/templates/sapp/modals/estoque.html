@@ -179,152 +179,162 @@
     .form-control, .form-select { border-radius: 8px; border: 1px solid #d1d5db; padding: 0.6rem 0.75rem; }
     .form-control:focus, .form-select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 </style>
+<!-- Carregamento da Biblioteca (Certifique-se de que está antes do seu script) -->
+<script src="https://unpkg.com/html5-qrcode"></script>
 
-<!-- SCRIPTS DE LOGICA APRIMORADA -->
 <script>
 /**
- * INVENTORY SCANNER MANAGER
- * Objeto responsável por gerenciar o ciclo de vida do scanner QR Code
+ * SISTEMA DE ESTOQUE - VERSÃO FINAL 3.0 (CORRIGIDA)
  */
-const InventoryScanner = {
-    html5QrCode: null,
-    isActive: false,
 
-    async start() {
-        if (this.isActive) return;
-        
-        const container = document.getElementById('scannerContainer');
-        container.style.display = 'flex';
-        
-        try {
-            if (!this.html5QrCode) {
-                this.html5QrCode = new Html5Qrcode("scanner-viewfinder");
+// Usamos var para evitar erro de "already declared" em caso de reload parcial
+var html5QrCodeInstance = null;
+
+const AppInventory = {
+    // --- 1. SCANNER ---
+    Scanner: {
+        async start() {
+            console.log("🎬 Iniciando tentativa de abertura de câmera...");
+            
+            // Verificação de emergência da biblioteca
+            if (typeof Html5Qrcode === 'undefined') {
+                console.error("❌ Erro: Biblioteca Html5Qrcode não carregada. Tentando carregar agora...");
+                await this.loadLibrary();
+                return;
             }
 
-            const config = {
-                fps: 15,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0
-            };
+            const container = document.getElementById('scannerContainer');
+            container.style.display = 'flex';
 
-            await this.html5QrCode.start(
-                { facingMode: "environment" }, 
-                config, 
-                this.onSuccess.bind(this)
-            );
-            this.isActive = true;
-        } catch (err) {
-            console.error("Erro ao iniciar câmera:", err);
-            alert("Não foi possível acessar a câmera. Verifique as permissões de HTTPS.");
+            try {
+                // Para qualquer instância anterior
+                if (html5QrCodeInstance) {
+                    try { await html5QrCodeInstance.stop(); } catch(e) {}
+                    html5QrCodeInstance.clear();
+                }
+
+                html5QrCodeInstance = new Html5Qrcode("scanner-viewfinder");
+
+                const config = {
+                    fps: 15,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                };
+
+                await html5QrCodeInstance.start(
+                    { facingMode: "environment" },
+                    config,
+                    (text) => this.onSuccess(text),
+                    (err) => {} // Erros silenciosos de frame-by-frame
+                );
+                
+                console.log("✅ Câmera iniciada com sucesso!");
+
+            } catch (err) {
+                console.error("💥 Falha ao abrir scanner:", err);
+                alert("Erro ao abrir câmera: " + err + "\nCertifique-se que o site é HTTPS.");
+                container.style.display = 'none';
+            }
+        },
+
+        async stop() {
+            if (html5QrCodeInstance) {
+                try {
+                    await html5QrCodeInstance.stop();
+                    html5QrCodeInstance.clear();
+                } catch(e) {
+                    console.warn("Aviso ao fechar scanner:", e);
+                }
+            }
+            document.getElementById('scannerContainer').style.display = 'none';
+        },
+
+        onSuccess(decodedText) {
+            console.log("🎯 QR Detectado:", decodedText);
+            
+            // Separa os dados (FORMATO: PRODUTO/LOTE)
+            const partes = decodedText.split('/');
+            const codProduto = partes[0] || "";
+            const lote = partes[1] || "";
+
+            document.getElementById('inputLoteEntrada').value = lote;
+            document.getElementById('inputProdutoEntrada').value = codProduto;
+
             this.stop();
+            
+            // Busca dados via API após o preenchimento
+            AppInventory.ProductAPI.buscar(codProduto);
+            
+            // Notificação visual
+            if (navigator.vibrate) navigator.vibrate(50);
+        },
+
+        // Carrega a lib dinamicamente se necessário
+        loadLibrary() {
+            return new Promise((resolve) => {
+                const script = document.createElement('script');
+                script.src = "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js";
+                script.onload = () => {
+                    console.log("📚 Biblioteca carregada via backup.");
+                    resolve();
+                };
+                document.head.appendChild(script);
+            });
         }
     },
 
-    async stop() {
-        if (this.html5QrCode && this.isActive) {
-            await this.html5QrCode.stop();
-        }
-        document.getElementById('scannerContainer').style.display = 'none';
-        this.isActive = false;
-    },
+    // --- 2. API DE BUSCA ---
+    ProductAPI: {
+        async buscar(codigo) {
+            if (!codigo) return;
+            const loader = document.getElementById('productLoader');
+            if (loader) loader.classList.remove('d-none');
 
-    onSuccess(decodedText) {
-        // Formato esperado: PRODUTO/LOTE/OUTRO
-        const parts = decodedText.split('/');
-        const codProduto = parts[0] || "";
-        const lote = parts[1] || "";
+            try {
+                // NOTA: Ajuste esta URL se seu projeto não estiver usando o nome de app 'sapp'
+                const response = await fetch(`{% url 'sapp:api_buscar_produto' %}?codigo=${encodeURIComponent(codigo)}`);
+                const data = await response.json();
 
-        // Preencher Lote
-        const inputLote = document.getElementById('inputLoteEntrada');
-        inputLote.value = lote;
-        inputLote.classList.add('field-success-animate');
+                if (data.encontrado) {
+                    console.log("✅ Dados da API:", data.dados);
+                    const form = document.getElementById('formNovaEntrada');
+                    const d = data.dados;
 
-        // Preencher Produto e disparar busca
-        const inputProd = document.getElementById('inputProdutoEntrada');
-        inputProd.value = codProduto;
-        
-        this.stop();
-        
-        // Disparar busca automática do produto após 300ms
-        setTimeout(() => buscarDadosProdutoReal(codProduto), 300);
-        
-        // Som de confirmação (opcional)
-        if (typeof Audio !== 'undefined') {
-            new Audio('https://assets.mixkit.co/active_storage/sfx/766/766-preview.mp3').play().catch(()=>{});
+                    const setVal = (name, val) => {
+                        const el = form.querySelector(`[name="${name}"]`);
+                        if (el && val) {
+                            el.value = val;
+                            el.style.backgroundColor = '#dcfce7'; // Verde claro de sucesso
+                            setTimeout(() => el.style.backgroundColor = '', 2000);
+                        }
+                    };
+
+                    setVal('cultivar', d.cultivar_id);
+                    setVal('peneira', d.peneira_id);
+                    setVal('categoria', d.categoria_id);
+                    setVal('tratamento', d.tratamento_id);
+                    setVal('especie', d.especie_id);
+                    setVal('empresa', d.empresa);
+                }
+            } catch (err) {
+                console.error("Erro API:", err);
+            } finally {
+                if (loader) loader.classList.add('d-none');
+            }
         }
     }
 };
 
-/**
- * BUSCA DE PRODUTO NA API DJANGO
- */
-async function buscarDadosProdutoReal(codigo) {
-    if (!codigo || codigo.length < 3) return;
-
-    const loader = document.getElementById('productLoader');
-    const alerts = document.getElementById('alertsArea');
-    const form = document.getElementById('formNovaEntrada');
-    
-    loader.classList.remove('d-none');
-    
-    try {
-        const response = await fetch(`{% url 'sapp:api_buscar_produto' %}?codigo=${encodeURIComponent(codigo)}`);
-        const data = await response.json();
-
-        if (data.encontrado) {
-            const d = data.dados;
-            
-            // Função utilitária para preencher selects e disparar efeito
-            const preencher = (name, val) => {
-                const el = form.querySelector(`[name="${name}"]`);
-                if (el && val) {
-                    el.value = val;
-                    el.classList.add('field-success-animate');
-                    setTimeout(() => el.classList.remove('field-success-animate'), 2000);
-                }
-            };
-
-            preencher('cultivar', d.cultivar_id);
-            preencher('peneira', d.peneira_id);
-            preencher('categoria', d.categoria_id);
-            preencher('tratamento', d.tratamento_id);
-            preencher('especie', d.especie_id);
-            preencher('empresa', d.empresa);
-
-            alerts.innerHTML = `
-                <div class="alert alert-success d-flex align-items-center mb-0 py-2">
-                    <i class="fas fa-check-double me-2"></i>
-                    <small>Dados de <strong>${d.cultivar_nome}</strong> carregados do banco.</small>
-                </div>
-            `;
-        } else {
-            alerts.innerHTML = `
-                <div class="alert alert-warning py-2 small">
-                    <i class="fas fa-exclamation-circle me-1"></i> Produto não encontrado no cadastro base.
-                </div>
-            `;
-        }
-    } catch (err) {
-        console.error("Erro API:", err);
-    } finally {
-        loader.classList.add('d-none');
+// --- INICIALIZAÇÃO ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Configura evento de saída do campo produto (manual)
+    const inputP = document.getElementById('inputProdutoEntrada');
+    if (inputP) {
+        inputP.addEventListener('blur', (e) => AppInventory.ProductAPI.buscar(e.target.value));
     }
-}
-
-// Escuta input manual do produto
-document.getElementById('inputProdutoEntrada').addEventListener('blur', function() {
-    buscarDadosProdutoReal(this.value);
-});
-
-// Autocomplete do Lote (Existente e aprimorado)
-document.getElementById('inputLoteEntrada').addEventListener('blur', function() {
-    // Se o usuário digitou um lote manualmente, tenta inferir se existe no estoque
-    // ou apenas segue o fluxo. O scanner já faz o trabalho principal.
-});
-
-// Fechar scanner no ESC
-document.addEventListener('keydown', (e) => {
-    if (e.key === "Escape" && InventoryScanner.isActive) InventoryScanner.stop();
+    
+    // Vincula função global para o botão onclick
+    window.InventoryScanner = AppInventory.Scanner;
 });
 </script>
 
