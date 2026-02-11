@@ -1,342 +1,378 @@
-<!-- === MODAL NOVA ENTRADA ATUALIZADO === -->
+<!-- ESTRUTURA DO MODAL -->
 <div class="modal fade" id="modalNovaEntrada" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            <!-- Header Estilizado -->
-            <div class="modal-header border-0 bg-primary text-white p-4">
-                <div class="d-flex align-items-center">
-                    <div class="bg-white bg-opacity-20 p-3 rounded-3 me-3">
-                        <i class="fas fa-truck-loading fs-3"></i>
-                    </div>
-                    <div>
-                        <h5 class="modal-title fw-bold mb-0">Nova Entrada de Estoque</h5>
-                        <small class="opacity-75">Registre a chegada de novos materiais ou produtos</small>
-                    </div>
-                </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+    <div class="modal-dialog modal-fullscreen-sm-down modal-xl modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0 rounded-4">
+            <!-- Header -->
+            <div class="modal-header bg-primary text-white border-0 py-3 rounded-top-4">
+                <h5 class="modal-title fw-bold d-flex align-items-center">
+                    <i class="bi bi-box-seam me-2"></i> Nova Entrada de Estoque
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <form method="POST" action="{% url 'sapp:nova_entrada' %}" enctype="multipart/form-data" id="formNovaEntrada">
+            <form id="formNovaEntrada" method="POST" action="{% url 'sapp:nova_entrada' %}" enctype="multipart/form-data">
                 {% csrf_token %}
-                <div class="modal-body p-4">
-                    <!-- ÁREA DE MENSAGENS -->
-                    <div id="alertsArea" class="mb-3"></div>
+                <div class="modal-body p-4 bg-light position-relative">
                     
-                    <div class="row g-4">
-                        <!-- SEÇÃO 1: IDENTIFICAÇÃO (DESTAQUE) -->
-                        <div class="col-12">
-                            <div class="p-3 rounded-3 bg-light border-start border-primary border-4">
-                                <div class="row g-3">
-                                    <!-- Lote com Scanner -->
-                                    <div class="col-md-7">
-                                        <label class="form-label fw-bold text-dark">
-                                            <i class="fas fa-barcode me-1 text-primary"></i> Número do Lote *
-                                        </label>
-                                        <div class="input-group">
-                                            <input type="text" name="lote" id="inputLoteEntrada" 
-                                                   class="form-control form-control-lg border-primary border-opacity-25" 
-                                                   required placeholder="Escaneie ou digite o lote"
-                                                   style="font-family: monospace; font-weight: bold; letter-spacing: 1px;">
-                                            <button type="button" class="btn btn-primary px-3" onclick="InventoryScanner.start()" title="Escanear QR Code">
-                                                <i class="fas fa-camera fa-lg"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <!-- Quantidade -->
-                                    <div class="col-md-5">
-                                        <label class="form-label fw-bold text-dark">
-                                            <i class="fas fa-layer-group me-1 text-primary"></i> Quantidade *
-                                        </label>
-                                        <input type="number" name="entrada" class="form-control form-control-lg text-center fw-bold" 
-                                               required min="1" placeholder="000">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Scanner Overlay -->
+                    <div id="scannerOverlay" class="d-none position-absolute top-0 start-0 w-100 h-100 bg-dark z-3 rounded-4 flex-column align-items-center justify-content-center">
+                        <div id="scannerReader" style="width: 100%; max-width: 500px;" class="overflow-hidden rounded-3 shadow"></div>
+                        <button type="button" class="btn btn-danger btn-lg mt-4 px-5 fw-bold" onclick="ScannerApp.stop()">
+                             Parar Câmera
+                        </button>
+                    </div>
 
-                        <!-- SEÇÃO 2: ORIGEM E LOCALIZAÇÃO -->
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Origem / Destino</label>
+                    <div class="row g-3">
+                        <!-- SEÇÃO 1: IDENTIFICAÇÃO -->
+                        <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-2">Identificação Principal</h6><hr class="mt-1"></div>
+                        
+                        <div class="col-md-8 position-relative">
+                            <label class="form-label small fw-bold">Número do Lote *</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-white"><i class="fas fa-route text-muted"></i></span>
-                                <input type="text" name="origem_destino" class="form-control" required placeholder="Ex: Produção Interna">
+                                <input type="text" name="lote" id="inputLote" class="form-control form-control-lg fw-bold" required autocomplete="off" placeholder="Digite o lote ou escaneie">
+                                <button type="button" class="btn btn-primary px-3" onclick="ScannerApp.start()" title="Escanear QR Code">
+                                    <i class="bi bi-qr-code-scan fs-5"></i>
+                                </button>
                             </div>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Endereço</label>
-                            <input type="text" name="endereco" class="form-control" required placeholder="P01-A02">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Armazém (AZ)</label>
-                            <input type="text" name="az" class="form-control" required placeholder="AZ-01">
+                            <!-- Dropdown Autocomplete Corrigido -->
+                            <div id="autoCompleteList" class="dropdown-menu shadow-lg w-100"></div>
                         </div>
 
-                        <!-- SEÇÃO 3: PRODUTO (INTELIGENTE) -->
-                        <div class="col-12 mt-4">
-                            <div class="d-flex align-items-center mb-3">
-                                <hr class="flex-grow-1 my-0">
-                                <span class="mx-3 fw-bold text-primary small text-uppercase">Dados Técnicos do Produto</span>
-                                <hr class="flex-grow-1 my-0">
-                            </div>
-                            
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label small fw-bold">Código do Produto (SKU)</label>
-                                    <div class="position-relative">
-                                        <input type="text" name="produto" id="inputProdutoEntrada" 
-                                               class="form-control bg-light fw-bold" 
-                                               placeholder="Busca automática via Lote/QR" autocomplete="off">
-                                        <div id="productLoader" class="spinner-border spinner-border-sm position-absolute end-0 top-50 translate-middle-y me-3 d-none text-primary"></div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small fw-bold">Cultivar</label>
-                                    <select name="cultivar" class="form-select bg-light" required>
-                                        <option value="">Aguardando código...</option>
-                                        {% for c in all_cultivares %}
-                                        <option value="{{ c.id }}">{{ c.nome }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small">Peneira</label>
-                                    <select name="peneira" class="form-select bg-light" required>
-                                        <option value="">Selecione...</option>
-                                        {% for p in all_peneiras %}
-                                        <option value="{{ p.id }}">{{ p.nome }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small">Categoria</label>
-                                    <select name="categoria" class="form-select bg-light" required>
-                                        <option value="">Selecione...</option>
-                                        {% for c in all_categorias %}
-                                        <option value="{{ c.id }}">{{ c.nome }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small">Tratamento</label>
-                                    <select name="tratamento" class="form-select bg-light">
-                                        <option value="">Nenhum</option>
-                                        {% for t in all_tratamentos %}
-                                        <option value="{{ t.id }}">{{ t.nome }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- SEÇÃO 4: OUTROS DETALHES -->
                         <div class="col-md-4">
-                            <label class="form-label small">Embalagem</label>
-                            <select name="embalagem" class="form-select">
-                                <option value="BAG">BIG BAG</option>
-                                <option value="SC">SACO (SC)</option>
+                            <label class="form-label small fw-bold">Quantidade *</label>
+                            <input type="number" name="entrada" id="inputQtd" class="form-control form-control-lg text-center fw-bold" required min="1" placeholder="0">
+                        </div>
+
+                        <!-- SEÇÃO 2: LOCALIZAÇÃO -->
+                        <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-3">Localização e Origem</h6><hr class="mt-1"></div>
+                        
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label small fw-bold">Origem / Destino *</label>
+                            <input type="text" name="origem_destino" id="inputOrigem" class="form-control" required placeholder="Ex: Produção Interna">
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label small fw-bold">Endereço *</label>
+                            <input type="text" name="endereco" id="inputEndereco" class="form-control text-uppercase" required placeholder="P01-A01">
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label small fw-bold">Armazém (AZ) *</label>
+                            <input type="text" name="az" id="inputAz" class="form-control text-uppercase" required placeholder="AZ-01">
+                        </div>
+                        <div class="col-md-6 col-lg-3">
+                            <label class="form-label small fw-bold">Cliente</label>
+                            <input type="text" name="cliente" id="inputCliente" class="form-control">
+                        </div>
+
+                        <!-- SEÇÃO 3: PRODUTO E DADOS TÉCNICOS -->
+                        <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-3">Dados do Produto e SKU</h6><hr class="mt-1"></div>
+                        
+                        <div class="col-md-12 col-lg-4">
+                            <label class="form-label small fw-bold">Código do Produto (SKU)</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" name="produto" id="inputSKU" class="form-control fw-bold" placeholder="Digite SKU para buscar dados">
+                            </div>
+                            <small id="skuLoading" class="text-primary d-none">Buscando dados...</small>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4">
+                            <label class="form-label small fw-bold">Espécie *</label>
+                            <select name="especie" id="selEspecie" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                {% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 col-lg-4">
+                            <label class="form-label small fw-bold">Cultivar *</label>
+                            <select name="cultivar" id="selCultivar" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                {% for c in all_cultivares %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small">Peso Unit. (kg)</label>
-                            <input type="number" step="0.01" name="peso_unitario" class="form-control" placeholder="0.00">
+                            <label class="form-label small fw-bold">Peneira *</label>
+                            <select name="peneira" id="selPeneira" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                {% for p in all_peneiras %}<option value="{{ p.id }}">{{ p.nome }}</option>{% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label small">Fotos</label>
-                            <input type="file" name="fotos" class="form-control" multiple accept="image/*">
+                            <label class="form-label small fw-bold">Categoria *</label>
+                            <select name="categoria" id="selCategoria" class="form-select" required>
+                                <option value="">Selecione...</option>
+                                {% for c in all_categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Tratamento</label>
+                            <select name="tratamento" id="selTratamento" class="form-select">
+                                <option value="">Nenhum tratamento</option>
+                                {% for t in all_tratamentos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}
+                            </select>
                         </div>
 
+                        <!-- SEÇÃO 4: COMPLEMENTO -->
+                        <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-3">Complementares</h6><hr class="mt-1"></div>
+
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Empresa</label>
+                            <input type="text" name="empresa" id="inputEmpresa" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Embalagem</label>
+                            <select name="embalagem" id="selEmbalagem" class="form-select">
+                                <option value="BAG">BIG BAG</option>
+                                <option value="SC">SACO (SC)</option>
+                                <option value="CX">CAIXA</option>
+                                <option value="PL">PALLET</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Peso Unit. (Kg)</label>
+                            <input type="number" step="0.01" name="peso_unitario" id="inputPeso" class="form-control" placeholder="0.00">
+                        </div>
                         <div class="col-12">
-                            <label class="form-label small">Observações</label>
-                            <textarea name="observacao" class="form-control" rows="2" placeholder="Notas adicionais..."></textarea>
+                            <label class="form-label small fw-bold">Fotos / Arquivos</label>
+                            <input type="file" name="fotos" class="form-control" multiple accept="image/*">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Observações Adicionais</label>
+                            <textarea name="observacao" id="inputObs" class="form-control" rows="2" placeholder="Notas, histórico ou avisos..."></textarea>
                         </div>
                     </div>
                 </div>
-                
-                <div class="modal-footer border-0 p-4 bg-light rounded-bottom-4">
-                    <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary px-5 fw-bold shadow">
-                        <i class="fas fa-check-circle me-2"></i> Confirmar Entrada
-                    </button>
+
+                <div class="modal-footer border-0 p-3 bg-white rounded-bottom-4">
+                    <button type="button" class="btn btn-light btn-lg px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-lg px-5 shadow fw-bold">Confirmar Registro</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- ESTILOS ADICIONAIS -->
+<!-- ESTILO -->
 <style>
-    .field-success-animate {
-        animation: pulseSuccess 1s ease-in-out;
-        border-color: #10b981 !important;
-        box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25) !important;
+    #autoCompleteList { max-height: 300px; overflow-y: auto; display: none; margin-top: 2px; border-radius: 8px; }
+    .autocomplete-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f1f1f1; }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .autocomplete-item:hover { background-color: #f8f9fa; }
+    .autocomplete-item strong { display: block; color: #0d6efd; font-family: monospace; }
+    .autocomplete-item small { display: block; color: #6c757d; font-size: 0.8rem; margin-top: 2px; }
+
+    @media (max-width: 575.98px) {
+        .modal-fullscreen-sm-down { width: 100vw; height: 100%; margin: 0; }
+        .modal-fullscreen-sm-down .modal-content { height: 100%; border-radius: 0 !important; }
+        .modal-fullscreen-sm-down .modal-body { overflow-y: auto; padding: 20px !important; }
+        .modal-footer { padding: 15px !important; flex-direction: column-reverse; }
+        .modal-footer .btn { width: 100%; margin: 5px 0; }
     }
-    @keyframes pulseSuccess {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.02); }
-        100% { transform: scale(1); }
-    }
-    .modal-content { border-radius: 1rem; overflow: hidden; }
-    .form-control, .form-select { border-radius: 8px; border: 1px solid #d1d5db; padding: 0.6rem 0.75rem; }
-    .form-control:focus, .form-select:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+    .is-invalid { border-color: #dc3545 !important; background-image: none !important; }
+    #scannerReader video { object-fit: cover !important; }
 </style>
-<!-- Carregamento da Biblioteca (Certifique-se de que está antes do seu script) -->
+
+<!-- SCRIPTS DE LÓGICA -->
 <script src="https://unpkg.com/html5-qrcode"></script>
-
 <script>
-/**
- * SISTEMA DE ESTOQUE - VERSÃO FINAL 3.0 (CORRIGIDA)
- */
+    const StockApp = {
+        debounce: null,
+        
+        init() {
+            this.setupAutocomplete();
+            this.setupSKUSearch();
+            this.setupValidation();
+            this.setupClean();
+        },
 
-// Usamos var para evitar erro de "already declared" em caso de reload parcial
-var html5QrCodeInstance = null;
+        // AUTOCOMPLETE LOTE (CORRIGIDO: item.dados)
+        setupAutocomplete() {
+            const input = document.getElementById('inputLote');
+            const list = document.getElementById('autoCompleteList');
 
-const AppInventory = {
-    // --- 1. SCANNER ---
-    Scanner: {
-        async start() {
-            console.log("🎬 Iniciando tentativa de abertura de câmera...");
+            input.addEventListener('input', (e) => {
+                clearTimeout(this.debounce);
+                const term = e.target.value;
+                if (term.length < 3) { list.style.display = 'none'; return; }
+
+                this.debounce = setTimeout(() => {
+                    fetch(`/api/autocomplete-lotes/?term=${encodeURIComponent(term)}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            list.innerHTML = '';
+                            if (data.length > 0) {
+                                list.style.display = 'block';
+                                data.forEach(item => {
+                                    const d = item.dados;
+                                    const div = document.createElement('div');
+                                    div.className = 'autocomplete-item';
+                                    div.innerHTML = `<strong>${d.lote}</strong><small>Prod: ${d.produto || 'N/A'} | End: ${d.endereco || '?'}</small>`;
+                                    div.addEventListener('mousedown', (evt) => {
+                                        evt.preventDefault();
+                                        this.fillFromData(d);
+                                    });
+                                    list.appendChild(div);
+                                });
+                            } else { list.style.display = 'none'; }
+                        });
+                }, 400);
+            });
+
+            // Corregido: Fechar ao perder foco mas permitir clique
+            input.addEventListener('blur', () => {
+                setTimeout(() => list.style.display = 'none', 200);
+            });
             
-            // Verificação de emergência da biblioteca
-            if (typeof Html5Qrcode === 'undefined') {
-                console.error("❌ Erro: Biblioteca Html5Qrcode não carregada. Tentando carregar agora...");
-                await this.loadLibrary();
-                return;
-            }
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !list.contains(e.target)) {
+                    list.style.display = 'none';
+                }
+            });
+        },
 
-            const container = document.getElementById('scannerContainer');
-            container.style.display = 'flex';
+        // BUSCA SKU (CORRIGIDO: encontrado / dados)
+        setupSKUSearch() {
+            const input = document.getElementById('inputSKU');
+            const loading = document.getElementById('skuLoading');
+
+            input.addEventListener('blur', () => {
+                const cod = input.value.trim();
+                if (!cod) return;
+
+                loading.classList.remove('d-none');
+                fetch(`/api/buscar-produto/?codigo=${encodeURIComponent(cod)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        loading.classList.add('d-none');
+                        // Lógica corrigida conforme a API:
+                        if (data.encontrado) {
+                            this.fillFields(data.dados);
+                        }
+                    })
+                    .catch(() => loading.classList.add('d-none'));
+            });
+        },
+
+        // POPULAR FORMULÁRIO (CORRIGIDO)
+        fillFromData(d) {
+            document.getElementById('inputLote').value = d.lote || '';
+            document.getElementById('inputSKU').value = d.produto || '';
+            document.getElementById('inputOrigem').value = d.origem_destino || '';
+            document.getElementById('inputEndereco').value = d.endereco || '';
+            document.getElementById('inputAz').value = d.az || '';
+            this.fillFields(d);
+            document.getElementById('autoCompleteList').style.display = 'none';
+            document.getElementById('inputQtd').focus();
+        },
+
+        fillFields(d) {
+            // Mapeamento corrigido para lidar com ids normais ou Django __id
+            const setValue = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val) el.value = val;
+            };
+
+            setValue('selEspecie', d.especie_id || d.especie__id);
+            setValue('selCultivar', d.cultivar_id || d.cultivar__id);
+            setValue('selPeneira', d.peneira_id || d.peneira__id);
+            setValue('selCategoria', d.categoria_id || d.categoria__id);
+            setValue('selTratamento', d.tratamento_id || d.tratamento__id);
+            
+            setValue('inputEmpresa', d.empresa);
+            setValue('inputCliente', d.cliente);
+            setValue('inputPeso', d.peso_unitario);
+            setValue('selEmbalagem', d.embalagem);
+        },
+
+        setupValidation() {
+            const form = document.getElementById('formNovaEntrada');
+            form.addEventListener('submit', (e) => {
+                const reqs = form.querySelectorAll('[required]');
+                let valid = true;
+                reqs.forEach(el => {
+                    if (!el.value.trim()) {
+                        el.classList.add('is-invalid');
+                        valid = false;
+                    } else { el.classList.remove('is-invalid'); }
+                });
+                if (!valid) { e.preventDefault(); alert("Campos obrigatórios pendentes."); }
+            });
+        },
+
+        setupClean() {
+            const modal = document.getElementById('modalNovaEntrada');
+            modal.addEventListener('hidden.bs.modal', () => {
+                document.getElementById('formNovaEntrada').reset();
+                ScannerApp.stop();
+            });
+        }
+    };
+
+    const ScannerApp = {
+        html5QrCode: null,
+        
+        async start() {
+            const overlay = document.getElementById('scannerOverlay');
+            overlay.classList.remove('d-none');
+            overlay.classList.add('d-flex');
 
             try {
-                // Para qualquer instância anterior
-                if (html5QrCodeInstance) {
-                    try { await html5QrCodeInstance.stop(); } catch(e) {}
-                    html5QrCodeInstance.clear();
+                if (!this.html5QrCode) {
+                    this.html5QrCode = new Html5Qrcode("scannerReader");
                 }
-
-                html5QrCodeInstance = new Html5Qrcode("scanner-viewfinder");
-
-                const config = {
-                    fps: 15,
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0
-                };
-
-                await html5QrCodeInstance.start(
-                    { facingMode: "environment" },
-                    config,
-                    (text) => this.onSuccess(text),
-                    (err) => {} // Erros silenciosos de frame-by-frame
-                );
-                
-                console.log("✅ Câmera iniciada com sucesso!");
-
-            } catch (err) {
-                console.error("💥 Falha ao abrir scanner:", err);
-                alert("Erro ao abrir câmera: " + err + "\nCertifique-se que o site é HTTPS.");
-                container.style.display = 'none';
-            }
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                await this.html5QrCode.start({ facingMode: "environment" }, config, (txt) => {
+                    const partes = txt.split('/');
+                    if (partes.length >= 2) {
+                        document.getElementById('inputSKU').value = partes[0];
+                        document.getElementById('inputLote').value = partes[1];
+                        // Trigger busca SKU automática
+                        document.getElementById('inputSKU').dispatchEvent(new Event('blur'));
+                        this.stop();
+                        setTimeout(() => document.getElementById('inputQtd').focus(), 300);
+                    }
+                });
+            } catch (err) { this.stop(); }
         },
 
         async stop() {
-            if (html5QrCodeInstance) {
-                try {
-                    await html5QrCodeInstance.stop();
-                    html5QrCodeInstance.clear();
-                } catch(e) {
-                    console.warn("Aviso ao fechar scanner:", e);
-                }
+            const overlay = document.getElementById('scannerOverlay');
+            if (this.html5QrCode && this.html5QrCode.isScanning) {
+                await this.html5QrCode.stop();
             }
-            document.getElementById('scannerContainer').style.display = 'none';
-        },
-
-        onSuccess(decodedText) {
-            console.log("🎯 QR Detectado:", decodedText);
-            
-            // Separa os dados (FORMATO: PRODUTO/LOTE)
-            const partes = decodedText.split('/');
-            const codProduto = partes[0] || "";
-            const lote = partes[1] || "";
-
-            document.getElementById('inputLoteEntrada').value = lote;
-            document.getElementById('inputProdutoEntrada').value = codProduto;
-
-            this.stop();
-            
-            // Busca dados via API após o preenchimento
-            AppInventory.ProductAPI.buscar(codProduto);
-            
-            // Notificação visual
-            if (navigator.vibrate) navigator.vibrate(50);
-        },
-
-        // Carrega a lib dinamicamente se necessário
-        loadLibrary() {
-            return new Promise((resolve) => {
-                const script = document.createElement('script');
-                script.src = "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js";
-                script.onload = () => {
-                    console.log("📚 Biblioteca carregada via backup.");
-                    resolve();
-                };
-                document.head.appendChild(script);
-            });
+            overlay.classList.replace('d-flex', 'd-none');
         }
-    },
+    };
 
-    // --- 2. API DE BUSCA ---
-    ProductAPI: {
-        async buscar(codigo) {
-            if (!codigo) return;
-            const loader = document.getElementById('productLoader');
-            if (loader) loader.classList.remove('d-none');
-
-            try {
-                // NOTA: Ajuste esta URL se seu projeto não estiver usando o nome de app 'sapp'
-                const response = await fetch(`{% url 'sapp:api_buscar_produto' %}?codigo=${encodeURIComponent(codigo)}`);
-                const data = await response.json();
-
-                if (data.encontrado) {
-                    console.log("✅ Dados da API:", data.dados);
-                    const form = document.getElementById('formNovaEntrada');
-                    const d = data.dados;
-
-                    const setVal = (name, val) => {
-                        const el = form.querySelector(`[name="${name}"]`);
-                        if (el && val) {
-                            el.value = val;
-                            el.style.backgroundColor = '#dcfce7'; // Verde claro de sucesso
-                            setTimeout(() => el.style.backgroundColor = '', 2000);
-                        }
-                    };
-
-                    setVal('cultivar', d.cultivar_id);
-                    setVal('peneira', d.peneira_id);
-                    setVal('categoria', d.categoria_id);
-                    setVal('tratamento', d.tratamento_id);
-                    setVal('especie', d.especie_id);
-                    setVal('empresa', d.empresa);
-                }
-            } catch (err) {
-                console.error("Erro API:", err);
-            } finally {
-                if (loader) loader.classList.add('d-none');
-            }
-        }
-    }
-};
-
-// --- INICIALIZAÇÃO ---
-document.addEventListener('DOMContentLoaded', () => {
-    // Configura evento de saída do campo produto (manual)
-    const inputP = document.getElementById('inputProdutoEntrada');
-    if (inputP) {
-        inputP.addEventListener('blur', (e) => AppInventory.ProductAPI.buscar(e.target.value));
-    }
-    
-    // Vincula função global para o botão onclick
-    window.InventoryScanner = AppInventory.Scanner;
-});
+    document.addEventListener('DOMContentLoaded', () => StockApp.init());
 </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

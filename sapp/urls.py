@@ -76,6 +76,8 @@ urlpatterns = [
     # ============================================================================
     path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
     path('api/autocomplete-entrada/', views.api_autocomplete_nova_entrada, name='api_autocomplete_entrada'),
+    path('api/autocomplete-lotes/', views.api_autocomplete_nova_entrada, name='api_autocomplete_nova_entrada'),
+    
     path('api/saldo/<int:id>/', views.api_saldo_lote, name='api_saldo_lote'),
     path('api/buscar-lotes/', views.api_buscar_lotes, name='api_buscar_lotes'),
     path('api/buscar-lote-completo/', views.api_buscar_lote_completo, name='api_buscar_lote_completo'),

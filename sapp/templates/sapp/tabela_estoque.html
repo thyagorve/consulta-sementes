@@ -1126,10 +1126,86 @@ function testarAPIManutalmente(codigoTeste = null) {
 }
 
 // 6. FUNÇÃO PARA ABRIR MODAL DE TRANSFERÊNCIA
+/**
+ * Função Premium para Abrir e Popular o Modal de Transferência
+ * @param {number} id - ID do item no banco de dados
+ */
 function abrirModalTransferencia(id) {
-    // Mantenha sua implementação existente
-    console.log("Abrir transferência para ID:", id);
-    // Sua implementação aqui
+    console.log("🚀 Iniciando Transferência/Ajuste para o ID:", id);
+
+    // 1. Localiza os Modais e o Formulário
+    const modalEditar = document.querySelector(`#modalEditar${id}`);
+    const modalTransfElement = document.getElementById('modalTransferencia');
+    const formTransf = document.getElementById('formTransferencia');
+
+    if (!modalEditar) {
+        console.error("❌ Erro: Modal de edição do item " + id + " não encontrado.");
+        return;
+    }
+
+    // 2. Atalho para pegar valores do Modal de Editar (que já tem os dados do banco)
+    const getVal = (name) => {
+        const field = modalEditar.querySelector(`[name="${name}"]`);
+        return field ? field.value : "";
+    };
+
+    // 3. Atualiza o Action do Form para o Django (Troca o '0' pelo ID real)
+    const urlBase = "{% url 'sapp:transferir' 0 %}";
+    formTransf.action = urlBase.replace('0', id);
+
+    // 4. Preenche os campos principais do Modal de Transferência
+    document.getElementById('transf_item_id').value = id;
+    document.getElementById('transf_lote_display').value = getVal('lote');
+    document.getElementById('transf_produto').value = getVal('produto');
+    document.getElementById('transf_cliente').value = getVal('cliente');
+    document.getElementById('transf_empresa').value = getVal('empresa');
+    document.getElementById('transf_peso').value = getVal('peso_unitario');
+    document.getElementById('transf_az').value = getVal('az');
+
+    // 5. Preenche os Selects (Dropdowns)
+    const setSelect = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+
+    setSelect('transf_especie', getVal('especie'));
+    setSelect('transf_embalagem', getVal('embalagem'));
+    setSelect('transf_cultivar', getVal('cultivar'));
+    setSelect('transf_peneira', getVal('peneira'));
+    setSelect('transf_categoria', getVal('categoria'));
+    setSelect('transf_tratamento', getVal('tratamento'));
+
+    // 6. Captura de Saldos e Infos de Exibição (Vindo da Tabela ou Modal Editar)
+    // Tenta pegar o saldo da tabela para garantir que é o valor mais atual
+    const row = document.querySelector(`tr[onclick*="details-${id}"]`) || document.querySelector(`tr[onclick*="toggleDetails(${id})"]`);
+    let saldoAtual = "0";
+    
+    if (row) {
+        // Busca o número grande de saldo dentro da linha da tabela
+        const saldoElement = row.querySelector('.fs-3, .fs-4, .fs-5');
+        if (saldoElement) {
+            saldoAtual = saldoElement.innerText.split(' ')[0].trim();
+        }
+    } else {
+        // Se não achar na tabela, tenta buscar no contexto do objeto (item.saldo) 
+        // ou deixa em branco se for edição pura.
+        saldoAtual = "0"; 
+    }
+
+    // Preenche os campos de leitura (readonly)
+    document.getElementById('transf_saldo_atual').innerText = saldoAtual;
+    document.getElementById('transf_saldo').value = saldoAtual;
+    document.getElementById('transf_entrada').value = getVal('entrada') || ""; // Quantidade inicial de entrada
+    document.getElementById('transf_endereco_atual').innerText = "Endereço Atual: " + getVal('endereco');
+
+    // 7. Configura a Quantidade padrão para transferência
+    const inputQtd = document.getElementById('transf_quantidade');
+    inputQtd.value = saldoAtual;   // Sugere transferir tudo
+    inputQtd.max = saldoAtual;     // Define o máximo permitido (segurança)
+
+    // 8. Abre o Modal de forma segura via Bootstrap
+    const modalBS = new bootstrap.Modal(modalTransfElement);
+    modalBS.show();
 }
 
 // 7. AUTO FOCUS EM INPUTS DE MODAL
