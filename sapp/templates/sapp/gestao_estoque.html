@@ -41,9 +41,6 @@
     .badge-saldo { font-size: 0.75rem; padding: 4px 8px; border-radius: 20px; font-weight: 600; }
     .badge-cliente { background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: white; font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; }
     .badge-empresa { background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; font-size: 0.75rem; padding: 3px 8px; border-radius: 20px; }
-    .badge-status-ativo { background: #198754; color: white; }
-    .badge-status-esgotado { background: #dc3545; color: white; }
-    .badge-status-bloqueado { background: #6c757d; color: white; }
     
     /* BUSCA */
     .search-container { position: relative; flex: 1; max-width: 400px; }
@@ -160,6 +157,7 @@
                     <tr>
                         <th data-column="az" data-type="text" onclick="showFilter(this, 'az', 'text')">AZ <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="lote" data-type="text" onclick="showFilter(this, 'lote', 'text')">Lote <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="produto" data-type="text" onclick="showFilter(this, 'produto', 'text')">Produto <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="cultivar" data-type="select" onclick="showFilter(this, 'cultivar', 'select')">Cultivar <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="peneira" data-type="select" onclick="showFilter(this, 'peneira', 'select')">Peneira <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="categoria" data-type="select" onclick="showFilter(this, 'categoria', 'select')">Categoria <i class="fa-solid fa-filter filter-indicator"></i></th>
@@ -167,16 +165,11 @@
                         <th data-column="saldo" data-type="number" onclick="showFilter(this, 'saldo', 'number')">Saldo <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="peso_unitario" data-type="number" onclick="showFilter(this, 'peso_unitario', 'number')">Peso Unit. <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="peso_total" data-type="number" onclick="showFilter(this, 'peso_total', 'number')">Peso Total <i class="fa-solid fa-filter filter-indicator"></i></th>
-
-                        <th data-column="especie" data-type="select" onclick="showFilter(this, 'especie', 'select')">
-                            Espécie <i class="fa-solid fa-filter filter-indicator"></i>
-                        </th>
-
+                        <th data-column="especie" data-type="select" onclick="showFilter(this, 'especie', 'select')">Espécie <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="tratamento" data-type="select" onclick="showFilter(this, 'tratamento', 'select')">Tratamento <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="embalagem" data-type="select" onclick="showFilter(this, 'embalagem', 'select')">Emb. <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="cliente" data-type="select" onclick="showFilter(this, 'cliente', 'select')">Cliente <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="empresa" data-type="select" onclick="showFilter(this, 'empresa', 'select')">Empresa <i class="fa-solid fa-filter filter-indicator"></i></th>
-                        <th data-column="status" data-type="select" onclick="showFilter(this, 'status', 'select')">Status <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="conferente" data-type="select" onclick="showFilter(this, 'conferente', 'select')">Conferente <i class="fa-solid fa-filter filter-indicator"></i></th>
                     </tr>
                 </thead>
@@ -187,6 +180,7 @@
                         title="Dê um clique duplo para ver detalhes">
                         <td><small class="text-muted">{{ item.az|default:"-" }}</small></td>
                         <td><span class="fw-bold text-primary">{{ item.lote }}</span></td>
+                        <td>{{ item.produto|default:"-" }}</td>
                         <td>{{ item.cultivar.nome }}</td>
                         <td>{{ item.peneira.nome }}</td>
                         <td>{{ item.categoria.nome }}</td>
@@ -203,12 +197,6 @@
                         <td><span class="badge {% if item.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">{{ item.get_embalagem_display }}</span></td>
                         <td>{% if item.cliente %}<span class="badge badge-cliente" title="{{ item.cliente }}"><i class="fas fa-user-tag me-1"></i>{{ item.cliente|truncatechars:15 }}</span>{% else %}-{% endif %}</td>
                         <td>{% if item.empresa %}<span class="badge badge-empresa">{{ item.empresa|truncatechars:15 }}</span>{% else %}-{% endif %}</td>
-                        <td>
-                            {% if item.status == 'ATIVO' %}<span class="badge badge-status-ativo">{{ item.status }}</span>
-                            {% elif item.status == 'ESGOTADO' %}<span class="badge badge-status-esgotado">{{ item.status }}</span>
-                            {% elif item.status == 'BLOQUEADO' %}<span class="badge badge-status-bloqueado">{{ item.status }}</span>
-                            {% else %}<span class="badge bg-secondary">{{ item.status }}</span>{% endif %}
-                        </td>
                         <td><small>{{ item.conferente.first_name|default:item.conferente.username }}</small></td>
                     </tr>
                     {% empty %}
@@ -237,7 +225,7 @@
             <div class="col-md-4">
                 <div class="pagination-controls">
                     {% if estoque.has_previous %}
-                    <a href="?page={{ estoque.previous_page_number }}&{{ url_params }}" class="pagination-btn" title="Anterior">
+                    <a href="?page={{ estoque.previous_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" class="pagination-btn" title="Anterior">
                         <i class="fa-solid fa-chevron-left"></i>
                     </a>
                     {% else %}
@@ -245,7 +233,7 @@
                     {% endif %}
                     
                     {% if estoque.number > 3 %}
-                    <a href="?page=1&{{ url_params }}" class="pagination-btn">1</a>
+                    <a href="?page=1{% if url_params %}&{{ url_params }}{% endif %}" class="pagination-btn">1</a>
                     <span class="pagination-dots">...</span>
                     {% endif %}
                     
@@ -254,18 +242,18 @@
                             {% if num == estoque.number %}
                             <span class="pagination-btn active">{{ num }}</span>
                             {% else %}
-                            <a href="?page={{ num }}&{{ url_params }}" class="pagination-btn">{{ num }}</a>
+                            <a href="?page={{ num }}{% if url_params %}&{{ url_params }}{% endif %}" class="pagination-btn">{{ num }}</a>
                             {% endif %}
                         {% endif %}
                     {% endfor %}
                     
                     {% if estoque.number < estoque.paginator.num_pages|add:'-2' %}
                     <span class="pagination-dots">...</span>
-                    <a href="?page={{ estoque.paginator.num_pages }}&{{ url_params }}" class="pagination-btn">{{ estoque.paginator.num_pages }}</a>
+                    <a href="?page={{ estoque.paginator.num_pages }}{% if url_params %}&{{ url_params }}{% endif %}" class="pagination-btn">{{ estoque.paginator.num_pages }}</a>
                     {% endif %}
                     
                     {% if estoque.has_next %}
-                    <a href="?page={{ estoque.next_page_number }}&{{ url_params }}" class="pagination-btn" title="Próximo">
+                    <a href="?page={{ estoque.next_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" class="pagination-btn" title="Próximo">
                         <i class="fa-solid fa-chevron-right"></i>
                     </a>
                     {% else %}
@@ -292,9 +280,7 @@
 <!-- DADOS IMPORTANTES DO BACKEND PARA O JS -->
 {{ filter_options|json_script:"filter-options-data" }}
 
-
 {% include 'sapp/modals/importacao.html' %}
-
 
 <!-- SCRIPT DE FILTRAGEM -->
 <script>

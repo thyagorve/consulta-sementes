@@ -121,10 +121,9 @@
                         <div class="col-md-4">
                             <label class="form-label small fw-bold">Embalagem</label>
                             <select name="embalagem" id="selEmbalagem" class="form-select">
-                                <option value="BAG">BIG BAG</option>
+                                <option value="BAG">BAG</option>
                                 <option value="SC">SACO (SC)</option>
-                                <option value="CX">CAIXA</option>
-                                <option value="PL">PALLET</option>
+
                             </select>
                         </div>
                         <div class="col-md-4">
@@ -388,6 +387,33 @@
                 {% csrf_token %}
                 <input type="hidden" name="item_id" id="transf_item_id">
                 <div class="modal-body">
+                    <!-- TIPO DE TRANSFERÊNCIA - NOVO CAMPO NO TOPO -->
+                    <div class="row mb-4 p-3 bg-light rounded border border-warning">
+                        <div class="col-12 mb-2">
+                            <h6 class="text-warning fw-bold border-bottom border-warning pb-2">
+                                <i class="fas fa-arrows-alt me-2"></i>Tipo de Transferência
+                            </h6>
+                        </div>
+                        <div class="col-12">
+                            <div class="d-flex flex-wrap gap-4 align-items-center">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="tipo_transferencia" id="tipo_normal" value="normal" checked>
+                                    <label class="form-check-label fw-bold" for="tipo_normal">
+                                        <i class="fas fa-exchange-alt text-primary me-1"></i>Transferência Normal
+                                    </label>
+                                    <small class="d-block text-muted mt-1 ms-3">Origem → Destino com criação de novo registro</small>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="tipo_transferencia" id="tipo_beneficiamento" value="beneficiamento">
+                                    <label class="form-check-label fw-bold" for="tipo_beneficiamento">
+                                        <i class="fas fa-industry text-success me-1"></i>Enviar para Beneficiamento
+                                    </label>
+                                    <small class="d-block text-muted mt-1 ms-3">Saída definitiva do estoque (baixa direta)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- SALDO DESTAQUE -->
                     <div class="text-center py-2 bg-light rounded border mb-3">
                         <small class="text-muted text-uppercase fw-bold">Saldo Atual</small>
@@ -395,11 +421,25 @@
                         <small class="text-muted" id="transf_endereco_atual">Endereço: </small>
                     </div>
 
-                    <div class="row mb-3 p-3 bg-warning bg-opacity-10 rounded border border-warning">
-                        <div class="col-12 mb-2"><h6 class="text-warning fw-bold border-bottom border-warning pb-2">Destino da Transferência</h6></div>
-                        <div class="col-6 mb-2"><label class="fw-bold">Novo Endereço *</label><input type="text" name="novo_endereco" class="form-control border-warning" required></div>
-                        <div class="col-3 mb-2"><label class="fw-bold">Qtd *</label><input type="number" name="quantidade" id="transf_quantidade" class="form-control border-warning fw-bold" required min="1"></div>
-                        <div class="col-3 mb-2"><label>AZ</label><input type="text" name="az" id="transf_az" class="form-control"></div>
+                    <!-- DESTINO - SEÇÃO QUE MUDA CONFORME O TIPO -->
+                    <div class="row mb-3 p-3 bg-opacity-10 rounded border" id="destino_section">
+                        <div class="col-12 mb-2">
+                            <h6 class="fw-bold border-bottom pb-2" id="destino_title">
+                                <i class="fas fa-arrow-right me-2"></i>Destino da Transferência
+                            </h6>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <label class="fw-bold" id="endereco_label">Novo Endereço *</label>
+                            <input type="text" name="novo_endereco" id="transf_novo_endereco" class="form-control" required>
+                        </div>
+                        <div class="col-3 mb-2">
+                            <label class="fw-bold">Quantidade *</label>
+                            <input type="number" name="quantidade" id="transf_quantidade" class="form-control fw-bold" required min="1">
+                        </div>
+                        <div class="col-3 mb-2">
+                            <label>AZ</label>
+                            <input type="text" name="az" id="transf_az" class="form-control">
+                        </div>
                     </div>
 
                     <div class="row g-2">
@@ -431,9 +471,6 @@
                             <select name="embalagem" id="transf_embalagem" class="form-select">
                                 <option value="BAG">BAG</option>
                                 <option value="SC">Saco</option>
-                                <option value="CX">Caixa</option>
-                                <option value="FD">Fardo</option>
-                                <option value="PL">Pallets</option>
                             </select>
                         </div>
                         <div class="col-3"><label>Saldo</label><input type="text" id="transf_saldo" class="form-control bg-light" readonly></div>
@@ -499,7 +536,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-warning fw-bold text-white">
+                    <button type="submit" class="btn btn-warning fw-bold text-white" id="btn_confirmar_transferencia">
                         <i class="fas fa-exchange-alt me-1"></i>Confirmar Transferência
                     </button>
                 </div>
@@ -507,6 +544,68 @@
         </div>
     </div>
 </div>
+
+<!-- JavaScript para controle dinâmico do modal -->
+<script>
+(function() {
+    // Aguarda o DOM carregar completamente
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTransferModal);
+    } else {
+        initTransferModal();
+    }
+
+    function initTransferModal() {
+        // Radio buttons
+        const tipoNormal = document.getElementById('tipo_normal');
+        const tipoBeneficiamento = document.getElementById('tipo_beneficiamento');
+        const destinoSection = document.getElementById('destino_section');
+        const enderecoInput = document.getElementById('transf_novo_endereco');
+        const enderecoLabel = document.getElementById('endereco_label');
+        const destinoTitle = document.getElementById('destino_title');
+        const btnConfirmar = document.getElementById('btn_confirmar_transferencia');
+        
+        // Apenas prossegue se todos os elementos existirem
+        if (!tipoNormal || !tipoBeneficiamento || !destinoSection || !enderecoInput || !destinoTitle || !btnConfirmar) {
+            console.warn('Elementos do modal de transferência não encontrados');
+            return;
+        }
+
+        function atualizarInterfacePorTipo() {
+            if (tipoBeneficiamento.checked) {
+                // MODO BENEFICIAMENTO
+                destinoSection.classList.remove('border-warning');
+                destinoSection.classList.add('border-success', 'bg-success', 'bg-opacity-10');
+                destinoTitle.innerHTML = '<i class="fas fa-industry me-2"></i>Envio para Beneficiamento';
+                enderecoLabel.innerHTML = 'Destino na UBS (apenas referência)';
+                enderecoInput.required = false;
+                enderecoInput.placeholder = 'Ex: UBS - Linha 1 (opcional)';
+                btnConfirmar.innerHTML = '<i class="fas fa-industry me-1"></i>Confirmar Envio para Beneficiamento';
+                btnConfirmar.classList.add('btn-success');
+                btnConfirmar.classList.remove('btn-warning');
+            } else {
+                // MODO NORMAL
+                destinoSection.classList.remove('border-success', 'bg-success', 'bg-opacity-10');
+                destinoSection.classList.add('border-warning');
+                destinoTitle.innerHTML = '<i class="fas fa-arrow-right me-2"></i>Destino da Transferência';
+                enderecoLabel.innerHTML = 'Novo Endereço *';
+                enderecoInput.required = true;
+                enderecoInput.placeholder = '';
+                btnConfirmar.innerHTML = '<i class="fas fa-exchange-alt me-1"></i>Confirmar Transferência';
+                btnConfirmar.classList.add('btn-warning');
+                btnConfirmar.classList.remove('btn-success');
+            }
+        }
+
+        // Adiciona listeners
+        tipoNormal.addEventListener('change', atualizarInterfacePorTipo);
+        tipoBeneficiamento.addEventListener('change', atualizarInterfacePorTipo);
+        
+        // Estado inicial
+        atualizarInterfacePorTipo();
+    }
+})();
+</script>
 
 <!-- MODAIS DENTRO DO LOOP -->
 {% for item in estoque %}

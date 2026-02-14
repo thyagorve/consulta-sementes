@@ -1919,24 +1919,36 @@ def limpar_duplicados_manualmente(request):
     
     return JsonResponse({'success': False, 'error': 'Método não permitido'})
 
-# ================================================================
-# OUTRAS VIEWS (mantenha as suas views existentes)
-# ================================================================
+
+
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.db.models import Q, Sum
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from sapp.models import Estoque, Cultivar, Peneira, Categoria, Tratamento, Especie
 
 @login_required
 def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     """
-    View unificada.
-    - Se for 'tabela_estoque.html': Mostra TUDO por padrão.
-    - Se for 'gestao_estoque.html': Mostra só ATIVOS por padrão.
+    View para a página principal de estoque - MOSTRA TODOS OS LOTES
     """
     
-    # 1. QuerySet Base
+    # QuerySet Base - TODOS os lotes (inclusive zerados) PARA EXIBIÇÃO
     qs = Estoque.objects.all().select_related(
         'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
     ).order_by('-data_ultima_movimentacao', '-id')
+    
+    # QuerySet Base para MÉTRICAS - TODOS os lotes
+    qs_metrics = Estoque.objects.all()
+    
+    # FILTRO POR STATUS
+    status = request.GET.get('status', 'todos')
+    if status == 'disponivel':
+        qs = qs.filter(saldo__gt=0)
+    elif status == 'esgotado':
+        qs = qs.filter(saldo=0)
 
-    # 2. Busca Global
+    # Busca Global
     busca = request.GET.get('busca', '').strip()
     if busca:
         for termo in busca.split():
@@ -1950,72 +1962,64 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
                 Q(empresa__icontains=termo)
             )
 
-    # 3. Lógica de Status Inteligente
-    status = request.GET.get('status', '')
-    
-    # Se o usuário escolheu explicitamente um filtro, respeita ele
-    if status == 'esgotado':
-        qs = qs.filter(saldo__lte=0)
-    elif status == 'disponivel':
-        qs = qs.filter(saldo__gt=0)
-    elif status == 'todos':
-        pass # Mostra tudo
-    
-    # Se o usuário NÃO escolheu filtro (status vazio), aplicamos o padrão da página
-    elif not status:
-        if template_name == 'sapp/gestao_estoque.html':
-            # Página de Gestão: Padrão é só DISPONÍVEIS (limpa a visão)
-            qs = qs.filter(saldo__gt=0)
-            status = 'disponivel' # Marca no select
-        else:
-            # Página de Tabela/Histórico: Padrão é TODOS (mostra zerados)
-            status = 'todos' # Marca no select
-
-    # ... (Resto dos filtros de coluna e numéricos continuam igual) ...
+    # Aplicar filtros sequenciais
     filter_map = {
-        'az': 'az__in', 'lote': 'lote__in', 'cultivar': 'cultivar__nome__in',
-        'peneira': 'peneira__nome__in', 'categoria': 'categoria__nome__in',
-        'endereco': 'endereco__in', 'especie': 'especie__nome__in',
-        'tratamento': 'tratamento__nome__in', 'embalagem': 'embalagem__in',
-        'cliente': 'cliente__in', 'empresa': 'empresa__in',
-        
+        'az': 'az__in',
+        'lote': 'lote__in',
+        'produto': 'produto__in',
+        'cultivar': 'cultivar__nome__in',
+        'peneira': 'peneira__nome__in',
+        'categoria': 'categoria__nome__in',
+        'endereco': 'endereco__in',
+        'especie': 'especie__nome__in',
+        'tratamento': 'tratamento__nome__in',
+        'embalagem': 'embalagem__in',
+        'cliente': 'cliente__in',
+        'empresa': 'empresa__in',
+        'conferente': 'conferente__username__in'
     }
 
     for param, lookup in filter_map.items():
         values = request.GET.getlist(param)
         values = [v for v in values if v.strip()]
-        if values: qs = qs.filter(**{lookup: values})
+        if values:
+            qs = qs.filter(**{lookup: values})
 
+    # Filtros numéricos
     for field in ['saldo', 'peso_unitario', 'peso_total']:
         min_val = request.GET.get(f'min_{field}')
         max_val = request.GET.get(f'max_{field}')
-        if min_val: qs = qs.filter(**{f'{field}__gte': min_val})
-        if max_val: qs = qs.filter(**{f'{field}__lte': max_val})
+        if min_val:
+            qs = qs.filter(**{f'{field}__gte': min_val})
+        if max_val:
+            qs = qs.filter(**{f'{field}__lte': max_val})
 
-    # ... (Métricas e Contexto continuam igual) ...
+    # MÉTRICAS - Usando o queryset NÃO FILTRADO
+    entradas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('entrada'))['s'] or 0
+    entradas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('entrada'))['s'] or 0
+    entradas_total_sc = (entradas_bags * 25) + entradas_sc
     
-    # Métricas
-    def calc_metrics(queryset, field):
-        bags = queryset.filter(embalagem='BAG').aggregate(s=Sum(field))['s'] or 0
-        scs = queryset.filter(embalagem='SC').aggregate(s=Sum(field))['s'] or 0
-        return {'bags': bags, 'total_sc': (bags * 25) + scs}
-
-    dados_entrada = calc_metrics(qs, 'entrada')
-    dados_saida = calc_metrics(qs, 'saida')
-    dados_saldo = calc_metrics(qs, 'saldo')
+    saidas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saida'))['s'] or 0
+    saidas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saida'))['s'] or 0
+    saidas_total_sc = (saidas_bags * 25) + saidas_sc
     
-    total_itens = qs.count()
-    clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
+    saldo_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
+    saldo_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+    saldo_total_sc = (saldo_bags * 25) + saldo_sc
 
-    # Opções de Filtro (Base total para não limitar opções)
-    base_qs = Estoque.objects.all()
+    dados_entrada = {'bags': entradas_bags, 'sc': entradas_sc, 'total_sc': entradas_total_sc}
+    dados_saida = {'bags': saidas_bags, 'sc': saidas_sc, 'total_sc': saidas_total_sc}
+    dados_saldo = {'bags': saldo_bags, 'sc': saldo_sc, 'total_sc': saldo_total_sc}
+
+    # Opções de Filtro
     def get_options_list(field_lookup):
-        vals = base_qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
+        vals = qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
         return [str(v) for v in vals if v is not None and str(v).strip() != '']
 
     filter_options = {
         'az': get_options_list('az'),
         'lote': get_options_list('lote'),
+        'produto': get_options_list('produto'),
         'cultivar': get_options_list('cultivar__nome'),
         'peneira': get_options_list('peneira__nome'),
         'categoria': get_options_list('categoria__nome'),
@@ -2025,45 +2029,216 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         'embalagem': get_options_list('embalagem'),
         'cliente': get_options_list('cliente'),
         'empresa': get_options_list('empresa'),
-        'status': get_options_list('status'),
         'conferente': get_options_list('conferente__username')
     }
 
     # Paginação
     page_size = request.GET.get('page_size', 25)
-    paginator = Paginator(qs, int(page_size))
-    page_obj = paginator.get_page(request.GET.get('page', 1))
+    try:
+        page_size = int(page_size)
+    except (ValueError, TypeError):
+        page_size = 25
+    
+    paginator = Paginator(qs, page_size)
+    page_number = request.GET.get('page', 1)
+    
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
 
     query_params = request.GET.copy()
-    if 'page' in query_params: del query_params['page']
+    if 'page' in query_params:
+        del query_params['page']
     
+    total_itens = qs_metrics.count()
+    clientes_unicos = qs_metrics.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
+
     context = {
-        'estoque': page_obj, 'itens': page_obj,
-        'dados_entrada': dados_entrada, 'dados_saida': dados_saida, 'dados_saldo': dados_saldo,
-        'total_itens': total_itens, 'total_sc': dados_saldo['total_sc'], 'total_bags': dados_saldo['bags'],
-        'total_sc_fisico': qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0,
+        'estoque': page_obj,
+        'itens': page_obj,
+        'dados_entrada': dados_entrada,
+        'dados_saida': dados_saida,
+        'dados_saldo': dados_saldo,
+        'status': status,
+        'busca': busca,
+        'total_itens': total_itens,
+        'total_sc': saldo_total_sc,
+        'total_bags': saldo_bags,
+        'total_sc_fisico': saldo_sc,
         'clientes_unicos': clientes_unicos,
-        'filter_options': filter_options, 'url_params': query_params.urlencode(),
-        'page_sizes': [10, 25, 50, 100, 200], 'page_size': int(page_size),
-        'busca': busca, 'status': status, 
-        'all_cultivares': Cultivar.objects.all(), 'all_peneiras': Peneira.objects.all(),
-        'all_categorias': Categoria.objects.all(), 'all_tratamentos': Tratamento.objects.all(),
+        'filter_options': filter_options,
+        'url_params': query_params.urlencode(),
+        'page_sizes': [10, 25, 50, 100, 200],
+        'page_size': page_size,
+        'all_cultivares': Cultivar.objects.all(),
+        'all_peneiras': Peneira.objects.all(),
+        'all_categorias': Categoria.objects.all(),
+        'all_tratamentos': Tratamento.objects.all(),
         'all_especies': Especie.objects.all(),
     }
     
     return render(request, template_name, context)
 
-# --- FUNÇÃO WRAPPER PARA CORRIGIR O ERRO NO URLS.PY ---
-@login_required
-def gestao_estoque(request):
-    """
-    Esta função existe para satisfazer a rota 'estoque/gestao/' no urls.py
-    Ela reutiliza a lógica da lista_estoque mas força o template novo.
-    """
-    return lista_estoque(request, template_name='sapp/gestao_estoque.html')
-# Alias
 
+@login_required
+def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
+    """
+    View para gestão de estoque - MOSTRA APENAS LOTES COM SALDO > 0
+    """
     
+    # QuerySet Base - APENAS LOTES COM SALDO > 0
+    qs = Estoque.objects.filter(saldo__gt=0).select_related(
+        'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
+    ).order_by('-data_ultima_movimentacao', '-id')
+    
+    # QuerySet Base para MÉTRICAS - TODOS os lotes (para os cards superiores)
+    qs_metrics = Estoque.objects.all()
+    
+    # FILTRO POR STATUS - adaptado para gestão
+    status = request.GET.get('status', 'disponivel')
+    if status == 'disponivel':
+        qs = qs.filter(saldo__gt=0)
+    elif status == 'todos':
+        qs = Estoque.objects.all().select_related(
+            'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
+        ).order_by('-data_ultima_movimentacao', '-id')
+
+    # Busca Global
+    busca = request.GET.get('busca', '').strip()
+    if busca:
+        for termo in busca.split():
+            qs = qs.filter(
+                Q(lote__icontains=termo) | 
+                Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) | 
+                Q(especie__nome__icontains=termo) |
+                Q(endereco__icontains=termo) | 
+                Q(cliente__icontains=termo) |
+                Q(empresa__icontains=termo)
+            )
+
+    # Aplicar filtros sequenciais
+    filter_map = {
+        'az': 'az__in',
+        'lote': 'lote__in',
+        'produto': 'produto__in',
+        'cultivar': 'cultivar__nome__in',
+        'peneira': 'peneira__nome__in',
+        'categoria': 'categoria__nome__in',
+        'endereco': 'endereco__in',
+        'especie': 'especie__nome__in',
+        'tratamento': 'tratamento__nome__in',
+        'embalagem': 'embalagem__in',
+        'cliente': 'cliente__in',
+        'empresa': 'empresa__in',
+        'conferente': 'conferente__username__in'
+    }
+
+    for param, lookup in filter_map.items():
+        values = request.GET.getlist(param)
+        values = [v for v in values if v.strip()]
+        if values:
+            qs = qs.filter(**{lookup: values})
+
+    # Filtros numéricos
+    for field in ['saldo', 'peso_unitario', 'peso_total']:
+        min_val = request.GET.get(f'min_{field}')
+        max_val = request.GET.get(f'max_{field}')
+        if min_val:
+            qs = qs.filter(**{f'{field}__gte': min_val})
+        if max_val:
+            qs = qs.filter(**{f'{field}__lte': max_val})
+
+    # MÉTRICAS - Usando o queryset NÃO FILTRADO (qs_metrics) para os cards
+    entradas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('entrada'))['s'] or 0
+    entradas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('entrada'))['s'] or 0
+    entradas_total_sc = (entradas_bags * 25) + entradas_sc
+    
+    saidas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saida'))['s'] or 0
+    saidas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saida'))['s'] or 0
+    saidas_total_sc = (saidas_bags * 25) + saidas_sc
+    
+    saldo_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
+    saldo_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+    saldo_total_sc = (saldo_bags * 25) + saldo_sc
+
+    dados_entrada = {'bags': entradas_bags, 'sc': entradas_sc, 'total_sc': entradas_total_sc}
+    dados_saida = {'bags': saidas_bags, 'sc': saidas_sc, 'total_sc': saidas_total_sc}
+    dados_saldo = {'bags': saldo_bags, 'sc': saldo_sc, 'total_sc': saldo_total_sc}
+
+    # Opções de Filtro (baseadas no queryset filtrado)
+    def get_options_list(field_lookup):
+        vals = qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
+        return [str(v) for v in vals if v is not None and str(v).strip() != '']
+
+    filter_options = {
+        'az': get_options_list('az'),
+        'lote': get_options_list('lote'),
+        'produto': get_options_list('produto'),
+        'cultivar': get_options_list('cultivar__nome'),
+        'peneira': get_options_list('peneira__nome'),
+        'categoria': get_options_list('categoria__nome'),
+        'endereco': get_options_list('endereco'),
+        'especie': get_options_list('especie__nome'),
+        'tratamento': get_options_list('tratamento__nome'),
+        'embalagem': get_options_list('embalagem'),
+        'cliente': get_options_list('cliente'),
+        'empresa': get_options_list('empresa'),
+        'conferente': get_options_list('conferente__username')
+    }
+
+    # Paginação
+    page_size = request.GET.get('page_size', 25)
+    try:
+        page_size = int(page_size)
+    except (ValueError, TypeError):
+        page_size = 25
+    
+    paginator = Paginator(qs, page_size)
+    page_number = request.GET.get('page', 1)
+    
+    try:
+        page_obj = paginator.page(page_number)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    query_params = request.GET.copy()
+    if 'page' in query_params:
+        del query_params['page']
+    
+    total_itens = qs.count()  # Conta apenas itens com saldo > 0
+    clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
+
+    context = {
+        'estoque': page_obj,
+        'itens': page_obj,
+        'dados_entrada': dados_entrada,
+        'dados_saida': dados_saida,
+        'dados_saldo': dados_saldo,
+        'status': status,
+        'busca': busca,
+        'total_itens': total_itens,
+        'total_sc': saldo_total_sc,
+        'total_bags': saldo_bags,
+        'total_sc_fisico': saldo_sc,
+        'clientes_unicos': clientes_unicos,
+        'filter_options': filter_options,
+        'url_params': query_params.urlencode(),
+        'page_sizes': [10, 25, 50, 100, 200],
+        'page_size': page_size,
+        'all_cultivares': Cultivar.objects.all(),
+        'all_peneiras': Peneira.objects.all(),
+        'all_categorias': Categoria.objects.all(),
+        'all_tratamentos': Tratamento.objects.all(),
+        'all_especies': Especie.objects.all(),
+    }
+    
+    return render(request, template_name, context)
     
     
 # No arquivo views.py
@@ -2229,13 +2404,10 @@ def transferir(request, id):
         try:
             with transaction.atomic():
                 qtd = int(request.POST.get('quantidade', 0))
+                tipo_transferencia = request.POST.get('tipo_transferencia', 'normal')
                 novo_end = request.POST.get('novo_endereco', '').strip().upper()
                 
-                # Validações básicas
-                if not novo_end:
-                    messages.error(request, "❌ Novo endereço é obrigatório!")
-                    return redirect('sapp:lista_estoque')
-                
+                # === VALIDAÇÕES BÁSICAS (COMUNS A AMBOS OS TIPOS) ===
                 if qtd <= 0:
                     messages.error(request, "❌ Quantidade deve ser maior que zero!")
                     return redirect('sapp:lista_estoque')
@@ -2244,154 +2416,187 @@ def transferir(request, id):
                     messages.error(request, f"❌ Saldo insuficiente. Disponível: {origem.saldo}")
                     return redirect('sapp:lista_estoque')
                 
-                # 1. Retira da Origem (atualiza saída)
+                # Validação de endereço apenas para transferência normal
+                if tipo_transferencia == 'normal' and not novo_end:
+                    messages.error(request, "❌ Novo endereço é obrigatório para transferência normal!")
+                    return redirect('sapp:lista_estoque')
+                
+                # === 1. SEMPRE DAR BAIXA NA ORIGEM ===
                 origem.saida += qtd
                 origem.save()  # Saldo é recalculado automaticamente no save()
                 
-                # 2. BUSCAR OBJETOS RELACIONADOS
-                # Espécie
-                novo_especie_id = request.POST.get('especie')
-                if novo_especie_id and novo_especie_id.strip() != '':
-                    obj_especie = get_object_or_404(Especie, id=novo_especie_id)
-                else:
-                    obj_especie = origem.especie
-                
-                # Cultivar
-                cultivar_id = request.POST.get('cultivar')
-                if cultivar_id and cultivar_id.strip() != '':
-                    obj_cultivar = get_object_or_404(Cultivar, id=cultivar_id)
-                else:
-                    obj_cultivar = origem.cultivar
-                
-                # Peneira
-                peneira_id = request.POST.get('peneira')
-                if peneira_id and peneira_id.strip() != '':
-                    obj_peneira = get_object_or_404(Peneira, id=peneira_id)
-                else:
-                    obj_peneira = origem.peneira
-                
-                # Categoria
-                categoria_id = request.POST.get('categoria')
-                if categoria_id and categoria_id.strip() != '':
-                    obj_categoria = get_object_or_404(Categoria, id=categoria_id)
-                else:
-                    obj_categoria = origem.categoria
-                
-                # Tratamento
-                tratamento_id = request.POST.get('tratamento')
-                if tratamento_id and tratamento_id.strip() != '':
-                    obj_tratamento = get_object_or_404(Tratamento, id=tratamento_id)
-                else:
-                    obj_tratamento = origem.tratamento
-                
-                # 3. Processar peso unitário
-                peso_raw = request.POST.get('peso_unitario', origem.peso_unitario or '0')
-                try:
-                    peso_raw = str(peso_raw).replace(',', '.')
-                    if peso_raw.count('.') > 1:
-                        partes = peso_raw.split('.')
-                        peso_raw = f"{partes[0]}.{''.join(partes[1:])}"
-                    novo_peso = Decimal(peso_raw)
-                except:
-                    novo_peso = origem.peso_unitario or Decimal('0.00')
-                
-                # 4. VERIFICAR SE JÁ EXISTE REGISTRO IDÊNTICO NO NOVO ENDEREÇO COM SALDO POSITIVO
-                # Campos técnicos para comparação
-                campos_tecnicos = {
-                    'lote': origem.lote,
-                    'cultivar': obj_cultivar,
-                    'especie': obj_especie,
-                    'peneira': obj_peneira,
-                    'categoria': obj_categoria,
-                    'tratamento': obj_tratamento,
-                    'embalagem': request.POST.get('embalagem', origem.embalagem),
-                    'empresa': request.POST.get('empresa', origem.empresa or ''),
-                    'cliente': request.POST.get('cliente', origem.cliente or ''),
-                    'endereco': novo_end,
-                    'saldo__gt': 0,  # 🔥 CRÍTICO: APENAS REGISTROS COM SALDO POSITIVO!
-                }
-                
-                # Buscar registro existente com todos os campos técnicos idênticos E COM SALDO POSITIVO
-                destino_existente = Estoque.objects.filter(**campos_tecnicos).first()
-                
-                if destino_existente:
-                    # 5. SE EXISTIR E TIVER SALDO POSITIVO: SOMAR AO REGISTRO EXISTENTE
-                    saldo_anterior = destino_existente.saldo
-                    destino_existente.entrada += qtd
-                    destino_existente.saldo += qtd
+                # === 2. PROCESSAMENTO POR TIPO DE TRANSFERÊNCIA ===
+                if tipo_transferencia == 'beneficiamento':
+                    # ============================================
+                    # CASO 1: ENVIO PARA BENEFICIAMENTO
+                    # ============================================
                     
-                    # Atualizar campos que podem ter mudado
-                    destino_existente.peso_unitario = novo_peso
-                    destino_existente.empresa = request.POST.get('empresa', destino_existente.empresa or '')
-                    destino_existente.cliente = request.POST.get('cliente', destino_existente.cliente or '')
-                    destino_existente.az = request.POST.get('az', destino_existente.az or '')
-                    destino_existente.conferente = request.user
+                    # Criar histórico de beneficiamento (NÃO cria destino)
+                    descricao_beneficiamento = f"Enviado para beneficiamento – Quantidade: {qtd} {origem.embalagem}"
+                    if novo_end:
+                        descricao_beneficiamento += f" | Destino referência: {novo_end}"
                     
-                    # Atualizar observação
-                    obs_atual = destino_existente.observacao or ''
-                    nova_obs = request.POST.get('observacao', '')
-                    if nova_obs:
-                        if obs_atual:
-                            destino_existente.observacao = f"{obs_atual}\n[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
-                        else:
-                            destino_existente.observacao = f"[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
-                    
-                    destino_existente.save()
-                    
-                    destino = destino_existente
-                    mensagem_tipo = f"somado ao registro existente (Saldo anterior: {saldo_anterior})"
-                else:
-                    # 6. SE NÃO EXISTIR OU SE EXISTIR MAS ESTIVER ZERADO: CRIAR NOVO REGISTRO
-                    # Primeiro, verificar se existe algum registro zerado no mesmo endereço
-                    # (para manter o histórico limpo, não reativamos registros zerados)
-                    
-                    destino = Estoque.objects.create(
-                        lote=origem.lote,
-                        endereco=novo_end,
-                        entrada=qtd,
-                        saldo=qtd,
-                        conferente=request.user,
-                        origem_destino=f"Transferência de {origem.endereco}",
-                        
-                        # Campos de texto com fallback
-                        produto=request.POST.get('produto', origem.produto or ''),
-                        cliente=request.POST.get('cliente', origem.cliente or ''),
-                        empresa=request.POST.get('empresa', origem.empresa or ''),
-                        az=request.POST.get('az', origem.az or ''),
-                        peso_unitario=novo_peso,
-                        embalagem=request.POST.get('embalagem', origem.embalagem),
-                        observacao=request.POST.get('observacao', origem.observacao or ''),
-                        
-                        # Foreign Keys (Objetos, não IDs)
-                        especie=obj_especie,
-                        cultivar=obj_cultivar,
-                        peneira=obj_peneira,
-                        categoria=obj_categoria,
-                        tratamento=obj_tratamento,
+                    historico_beneficiamento = HistoricoMovimentacao.objects.create(
+                        estoque=origem,
+                        usuario=request.user,
+                        tipo='Beneficiamento',
+                        descricao=descricao_beneficiamento
                     )
-                    mensagem_tipo = "criado no novo endereço"
-                
-                # 7. Históricos (Saída da origem)
-                hist_saida = HistoricoMovimentacao.objects.create(
-                    estoque=origem,
-                    usuario=request.user,
-                    tipo='Transferência (Saída)',
-                    descricao=f"Transferido para {novo_end} ({destino.lote}) - Quantidade: {qtd} {origem.embalagem} | {mensagem_tipo}"
-                )
-                
-                # 8. Histórico (Entrada no destino)
-                hist_entrada = HistoricoMovimentacao.objects.create(
-                    estoque=destino,
-                    usuario=request.user,
-                    tipo='Transferência (Entrada)',
-                    descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem} | Novo saldo: {destino.saldo}"
-                )
-                
-                # 9. Salvar fotos na saída (origem)
-                for f in request.FILES.getlist('fotos'):
-                    FotoMovimentacao.objects.create(historico=hist_saida, arquivo=f)
                     
-                messages.success(request, f"✅ Transferência concluída! {qtd} unidades {mensagem_tipo} em {novo_end}")
+                    # Salvar fotos no histórico de beneficiamento
+                    for f in request.FILES.getlist('fotos'):
+                        FotoMovimentacao.objects.create(historico=historico_beneficiamento, arquivo=f)
+                    
+                    messages.success(
+                        request, 
+                        f"✅ Lote enviado para beneficiamento! Quantidade baixada: {qtd} {origem.embalagem}"
+                    )
+                    
+                else:  # tipo_transferencia == 'normal'
+                    # ============================================
+                    # CASO 2: TRANSFERÊNCIA NORMAL (FLUXO ORIGINAL)
+                    # ============================================
+                    
+                    # BUSCAR OBJETOS RELACIONADOS
+                    # Espécie
+                    novo_especie_id = request.POST.get('especie')
+                    if novo_especie_id and novo_especie_id.strip() != '':
+                        obj_especie = get_object_or_404(Especie, id=novo_especie_id)
+                    else:
+                        obj_especie = origem.especie
+                    
+                    # Cultivar
+                    cultivar_id = request.POST.get('cultivar')
+                    if cultivar_id and cultivar_id.strip() != '':
+                        obj_cultivar = get_object_or_404(Cultivar, id=cultivar_id)
+                    else:
+                        obj_cultivar = origem.cultivar
+                    
+                    # Peneira
+                    peneira_id = request.POST.get('peneira')
+                    if peneira_id and peneira_id.strip() != '':
+                        obj_peneira = get_object_or_404(Peneira, id=peneira_id)
+                    else:
+                        obj_peneira = origem.peneira
+                    
+                    # Categoria
+                    categoria_id = request.POST.get('categoria')
+                    if categoria_id and categoria_id.strip() != '':
+                        obj_categoria = get_object_or_404(Categoria, id=categoria_id)
+                    else:
+                        obj_categoria = origem.categoria
+                    
+                    # Tratamento
+                    tratamento_id = request.POST.get('tratamento')
+                    if tratamento_id and tratamento_id.strip() != '':
+                        obj_tratamento = get_object_or_404(Tratamento, id=tratamento_id)
+                    else:
+                        obj_tratamento = origem.tratamento
+                    
+                    # Processar peso unitário
+                    peso_raw = request.POST.get('peso_unitario', origem.peso_unitario or '0')
+                    try:
+                        peso_raw = str(peso_raw).replace(',', '.')
+                        if peso_raw.count('.') > 1:
+                            partes = peso_raw.split('.')
+                            peso_raw = f"{partes[0]}.{''.join(partes[1:])}"
+                        novo_peso = Decimal(peso_raw)
+                    except:
+                        novo_peso = origem.peso_unitario or Decimal('0.00')
+                    
+                    # VERIFICAR SE JÁ EXISTE REGISTRO IDÊNTICO NO NOVO ENDEREÇO COM SALDO POSITIVO
+                    campos_tecnicos = {
+                        'lote': origem.lote,
+                        'cultivar': obj_cultivar,
+                        'especie': obj_especie,
+                        'peneira': obj_peneira,
+                        'categoria': obj_categoria,
+                        'tratamento': obj_tratamento,
+                        'embalagem': request.POST.get('embalagem', origem.embalagem),
+                        'empresa': request.POST.get('empresa', origem.empresa or ''),
+                        'cliente': request.POST.get('cliente', origem.cliente or ''),
+                        'endereco': novo_end,
+                        'saldo__gt': 0,  # APENAS REGISTROS COM SALDO POSITIVO!
+                    }
+                    
+                    # Buscar registro existente com todos os campos técnicos idênticos E COM SALDO POSITIVO
+                    destino_existente = Estoque.objects.filter(**campos_tecnicos).first()
+                    
+                    if destino_existente:
+                        # SE EXISTIR E TIVER SALDO POSITIVO: SOMAR AO REGISTRO EXISTENTE
+                        saldo_anterior = destino_existente.saldo
+                        destino_existente.entrada += qtd
+                        destino_existente.saldo += qtd
+                        
+                        # Atualizar campos que podem ter mudado
+                        destino_existente.peso_unitario = novo_peso
+                        destino_existente.empresa = request.POST.get('empresa', destino_existente.empresa or '')
+                        destino_existente.cliente = request.POST.get('cliente', destino_existente.cliente or '')
+                        destino_existente.az = request.POST.get('az', destino_existente.az or '')
+                        destino_existente.conferente = request.user
+                        
+                        # Atualizar observação
+                        obs_atual = destino_existente.observacao or ''
+                        nova_obs = request.POST.get('observacao', '')
+                        if nova_obs:
+                            if obs_atual:
+                                destino_existente.observacao = f"{obs_atual}\n[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
+                            else:
+                                destino_existente.observacao = f"[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
+                        
+                        destino_existente.save()
+                        
+                        destino = destino_existente
+                        mensagem_tipo = f"somado ao registro existente (Saldo anterior: {saldo_anterior})"
+                    else:
+                        # SE NÃO EXISTIR OU SE EXISTIR MAS ESTIVER ZERADO: CRIAR NOVO REGISTRO
+                        destino = Estoque.objects.create(
+                            lote=origem.lote,
+                            endereco=novo_end,
+                            entrada=qtd,
+                            saldo=qtd,
+                            conferente=request.user,
+                            origem_destino=f"Transferência de {origem.endereco}",
+                            
+                            # Campos de texto com fallback
+                            produto=request.POST.get('produto', origem.produto or ''),
+                            cliente=request.POST.get('cliente', origem.cliente or ''),
+                            empresa=request.POST.get('empresa', origem.empresa or ''),
+                            az=request.POST.get('az', origem.az or ''),
+                            peso_unitario=novo_peso,
+                            embalagem=request.POST.get('embalagem', origem.embalagem),
+                            observacao=request.POST.get('observacao', origem.observacao or ''),
+                            
+                            # Foreign Keys (Objetos, não IDs)
+                            especie=obj_especie,
+                            cultivar=obj_cultivar,
+                            peneira=obj_peneira,
+                            categoria=obj_categoria,
+                            tratamento=obj_tratamento,
+                        )
+                        mensagem_tipo = "criado no novo endereço"
+                    
+                    # Históricos (Saída da origem)
+                    hist_saida = HistoricoMovimentacao.objects.create(
+                        estoque=origem,
+                        usuario=request.user,
+                        tipo='Transferência (Saída)',
+                        descricao=f"Transferido para {novo_end} ({destino.lote}) - Quantidade: {qtd} {origem.embalagem} | {mensagem_tipo}"
+                    )
+                    
+                    # Histórico (Entrada no destino)
+                    hist_entrada = HistoricoMovimentacao.objects.create(
+                        estoque=destino,
+                        usuario=request.user,
+                        tipo='Transferência (Entrada)',
+                        descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem} | Novo saldo: {destino.saldo}"
+                    )
+                    
+                    # Salvar fotos na saída (origem)
+                    for f in request.FILES.getlist('fotos'):
+                        FotoMovimentacao.objects.create(historico=hist_saida, arquivo=f)
+                    
+                    messages.success(request, f"✅ Transferência concluída! {qtd} unidades {mensagem_tipo} em {novo_end}")
                 
         except Exception as e:
             import traceback
