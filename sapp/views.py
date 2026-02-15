@@ -1777,62 +1777,82 @@ def lotes_para_remover(request):
 
 @login_required
 def consolidar_lotes_duplicados(request):
-    """Consolida lotes duplicados (mesmo lote + produto + endereço + AZ)"""
+    """Consolida lotes duplicados - AGORA CONSIDERA PESO UNITÁRIO"""
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                # Encontrar lotes duplicados exatos
                 from django.db.models import Count
                 
+                # 🔥 MUDANÇA: Agrupar por lote + produto + endereço + az + peso_unitario
                 duplicados = Estoque.objects.values(
-                    'lote', 'produto', 'endereco', 'az'
+                    'lote', 'produto', 'endereco', 'az', 'peso_unitario'  # 🔥 ADICIONADO peso_unitario
                 ).annotate(
                     total=Count('id')
                 ).filter(total__gt=1)
                 
                 consolidados_count = 0
+                ignorados_count = 0
                 
                 for dup in duplicados:
                     lote = dup['lote']
                     produto = dup['produto']
                     endereco = dup['endereco']
                     az = dup['az']
+                    peso_unitario = dup['peso_unitario']
                     
-                    print(f"🔍 Consolidando: {lote} | {produto} | {endereco} | {az}")
+                    print(f"🔍 Consolidando: {lote} | {produto} | {endereco} | {az} | Peso: {peso_unitario}")
                     
-                    # Buscar todos os registros duplicados
+                    # Buscar todos os registros com MESMO PESO
                     registros = Estoque.objects.filter(
                         lote=lote,
                         produto=produto,
                         endereco=endereco,
-                        az=az
+                        az=az,
+                        peso_unitario=peso_unitario  # 🔥 AGORA FILTRA POR PESO
                     ).order_by('id')
                     
                     if registros.count() > 1:
-                        # Manter o primeiro e somar os outros
+                        # Manter o primeiro e somar os outros (todos com mesmo peso)
                         manter = registros.first()
                         excluir = registros[1:]
                         
                         total_saldo = manter.saldo
-                        total_peso = manter.peso_total
+                        total_peso_total = manter.peso_total
                         
                         for reg in excluir:
-                            print(f"   ➕ Somando: {reg.id} (Saldo: {reg.saldo})")
+                            print(f"   ➕ Somando: {reg.id} (Saldo: {reg.saldo}, Peso: {reg.peso_unitario})")
                             total_saldo += reg.saldo
-                            total_peso += reg.peso_total
+                            total_peso_total += reg.peso_total
                             reg.delete()
                         
                         # Atualizar o registro mantido
                         manter.saldo = total_saldo
-                        manter.peso_total = total_peso
+                        manter.peso_total = total_peso_total
                         manter.save()
                         
                         consolidados_count += 1
-                        print(f"✅ Consolidado: {lote} | Saldo total: {total_saldo}")
+                        print(f"✅ Consolidado: {lote} | Saldo total: {total_saldo} | Peso unitário: {peso_unitario}")
+                
+                # 🔥 VERIFICAR LOTES COM MESMO CÓDIGO MAS PESOS DIFERENTES
+                lotes_com_pesos_diferentes = Estoque.objects.values(
+                    'lote', 'produto', 'endereco', 'az'
+                ).annotate(
+                    pesos_diferentes=Count('peso_unitario', distinct=True)
+                ).filter(pesos_diferentes__gt=1)
+                
+                for item in lotes_com_pesos_diferentes:
+                    print(f"⚠️ Lote {item['lote']} em {item['endereco']} tem múltiplos pesos - NÃO consolidado")
+                    ignorados_count += 1
+                
+                mensagem = f'{consolidados_count} grupos de lotes consolidados!'
+                if ignorados_count > 0:
+                    mensagem += f' {ignorados_count} lotes ignorados (possuem pesos diferentes)'
                 
                 return JsonResponse({
                     'success': True,
-                    'message': f'{consolidados_count} grupos de lotes consolidados!'
+                    'message': mensagem,
+                    'consolidados': consolidados_count,
+                    'ignorados': ignorados_count
                 })
                 
         except Exception as e:
@@ -2500,12 +2520,13 @@ def transferir(request, id):
                         if peso_raw.count('.') > 1:
                             partes = peso_raw.split('.')
                             peso_raw = f"{partes[0]}.{''.join(partes[1:])}"
-                        novo_peso = Decimal(peso_raw)
+                        novo_peso = Decimal(peso_raw).quantize(Decimal('0.01'))
                     except:
                         novo_peso = origem.peso_unitario or Decimal('0.00')
                     
-                    # VERIFICAR SE JÁ EXISTE REGISTRO IDÊNTICO NO NOVO ENDEREÇO COM SALDO POSITIVO
-                    campos_tecnicos = {
+                    # 🔥 CORREÇÃO: Separar os filtros corretamente
+                    # Primeiro, montar dicionário com todos os campos EXCETO saldo__gt
+                    campos_base = {
                         'lote': origem.lote,
                         'cultivar': obj_cultivar,
                         'especie': obj_especie,
@@ -2516,20 +2537,33 @@ def transferir(request, id):
                         'empresa': request.POST.get('empresa', origem.empresa or ''),
                         'cliente': request.POST.get('cliente', origem.cliente or ''),
                         'endereco': novo_end,
-                        'saldo__gt': 0,  # APENAS REGISTROS COM SALDO POSITIVO!
                     }
                     
-                    # Buscar registro existente com todos os campos técnicos idênticos E COM SALDO POSITIVO
-                    destino_existente = Estoque.objects.filter(**campos_tecnicos).first()
+                    # Buscar registro existente com MESMO PESO
+                    destino_existente = Estoque.objects.filter(
+                        **campos_base,
+                        peso_unitario=novo_peso,
+                        saldo__gt=0  # 🔥 AGORA CORRETO: um único argumento saldo__gt
+                    ).first()
+                    
+                    # 🔥 CORREÇÃO: Buscar registro com PESO DIFERENTE
+                    destino_peso_diferente = None
+                    if not destino_existente:
+                        destino_peso_diferente = Estoque.objects.filter(
+                            **campos_base,  # Mesmos campos base
+                            saldo__gt=0  # 🔥 AGORA CORRETO
+                        ).exclude(
+                            peso_unitario=novo_peso  # Exclui quem tem o mesmo peso
+                        ).first()
                     
                     if destino_existente:
-                        # SE EXISTIR E TIVER SALDO POSITIVO: SOMAR AO REGISTRO EXISTENTE
+                        # 🔥 CASO 1: MESMO PESO - PODE SOMAR
                         saldo_anterior = destino_existente.saldo
                         destino_existente.entrada += qtd
                         destino_existente.saldo += qtd
                         
                         # Atualizar campos que podem ter mudado
-                        destino_existente.peso_unitario = novo_peso
+                        destino_existente.peso_unitario = novo_peso  # Mantém o mesmo peso
                         destino_existente.empresa = request.POST.get('empresa', destino_existente.empresa or '')
                         destino_existente.cliente = request.POST.get('cliente', destino_existente.cliente or '')
                         destino_existente.az = request.POST.get('az', destino_existente.az or '')
@@ -2547,9 +2581,50 @@ def transferir(request, id):
                         destino_existente.save()
                         
                         destino = destino_existente
-                        mensagem_tipo = f"somado ao registro existente (Saldo anterior: {saldo_anterior})"
+                        mensagem_tipo = f"somado ao registro existente (Saldo anterior: {saldo_anterior}, Peso: {novo_peso} kg)"
+                        
+                        print(f"✅ Somando ao lote existente com mesmo peso: {origem.lote} | Peso: {novo_peso} kg")
+                        
+                    elif destino_peso_diferente:
+                        # 🔥 CASO 2: PESO DIFERENTE - NÃO SOMA, CRIA NOVO REGISTRO
+                        print(f"⚠️ Lote {origem.lote} já existe em {novo_end} com peso DIFERENTE ({destino_peso_diferente.peso_unitario} kg vs {novo_peso} kg)")
+                        
+                        # Avisar ao usuário
+                        messages.warning(
+                            request,
+                            f"⚠️ Já existe um lote {origem.lote} em {novo_end} com peso {destino_peso_diferente.peso_unitario} kg. "
+                            f"Como o peso é diferente ({novo_peso} kg), foi criado um NOVO registro."
+                        )
+                        
+                        # Criar NOVO registro (não somar)
+                        destino = Estoque.objects.create(
+                            lote=origem.lote,
+                            endereco=novo_end,
+                            entrada=qtd,
+                            saldo=qtd,
+                            conferente=request.user,
+                            origem_destino=f"Transferência de {origem.endereco}",
+                            
+                            # Campos de texto com fallback
+                            produto=request.POST.get('produto', origem.produto or ''),
+                            cliente=request.POST.get('cliente', origem.cliente or ''),
+                            empresa=request.POST.get('empresa', origem.empresa or ''),
+                            az=request.POST.get('az', origem.az or ''),
+                            peso_unitario=novo_peso,  # Peso NOVO
+                            embalagem=request.POST.get('embalagem', origem.embalagem),
+                            observacao=request.POST.get('observacao', origem.observacao or '') + f" [Peso: {novo_peso} kg - DIFERENTE DO EXISTENTE]",
+                            
+                            # Foreign Keys (Objetos, não IDs)
+                            especie=obj_especie,
+                            cultivar=obj_cultivar,
+                            peneira=obj_peneira,
+                            categoria=obj_categoria,
+                            tratamento=obj_tratamento,
+                        )
+                        mensagem_tipo = f"criado no novo endereço (peso diferente: {novo_peso} kg)"
+                        
                     else:
-                        # SE NÃO EXISTIR OU SE EXISTIR MAS ESTIVER ZERADO: CRIAR NOVO REGISTRO
+                        # 🔥 CASO 3: NÃO EXISTE - CRIAR NOVO REGISTRO
                         destino = Estoque.objects.create(
                             lote=origem.lote,
                             endereco=novo_end,
@@ -2589,7 +2664,7 @@ def transferir(request, id):
                         estoque=destino,
                         usuario=request.user,
                         tipo='Transferência (Entrada)',
-                        descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem} | Novo saldo: {destino.saldo}"
+                        descricao=f"Recebido de {origem.endereco} ({origem.lote}) - Quantidade: {qtd} {origem.embalagem} | Peso: {novo_peso} kg | Novo saldo: {destino.saldo}"
                     )
                     
                     # Salvar fotos na saída (origem)
@@ -2646,7 +2721,19 @@ def nova_entrada(request):
             with transaction.atomic():
                 lote = request.POST.get('lote', '').strip()
                 endereco = request.POST.get('endereco', '').strip().upper()
+                produto = request.POST.get('produto', '').strip()  # 🔥 CAPTURAR PRODUTO
                 qtd = int(request.POST.get('entrada', 0))
+                
+                # Processar peso unitário
+                peso_raw = request.POST.get('peso_unitario', '0')
+                try:
+                    peso_raw = str(peso_raw).replace(',', '.')
+                    if peso_raw.count('.') > 1:
+                        partes = peso_raw.split('.')
+                        peso_raw = f"{partes[0]}.{''.join(partes[1:])}"
+                    novo_peso = Decimal(peso_raw).quantize(Decimal('0.01'))
+                except:
+                    novo_peso = Decimal('0.00')
                 
                 # CORREÇÃO AQUI: Buscar o Objeto Espécie pelo ID
                 especie_id = request.POST.get('especie')
@@ -2665,16 +2752,55 @@ def nova_entrada(request):
                 trat_id = request.POST.get('tratamento')
                 tratamento = Tratamento.objects.filter(id=trat_id).first() if trat_id else None
 
-                # Verifica se já existe lote nesse endereço (para somar)
-                item = Estoque.objects.filter(lote=lote, endereco=endereco, cultivar=cultivar).first()
+                # 🔥 MUDANÇA CRÍTICA: Buscar item existente com MESMO LOTE, ENDEREÇO, PRODUTO, CULTIVAR E PESO
+                item = Estoque.objects.filter(
+                    lote=lote, 
+                    endereco=endereco,
+                    produto=produto,  # 🔥 ADICIONADO PRODUTO!
+                    cultivar=cultivar,
+                    peso_unitario=novo_peso
+                ).first()
                 
                 if item:
+                    # SOMA apenas se todos os campos forem iguais (incluindo PRODUTO)
                     item.entrada += qtd
                     item.observacao += f"\n[+ENTRADA {qtd} em {timezone.now().strftime('%d/%m')}]"
-                    item.especie = especie_obj # Atualiza espécie se mudou
-                    msg = "adicionados ao lote existente"
+                    item.especie = especie_obj
+                    msg = "adicionados ao lote existente (mesmo produto e peso)"
+                    print(f"✅ Somando ao lote existente: {lote} | Produto: {produto} | Peso: {novo_peso} | Qtd: {qtd}")
                 else:
-                    # CRIAÇÃO DO NOVO LOTE
+                    # 🔥 Verificar se existe lote com mesmo código mas PRODUTO DIFERENTE
+                    item_produto_diferente = Estoque.objects.filter(
+                        lote=lote,
+                        endereco=endereco,
+                        cultivar=cultivar
+                    ).exclude(produto=produto).first()
+                    
+                    if item_produto_diferente:
+                        print(f"⚠️ Lote {lote} já existe com produto DIFERENTE ('{item_produto_diferente.produto}' vs '{produto}')")
+                        messages.warning(
+                            request, 
+                            f"⚠️ Lote {lote} já existe no endereço {endereco} com produto '{item_produto_diferente.produto}'. "
+                            f"Não foi possível somar (produto diferente). Criado como novo registro."
+                        )
+                    
+                    # 🔥 Verificar se existe lote com mesmo código mas PESO DIFERENTE
+                    item_peso_diferente = Estoque.objects.filter(
+                        lote=lote,
+                        endereco=endereco,
+                        produto=produto,
+                        cultivar=cultivar
+                    ).exclude(peso_unitario=novo_peso).first()
+                    
+                    if item_peso_diferente:
+                        print(f"⚠️ Lote {lote} já existe com peso DIFERENTE ({item_peso_diferente.peso_unitario} kg vs {novo_peso} kg)")
+                        messages.warning(
+                            request, 
+                            f"⚠️ Lote {lote} já existe no endereço {endereco} com peso {item_peso_diferente.peso_unitario} kg. "
+                            f"Não foi possível somar (peso diferente). Criado como novo registro."
+                        )
+                    
+                    # CRIAÇÃO DO NOVO LOTE (sempre cria novo quando produto ou peso diferente)
                     item = Estoque(
                         lote=lote, 
                         endereco=endereco, 
@@ -2684,34 +2810,45 @@ def nova_entrada(request):
                         peneira=peneira, 
                         categoria=categoria, 
                         tratamento=tratamento,
-                        especie=especie_obj, # Passando o OBJETO, não o ID
+                        especie=especie_obj,
                         conferente=request.user,
-                        produto=request.POST.get('produto', ''),
+                        produto=produto,  # 🔥 USANDO O PRODUTO CAPTURADO
                         cliente=request.POST.get('cliente', ''),
                         empresa=request.POST.get('empresa', ''),
                         az=request.POST.get('az', ''),
                         origem_destino=request.POST.get('origem_destino', ''),
-                        peso_unitario=processar_decimal(request.POST.get('peso_unitario')),
+                        peso_unitario=novo_peso,
                         embalagem=request.POST.get('embalagem', 'BAG'),
                         observacao=request.POST.get('observacao', '')
                     )
                     msg = "criado com sucesso"
+                    print(f"🆕 Novo lote criado: {lote} | Produto: {produto} | Peso: {novo_peso}")
                 
                 item.save()
                 
+                # Calcular peso total
+                if item.peso_unitario and item.peso_unitario > 0:
+                    item.peso_total = Decimal(str(item.saldo)) * item.peso_unitario
+                    item.peso_total = item.peso_total.quantize(Decimal('0.01'))
+                    item.save()
+                
                 # Histórico e Fotos
+                descricao_historico = f"Entrada de {qtd} unidades. ({msg}) | Produto: {produto} | Peso unitário: {novo_peso} kg"
                 hist = HistoricoMovimentacao.objects.create(
-                    estoque=item, usuario=request.user, tipo='Entrada',
-                    descricao=f"Entrada de {qtd} unidades. ({msg})"
+                    estoque=item, 
+                    usuario=request.user, 
+                    tipo='Entrada',
+                    descricao=descricao_historico
                 )
+                
                 for f in request.FILES.getlist('fotos'):
                     FotoMovimentacao.objects.create(historico=hist, arquivo=f)
                 
-                messages.success(request, f"✅ Lote {lote} {msg}!")
+                messages.success(request, f"✅ Lote {lote} {msg}! Produto: {produto} | Peso: {novo_peso} kg")
                 
         except Exception as e:
             import traceback
-            print(traceback.format_exc()) # Ajuda no debug
+            print(traceback.format_exc())
             messages.error(request, f"Erro ao processar entrada: {str(e)}")
             
     return redirect('sapp:lista_estoque')
