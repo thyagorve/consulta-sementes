@@ -57,9 +57,7 @@ urlpatterns = [
     
     # ============================================================================
     # IMPORT/EXPORT
-    # ============================================================================
-    path('importar-estoque/', views.importar_estoque, name='importar_estoque'),
-    path('aprovar-importacao/', views.aprovar_importacao, name='aprovar_importacao'),
+
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
     
@@ -67,13 +65,6 @@ urlpatterns = [
     # DEBUG E MANUTENÇÃO
     # ============================================================================
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
-    path('limpar-cache-importacao/', views.limpar_cache_importacao, name='limpar_cache_importacao'),
-    path('lotes-para-remover/', views.lotes_para_remover, name='lotes_para_remover'),
-    path('consolidar-duplicados/', views.consolidar_lotes_duplicados, name='consolidar_lotes_duplicados'),
-
-    # ============================================================================
-    # APIs PARA ESTOQUE (JSON)
-    # ============================================================================
     path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
     path('api/autocomplete-entrada/', views.api_autocomplete_nova_entrada, name='api_autocomplete_entrada'),
     path('api/autocomplete-lotes/', views.api_autocomplete_nova_entrada, name='api_autocomplete_nova_entrada'),
@@ -85,13 +76,8 @@ urlpatterns = [
     path('api/estoque-resumo/', views.api_estoque_resumo, name='api_estoque_resumo'),
     path('api/ultimas-movimentacoes/', views.api_ultimas_movimentacoes, name='api_ultimas_movimentacoes'),
     path('api/itens-empenhos/', views.api_itens_empenhos, name='api_itens_empenhos'),
-    
 
     path('api/buscar-produto/', views.api_buscar_produto, name='api_buscar_produto'),
-    # ============================================================================
-    # APIs PARA MAPA (Canvas HTML5 - Sistema Novo)
-    # ============================================================================
-    # 1. APIs para o sistema Canvas (principal)
    
     path('api/salvar-todos-elementos/', views.salvar_todos_elementos, name='salvar_todos_elementos'),
   

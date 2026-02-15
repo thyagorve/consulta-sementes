@@ -2,19 +2,29 @@
 {% load static %}
 
 {% block content %}
-<div class="main-wrapper d-flex flex-column" style="height: 100vh; height: -webkit-fill-available; background-color: #0f172a; overflow: hidden;">
-    
-    <!-- BARRA DE CONTROLE ÚNICA LINHA (ULTRA SLIM) -->
-    <nav class="navbar navbar-dark bg-glass p-2 px-3 border-bottom border-secondary border-opacity-25 flex-shrink-0">
-        <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap gap-2">
-            
-            <!-- 1. IDENTIFICAÇÃO E STATUS -->
-            <div class="d-flex align-items-center gap-2 overflow-hidden">
-                <div>
-                    <h5 class="mb-0 fw-bold text-white"><i class="fas fa-warehouse text-warning me-2"></i>{{ armazem.nome }}</h5>
-                    <div class="text-white-50 small d-flex align-items-center gap-2 mt-1">
-                        <span class="badge bg-dark border border-secondary text-info p-1 px-2" id="statsTotal">0</span>
-                        <span class="badge bg-dark border border-secondary text-success p-1 px-2" id="statsOcupados">0</span>
+                <div class="main-wrapper d-flex flex-column" style="height: 100vh; height: -webkit-fill-available; background-color: #0f172a; overflow: hidden;">
+                    
+                    <!-- BARRA DE CONTROLE ÚNICA LINHA (ULTRA SLIM) -->
+                    <nav class="navbar navbar-dark bg-glass p-2 px-3 border-bottom border-secondary border-opacity-25 flex-shrink-0">
+                        <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap gap-2">
+                            
+                            <!-- 1. IDENTIFICAÇÃO E STATUS -->
+                            <div class="d-flex align-items-center gap-2 overflow-hidden">
+                            <div class="d-flex align-items-center flex-wrap gap-2">
+                    <!-- Nome do Armazém com Ícone -->
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-warehouse text-warning me-1 fs-6"></i>
+                        <h6 class="mb-0 fw-bold text-white">{{ armazem.nome }}</h6>
+                    </div>
+                    
+                    <!-- Badges de Estatísticas na mesma linha -->
+                    <div class="d-flex align-items-center gap-1">
+                        <span class="badge bg-dark border border-secondary text-info px-2 py-1 small" id="statsTotal">
+                            <i class="fas fa-cubes me-1"></i>0
+                        </span>
+                        <span class="badge bg-dark border border-secondary text-success px-2 py-1 small" id="statsOcupados">
+                            <i class="fas fa-check-circle me-1"></i>0
+                        </span>
                     </div>
                 </div>
 
@@ -54,12 +64,7 @@
             <!-- 3. BOTÕES DE AÇÃO E VISUALIZAÇÃO -->
             <div class="d-flex align-items-center gap-1 gap-md-2 flex-shrink-0">
                 <!-- Check de Quantidade Customizado -->
-                <div class="view-option d-none d-sm-flex">
-                    <input type="checkbox" id="btnToggleQuantidade" class="btn-check">
-                    <label class="btn btn-outline-light btn-sm border-0 py-2 fw-600 px-3" for="btnToggleQuantidade">
-                        <i class="fas fa-cubes me-1"></i> <span class="d-none d-xl-inline">VER QTDE</span>
-                    </label>
-                </div>
+
 
                 <div class="vr mx-1 opacity-25 text-white h-20px"></div>
 
@@ -309,7 +314,6 @@ document.addEventListener('DOMContentLoaded', function() {
     canvas.height = CANVAS_HEIGHT;
 
     let estado = {
-        mostrarQuantidade: false,
         termo: '',
         encontrados: new Set()
     };
@@ -382,44 +386,51 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnLimpar = document.getElementById('btnLimparPesquisa');
     const wrapperContador = document.getElementById('wrapperContador');
     const resContador = document.getElementById('resultadosContador');
-    const btnToggleQuantidade = document.getElementById('btnToggleQuantidade');
 
-    // CORREÇÃO: O select já tem onchange="location.href='/mapa-armazem/'+this.value+'/'"
-    // que está funcionando perfeitamente como no código original
-
-    // SISTEMA DE PESQUISA - busca apenas nas posições COM endereço
+    // ===== SISTEMA DE PESQUISA OTIMIZADO =====
+    let searchTimeout = null;
+    
     campoPesquisa.addEventListener('input', function() {
         estado.termo = this.value.trim().toLowerCase();
         
+        // Mostra/esconde botão de limpar
         if (estado.termo.length > 0) {
             btnLimpar.style.display = 'block';
-            wrapperContador.classList.remove('d-none');
-            
-            estado.encontrados.clear();
-            cache.indiceBusca.forEach((data, endereco) => {
-                if (data.termos.includes(estado.termo)) {
-                    estado.encontrados.add(endereco);
-                }
-            });
-            resContador.innerText = estado.encontrados.size;
         } else {
             btnLimpar.style.display = 'none';
-            wrapperContador.classList.add('d-none');
-            estado.encontrados.clear();
         }
-        desenharMapa();
+        
+        // Limpa timeout anterior
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        
+        // Só busca se tiver 3+ caracteres OU se estiver vazio
+        if (estado.termo.length >= 3 || estado.termo.length === 0) {
+            searchTimeout = setTimeout(() => {
+                if (estado.termo.length >= 3) {
+                    wrapperContador.classList.remove('d-none');
+                    
+                    estado.encontrados.clear();
+                    cache.indiceBusca.forEach((data, endereco) => {
+                        if (data.termos.includes(estado.termo)) {
+                            estado.encontrados.add(endereco);
+                        }
+                    });
+                    resContador.innerText = estado.encontrados.size;
+                } else {
+                    wrapperContador.classList.add('d-none');
+                    estado.encontrados.clear();
+                }
+                desenharMapa();
+            }, 300); // Delay de 300ms para não sobrecarregar
+        }
     });
 
     btnLimpar.onclick = () => { 
         campoPesquisa.value = ''; 
         campoPesquisa.dispatchEvent(new Event('input')); 
     };
-
-    // Botão Ver Quantidade
-    btnToggleQuantidade.addEventListener('change', function(e) {
-        estado.mostrarQuantidade = e.target.checked;
-        desenharMapa();
-    });
 
     function desenharMapa() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -499,22 +510,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 ctx.fillText('!', pos.x + pos.w - padding, pos.y + padding);
             }
 
-            if (estado.mostrarQuantidade && temDados) {
+            // ===== QUANTIDADE SEMPRE VISÍVEL =====
+            if (temDados) {
                 const quantidade = cache.totalPorEndereco[chave];
                 
+                // Escolhe a cor do texto baseado no fundo
                 ctx.fillStyle = encontrado ? '#92400e' : '#ffffff';
-                ctx.font = `bold ${Math.min(pos.h * 0.5, 12)}px 'Plus Jakarta Sans'`;
+                
+                // Tamanho da fonte proporcional ao retângulo
+                ctx.font = `bold ${Math.min(pos.h * 0.5, 14)}px 'Plus Jakarta Sans'`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
+                // Sombra para melhor legibilidade (só quando não está em destaque)
                 if (!encontrado) {
                     ctx.shadowColor = 'rgba(0,0,0,0.5)';
-                    ctx.shadowBlur = 2;
+                    ctx.shadowBlur = 3;
                     ctx.shadowOffsetY = 1;
                 }
                 
                 ctx.fillText(quantidade.toString(), pos.x + pos.w/2, pos.y + pos.h/2);
                 
+                // Reset sombra
                 ctx.shadowColor = 'transparent';
                 ctx.shadowBlur = 0;
                 ctx.shadowOffsetY = 0;
@@ -536,7 +553,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('statsOcupados').innerText = totalOcupados;
     }
 
-    // Interações Hover (Tooltip) - APENAS para posições COM endereço
+    // ===== INTERAÇÕES HOVER (TOOLTIP) =====
+    let hoverTimeout;
+    
     canvas.addEventListener('mousemove', function(e) {
         if (modalEl.classList.contains('show')) return;
         
@@ -545,6 +564,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const scaleY = canvas.height / rect.height;
         const x = (e.clientX - rect.left) * scaleX;
         const y = (e.clientY - rect.top) * scaleY;
+        
+        // Limpa timeout anterior
+        if (hoverTimeout) clearTimeout(hoverTimeout);
         
         let elementoEncontrado = null;
         for (let i = cache.posicoesComEndereco.length - 1; i >= 0; i--) {
@@ -569,87 +591,89 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         if (elementoEncontrado) {
-            const chave = elementoEncontrado.chave;
-            const dados = cache.dadosPorEndereco[chave];
-            
-            let html = `
-                <div style="padding: 12px 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 800; font-size: 14px;">
-                    ${chave || 'Sem endereço'}
-                    <span style="float:right; font-size: 11px; opacity: 0.8;">
-                        <i class="fas fa-mouse-pointer me-1"></i>Clique 2x
-                    </span>
-                </div>
-                <div style="padding: 16px;">
-            `;
-            
-            if (dados && dados.length > 0) {
-                const totalQuantidade = cache.totalPorEndereco[chave] || 0;
+            hoverTimeout = setTimeout(() => {
+                const chave = elementoEncontrado.chave;
+                const dados = cache.dadosPorEndereco[chave];
                 
-                html += `
-                    <div style="margin-bottom: 12px; padding: 8px; background: #f0f9ff; border-radius: 8px;">
-                        <div style="font-size: 11px; color: #0ea5e9; font-weight: 600; margin-bottom: 4px;">
-                            <i class="fas fa-boxes me-1"></i>Resumo
-                        </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 12px; color: #475569;">
-                                ${dados.length} lote${dados.length > 1 ? 's' : ''}
-                            </span>
-                            <span style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 600; font-size: 11px; padding: 4px 8px; border-radius: 10px;">
-                                ${totalQuantidade} unidades
-                            </span>
-                        </div>
+                let html = `
+                    <div style="padding: 12px 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 800; font-size: 14px;">
+                        ${chave || 'Sem endereço'}
+                        <span style="float:right; font-size: 11px; opacity: 0.8;">
+                            <i class="fas fa-mouse-pointer me-1"></i>Clique 2x
+                        </span>
                     </div>
+                    <div style="padding: 16px;">
                 `;
                 
-                dados.forEach((item, index) => {
-                    const isLast = index === dados.length - 1;
+                if (dados && dados.length > 0) {
+                    const totalQuantidade = cache.totalPorEndereco[chave] || 0;
+                    
                     html += `
-                        <div style="margin-bottom: ${isLast ? '0' : '8px'}; padding-bottom: ${isLast ? '0' : '8px'}; border-bottom: ${isLast ? 'none' : '1px dashed #e2e8f0'}">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
-                                <span style="background: #4f46e5; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">
-                                    ${item.lote}
+                        <div style="margin-bottom: 12px; padding: 8px; background: #f0f9ff; border-radius: 8px;">
+                            <div style="font-size: 11px; color: #0ea5e9; font-weight: 600; margin-bottom: 4px;">
+                                <i class="fas fa-boxes me-1"></i>Resumo
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 12px; color: #475569;">
+                                    ${dados.length} lote${dados.length > 1 ? 's' : ''}
                                 </span>
-                                <span style="font-size: 12px; color: #475569; font-weight: 600;">
-                                    ${item.qtd} ${item.embalagem || 'un'}
+                                <span style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 600; font-size: 11px; padding: 4px 8px; border-radius: 10px;">
+                                    ${totalQuantidade} unidades
                                 </span>
                             </div>
-                            ${item.cliente ? `
-                                <div style="font-size: 11px; color: #64748b;">
-                                    <i class="fas fa-user-tag me-1"></i>${item.cliente}
-                                </div>
-                            ` : ''}
                         </div>
                     `;
-                });
-            } else {
-                html += `
-                    <div style="text-align: center; padding: 20px 0;">
-                        <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
-                            <i class="fas fa-box-open" style="color: #94a3b8;"></i>
+                    
+                    dados.forEach((item, index) => {
+                        const isLast = index === dados.length - 1;
+                        html += `
+                            <div style="margin-bottom: ${isLast ? '0' : '8px'}; padding-bottom: ${isLast ? '0' : '8px'}; border-bottom: ${isLast ? 'none' : '1px dashed #e2e8f0'}">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+                                    <span style="background: #4f46e5; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">
+                                        ${item.lote}
+                                    </span>
+                                    <span style="font-size: 12px; color: #475569; font-weight: 600;">
+                                        ${item.qtd} ${item.embalagem || 'un'}
+                                    </span>
+                                </div>
+                                ${item.cliente ? `
+                                    <div style="font-size: 11px; color: #64748b;">
+                                        <i class="fas fa-user-tag me-1"></i>${item.cliente}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `
+                        <div style="text-align: center; padding: 20px 0;">
+                            <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                                <i class="fas fa-box-open" style="color: #94a3b8;"></i>
+                            </div>
+                            <span style="color: #94a3b8; font-size: 13px;">Posição Vazia</span>
                         </div>
-                        <span style="color: #94a3b8; font-size: 13px;">Posição Vazia</span>
-                    </div>
-                `;
-            }
-            
-            html += `</div>`;
-            
-            tooltip.innerHTML = html;
-            tooltip.style.display = 'block';
-            
-            const ttWidth = 300;
-            const ttHeight = tooltip.offsetHeight;
-            const margin = 15;
-            
-            let leftPos = e.clientX + margin;
-            let topPos = e.clientY + margin;
-            
-            if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - margin;
-            if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - margin;
-            
-            tooltip.style.left = leftPos + 'px';
-            tooltip.style.top = topPos + 'px';
-            canvas.style.cursor = 'pointer';
+                    `;
+                }
+                
+                html += `</div>`;
+                
+                tooltip.innerHTML = html;
+                tooltip.style.display = 'block';
+                
+                const ttWidth = 300;
+                const ttHeight = tooltip.offsetHeight;
+                const margin = 15;
+                
+                let leftPos = e.clientX + margin;
+                let topPos = e.clientY + margin;
+                
+                if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - margin;
+                if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - margin;
+                
+                tooltip.style.left = leftPos + 'px';
+                tooltip.style.top = topPos + 'px';
+                canvas.style.cursor = 'pointer';
+            }, 200); // Delay de 200ms para o tooltip aparecer
         } else {
             tooltip.style.display = 'none';
             canvas.style.cursor = 'default';
@@ -738,22 +762,49 @@ document.addEventListener('DOMContentLoaded', function() {
         bsModal.show();
     }
 
-    // Redimensionamento responsivo
+    // ===== OTIMIZAÇÕES DE RESPONSIVIDADE =====
+    
+    // Redimensionamento responsivo com debounce
     let resizeTimeout;
     window.addEventListener('resize', function() {
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
             desenharMapa();
-        }, 200);
+            
+            // Ajusta tamanho do canvas proporcionalmente
+            const container = document.getElementById('canvasContainer');
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            
+            // Mantém proporção
+            if (containerWidth < canvas.width) {
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
+            }
+        }, 150);
     });
 
+    // Fecha tooltip ao rolar
     window.addEventListener('scroll', () => tooltip.style.display = 'none');
 
-    // Foco automático no campo de pesquisa
-    campoPesquisa.focus();
+    // ===== AUTOFOCO INTELIGENTE =====
+    // Só foca se já tiver um termo de busca
+    if (campoPesquisa && campoPesquisa.value.trim() !== '') {
+        // Pequeno delay para mobile não abrir teclado sem necessidade
+        setTimeout(() => {
+            campoPesquisa.focus();
+            // Coloca o cursor no final do texto
+            campoPesquisa.setSelectionRange(campoPesquisa.value.length, campoPesquisa.value.length);
+        }, 100);
+    }
 
     // Inicializar
     desenharMapa();
+    
+    // Disparar evento de input inicial se houver valor
+    if (campoPesquisa.value.trim() !== '') {
+        campoPesquisa.dispatchEvent(new Event('input'));
+    }
 });
 </script>
 {% endblock %}

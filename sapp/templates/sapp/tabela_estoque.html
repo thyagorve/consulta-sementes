@@ -510,22 +510,26 @@
 {% include 'sapp/modals/estoque.html' %}
 
 <script>
-    // VARIÁVEIS GLOBAIS
+// VARIÁVEIS GLOBAIS
 let scannerAtivo = false;
 let html5QrCode = null;
 let scannerIniciando = false;
 
-// 1. INICIALIZAÇÃO
+// ============================================
+// 1. INICIALIZAÇÃO PRINCIPAL
+// ============================================
 document.addEventListener('DOMContentLoaded', function() {
     console.log("=== INICIALIZANDO SISTEMA ===");
     
-    // Inicializar o auto-complete do produto
+    // Inicializar componentes
     inicializarAutoCompleteProduto();
+    inicializarPesquisaAutomatica();
+    aplicarAutoFocoBusca();
+    inicializarAutoCompleteLote();
     
     // Configurar botão de scanner
     const btnScanner = document.querySelector('.btn-scan-qr');
     if (btnScanner) {
-        // Remover event listeners antigos
         const novoBtn = btnScanner.cloneNode(true);
         btnScanner.parentNode.replaceChild(novoBtn, btnScanner);
         
@@ -537,7 +541,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Adicionar evento para fechar scanner com ESC
+    // Evento para fechar scanner com ESC
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && scannerAtivo) {
             stopScanner();
@@ -554,10 +558,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Auto focus em inputs de modal
+    document.addEventListener('shown.bs.modal', function(event) {
+        const firstInput = event.target.querySelector('input:not([type="hidden"]), select, textarea');
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 100);
+        }
+    });
+    
     console.log("✅ Sistema inicializado com sucesso!");
 });
 
+// ============================================
 // 2. TOGGLE DETALHES (ACORDEÃO)
+// ============================================
 function toggleDetails(rowId) {
     const row = document.getElementById(rowId);
     const cid = rowId.split('-')[1];
@@ -580,7 +594,177 @@ function toggleDetails(rowId) {
     }
 }
 
-// 3. AUTO-COMPLETE DO PRODUTO - APENAS API REAL
+// ============================================
+// 3. AUTO FOCO INTELIGENTE NO CAMPO DE BUSCA
+// ============================================
+function aplicarAutoFocoBusca() {
+    const searchInput = document.querySelector('input[name="busca"]');
+    
+    if (searchInput && searchInput.value.trim() !== '') {
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+            console.log("🎯 Foco aplicado no campo de busca");
+        }, 100);
+    }
+}
+
+// ============================================
+// 4. PESQUISA AUTOMÁTICA APÓS 3 CARACTERES
+// ============================================
+function inicializarPesquisaAutomatica() {
+    console.log("🔍 Inicializando pesquisa automática...");
+    
+    const searchForm = document.querySelector('.search-container form');
+    const searchInput = document.querySelector('input[name="busca"]');
+    const statusSelect = document.querySelector('select[name="status"]');
+    
+    if (!searchInput) {
+        console.log("⚠️ Campo de busca não encontrado");
+        return;
+    }
+    
+    console.log("✅ Sistema de pesquisa automática configurado");
+    
+    let searchTimeout = null;
+    let currentValue = searchInput.value;
+    
+    function realizarBusca() {
+        const params = new URLSearchParams(window.location.search);
+        const valorBusca = searchInput.value.trim();
+        
+        if (valorBusca.length >= 3) {
+            params.set('busca', valorBusca);
+        } else if (valorBusca.length === 0) {
+            params.delete('busca');
+        } else {
+            return;
+        }
+        
+        if (statusSelect) {
+            params.set('status', statusSelect.value);
+        }
+        
+        params.set('page', '1');
+        
+        const novaUrl = window.location.pathname + '?' + params.toString();
+        console.log(`🔍 Buscando: "${valorBusca}"`);
+        window.location.href = novaUrl;
+    }
+    
+    if (searchForm) {
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (searchInput.value.length >= 3 || searchInput.value.length === 0) {
+                realizarBusca();
+            }
+        });
+    }
+    
+    searchInput.addEventListener('input', function() {
+        const novoValor = this.value.trim();
+        
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
+        }
+        
+        // Feedback visual
+        if (novoValor.length >= 3) {
+            this.style.borderColor = '#2563eb';
+            this.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+        } else if (novoValor.length > 0 && novoValor.length < 3) {
+            this.style.borderColor = '#f59e0b';
+            this.style.boxShadow = '0 0 0 3px rgba(245, 158, 11, 0.1)';
+        } else {
+            this.style.borderColor = '#e2e8f0';
+            this.style.boxShadow = 'none';
+        }
+        
+        if (novoValor.length >= 3 || novoValor.length === 0) {
+            if (novoValor !== currentValue) {
+                searchTimeout = setTimeout(() => {
+                    currentValue = novoValor;
+                    realizarBusca();
+                }, 500);
+            }
+        }
+    });
+    
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            if (this.value.length >= 3 || this.value.length === 0) {
+                currentValue = this.value.trim();
+                realizarBusca();
+            }
+        }
+    });
+    
+    if (statusSelect) {
+        statusSelect.addEventListener('change', function() {
+            if (searchInput.value.length >= 3) {
+                realizarBusca();
+            } else {
+                const params = new URLSearchParams(window.location.search);
+                params.set('status', this.value);
+                params.set('page', '1');
+                window.location.href = window.location.pathname + '?' + params.toString();
+            }
+        });
+    }
+    
+    // Melhorias visuais
+    searchInput.placeholder = "Pesquisar... (mín. 3 caracteres)";
+    
+    const searchContainer = searchInput.closest('.col-md-9');
+    if (searchContainer) {
+        const counterSpan = document.createElement('small');
+        counterSpan.className = 'position-absolute text-muted';
+        counterSpan.style.right = '20px';
+        counterSpan.style.top = '50%';
+        counterSpan.style.transform = 'translateY(-50%)';
+        counterSpan.style.fontSize = '11px';
+        counterSpan.style.background = 'white';
+        counterSpan.style.padding = '2px 8px';
+        counterSpan.style.borderRadius = '12px';
+        counterSpan.style.border = '1px solid #e2e8f0';
+        counterSpan.style.zIndex = '5';
+        counterSpan.id = 'charCounter';
+        
+        function atualizarContador() {
+            const len = searchInput.value.length;
+            if (len > 0) {
+                if (len < 3) {
+                    counterSpan.innerHTML = `<i class="fas fa-circle-exclamation text-warning me-1"></i>${len}/3`;
+                    counterSpan.style.color = '#f59e0b';
+                } else {
+                    counterSpan.innerHTML = `<i class="fas fa-check-circle text-success me-1"></i>${len}`;
+                    counterSpan.style.color = '#10b981';
+                }
+                counterSpan.style.display = 'block';
+            } else {
+                counterSpan.style.display = 'none';
+            }
+        }
+        
+        searchInput.addEventListener('input', atualizarContador);
+        searchContainer.style.position = 'relative';
+        searchContainer.appendChild(counterSpan);
+        atualizarContador();
+    }
+    
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'text-muted small mt-2';
+    infoDiv.innerHTML = '<i class="fas fa-info-circle me-1"></i> Digite pelo menos 3 caracteres para busca automática';
+    searchForm.appendChild(infoDiv);
+}
+
+// ============================================
+// 5. AUTO-COMPLETE DO PRODUTO
+// ============================================
 function inicializarAutoCompleteProduto() {
     const inputProduto = document.getElementById('inputProdutoEntrada');
     
@@ -591,16 +775,13 @@ function inicializarAutoCompleteProduto() {
     
     console.log("✅ Inicializando auto-complete do produto");
     
-    // Buscar produto quando o usuário terminar de digitar
     let debounceTimer;
     inputProduto.addEventListener('input', function() {
         clearTimeout(debounceTimer);
         const codigo = this.value.trim();
         
         if (codigo.length >= 2) {
-            // Mostrar loader
             mostrarLoaderProduto(true);
-            
             debounceTimer = setTimeout(() => {
                 buscarProdutoPorCodigo(codigo);
             }, 500);
@@ -610,7 +791,6 @@ function inicializarAutoCompleteProduto() {
         }
     });
     
-    // Buscar produto quando o campo perder o foco
     inputProduto.addEventListener('blur', function() {
         const codigo = this.value.trim();
         if (codigo.length >= 2) {
@@ -638,630 +818,158 @@ function inicializarAutoCompleteProduto() {
             loader.remove();
         }
     }
-    
-    function buscarProdutoPorCodigo(codigo) {
-        console.log(`🔍 Buscando produto REAL: "${codigo}"`);
-        
-        // URL da API REAL - do Django
-        const urlApi = "{% url 'sapp:api_buscar_produto' %}";
-        console.log(`🌐 URL da API: ${urlApi}`);
-        
-        fetch(`${urlApi}?codigo=${encodeURIComponent(codigo)}`, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            cache: 'no-store'
-        })
-        .then(response => {
-            console.log(`📊 Status: ${response.status} ${response.statusText}`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status} - ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            console.log("📦 Dados recebidos DA API REAL:", data);
-            mostrarLoaderProduto(false);
-            
-            if (data.encontrado) {
-                console.log("✅ Produto encontrado no banco de dados!");
-                preencherCamposComProdutoReal(data.dados);
-                mostrarAlertaSucesso(data.dados);
-            } else {
-                console.log("❌ Produto não encontrado:", data.erro);
-                mostrarAlertaNaoEncontrado(codigo, data.erro);
-            }
-        })
-        .catch(error => {
-            console.error("💥 Erro na API REAL:", error);
-            mostrarLoaderProduto(false);
-            mostrarAlertaErroAPI(error);
-        });
-    }
-    
-    function preencherCamposComProdutoReal(dados) {
-        console.log("🔄 Preenchendo campos com dados REAIS do banco:");
-        console.log("📝 Dados completos:", dados);
-        
-        // Preencher cada campo individualmente
-        const campos = [
-            { nome: 'cultivar', id: dados.cultivar_id, valor: dados.cultivar_id },
-            { nome: 'peneira', id: dados.peneira_id, valor: dados.peneira_id },
-            { nome: 'especie', id: dados.especie_id, valor: dados.especie_id },
-            { nome: 'categoria', id: dados.categoria_id, valor: dados.categoria_id },
-            { nome: 'tratamento', id: dados.tratamento_id, valor: dados.tratamento_id }
-        ];
-        
-        campos.forEach(campo => {
-            if (campo.valor) {
-                const select = document.querySelector(`[name="${campo.nome}"]`);
-                if (select) {
-                    select.value = campo.valor;
-                    // Disparar evento change
-                    const event = new Event('change', { bubbles: true });
-                    select.dispatchEvent(event);
-                    console.log(`   ✅ ${campo.nome}: definido como ${campo.valor}`);
-                } else {
-                    console.log(`   ⚠️ Select ${campo.nome} não encontrado`);
-                }
-            }
-        });
-        
-        // Preencher empresa
-        if (dados.empresa) {
-            const inputEmpresa = document.querySelector('[name="empresa"]');
-            if (inputEmpresa) {
-                inputEmpresa.value = dados.empresa;
-                console.log(`   ✅ empresa: "${dados.empresa}"`);
-            }
-        }
-        
-        console.log("✅ Todos os campos preenchidos com dados REAIS do banco");
-    }
-    
-    function mostrarAlertaSucesso(dados) {
-        const alertsArea = document.getElementById('alertsArea');
-        if (!alertsArea) return;
-        
-        const html = `
-            <div class="alert alert-success alert-dismissible fade show alert-auto-fill" role="alert">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-check-circle me-3 fs-4"></i>
-                    <div>
-                        <strong><i class="fas fa-database me-1"></i> Dados carregados do banco!</strong><br>
-                        <small class="text-muted">
-                            Produto: <strong>${dados.codigo}</strong> | 
-                            Cultivar: <strong>${dados.cultivar_nome}</strong> |
-                            Empresa: <strong>${dados.empresa || 'Não informada'}</strong>
-                        </small>
-                        <div class="mt-2 small">
-                            <span class="badge bg-success bg-opacity-25 text-dark me-1">Peneira: ${dados.peneira_nome || 'Não informada'}</span>
-                            <span class="badge bg-success bg-opacity-25 text-dark me-1">Espécie: ${dados.especie_nome || 'Não informada'}</span>
-                            <span class="badge bg-success bg-opacity-25 text-dark">Categoria: ${dados.categoria_nome || 'Não informada'}</span>
-                        </div>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar"></button>
-            </div>
-        `;
-        
-        alertsArea.innerHTML = html;
-    }
-    
-    function mostrarAlertaNaoEncontrado(codigo, erro) {
-        const alertsArea = document.getElementById('alertsArea');
-        if (!alertsArea) return;
-        
-        const html = `
-            <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-exclamation-triangle me-3"></i>
-                    <div>
-                        <strong>Produto não encontrado!</strong><br>
-                        <small>Código: <code>${codigo}</code></small><br>
-                        <small class="text-muted">${erro}</small>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        
-        alertsArea.innerHTML = html;
-    }
-    
-    function mostrarAlertaErroAPI(error) {
-        const alertsArea = document.getElementById('alertsArea');
-        if (!alertsArea) return;
-        
-        let mensagem = "Erro ao conectar com o servidor";
-        if (error.message.includes('404')) {
-            mensagem = "API não encontrada. Verifique se a view está configurada.";
-        }
-        
-        const html = `
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-times-circle me-3"></i>
-                    <div>
-                        <strong>Erro na busca!</strong><br>
-                        <small>${mensagem}</small><br>
-                        <small class="text-muted">${error.message}</small>
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        `;
-        
-        alertsArea.innerHTML = html;
-    }
-    
-    function esconderAlerta() {
-        const alertsArea = document.getElementById('alertsArea');
-        if (alertsArea) {
-            alertsArea.innerHTML = '';
-        }
-    }
 }
 
-// 4. SCANNER QR CODE - VERSÃO CORRIGIDA E FUNCIONAL
-function carregarBibliotecaScanner() {
-    return new Promise((resolve, reject) => {
-        if (typeof Html5Qrcode !== 'undefined') {
-            console.log("✅ Biblioteca de scanner já carregada");
-            resolve();
-            return;
-        }
-        
-        console.log("📚 Carregando biblioteca de scanner...");
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
-        script.onload = () => {
-            console.log("✅ Biblioteca de scanner carregada com sucesso");
-            resolve();
-        };
-        script.onerror = (error) => {
-            console.error("💥 Falha ao carregar biblioteca de scanner:", error);
-            reject(new Error('Falha ao carregar biblioteca do scanner'));
-        };
-        document.head.appendChild(script);
-    });
-}
-
-function startScanner() {
-    console.log("🎬 Iniciando scanner QR Code...");
-    
-    if (scannerIniciando) {
-        console.log("⏳ Scanner já está iniciando, aguarde...");
-        return;
-    }
-    
-    scannerIniciando = true;
-    
-    // Mostrar container do scanner imediatamente
-    const scannerContainer = document.getElementById('scannerContainer');
-    scannerContainer.style.display = 'flex';
-    
-    carregarBibliotecaScanner()
-        .then(() => {
-            scannerAtivo = true;
-            
-            // Inicializar scanner se não existir
-            if (!html5QrCode) {
-                html5QrCode = new Html5Qrcode("scanner-viewfinder");
-                console.log("✅ Scanner inicializado");
-            }
-            
-            // Verificar se já está escaneando
-            if (html5QrCode && html5QrCode.isScanning) {
-                console.log("✅ Scanner já está ativo");
-                scannerIniciando = false;
-                return;
-            }
-            
-            // Configurações simplificadas do scanner
-            const config = {
-                fps: 10,
-                qrbox: { width: 250, height: 250 },
-                aspectRatio: 1.0,
-                rememberLastUsedCamera: true
-            };
-            
-            // Opções da câmera SIMPLIFICADAS
-            const cameraConfig = "environment";
-            
-            console.log("📸 Iniciando escaneamento...");
-            
-            // Iniciar scanner com string simples
-            return html5QrCode.start(
-                cameraConfig, 
-                config, 
-                onScanSuccess,
-                onScanError
-            );
-        })
-        .then(() => {
-            console.log("✅ Scanner iniciado com sucesso!");
-            scannerIniciando = false;
-        })
-        .catch(error => {
-            console.error("💥 Erro ao iniciar scanner:", error);
-            scannerAtivo = false;
-            scannerIniciando = false;
-            scannerContainer.style.display = 'none';
-            
-            // Tratamento de erros específicos
-            let mensagemErro = "Erro ao acessar a câmera";
-            
-            if (error.name === 'NotAllowedError') {
-                mensagemErro = "❌ Permissão de câmera negada.\nPor favor, permita o acesso à câmera nas configurações do navegador.";
-            } else if (error.name === 'NotFoundError') {
-                mensagemErro = "❌ Câmera não encontrada.\nVerifique se há uma câmera disponível no dispositivo.";
-            } else if (error.name === 'NotSupportedError') {
-                mensagemErro = "❌ Navegador não suporta acesso à câmera.\nRecomendamos usar Chrome, Firefox ou Edge atualizados.";
-            } else if (error.name === 'NotReadableError') {
-                mensagemErro = "❌ Não foi possível acessar a câmera.\nPode estar em uso por outro aplicativo.";
-            } else if (error.message.includes('already under transition')) {
-                mensagemErro = "⏳ Scanner já está sendo iniciado. Aguarde...";
-                // Tentar novamente após 1 segundo
-                setTimeout(() => {
-                    scannerIniciando = false;
-                    startScanner();
-                }, 1000);
-                return;
-            } else if (error.message.includes('cameraIdOrConfig')) {
-                // Tentar com configuração mais simples
-                console.log("🔄 Tentando configuração alternativa...");
-                iniciarScannerSimples();
-                return;
-            } else {
-                mensagemErro = "❌ Erro ao acessar a câmera:\n" + error.message;
-            }
-            
-            alert(mensagemErro);
-        });
-}
-
-// Função alternativa para iniciar scanner com configuração mais simples
-function iniciarScannerSimples() {
-    console.log("🔄 Tentando configuração alternativa do scanner...");
-    
-    if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("scanner-viewfinder");
-    }
-    
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 }
-    };
-    
-    // Configuração mais simples - apenas string
-    html5QrCode.start(
-        "environment",
-        config,
-        onScanSuccess,
-        onScanError
-    ).then(() => {
-        console.log("✅ Scanner iniciado com configuração alternativa!");
-        scannerIniciando = false;
-        scannerAtivo = true;
-    }).catch(err => {
-        console.error("💥 Erro na configuração alternativa:", err);
-        scannerIniciando = false;
-        scannerContainer.style.display = 'none';
-        alert("Não foi possível acessar a câmera.");
-    });
-}
-
-function onScanSuccess(decodedText, decodedResult) {
-    console.log("✅ QR Code escaneado com sucesso!");
-    console.log("📝 Texto:", decodedText);
-    
-    // Parar scanner
-    stopScanner();
-    
-    // Processar o código
-    const parts = decodedText.split('/');
-    
-    if (parts.length >= 2) {
-        const codigoProduto = parts[0];
-        const numeroLote = parts[1];
-        
-        console.log(`📦 Processando: Produto=${codigoProduto}, Lote=${numeroLote}`);
-        
-        // Preencher campos
-        preencherCamposDoScanner(codigoProduto, numeroLote);
-        
-        // Mostrar mensagem de sucesso
-        mostrarMensagemSucessoScanner(codigoProduto, numeroLote);
-    } else {
-        alert("⚠️ Formato de QR Code inválido!\n\n📋 Formato esperado: CODIGO/LOTE/ID\n\n💡 Exemplo: 4604000001/CS060146560001/0003");
-        // Re-iniciar scanner após erro
-        setTimeout(() => {
-            scannerIniciando = false;
-            startScanner();
-        }, 1000);
-    }
-}
-
-function onScanError(errorMessage) {
-    // Ignorar erros normais de varredura
-    if (!errorMessage.includes("No MultiFormat Readers") && 
-        !errorMessage.includes("NotFoundException") &&
-        !errorMessage.includes("No barcode or QR code detected")) {
-        console.warn("⚠️ Erro no scanner:", errorMessage);
-    }
-}
-
-function stopScanner() {
-    console.log("🛑 Parando scanner...");
-    
-    const scannerContainer = document.getElementById('scannerContainer');
-    
-    if (html5QrCode && scannerAtivo) {
-        scannerAtivo = false;
-        scannerIniciando = false;
-        
-        html5QrCode.stop().then(() => {
-            console.log("✅ Scanner parado com sucesso");
-            scannerContainer.style.display = 'none';
-        }).catch(err => {
-            console.error("⚠️ Erro ao parar scanner:", err);
-            scannerContainer.style.display = 'none';
-        });
-    } else {
-        scannerAtivo = false;
-        scannerIniciando = false;
-        scannerContainer.style.display = 'none';
-    }
-}
-
-function preencherCamposDoScanner(codigoProduto, numeroLote) {
-    console.log(`🔄 Preenchendo campos do scanner: Produto=${codigoProduto}, Lote=${numeroLote}`);
-    
-    // 1. Preencher lote
-    const inputLote = document.getElementById('inputLoteEntrada');
-    if (inputLote) {
-        inputLote.value = numeroLote;
-        console.log(`   ✅ Lote preenchido: ${numeroLote}`);
-    }
-    
-    // 2. Preencher produto e buscar dados automaticamente
-    const inputProduto = document.getElementById('inputProdutoEntrada');
-    if (inputProduto) {
-        inputProduto.value = codigoProduto;
-        console.log(`   ✅ Produto preenchido: ${codigoProduto}`);
-        
-        // Disparar eventos para buscar automaticamente
-        setTimeout(() => {
-            const inputEvent = new Event('input', { bubbles: true });
-            inputProduto.dispatchEvent(inputEvent);
-            
-            const changeEvent = new Event('change', { bubbles: true });
-            inputProduto.dispatchEvent(changeEvent);
-            
-            console.log(`   ✅ Eventos disparados para busca automática`);
-        }, 100);
-    }
-    
-    // 3. Abrir modal se não estiver aberto
-    const modal = document.getElementById('modalNovaEntrada');
-    if (modal && !modal.classList.contains('show')) {
-        console.log("   🪟 Abrindo modal...");
-        const bsModal = new bootstrap.Modal(modal);
-        bsModal.show();
-    }
-    
-    // 4. Focar na quantidade após um delay
-    setTimeout(() => {
-        const inputQuantidade = document.querySelector('[name="entrada"]');
-        if (inputQuantidade) {
-            inputQuantidade.focus();
-            console.log(`   ✅ Campo quantidade focado`);
-        }
-    }, 500);
-}
-
-function mostrarMensagemSucessoScanner(codigo, lote) {
-    // Criar toast de sucesso
-    const toast = document.createElement('div');
-    toast.className = 'toast-scanner alert alert-success';
-    toast.innerHTML = `
-        <div class="d-flex align-items-center">
-            <i class="fas fa-check-circle me-2 fs-4"></i>
-            <div>
-                <strong>QR Code lido com sucesso!</strong><br>
-                <small>
-                    <i class="fas fa-barcode me-1"></i> Produto: <strong>${codigo}</strong><br>
-                    <i class="fas fa-tag me-1"></i> Lote: <strong>${lote}</strong>
-                </small>
-            </div>
-            <button type="button" class="btn-close ms-3" onclick="this.parentElement.parentElement.remove()"></button>
-        </div>
-    `;
-    
-    document.body.appendChild(toast);
-    
-    // Remover após 5 segundos
-    setTimeout(() => {
-        if (toast.parentElement) {
-            toast.remove();
-        }
-    }, 5000);
-}
-
-// 5. FUNÇÃO PARA TESTAR API MANUALMENTE (DEBUG)
-function testarAPIManutalmente(codigoTeste = null) {
-    const codigo = codigoTeste || prompt("Digite o código do produto para testar a API:", "4604000001");
-    if (!codigo) return;
+function buscarProdutoPorCodigo(codigo) {
+    console.log(`🔍 Buscando produto REAL: "${codigo}"`);
     
     const urlApi = "{% url 'sapp:api_buscar_produto' %}";
-    console.log("=== TESTE MANUAL DA API ===");
-    console.log("🔗 URL:", urlApi);
-    console.log("📋 Código:", codigo);
     
-    fetch(`${urlApi}?codigo=${encodeURIComponent(codigo)}`)
-        .then(res => {
-            console.log("📤 Status:", res.status, res.statusText);
-            console.log("🌐 URL completa:", res.url);
-            return res.json();
-        })
-        .then(data => {
-            console.log("📦 Dados recebidos:", data);
-            
-            if (data.encontrado) {
-                console.log("✅ PRODUTO ENCONTRADO NO BANCO!");
-                console.log("📝 Dados completos:", JSON.stringify(data.dados, null, 2));
-                
-                // Mostrar em alerta formatado
-                let info = `=== PRODUTO ENCONTRADO ===\n\n`;
-                info += `CÓDIGO: ${data.dados.codigo}\n`;
-                info += `CULTIVAR: ${data.dados.cultivar_nome} (ID: ${data.dados.cultivar_id})\n`;
-                info += `EMPRESA: ${data.dados.empresa || 'Não informada'}\n`;
-                info += `PENEIRA: ${data.dados.peneira_nome || 'Não informada'}\n`;
-                info += `ESPÉCIE: ${data.dados.especie_nome || 'Não informada'}\n`;
-                info += `CATEGORIA: ${data.dados.categoria_nome || 'Não informada'}\n`;
-                info += `TRATAMENTO: ${data.dados.tratamento_nome || 'Não informado'}\n`;
-                info += `TIPO: ${data.dados.tipo || 'Não informado'}`;
-                
-                alert(info);
-            } else {
-                console.log("❌ PRODUTO NÃO ENCONTRADO:", data.erro);
-                alert("❌ " + data.erro);
-            }
-        })
-        .catch(err => {
-            console.error("💥 ERRO NA REQUISIÇÃO:", err);
-            alert("💥 ERRO: " + err.message + "\n\nVerifique:\n1. Se a view existe\n2. Se a URL está correta\n3. Se há produtos cadastrados");
-        });
-}
-
-// 6. FUNÇÃO PARA ABRIR MODAL DE TRANSFERÊNCIA
-/**
- * Função Premium para Abrir e Popular o Modal de Transferência
- * @param {number} id - ID do item no banco de dados
- */
-function abrirModalTransferencia(id) {
-    console.log("🚀 Iniciando Transferência/Ajuste para o ID:", id);
-
-    // 1. Localiza os Modais e o Formulário
-    const modalEditar = document.querySelector(`#modalEditar${id}`);
-    const modalTransfElement = document.getElementById('modalTransferencia');
-    const formTransf = document.getElementById('formTransferencia');
-
-    if (!modalEditar) {
-        console.error("❌ Erro: Modal de edição do item " + id + " não encontrado.");
-        return;
-    }
-
-    // 2. Atalho para pegar valores do Modal de Editar (que já tem os dados do banco)
-    const getVal = (name) => {
-        const field = modalEditar.querySelector(`[name="${name}"]`);
-        return field ? field.value : "";
-    };
-
-    // 3. Atualiza o Action do Form para o Django (Troca o '0' pelo ID real)
-    const urlBase = "{% url 'sapp:transferir' 0 %}";
-    formTransf.action = urlBase.replace('0', id);
-
-    // 4. Preenche os campos principais do Modal de Transferência
-    document.getElementById('transf_item_id').value = id;
-    document.getElementById('transf_lote_display').value = getVal('lote');
-    document.getElementById('transf_produto').value = getVal('produto');
-    document.getElementById('transf_cliente').value = getVal('cliente');
-    document.getElementById('transf_empresa').value = getVal('empresa');
-    document.getElementById('transf_peso').value = getVal('peso_unitario');
-    document.getElementById('transf_az').value = getVal('az');
-
-    // 5. Preenche os Selects (Dropdowns)
-    const setSelect = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val;
-    };
-
-    setSelect('transf_especie', getVal('especie'));
-    setSelect('transf_embalagem', getVal('embalagem'));
-    setSelect('transf_cultivar', getVal('cultivar'));
-    setSelect('transf_peneira', getVal('peneira'));
-    setSelect('transf_categoria', getVal('categoria'));
-    setSelect('transf_tratamento', getVal('tratamento'));
-
-    // 6. Captura de Saldos e Infos de Exibição (Vindo da Tabela ou Modal Editar)
-    // Tenta pegar o saldo da tabela para garantir que é o valor mais atual
-    const row = document.querySelector(`tr[onclick*="details-${id}"]`) || document.querySelector(`tr[onclick*="toggleDetails(${id})"]`);
-    let saldoAtual = "0";
-    
-    if (row) {
-        // Busca o número grande de saldo dentro da linha da tabela
-        const saldoElement = row.querySelector('.fs-3, .fs-4, .fs-5');
-        if (saldoElement) {
-            saldoAtual = saldoElement.innerText.split(' ')[0].trim();
+    fetch(`${urlApi}?codigo=${encodeURIComponent(codigo)}`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        cache: 'no-store'
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
-    } else {
-        // Se não achar na tabela, tenta buscar no contexto do objeto (item.saldo) 
-        // ou deixa em branco se for edição pura.
-        saldoAtual = "0"; 
-    }
-
-    // Preenche os campos de leitura (readonly)
-    document.getElementById('transf_saldo_atual').innerText = saldoAtual;
-    document.getElementById('transf_saldo').value = saldoAtual;
-    document.getElementById('transf_entrada').value = getVal('entrada') || ""; // Quantidade inicial de entrada
-    document.getElementById('transf_endereco_atual').innerText = "Endereço Atual: " + getVal('endereco');
-
-    // 7. Configura a Quantidade padrão para transferência
-    const inputQtd = document.getElementById('transf_quantidade');
-    inputQtd.value = saldoAtual;   // Sugere transferir tudo
-    inputQtd.max = saldoAtual;     // Define o máximo permitido (segurança)
-
-    // 8. Abre o Modal de forma segura via Bootstrap
-    const modalBS = new bootstrap.Modal(modalTransfElement);
-    modalBS.show();
+        return response.json();
+    })
+    .then(data => {
+        console.log("📦 Dados recebidos:", data);
+        mostrarLoaderProduto(false);
+        
+        if (data.encontrado) {
+            preencherCamposComProdutoReal(data.dados);
+            mostrarAlertaSucesso(data.dados);
+        } else {
+            mostrarAlertaNaoEncontrado(codigo, data.erro);
+        }
+    })
+    .catch(error => {
+        console.error("💥 Erro na API:", error);
+        mostrarLoaderProduto(false);
+        mostrarAlertaErroAPI(error);
+    });
 }
 
-// 7. AUTO FOCUS EM INPUTS DE MODAL
-document.addEventListener('shown.bs.modal', function(event) {
-    const firstInput = event.target.querySelector('input:not([type="hidden"]), select, textarea');
-    if (firstInput) {
-        setTimeout(() => {
-            firstInput.focus();
-        }, 100);
+function preencherCamposComProdutoReal(dados) {
+    console.log("🔄 Preenchendo campos com dados REAIS:", dados);
+    
+    const campos = [
+        { nome: 'cultivar', id: dados.cultivar_id },
+        { nome: 'peneira', id: dados.peneira_id },
+        { nome: 'especie', id: dados.especie_id },
+        { nome: 'categoria', id: dados.categoria_id },
+        { nome: 'tratamento', id: dados.tratamento_id }
+    ];
+    
+    campos.forEach(campo => {
+        if (campo.id) {
+            const select = document.querySelector(`[name="${campo.nome}"]`);
+            if (select) {
+                select.value = campo.id;
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+                console.log(`   ✅ ${campo.nome}: ${campo.id}`);
+            }
+        }
+    });
+    
+    if (dados.empresa) {
+        const inputEmpresa = document.querySelector('[name="empresa"]');
+        if (inputEmpresa) {
+            inputEmpresa.value = dados.empresa;
+        }
     }
-});
+}
 
-// 8. EXPORTAR FUNÇÕES PARA DEBUG NO CONSOLE
-window.debug = {
-    testarAPI: testarAPIManutalmente,
-    startScanner: startScanner,
-    stopScanner: stopScanner,
-    toggleDetails: toggleDetails
-};
+function mostrarAlertaSucesso(dados) {
+    const alertsArea = document.getElementById('alertsArea');
+    if (!alertsArea) return;
+    
+    alertsArea.innerHTML = `
+        <div class="alert alert-success alert-dismissible fade show alert-auto-fill" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle me-3 fs-4"></i>
+                <div>
+                    <strong><i class="fas fa-database me-1"></i> Dados carregados do banco!</strong><br>
+                    <small class="text-muted">
+                        Produto: <strong>${dados.codigo}</strong> | 
+                        Cultivar: <strong>${dados.cultivar_nome}</strong>
+                    </small>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+}
 
-console.log("🚀 Sistema pronto! Comandos disponíveis:");
-console.log("   debug.testarAPI() - Testar a API manualmente");
-console.log("   debug.startScanner() - Iniciar scanner manualmente");
-console.log("   debug.stopScanner() - Parar scanner manualmente");
-console.log("   debug.toggleDetails('details-ID') - Abrir/fechar detalhes");
+function mostrarAlertaNaoEncontrado(codigo, erro) {
+    const alertsArea = document.getElementById('alertsArea');
+    if (!alertsArea) return;
+    
+    alertsArea.innerHTML = `
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-3"></i>
+                <div>
+                    <strong>Produto não encontrado!</strong><br>
+                    <small>Código: <code>${codigo}</code> - ${erro}</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+}
 
-// 9. FUNÇÃO PARA AUTOCOMPLETE LOTE (MANTIDA DO CÓDIGO ANTERIOR)
-document.addEventListener('DOMContentLoaded', function() {
+function mostrarAlertaErroAPI(error) {
+    const alertsArea = document.getElementById('alertsArea');
+    if (!alertsArea) return;
+    
+    alertsArea.innerHTML = `
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-times-circle me-3"></i>
+                <div>
+                    <strong>Erro na busca!</strong><br>
+                    <small>${error.message}</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+}
+
+function esconderAlerta() {
+    const alertsArea = document.getElementById('alertsArea');
+    if (alertsArea) {
+        alertsArea.innerHTML = '';
+    }
+}
+
+// ============================================
+// 6. AUTO-COMPLETE DO LOTE
+// ============================================
+function inicializarAutoCompleteLote() {
     const inputLote = document.getElementById('inputLoteEntrada');
     const listaSugestoes = document.getElementById('listaSugestoesLote');
     
     if (inputLote && listaSugestoes) {
         let debounceTimer;
-
+        
         inputLote.addEventListener('input', function() {
             const termo = this.value;
             clearTimeout(debounceTimer);
-
+            
             if (termo.length < 2) {
                 listaSugestoes.style.display = 'none';
                 return;
             }
-
+            
             debounceTimer = setTimeout(() => {
                 const urlApi = "{% url 'sapp:api_autocomplete_entrada' %}";
                 
@@ -1289,52 +997,337 @@ document.addEventListener('DOMContentLoaded', function() {
                     .catch(err => console.log(err));
             }, 300);
         });
-
+        
         document.addEventListener('click', function(e) {
             if (e.target !== inputLote && e.target !== listaSugestoes) {
                 listaSugestoes.style.display = 'none';
             }
         });
     }
+}
 
-    function preencherModalEntrada(dados) {
-        const modal = document.getElementById('modalNovaEntrada');
-        const form = modal.querySelector('form');
+function preencherModalEntrada(dados) {
+    const modal = document.getElementById('modalNovaEntrada');
+    const form = modal.querySelector('form');
+    
+    const setVal = (name, value) => {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el) el.value = value || '';
+    };
+    
+    setVal('lote', dados.lote);
+    setVal('produto', dados.produto);
+    setVal('empresa', dados.empresa);
+    setVal('cliente', dados.cliente);
+    setVal('origem_destino', dados.origem_destino);
+    setVal('peso_unitario', dados.peso_unitario);
+    setVal('az', dados.az);
+    setVal('observacao', dados.observacao);
+    
+    const setSelect = (name, value) => {
+        const el = form.querySelector(`select[name="${name}"]`);
+        if (el && value) {
+            el.value = value;
+        }
+    };
+    
+    setSelect('cultivar', dados.cultivar__id);
+    setSelect('peneira', dados.peneira__id);
+    setSelect('categoria', dados.categoria__id);
+    setSelect('tratamento', dados.tratamento__id);
+    setSelect('embalagem', dados.embalagem);
+    setSelect('especie', dados.especie__id);
+    
+    setTimeout(() => {
+        const entradaInput = form.querySelector('[name="entrada"]');
+        if (entradaInput) entradaInput.focus();
+    }, 100);
+}
+
+// ============================================
+// 7. SCANNER QR CODE
+// ============================================
+function carregarBibliotecaScanner() {
+    return new Promise((resolve, reject) => {
+        if (typeof Html5Qrcode !== 'undefined') {
+            console.log("✅ Biblioteca de scanner já carregada");
+            resolve();
+            return;
+        }
         
-        const setVal = (name, value) => {
-            const el = form.querySelector(`[name="${name}"]`);
-            if (el) el.value = value || '';
+        console.log("📚 Carregando biblioteca de scanner...");
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+        script.onload = () => {
+            console.log("✅ Biblioteca de scanner carregada");
+            resolve();
         };
-        
-        setVal('lote', dados.lote);
-        setVal('produto', dados.produto);
-        setVal('empresa', dados.empresa);
-        setVal('cliente', dados.cliente);
-        setVal('origem_destino', dados.origem_destino);
-        setVal('peso_unitario', dados.peso_unitario);
-        setVal('az', dados.az);
-        setVal('observacao', dados.observacao);
-        
-        // Para selects sem Select2, apenas setar o valor
-        const setSelect = (name, value) => {
-            const el = form.querySelector(`select[name="${name}"]`);
-            if (el && value) {
-                el.value = value;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+function startScanner() {
+    console.log("🎬 Iniciando scanner QR Code...");
+    
+    if (scannerIniciando) {
+        console.log("⏳ Scanner já está iniciando");
+        return;
+    }
+    
+    scannerIniciando = true;
+    
+    const scannerContainer = document.getElementById('scannerContainer');
+    scannerContainer.style.display = 'flex';
+    
+    carregarBibliotecaScanner()
+        .then(() => {
+            scannerAtivo = true;
+            
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("scanner-viewfinder");
             }
-        };
+            
+            if (html5QrCode && html5QrCode.isScanning) {
+                scannerIniciando = false;
+                return;
+            }
+            
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+            
+            return html5QrCode.start(
+                "environment",
+                config,
+                onScanSuccess,
+                onScanError
+            );
+        })
+        .then(() => {
+            console.log("✅ Scanner iniciado");
+            scannerIniciando = false;
+        })
+        .catch(error => {
+            console.error("💥 Erro ao iniciar scanner:", error);
+            scannerAtivo = false;
+            scannerIniciando = false;
+            scannerContainer.style.display = 'none';
+            
+            let mensagem = "Erro ao acessar a câmera";
+            if (error.name === 'NotAllowedError') {
+                mensagem = "Permissão de câmera negada";
+            } else if (error.name === 'NotFoundError') {
+                mensagem = "Câmera não encontrada";
+            }
+            alert("❌ " + mensagem);
+        });
+}
 
-        setSelect('cultivar', dados.cultivar__id);
-        setSelect('peneira', dados.peneira__id);
-        setSelect('categoria', dados.categoria__id);
-        setSelect('tratamento', dados.tratamento__id);
-        setSelect('embalagem', dados.embalagem);
-        setSelect('especie', dados.especie__id);
+function onScanSuccess(decodedText) {
+    console.log("✅ QR Code escaneado:", decodedText);
+    
+    stopScanner();
+    
+    const parts = decodedText.split('/');
+    
+    if (parts.length >= 2) {
+        const codigoProduto = parts[0];
+        const numeroLote = parts[1];
+        
+        preencherCamposDoScanner(codigoProduto, numeroLote);
+        mostrarMensagemSucessoScanner(codigoProduto, numeroLote);
+    } else {
+        alert("⚠️ Formato inválido!\nEsperado: CODIGO/LOTE");
+        setTimeout(() => {
+            scannerIniciando = false;
+            startScanner();
+        }, 1000);
+    }
+}
+
+function onScanError(errorMessage) {
+    if (!errorMessage.includes("No MultiFormat Readers") && 
+        !errorMessage.includes("NotFoundException")) {
+        console.warn("⚠️ Erro no scanner:", errorMessage);
+    }
+}
+
+function stopScanner() {
+    console.log("🛑 Parando scanner...");
+    
+    const scannerContainer = document.getElementById('scannerContainer');
+    
+    if (html5QrCode && scannerAtivo) {
+        scannerAtivo = false;
+        scannerIniciando = false;
+        
+        html5QrCode.stop()
+            .then(() => {
+                scannerContainer.style.display = 'none';
+            })
+            .catch(err => {
+                console.error("⚠️ Erro ao parar scanner:", err);
+                scannerContainer.style.display = 'none';
+            });
+    } else {
+        scannerAtivo = false;
+        scannerIniciando = false;
+        scannerContainer.style.display = 'none';
+    }
+}
+
+function preencherCamposDoScanner(codigoProduto, numeroLote) {
+    console.log(`🔄 Preenchendo scanner: ${codigoProduto} / ${numeroLote}`);
+    
+    const inputLote = document.getElementById('inputLoteEntrada');
+    if (inputLote) {
+        inputLote.value = numeroLote;
+    }
+    
+    const inputProduto = document.getElementById('inputProdutoEntrada');
+    if (inputProduto) {
+        inputProduto.value = codigoProduto;
         
         setTimeout(() => {
-            const entradaInput = form.querySelector('[name="entrada"]');
-            if (entradaInput) entradaInput.focus();
+            inputProduto.dispatchEvent(new Event('input', { bubbles: true }));
+            inputProduto.dispatchEvent(new Event('change', { bubbles: true }));
         }, 100);
     }
-});
+    
+    const modal = document.getElementById('modalNovaEntrada');
+    if (modal && !modal.classList.contains('show')) {
+        new bootstrap.Modal(modal).show();
+    }
+    
+    setTimeout(() => {
+        const inputQuantidade = document.querySelector('[name="entrada"]');
+        if (inputQuantidade) inputQuantidade.focus();
+    }, 500);
+}
+
+function mostrarMensagemSucessoScanner(codigo, lote) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-scanner alert alert-success';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-check-circle me-2 fs-4"></i>
+            <div>
+                <strong>QR Code lido!</strong><br>
+                <small>Produto: ${codigo} | Lote: ${lote}</small>
+            </div>
+            <button type="button" class="btn-close ms-3" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+
+// ============================================
+// 8. FUNÇÃO PARA ABRIR MODAL DE TRANSFERÊNCIA
+// ============================================
+function abrirModalTransferencia(id) {
+    console.log("🚀 Iniciando Transferência para ID:", id);
+    
+    const modalEditar = document.querySelector(`#modalEditar${id}`);
+    const modalTransfElement = document.getElementById('modalTransferencia');
+    const formTransf = document.getElementById('formTransferencia');
+    
+    if (!modalEditar) {
+        console.error("❌ Modal de edição não encontrado");
+        return;
+    }
+    
+    const getVal = (name) => {
+        const field = modalEditar.querySelector(`[name="${name}"]`);
+        return field ? field.value : "";
+    };
+    
+    const urlBase = "{% url 'sapp:transferir' 0 %}";
+    formTransf.action = urlBase.replace('0', id);
+    
+    document.getElementById('transf_item_id').value = id;
+    document.getElementById('transf_lote_display').value = getVal('lote');
+    document.getElementById('transf_produto').value = getVal('produto');
+    document.getElementById('transf_cliente').value = getVal('cliente');
+    document.getElementById('transf_empresa').value = getVal('empresa');
+    document.getElementById('transf_peso').value = getVal('peso_unitario');
+    document.getElementById('transf_az').value = getVal('az');
+    
+    const setSelect = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+    };
+    
+    setSelect('transf_especie', getVal('especie'));
+    setSelect('transf_embalagem', getVal('embalagem'));
+    setSelect('transf_cultivar', getVal('cultivar'));
+    setSelect('transf_peneira', getVal('peneira'));
+    setSelect('transf_categoria', getVal('categoria'));
+    setSelect('transf_tratamento', getVal('tratamento'));
+    
+    const row = document.querySelector(`tr[onclick*="details-${id}"]`);
+    let saldoAtual = "0";
+    
+    if (row) {
+        const saldoElement = row.querySelector('.fs-3, .fs-4, .fs-5');
+        if (saldoElement) {
+            saldoAtual = saldoElement.innerText.split(' ')[0].trim();
+        }
+    }
+    
+    document.getElementById('transf_saldo_atual').innerText = saldoAtual;
+    document.getElementById('transf_saldo').value = saldoAtual;
+    document.getElementById('transf_entrada').value = getVal('entrada') || "";
+    document.getElementById('transf_endereco_atual').innerText = "Endereço Atual: " + getVal('endereco');
+    
+    const inputQtd = document.getElementById('transf_quantidade');
+    inputQtd.value = saldoAtual;
+    inputQtd.max = saldoAtual;
+    
+    new bootstrap.Modal(modalTransfElement).show();
+}
+
+// ============================================
+// 9. FUNÇÕES DE DEBUG
+// ============================================
+function testarAPIManutalmente(codigoTeste = null) {
+    const codigo = codigoTeste || prompt("Digite o código do produto:", "4604000001");
+    if (!codigo) return;
+    
+    const urlApi = "{% url 'sapp:api_buscar_produto' %}";
+    
+    fetch(`${urlApi}?codigo=${encodeURIComponent(codigo)}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.encontrado) {
+                let info = `=== PRODUTO ENCONTRADO ===\n\n`;
+                info += `CÓDIGO: ${data.dados.codigo}\n`;
+                info += `CULTIVAR: ${data.dados.cultivar_nome}\n`;
+                info += `EMPRESA: ${data.dados.empresa || 'N/I'}\n`;
+                alert(info);
+            } else {
+                alert("❌ " + data.erro);
+            }
+        })
+        .catch(err => alert("💥 Erro: " + err.message));
+}
+
+// ============================================
+// 10. EXPORTAR FUNÇÕES PARA CONSOLE
+// ============================================
+window.debug = {
+    testarAPI: testarAPIManutalmente,
+    startScanner: startScanner,
+    stopScanner: stopScanner,
+    toggleDetails: toggleDetails
+};
+
+console.log("🚀 Sistema pronto! Comandos disponíveis:");
+console.log("   debug.testarAPI() - Testar a API");
+console.log("   debug.startScanner() - Iniciar scanner");
+console.log("   debug.stopScanner() - Parar scanner");
 </script>
 {% endblock %}

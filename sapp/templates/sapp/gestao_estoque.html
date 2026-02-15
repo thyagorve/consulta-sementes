@@ -138,7 +138,7 @@
     <!-- BOTÕES DE AÇÃO -->
     <div class="action-buttons">
         <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="fa-solid fa-download me-2"></i>Exportar</button>
-        <button class="btn btn-import" data-bs-toggle="modal" data-bs-target="#importModal"><i class="fa-solid fa-upload me-2"></i>Importar</button>
+        
         <button class="btn btn-print" onclick="window.print()"><i class="fa-solid fa-print me-2"></i>Imprimir</button>
         <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;"><i class="fa-solid fa-filter-circle-xmark me-2"></i>Limpar Filtros</button>
         
@@ -175,7 +175,7 @@
                 </thead>
                 <tbody id="tableBody">
                     {% for item in estoque %}
-                    <tr ondblclick="window.location.href='{% url 'sapp:lista_estoque' %}?busca={{ item.lote }}'" 
+                    <tr ondblclick="window.location.href='{% url "sapp:lista_estoque" %}?busca={{ item.lote }}'" 
                         style="cursor: pointer;"
                         title="Dê um clique duplo para ver detalhes">
                         <td><small class="text-muted">{{ item.az|default:"-" }}</small></td>
@@ -279,8 +279,47 @@
 
 <!-- DADOS IMPORTANTES DO BACKEND PARA O JS -->
 {{ filter_options|json_script:"filter-options-data" }}
+<!-- DADOS IMPORTANTES DO BACKEND PARA O JS -->
+{{ filter_options|json_script:"filter-options-data" }}
 
-{% include 'sapp/modals/importacao.html' %}
+<!-- MODAL DE EXPORTAÇÃO -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exportModalLabel">
+                    <i class="fa-solid fa-download me-2"></i>Exportar Estoque
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Escolha o formato para exportar:</p>
+                <div class="d-grid gap-3">
+                    <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success btn-lg">
+                        <i class="fa-solid fa-file-excel me-2"></i>Excel
+                    </a>
+                    <!-- REMOVA ESTE BLOCO INTEIRO -->
+                    <!--
+                    <a href="{% url 'sapp:exportar_estoque_pdf' %}" class="btn btn-danger btn-lg">
+                        <i class="fa-solid fa-file-pdf me-2"></i>PDF
+                    </a>
+                    -->
+                </div>
+                <hr>
+                <small class="text-muted">
+                    <i class="fa-solid fa-info-circle me-1"></i>
+                    O relatório incluirá todos os lotes com saldo positivo.
+                </small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fa-solid fa-times me-1"></i>Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <!-- SCRIPT DE FILTRAGEM -->
 <script>
@@ -300,6 +339,18 @@ document.addEventListener('DOMContentLoaded', function() {
     setupClearButtons();
     updateActiveFiltersUI();
     markActiveHeaders();
+    
+    // ===== AUTOFOCO INTELIGENTE =====
+    // Só ativa se já existir um termo de busca
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput && searchInput.value.trim() !== '') {
+        // Pequeno delay para garantir que a página carregou completamente
+        setTimeout(() => {
+            searchInput.focus();
+            // Coloca o cursor no final do texto
+            searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
+        }, 100);
+    }
 });
 
 // UI DOS FILTROS
@@ -406,16 +457,40 @@ function setupFilterEvents(container, columnName, type) {
 function setupSearch() {
     const input = document.getElementById('searchInput');
     const btn = document.getElementById('clearSearchBtn');
+    let searchTimeout = null;
+    
     if (input) {
         if (input.value) btn.style.display = 'block';
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                currentUrlParams.set('busca', input.value);
-                currentUrlParams.set('page', 1);
-                reloadPage();
+        
+        // Remove o evento de keypress anterior
+        // input.removeEventListener('keypress', ...);
+        
+        // Adiciona evento de input com delay
+        input.addEventListener('input', function() {
+            // Mostra/esconde botão de limpar
+            btn.style.display = this.value ? 'block' : 'none';
+            
+            // Limpa o timeout anterior
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            // Só busca se tiver 3 ou mais caracteres OU se estiver vazio (limpa busca)
+            if (this.value.length >= 3 || this.value.length === 0) {
+                // Cria um novo timeout para buscar após 500ms de pausa na digitação
+                searchTimeout = setTimeout(() => {
+                    if (this.value.length >= 3) {
+                        currentUrlParams.set('busca', this.value);
+                    } else {
+                        currentUrlParams.delete('busca');
+                    }
+                    currentUrlParams.set('page', 1);
+                    reloadPage();
+                }, 500); // Aguarda 500ms após parar de digitar
             }
         });
-        input.addEventListener('input', function() { btn.style.display = this.value ? 'block' : 'none'; });
+        
+        // Mantém o botão de limpar
         btn.addEventListener('click', function() {
             input.value = '';
             currentUrlParams.delete('busca');

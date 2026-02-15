@@ -17,7 +17,19 @@ from django import forms  #
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 import random
+from django.contrib.admin.views.decorators import staff_member_required
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import ArmazemLayout, ElementoMapa, Estoque
+import json
+from django.utils import timezone
 
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
 # App imports
 from .models import (
     Estoque, HistoricoMovimentacao, Configuracao, Cultivar, 
@@ -55,13 +67,81 @@ from .models import (
 )
 
 
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
+from django.db.models import Q, Sum
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from sapp.models import Estoque, Cultivar, Peneira, Categoria, Tratamento, Especie
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth.models import User
+from .models import (
+    Configuracao, Cultivar, Peneira, Categoria, 
+    Tratamento, Especie, Produto
+)
+from .forms import (
+    ConfiguracaoForm, NovoConferenteUserForm,
+    CultivarForm, PeneiraForm, CategoriaForm, TratamentoForm
+)
 
+# views.py - ARQUIVO COMPLETO
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.db.models import Q
+from .models import (
+    Configuracao, Cultivar, Peneira, Categoria, 
+    Tratamento, Especie, Produto, Estoque,
+    HistoricoMovimentacao, Empenho, ItemEmpenho,
+    ArmazemLayout, ElementoMapa
+)
+from .forms import (
+    ConfiguracaoForm, NovoConferenteUserForm,
+    CultivarForm, PeneiraForm, CategoriaForm, 
+    TratamentoForm, ProdutoForm, NovaEntradaForm
+)
 
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.db.models import Q
+from .models import (
+    Configuracao, Cultivar, Peneira, Categoria, 
+    Tratamento, Especie, Produto, Estoque
+)
+from .forms import (
+    ConfiguracaoForm, NovoConferenteUserForm,
+    CultivarForm, PeneiraForm, CategoriaForm, 
+    TratamentoForm, ProdutoForm
+)
 
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db import transaction, models
+from django.db.models import Q
+
+from .models import (
+    Estoque,
+    Empenho,
+    ItemEmpenho,
+    EmpenhoStatus,
+    HistoricoMovimentacao
+)
+from django.contrib.admin.views.decorators import staff_member_required 
+from django.contrib.admin.views.decorators import staff_member_required
+from django.http import JsonResponse
+from django.shortcuts import render, get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
+from .models import ArmazemLayout, ElementoMapa, Estoque
+import json
 # ================================================================
 # FUNÇÕES AUXILIARES (ADICIONAR NO TOPO DO ARQUIVO views.py)
 # ================================================================
-
 def processar_inteiro(valor, default=0):
     """Converte valor para inteiro com segurança"""
     if valor is None or valor == '':
@@ -105,708 +185,6 @@ def processar_decimal(valor, default=Decimal('0.00')):
         return default
 # ================================================================
 # FUNÇÕES AUXILIARES
-# ================================================================
-
-def safe_get(row, column, default=''):
-    """Extrai valor de forma segura"""
-    if not column or column not in row:
-        return default
-    value = row[column]
-    if pd.isna(value) or value is None:
-        return default
-    return str(value).strip()
-
-def extrair_numero(row, column_key, default=0):
-    """Extrai número de forma segura"""
-    if not column_key:
-        return default
-    
-    value = row.get(column_key)
-    if value is None or pd.isna(value):
-        return default
-    
-    try:
-        if isinstance(value, str):
-            value = ''.join(c for c in value if c.isdigit() or c in ',.')
-            value = value.replace(',', '.')
-        return float(value)
-    except (ValueError, TypeError):
-        return default
-
-def mapear_colunas_protheus_inteligente(colunas_encontradas):
-    """Mapeamento INTELIGENTE com fallbacks seguros"""
-    mapping = {}
-    
-    print(f"🔍 [MAPEAMENTO] Colunas encontradas: {colunas_encontradas}")
-    
-    # Mapeamento DIRETO baseado nas colunas do Protheus
-    mapeamento_direto = {
-        'Lote': 'lote',
-        'Quantidade': 'quantidade',
-        'Endereco': 'endereco',
-        'Cultivar': 'cultivar',
-        'Peneira': 'peneira',
-        'Categoria': 'categoria',
-        'Tp. Tratame.': 'tratamento',
-        'Unidade': 'unidade',
-        'Peso Med Ens': 'peso_med_ens',
-        'Empenho': 'empresa',
-        'Armazem': 'az',
-        'Cultura': 'cultura'
-    }
-    
-    for coluna_original, campo in mapeamento_direto.items():
-        if coluna_original in colunas_encontradas:
-            mapping[campo] = coluna_original
-            print(f"   ✅ MAPEADO: {campo} -> {coluna_original}")
-    
-    # Verificar campos obrigatórios
-    campos_obrigatorios = ['lote', 'quantidade', 'endereco']
-    for campo in campos_obrigatorios:
-        if campo not in mapping:
-            print(f"   ❌ CAMPO OBRIGATÓRIO FALTANDO: {campo}")
-    
-    print(f"🎯 [MAPEAMENTO FINAL]: {mapping}")
-    return mapping
-
-def converter_unidade(quantidade_original, unidade, peso_med_ens):
-    """Converte unidades usando peso_med_ens COM TRATAMENTO DE SEGURANÇA"""
-    if not unidade or peso_med_ens <= 0:
-        return quantidade_original, 1
-    
-    # Garantir que os valores são numéricos
-    try:
-        quantidade_original = float(quantidade_original)
-        peso_med_ens = float(peso_med_ens)
-    except (ValueError, TypeError):
-        return quantidade_original, 1
-    
-    unidade = unidade.upper()
-    
-    try:
-        if unidade in ['KG', 'QUILO', 'QUILOS']:
-            quantidade_convertida = quantidade_original / peso_med_ens
-            return round(quantidade_convertida), peso_med_ens
-        elif unidade in ['TON', 'TONELADA']:
-            quantidade_convertida = (quantidade_original * 1000) / peso_med_ens
-            return round(quantidade_convertida), peso_med_ens / 1000
-        elif unidade in ['MLH', 'MILHEIRO']:
-            quantidade_convertida = quantidade_original * 1000
-            return quantidade_convertida, 0.001
-        elif unidade in ['SC', 'SACO', 'BAG', 'BAGS', 'UN', 'UNID', 'UNIDADE']:
-            return quantidade_original, 1
-        else:
-            return quantidade_original, 1
-    except Exception:
-        return quantidade_original, 1
-
-def identificar_embalagem_por_unidade(unidade):
-    """Identifica embalagem baseado na unidade"""
-    if not unidade:
-        return 'BAG'
-    
-    unidade = str(unidade).upper().strip()
-    
-    mapeamento_direto = {
-        'SC': 'SC', 'SACO': 'SC', 'SACOS': 'SC',
-        'BAG': 'BAG', 'BAGS': 'BAG', 'BIG BAG': 'BAG',
-        'KG': 'BAG', 'QUILO': 'BAG', 'TON': 'BAG',
-        'MLH': 'BAG', 'UN': 'BAG', 'UNIDADE': 'BAG'
-    }
-    
-    if unidade in mapeamento_direto:
-        return mapeamento_direto[unidade]
-    
-    for padrao, embalagem in mapeamento_direto.items():
-        if padrao in unidade:
-            return embalagem
-    
-    return 'BAG'
-
-# No importar_estoque, na parte do processamento, adicione:
-def buscar_tratamento_categoria_avancado(tratamento_nome, categoria_nome):
-    """Busca ou cria tratamento e categoria COM TRUNCAMENTO"""
-    tratamento_obj = None
-    categoria_obj = None
-    
-    # 🔥 TRUNCAR TRATAMENTO PARA 8 CARACTERES (igual ao banco)
-    if tratamento_nome and str(tratamento_nome).strip():
-        try:
-            tratamento_nome_limpo = str(tratamento_nome).strip()
-            
-            # 🔥 SEMPRE TRUNCAR PARA 8 CARACTERES
-            if len(tratamento_nome_limpo) > 8:
-                tratamento_nome_limpo = tratamento_nome_limpo[:8]
-                print(f"✂️ Tratamento truncado para 8 caracteres: '{tratamento_nome}' → '{tratamento_nome_limpo}'")
-            
-            # Buscar pelo nome TRUNCADO
-            tratamento_obj = Tratamento.objects.filter(
-                nome__iexact=tratamento_nome_limpo
-            ).first()
-            
-            if not tratamento_obj:
-                tratamento_obj = Tratamento.objects.create(
-                    nome=tratamento_nome_limpo
-                )
-                print(f"✅ Criado novo tratamento: '{tratamento_nome_limpo}'")
-                
-        except Exception as e:
-            print(f"⚠️ Erro ao buscar/criar tratamento '{tratamento_nome}': {e}")
-    
-    if categoria_nome and str(categoria_nome).strip():
-        try:
-            categoria_nome_limpo = str(categoria_nome).strip()
-            
-            categoria_obj = Categoria.objects.filter(
-                nome__iexact=categoria_nome_limpo
-            ).first()
-            
-            if not categoria_obj:
-                categoria_obj = Categoria.objects.create(
-                    nome=categoria_nome_limpo
-                )
-                
-        except Exception as e:
-            print(f"⚠️ Erro ao buscar/criar categoria '{categoria_nome}': {e}")
-    
-    return tratamento_obj, categoria_obj
-
-
-@login_required
-def debug_comparacao_endereco(request):
-    """Debug específico para comparação de endereços"""
-    print("🔍 [DEBUG COMPARAÇÃO ENDEREÇO]")
-    print("=" * 80)
-    
-    # Testar lotes específicos do seu exemplo
-    lotes_teste = ["PQH00208", "UCS0357-25", "UCS0163-25"]
-    
-    for lote_teste in lotes_teste:
-        print(f"\n📦 TESTANDO LOTE: {lote_teste}")
-        
-        # Buscar no banco
-        itens = Estoque.objects.filter(lote=lote_teste).select_related('peneira', 'cultivar', 'tratamento')
-        
-        print(f"   Encontrados {itens.count()} itens no banco:")
-        
-        for i, item in enumerate(itens):
-            print(f"   --- Item {i+1} ---")
-            print(f"      ID: {item.id}")
-            print(f"      Endereço BD: '{item.endereco}'")
-            print(f"      Endereço BD (Upper): '{item.endereco.upper().strip() if item.endereco else ''}'")
-            print(f"      Peneira: '{item.peneira.nome if item.peneira else 'None'}'")
-            print(f"      Cultivar: '{item.cultivar.nome if item.cultivar else 'None'}'")
-            print(f"      Tratamento: '{item.tratamento.nome if item.tratamento else 'None'}'")
-            print(f"      Saldo: {item.saldo}")
-            print(f"      Peso Unitário: {item.peso_unitario}")
-    
-    print("\n" + "=" * 80)
-    print("🎯 TESTE DE COMPARAÇÃO MANUAL:")
-    
-    # Teste manual de comparação
-    lote_manual = "PQH00208"
-    endereco_arquivo = "R05 LN10 P06"
-    
-    print(f"Lote: {lote_manual}")
-    print(f"Endereço do arquivo: '{endereco_arquivo}'")
-    
-    item_bd = Estoque.objects.filter(lote=lote_manual).first()
-    if item_bd:
-        endereco_bd = item_bd.endereco.upper().strip() if item_bd.endereco else ''
-        endereco_arq = endereco_arquivo.upper().strip()
-        
-        print(f"Endereço BD: '{endereco_bd}'")
-        print(f"Endereço Arquivo (Upper): '{endereco_arq}'")
-        print(f"São iguais? {endereco_bd == endereco_arq}")
-        print(f"Tamanho BD: {len(endereco_bd)}, Tamanho Arquivo: {len(endereco_arq)}")
-    else:
-        print("Lote não encontrado no banco!")
-    
-    return JsonResponse({'success': True, 'message': 'Check console para debug'})
-
-
-@login_required
-def debug_importacao(request):
-    """Debug completo do processo de importação"""
-    print("🔍 [DEBUG IMPORTAÇÃO COMPLETA]")
-    print("=" * 80)
-    
-    # Verificar tratamentos no banco
-    tratamentos = Tratamento.objects.all().values('id', 'nome')
-    print("TRATAMENTOS NO BANCO:")
-    for t in tratamentos:
-        print(f"  {t['id']}: '{t['nome']}' (tamanho: {len(t['nome'])})")
-    
-    # Verificar cultivares
-    cultivares = Cultivar.objects.all().values('id', 'nome')[:10]
-    print(f"\nPRIMEIROS 10 CULTIVARES:")
-    for c in cultivares:
-        print(f"  {c['id']}: '{c['nome']}'")
-    
-    # Verificar lotes específicos
-    lotes_teste = ["PQH00208", "UCS0357-25", "UCS0163-25"]
-    
-    for lote in lotes_teste:
-        print(f"\n--- LOTE: {lote} ---")
-        itens = Estoque.objects.filter(lote=lote).select_related('peneira', 'cultivar', 'tratamento')
-        
-        for item in itens:
-            print(f"  ID: {item.id}")
-            print(f"  Endereço: '{item.endereco}'")
-            print(f"  Peneira: '{item.peneira.nome}'")
-            print(f"  Cultivar: '{item.cultivar.nome}'")
-            print(f"  Tratamento: '{item.tratamento.nome if item.tratamento else 'None'}'")
-            print(f"  Saldo: {item.saldo}")
-            print(f"  Peso Unit: {item.peso_unitario}")
-    
-    return JsonResponse({'success': True, 'message': 'Debug completo no console'})
-
-
-
-def comparar_com_estoque_atual_com_produto(dados_importados):
-    """
-    COMPARAÇÃO ROBUSTA - Encontra registros existentes mesmo com mudanças
-    """
-    print("🔍 [COMPARAÇÃO ROBUSTA] Iniciando...")
-    
-    comparacao = {
-        'novos_lotes': [],
-        'lotes_alterados': [],
-        'lotes_iguais': [],
-        'resumo': {'novos': 0, 'atualizados': 0, 'iguais': 0}
-    }
-    
-    # Buscar TODOS os registros do banco (não apenas por lote)
-    estoque_atual = Estoque.objects.all().select_related('cultivar', 'peneira', 'categoria', 'tratamento')
-    
-    print(f"📊 Total de registros no banco: {estoque_atual.count()}")
-    print(f"📊 Itens para importar: {len(dados_importados)}")
-    
-    # Criar índice completo do banco
-    banco_index = {}
-    for item in estoque_atual:
-        # 🔥 MÚLTIPLAS CHAVES para busca flexível
-        chaves = [
-            # Chave principal: Lote + Produto (mais confiável)
-            f"LOTE_PRODUTO:{item.lote}|{item.produto or ''}",
-            # Chave alternativa: apenas Lote
-            f"LOTE:{item.lote}",
-            # Chave com endereço antigo (para detectar mudanças)
-            f"LOTE_ENDERECO:{item.lote}|{item.endereco or ''}",
-        ]
-        
-        for chave in chaves:
-            if chave not in banco_index:
-                banco_index[chave] = []
-            banco_index[chave].append(item)
-    
-    # Processar cada item importado
-    for i, item_importado in enumerate(dados_importados):
-        lote = item_importado.get('lote', '').strip()
-        produto_importado = item_importado.get('produto', '').strip()
-        endereco_importado = item_importado.get('endereco', '').strip().upper()
-        az_importado = normalizar_az(item_importado.get('az', ''))
-        quantidade_importada = float(item_importado.get('quantidade', 0))
-        
-        print(f"\n--- Item {i+1}: {lote} ---")
-        print(f"   🏷️  Produto: '{produto_importado}'")
-        print(f"   📍 Endereço (novo): '{endereco_importado}'")
-        print(f"   🏭 AZ (novo): '{az_importado}'")
-        print(f"   🔢 Quantidade: {quantidade_importada}")
-        
-        # 🔥 BUSCA INTELIGENTE: Tentar encontrar o registro correto
-        item_estoque = None
-        motivo_busca = ""
-        
-        # 1. Buscar por LOTE + PRODUTO (mais preciso)
-        chave_lote_produto = f"LOTE_PRODUTO:{lote}|{produto_importado}"
-        if chave_lote_produto in banco_index:
-            item_estoque = banco_index[chave_lote_produto][0]
-            motivo_busca = "Lote + Produto"
-        
-        # 2. Se não encontrou, buscar apenas por LOTE
-        if not item_estoque:
-            chave_lote = f"LOTE:{lote}"
-            if chave_lote in banco_index:
-                # Se houver múltiplos com mesmo lote, pegar o mais recente
-                itens_mesmo_lote = banco_index[chave_lote]
-                item_estoque = itens_mesmo_lote[0]  # Pega o primeiro (ou ordenar por ID)
-                motivo_busca = f"Apenas Lote ({len(itens_mesmo_lote)} encontrados)"
-        
-        if item_estoque:
-            print(f"   ✅ ENCONTRADO no banco por: {motivo_busca}")
-            print(f"   📊 Dados atuais no banco:")
-            print(f"      Lote: '{item_estoque.lote}'")
-            print(f"      Produto: '{item_estoque.produto}'")
-            print(f"      Endereço: '{item_estoque.endereco}'")
-            print(f"      AZ: '{item_estoque.az}'")
-            print(f"      Quantidade: {item_estoque.saldo}")
-            
-            # 🔥 DETECTAR MUDANÇAS
-            diferencas = []
-            mudou_endereco = False
-            mudou_az = False
-            
-            # 1. Verificar mudança de ENDEREÇO
-            endereco_bd = (item_estoque.endereco or '').strip().upper()
-            if endereco_bd != endereco_importado:
-                diferencas.append(f"endereco: '{endereco_bd}' → '{endereco_importado}'")
-                mudou_endereco = True
-                print(f"   📍 MUDANÇA DE ENDEREÇO DETECTADA!")
-            
-            # 2. Verificar mudança de AZ
-            az_bd = normalizar_az(item_estoque.az)
-            if az_bd != az_importado:
-                diferencas.append(f"az: '{item_estoque.az}' → '{az_importado}'")
-                mudou_az = True
-                print(f"   🏭 MUDANÇA DE AZ DETECTADA!")
-            
-            # 3. Verificar mudança de QUANTIDADE
-            quantidade_bd = float(item_estoque.saldo or 0)
-            if abs(quantidade_bd - quantidade_importada) > 0.001:
-                diferencas.append(f"quantidade: {quantidade_bd} → {quantidade_importada}")
-                print(f"   🔢 MUDANÇA DE QUANTIDADE DETECTADA!")
-            
-            # 4. Verificar outros campos
-            campos_comparacao = [
-                ('peneira', 'peneira', item_estoque.peneira.nome if item_estoque.peneira else ''),
-                ('cultivar', 'cultivar', item_estoque.cultivar.nome if item_estoque.cultivar else ''),
-                ('tratamento', 'tratamento', item_estoque.tratamento.nome if item_estoque.tratamento else ''),
-                ('peso_unitario', 'peso_unitario', float(item_estoque.peso_unitario or 0)),
-                ('embalagem', 'embalagem', item_estoque.embalagem or ''),
-            ]
-            
-            for campo_nome, campo_importado, valor_bd in campos_comparacao:
-                valor_importado = item_importado.get(campo_importado, '')
-                
-                if campo_nome in ['peso_unitario']:
-                    valor_importado = float(valor_importado or 0)
-                    if abs(float(valor_bd or 0) - valor_importado) > 0.001:
-                        diferencas.append(f"{campo_nome}: {valor_bd} → {valor_importado}")
-                else:
-                    valor_bd_str = str(valor_bd or '').strip()
-                    valor_importado_str = str(valor_importado or '').strip()
-                    if valor_bd_str != valor_importado_str:
-                        if valor_importado_str not in ['', 'None', 'nan']:
-                            diferencas.append(f"{campo_nome}: '{valor_bd_str}' → '{valor_importado_str}'")
-            
-            # 🔥 DECISÃO: Atualizar ou considerar novo?
-            if diferencas:
-                print(f"   🔄 {len(diferencas)} MUDANÇAS DETECTADAS - Marcando para ATUALIZAR")
-                
-                # Se mudou endereço ou AZ, é uma TRANSFERÊNCIA, não um novo lote
-                if mudou_endereco or mudou_az:
-                    print(f"   🚛 TRANSFERÊNCIA DETECTADA: Endereço/AZ modificado")
-                
-                comparacao['lotes_alterados'].append({
-                    'lote': lote,
-                    'endereco': endereco_importado,
-                    'az': az_importado,
-                    'endereco_original': item_estoque.endereco,
-                    'az_original': item_estoque.az,
-                    'divergencias': diferencas,
-                    'dados_novos': item_importado,
-                    'dados_atuais': {
-                        'id': item_estoque.id,
-                        'saldo': item_estoque.saldo,
-                        'endereco': item_estoque.endereco,
-                        'az': item_estoque.az,
-                        'peneira_id': item_estoque.peneira.id,
-                        'cultivar_id': item_estoque.cultivar.id,
-                        'tratamento_id': item_estoque.tratamento.id if item_estoque.tratamento else None,
-                        'peso_unitario': item_estoque.peso_unitario,
-                        'embalagem': item_estoque.embalagem
-                    }
-                })
-                comparacao['resumo']['atualizados'] += 1
-            else:
-                print(f"   ✅ SEM MUDANÇAS - Idêntico")
-                comparacao['lotes_iguais'].append({
-                    'lote': lote,
-                    'endereco': endereco_importado,
-                    'az': az_importado,
-                    'dados': item_importado
-                })
-                comparacao['resumo']['iguais'] += 1
-                
-        else:
-            print(f"   🆕 NÃO ENCONTRADO - Novo lote")
-            comparacao['novos_lotes'].append({
-                'lote': lote,
-                'endereco': endereco_importado,
-                'az': az_importado,
-                'dados': item_importado
-            })
-            comparacao['resumo']['novos'] += 1
-    
-    print(f"\n📊 RESUMO FINAL:")
-    print(f"   🆕 Novos: {comparacao['resumo']['novos']}")
-    print(f"   🔄 Para atualizar: {comparacao['resumo']['atualizados']}")
-    print(f"   ✅ Idênticos: {comparacao['resumo']['iguais']}")
-    
-    return comparacao
-
-def normalizar_az(az_value):
-    """Normaliza o valor do AZ removendo .0 e espaços"""
-    if not az_value:
-        return ''
-    
-    az_str = str(az_value).strip()
-    
-    # Remover .0 do final
-    if az_str.endswith('.0'):
-        az_str = az_str[:-2]
-    elif '.' in az_str:
-        # Verificar se a parte decimal é só zeros
-        partes = az_str.split('.')
-        if len(partes) == 2 and partes[1].replace('0', '') == '':
-            az_str = partes[0]
-    
-    return az_str.upper()
-
-
-
-
-@login_required
-def debug_tratamentos(request):
-    """Debug: mostra todos os tratamentos existentes no banco"""
-    tratamentos = Tratamento.objects.all().values('id', 'nome')
-    estoque_com_tratamento = Estoque.objects.filter(tratamento__isnull=False).select_related('tratamento')
-    
-    print("🔍 [DEBUG TRATAMENTOS]")
-    print("Tratamentos cadastrados:")
-    for t in tratamentos:
-        print(f"  {t['id']}: '{t['nome']}'")
-    
-    print("\nEstoque com tratamento:")
-    for e in estoque_com_tratamento:
-        print(f"  Lote: {e.lote}, Tratamento: '{e.tratamento.nome if e.tratamento else 'None'}'")
-    
-    return JsonResponse({'success': True, 'message': 'Check console for debug info'})
-
-
-
-
-
-# ================================================================
-# FUNÇÕES DE COMPARAÇÃO
-# ================================================================
-
-
-
-
-def comparar_com_estoque_atual_precisa(novos_dados):
-    """
-    COMPARAÇÃO SUPER PRECISA com debug detalhado
-    """
-    comparacao = {
-        'novos_lotes': [],
-        'lotes_alterados': [],
-        'lotes_iguais': [],
-        'resumo': {'novos': 0, 'atualizados': 0, 'iguais': 0}
-    }
-    
-    print("🎯 [COMPARAÇÃO SUPER PRECISA] Iniciando...")
-    
-    for i, novo_item in enumerate(novos_dados):
-        lote = novo_item.get('lote', '')
-        peneira_nova = novo_item.get('peneira', '')
-        cultivar_novo = novo_item.get('cultivar', '')
-        tratamento_novo = novo_item.get('tratamento', '')
-        
-        print(f"\n🔍 [ITEM {i+1}] {lote}")
-        print(f"   ARQUIVO -> Peneira: '{peneira_nova}', Cultivar: '{cultivar_novo}', Tratamento: '{tratamento_novo}'")
-        
-        # Buscar TODOS os registros com este lote no banco para debug
-        itens_bd = Estoque.objects.filter(lote=lote).select_related('peneira', 'cultivar', 'tratamento')
-        
-        if itens_bd:
-            print(f"   📊 ENCONTRADO(S) {itens_bd.count()} registro(s) no banco:")
-            for j, item_bd in enumerate(itens_bd):
-                print(f"      BD {j+1} -> Peneira: '{item_bd.peneira.nome if item_bd.peneira else 'None'}', "
-                      f"Cultivar: '{item_bd.cultivar.nome if item_bd.cultivar else 'None'}', "
-                      f"Tratamento: '{item_bd.tratamento.nome if item_bd.tratamento else 'None'}'")
-        
-        # Agora buscar pelo match exato
-        encontrado = False
-        for item_bd in itens_bd:
-            peneira_bd = item_bd.peneira.nome if item_bd.peneira else ''
-            cultivar_bd = item_bd.cultivar.nome if item_bd.cultivar else ''
-            tratamento_bd = item_bd.tratamento.nome if item_bd.tratamento else ''
-            
-            # 🔥 COMPARAÇÃO PRECISA
-            peneira_match = (peneira_bd == peneira_nova)
-            cultivar_match = (cultivar_bd == cultivar_novo)
-            
-            # Comparação FLEXÍVEL de tratamento
-            tratamento_match = comparar_tratamentos_flexivel(tratamento_bd, tratamento_novo)
-            
-            if peneira_match and cultivar_match and tratamento_match:
-                print(f"   ✅ MATCH EXATO ENCONTRADO!")
-                encontrado = True
-                
-                # Comparar endereço e quantidade
-                endereco_bd = item_bd.endereco
-                endereco_novo = novo_item.get('endereco', '')
-                quantidade_bd = item_bd.saldo
-                quantidade_novo = novo_item.get('quantidade', 0)
-                
-                print(f"   📍 Endereço: BD '{endereco_bd}' vs Arquivo '{endereco_novo}'")
-                print(f"   🔢 Quantidade: BD {quantidade_bd} vs Arquivo {quantidade_novo}")
-                
-                if endereco_bd == endereco_novo and quantidade_bd == quantidade_novo:
-                    print("   ✅ TUDO IGUAL - Marcando como IGUAL")
-                    comparacao['lotes_iguais'].append({
-                        'lote': lote,
-                        'endereco': endereco_novo,
-                        'dados': novo_item,
-                        'dados_atuais': {
-                            'id': item_bd.id,
-                            'saldo': quantidade_bd,
-                            'endereco': endereco_bd
-                        }
-                    })
-                    comparacao['resumo']['iguais'] += 1
-                else:
-                    print("   🔄 DIFERENÇAS - Marcando para ATUALIZAR")
-                    divergencias = []
-                    if endereco_bd != endereco_novo:
-                        divergencias.append(f'Endereço: {endereco_bd} → {endereco_novo}')
-                    if quantidade_bd != quantidade_novo:
-                        divergencias.append(f'Quantidade: {quantidade_bd} → {quantidade_novo}')
-                    
-                    comparacao['lotes_alterados'].append({
-                        'lote': lote,
-                        'endereco': endereco_novo,
-                        'endereco_original': endereco_bd,
-                        'divergencias': divergencias,
-                        'dados_novos': novo_item,
-                        'dados_atuais': {
-                            'id': item_bd.id,
-                            'saldo': quantidade_bd,
-                            'endereco': endereco_bd,
-                            'peneira_id': item_bd.peneira.id,
-                            'cultivar_id': item_bd.cultivar.id,
-                            'tratamento_id': item_bd.tratamento.id if item_bd.tratamento else None
-                        }
-                    })
-                    comparacao['resumo']['atualizados'] += 1
-                break
-        
-        if not encontrado:
-            print("   🆕 NENHUM MATCH ENCONTRADO - Marcando como NOVO")
-            comparacao['novos_lotes'].append({
-                'lote': lote,
-                'endereco': novo_item.get('endereco', ''),
-                'dados': novo_item
-            })
-            comparacao['resumo']['novos'] += 1
-    
-    print(f"\n📊 RESUMO FINAL:")
-    print(f"   ✅ Iguais: {comparacao['resumo']['iguais']}")
-    print(f"   🔄 Para atualizar: {comparacao['resumo']['atualizados']}")
-    print(f"   🆕 Novos: {comparacao['resumo']['novos']}")
-    
-    return comparacao
-
-def comparar_tratamentos_flexivel(tratamento_bd, tratamento_arquivo):
-    """Comparação FLEXÍVEL de tratamentos"""
-    if not tratamento_bd and not tratamento_arquivo:
-        return True
-    
-    if not tratamento_bd or not tratamento_arquivo:
-        # Se um é vazio e o outro é "SEM TRATAMENTO", considerar iguais
-        if (not tratamento_bd and str(tratamento_arquivo).upper() in ['', 'SEM TRATAMENTO', 'NAN']) or \
-           (not tratamento_arquivo and str(tratamento_bd).upper() in ['', 'SEM TRATAMENTO', 'NAN']):
-            return True
-        return False
-    
-    # Normalizar ambos
-    bd_normalizado = str(tratamento_bd).strip().upper()
-    arquivo_normalizado = str(tratamento_arquivo).strip().upper()
-    
-    # Remover 'NAN'
-    if arquivo_normalizado == 'NAN':
-        arquivo_normalizado = ''
-    if bd_normalizado == 'NAN':
-        bd_normalizado = ''
-    
-    # Mapear equivalentes
-    equivalentes = {
-        '': ['SEM TRATAMENTO', 'SEM TRAT', 'NONE', 'NULL'],
-        'SEM TRATAMENTO': ['', 'SEM TRAT', 'NONE', 'NULL']
-    }
-    
-    # Verificar igualdade direta
-    if bd_normalizado == arquivo_normalizado:
-        return True
-    
-    # Verificar equivalentes
-    for base, sinonimos in equivalentes.items():
-        if bd_normalizado == base and arquivo_normalizado in sinonimos:
-            return True
-        if arquivo_normalizado == base and bd_normalizado in sinonimos:
-            return True
-    
-    return False
-
-
-def normalizar_tratamento(tratamento):
-    """Normaliza valores de tratamento para comparação"""
-    if not tratamento or str(tratamento).strip() in ['', 'nan', 'NaN', 'None', 'null']:
-        return 'SEM TRATAMENTO'
-    
-    tratamento_str = str(tratamento).strip()
-    
-    # Mapear sinônimos
-    if tratamento_str.upper() in ['SEM TRATAMENTO', 'SEM TRAT', 'SEM TRAT.']:
-        return 'SEM TRATAMENTO'
-    
-    return tratamento_str
-
-
-@login_required
-def limpar_lotes_duplicados(request):
-    """Limpa lotes duplicados do banco"""
-    if request.method == 'POST':
-        try:
-            with transaction.atomic():
-                # Encontrar lotes duplicados
-                from django.db.models import Count
-                duplicados = Estoque.objects.values('lote', 'endereco').annotate(
-                    total=Count('id')
-                ).filter(total__gt=1)
-                
-                print(f"🔍 Encontrados {len(duplicados)} lotes duplicados")
-                
-                for dup in duplicados:
-                    lote = dup['lote']
-                    endereco = dup['endereco']
-                    
-                    # Manter apenas o mais recente
-                    registros = Estoque.objects.filter(lote=lote, endereco=endereco).order_by('-id')
-                    manter = registros.first()
-                    excluir = registros[1:]
-                    
-                    for reg in excluir:
-                        print(f"🗑️  Excluindo duplicado: {lote} -> {endereco} (ID: {reg.id})")
-                        reg.delete()
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Lotes duplicados limpos: {len(duplicados)}'
-                })
-                
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Erro ao limpar duplicados: {str(e)}'
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
-
-# ================================================================
-# VIEWS PRINCIPAIS
 # ================================================================
 
 @login_required
@@ -876,1076 +254,6 @@ def dashboard(request):
     }
     
     return render(request, 'sapp/dashboard.html', context)
-
-
-
-@login_required
-def importar_estoque(request):
-    """Importação de estoque COMPLETA - todos os campos igual à exportação"""
-    if request.method == 'POST' and request.FILES.get('excel_file'):
-        try:
-            excel_file = request.FILES['excel_file']
-            
-            print("=" * 80)
-            print("🔍 [IMPORTAÇÃO COMPLETA] INICIANDO PROCESSAMENTO")
-            print("=" * 80)
-            
-            # Ler o arquivo Excel
-            try:
-                df = pd.read_excel(excel_file, dtype=str)  # Ler tudo como string
-                print("✅ Arquivo lido com dtype=str para todas as colunas")
-            except Exception as e:
-                print(f"⚠️ Erro ao ler com dtype=str: {e}")
-                df = pd.read_excel(excel_file)
-            
-            print(f"📊 Arquivo lido - {len(df)} linhas, {len(df.columns)} colunas")
-            print(f"🔍 Colunas encontradas: {list(df.columns)}")
-            
-            # Verificar colunas obrigatórias e criar mapping automático
-            colunas_esperadas = [
-                'Lote', 'Produto', 'Cultivar', 'Peneira', 'Categoria', 'Endereço',
-                'Saldo', 'Peso Unitário (kg)', 'Peso Total (kg)', 'Tratamento',
-                'Embalagem', 'Conferente', 'Data Entrada', 'AZ', 'Origem/Destino',
-                'Empresa', 'Espécie', 'Lote Anterior', 'Observação'
-            ]
-            
-            # Mapeamento baseado nos nomes das colunas do Excel exportado
-            mapping = {}
-            for coluna in colunas_esperadas:
-                for coluna_arquivo in df.columns:
-                    if coluna.lower() in coluna_arquivo.lower() or coluna_arquivo.lower() in coluna.lower():
-                        mapping[coluna] = coluna_arquivo
-                        print(f"   ✅ MAPEADO: '{coluna_arquivo}' → '{coluna}'")
-                        break
-                if coluna not in mapping:
-                    print(f"   ⚠️ COLUNA NÃO ENCONTRADA: '{coluna}'")
-            
-            # Processar dados
-            processed_data = []
-            linhas_com_erro = 0
-            
-            for index, row in df.iterrows():
-                try:
-                    # Extrair dados com fallback para valores padrão
-                    item_data = {
-                        'lote': str(row.get(mapping.get('Lote', ''), '')).strip(),
-                        'produto': str(row.get(mapping.get('Produto', ''), '')).strip(),
-                        'cultivar': str(row.get(mapping.get('Cultivar', ''), '')).strip(),
-                        'peneira': str(row.get(mapping.get('Peneira', ''), '')).strip(),
-                        'categoria': str(row.get(mapping.get('Categoria', ''), '')).strip(),
-                        'endereco': str(row.get(mapping.get('Endereço', ''), '')).strip().upper(),
-                        'saldo': 0,
-                        'peso_unitario': 0.0,
-                        'peso_total': 0.0,
-                        'tratamento': str(row.get(mapping.get('Tratamento', ''), '')).strip(),
-                        'embalagem': str(row.get(mapping.get('Embalagem', ''), '')).strip(),
-                        'conferente': str(row.get(mapping.get('Conferente', ''), '')).strip(),
-                        'data_entrada': str(row.get(mapping.get('Data Entrada', ''), '')).strip(),
-                        'az': str(row.get(mapping.get('AZ', ''), '')).strip(),
-                        'origem_destino': str(row.get(mapping.get('Origem/Destino', ''), '')).strip(),
-                        'empresa': str(row.get(mapping.get('Empresa', ''), '')).strip(),
-                        'especie': str(row.get(mapping.get('Espécie', ''), 'SOJA')).strip(),
-                       
-                        'observacao': str(row.get(mapping.get('Observação', ''), '')).strip()
-                    }
-                    
-                    # Processar valores numéricos
-                    try:
-                        saldo_raw = row.get(mapping.get('Saldo', ''))
-                        if not pd.isna(saldo_raw) and saldo_raw not in [None, '']:
-                            item_data['saldo'] = float(str(saldo_raw).replace(',', '.'))
-                    except:
-                        item_data['saldo'] = 0
-                    
-                    try:
-                        peso_unit_raw = row.get(mapping.get('Peso Unitário (kg)', ''))
-                        if not pd.isna(peso_unit_raw) and peso_unit_raw not in [None, '']:
-                            item_data['peso_unitario'] = float(str(peso_unit_raw).replace(',', '.'))
-                    except:
-                        item_data['peso_unitario'] = 0.0
-                    
-                    try:
-                        peso_total_raw = row.get(mapping.get('Peso Total (kg)', ''))
-                        if not pd.isna(peso_total_raw) and peso_total_raw not in [None, '']:
-                            item_data['peso_total'] = float(str(peso_total_raw).replace(',', '.'))
-                    except:
-                        item_data['peso_total'] = 0.0
-                    
-                    # Validar dados obrigatórios
-                    if not item_data['lote'] or not item_data['endereco']:
-                        print(f"⚠️ Linha {index + 2}: Lote ou endereço vazio - pulando")
-                        linhas_com_erro += 1
-                        continue
-                    
-                    if item_data['saldo'] <= 0:
-                        print(f"⚠️ Linha {index + 2}: Saldo <= 0 - pulando")
-                        linhas_com_erro += 1
-                        continue
-                    
-                    # Normalizar embalagem
-                    if item_data['embalagem']:
-                        emb = item_data['embalagem'].upper()
-                        if 'SACO' in emb or 'SC' in emb:
-                            item_data['embalagem'] = 'SC'
-                        elif 'BAG' in emb or 'BIG' in emb:
-                            item_data['embalagem'] = 'BAG'
-                    
-                    # Tratamento de datas
-                    if item_data['data_entrada']:
-                        try:
-                            # Tentar converter várias formatos de data
-                            if isinstance(item_data['data_entrada'], str):
-                                # Remove hora se existir
-                                item_data['data_entrada'] = item_data['data_entrada'].split()[0]
-                        except:
-                            item_data['data_entrada'] = timezone.now().strftime('%d/%m/%Y')
-                    else:
-                        item_data['data_entrada'] = timezone.now().strftime('%d/%m/%Y')
-                    
-                    # Buscar/crear objetos relacionados
-                    # Cultivar
-                    if item_data['cultivar']:
-                        cultivar_obj, _ = Cultivar.objects.get_or_create(
-                            nome=item_data['cultivar'],
-                            defaults={'nome': item_data['cultivar']}
-                        )
-                        item_data['cultivar_id'] = cultivar_obj.id
-                    else:
-                        cultivar_padrao, _ = Cultivar.objects.get_or_create(
-                            nome='CULTIVAR NÃO ESPECIFICADO',
-                            defaults={'nome': 'CULTIVAR NÃO ESPECIFICADO'}
-                        )
-                        item_data['cultivar_id'] = cultivar_padrao.id
-                    
-                    # Peneira
-                    if item_data['peneira']:
-                        peneira_obj, _ = Peneira.objects.get_or_create(
-                            nome=item_data['peneira'],
-                            defaults={'nome': item_data['peneira']}
-                        )
-                        item_data['peneira_id'] = peneira_obj.id
-                    else:
-                        peneira_padrao, _ = Peneira.objects.get_or_create(
-                            nome='PENEIRA NÃO ESPECIFICADA',
-                            defaults={'nome': 'PENEIRA NÃO ESPECIFICADA'}
-                        )
-                        item_data['peneira_id'] = peneira_padrao.id
-                    
-                    # Categoria
-                    if item_data['categoria']:
-                        categoria_obj, _ = Categoria.objects.get_or_create(
-                            nome=item_data['categoria'],
-                            defaults={'nome': item_data['categoria']}
-                        )
-                        item_data['categoria_id'] = categoria_obj.id
-                    else:
-                        categoria_padrao, _ = Categoria.objects.get_or_create(
-                            nome='CATEGORIA NÃO ESPECIFICADA',
-                            defaults={'nome': 'CATEGORIA NÃO ESPECIFICADA'}
-                        )
-                        item_data['categoria_id'] = categoria_padrao.id
-                    
-                    # Tratamento
-                    if item_data['tratamento'] and item_data['tratamento'].lower() not in ['', 'nan', 'none', 'sem tratamento']:
-                        # Truncar para 8 caracteres se necessário
-                        tratamento_nome = item_data['tratamento'][:8] if len(item_data['tratamento']) > 8 else item_data['tratamento']
-                        tratamento_obj, _ = Tratamento.objects.get_or_create(
-                            nome=tratamento_nome,
-                            defaults={'nome': tratamento_nome}
-                        )
-                        item_data['tratamento_id'] = tratamento_obj.id
-                    else:
-                        item_data['tratamento_id'] = None
-                    
-                    # Conferente (usuário)
-                    if item_data['conferente']:
-                        # Tentar encontrar usuário pelo nome
-                        user = User.objects.filter(
-                            Q(first_name__icontains=item_data['conferente']) |
-                            Q(username__icontains=item_data['conferente'])
-                        ).first()
-                        if user:
-                            item_data['conferente_id'] = user.id
-                        else:
-                            item_data['conferente_id'] = request.user.id
-                    else:
-                        item_data['conferente_id'] = request.user.id
-                    
-                    print(f"✅ Processado: {item_data['lote']} | {item_data['endereco']} | Saldo: {item_data['saldo']}")
-                    processed_data.append(item_data)
-                    
-                except Exception as e:
-                    print(f"❌ Erro na linha {index + 2}: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    linhas_com_erro += 1
-                    continue
-            
-            print(f"📊 Total processado: {len(processed_data)} itens")
-            print(f"⚠️ Linhas com erro: {linhas_com_erro}")
-            
-            if not processed_data:
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Nenhum dado válido encontrado no arquivo.'
-                })
-            
-            # Usar comparação robusta
-            comparacao = comparar_com_estoque_atual_com_produto(processed_data)
-            
-            return JsonResponse({
-                'success': True,
-                'processed_count': len(processed_data),
-                'error_count': linhas_com_erro,
-                'comparacao': comparacao,
-                'message': f'✅ Importação concluída! {len(processed_data)} itens processados, {linhas_com_erro} erros'
-            })
-            
-        except Exception as e:
-            print(f"💥 Erro geral na importação: {e}")
-            import traceback
-            print(f"🔍 Traceback: {traceback.format_exc()}")
-            return JsonResponse({
-                'success': False,
-                'error': f'Erro ao processar arquivo: {str(e)}'
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
-
-# 🔥 FUNÇÃO AUXILIAR PARA LIMPAR PRODUTO
-def limpar_codigo_produto(produto_raw):
-    """Remove .0 e formata códigos de produto"""
-    if pd.isna(produto_raw) or produto_raw is None:
-        return ''
-    
-    produto_str = str(produto_raw).strip()
-    
-    # Casos comuns de .0 no final
-    if produto_str.endswith('.0'):
-        produto_str = produto_str[:-2]
-    
-    # Remover espaços extras
-    produto_str = produto_str.strip()
-    
-    # Se ficou vazio ou é inválido
-    if not produto_str or produto_str.lower() in ['nan', 'none', 'null']:
-        return ''
-    
-    return produto_str
-
-# No loop de processamento, use:
-
-
-def comparar_com_estoque_atual_com_produto(dados_importados):
-    """
-    COMPARAÇÃO COMPLETA - Considera Lote + Produto + Endereço + AZ como chave única
-    """
-    print("🔍 [COMPARAÇÃO COMPLETA] Iniciando...")
-    
-    comparacao = {
-        'novos_lotes': [],
-        'lotes_alterados': [],
-        'lotes_iguais': [],
-        'resumo': {'novos': 0, 'atualizados': 0, 'iguais': 0}
-    }
-    
-    # Coletar todos os lotes únicos do arquivo
-    lotes_importados = list(set([item.get('lote', '') for item in dados_importados if item.get('lote')]))
-    
-    print(f"📊 Lotes únicos no arquivo: {len(lotes_importados)}")
-    
-    # Buscar TODOS os registros do banco que correspondem aos lotes importados
-    estoque_atual = Estoque.objects.filter(
-        lote__in=lotes_importados
-    ).select_related('cultivar', 'peneira', 'categoria', 'tratamento')
-    
-    print(f"📊 Registros encontrados no banco: {estoque_atual.count()}")
-    
-    # Criar dicionário para busca rápida por CHAVE COMPLETA
-    estoque_dict = {}
-    for item in estoque_atual:
-        # 🔥 CHAVE COMPLETA: lote + produto + endereço + az
-        chave_completa = f"{item.lote}|{item.produto or ''}|{item.endereco or ''}|{item.az or ''}"
-        
-        if chave_completa not in estoque_dict:
-            estoque_dict[chave_completa] = []
-        estoque_dict[chave_completa].append(item)
-        
-        # Também criar chave apenas por lote para fallback
-        chave_lote = item.lote
-        if chave_lote not in estoque_dict:
-            estoque_dict[chave_lote] = []
-        estoque_dict[chave_lote].append(item)
-    
-    # Processar cada item importado
-    for i, item_importado in enumerate(dados_importados):
-        lote = item_importado.get('lote', '')
-        produto_importado = item_importado.get('produto', '')
-        endereco_importado = item_importado.get('endereco', '').strip().upper()
-        az_importado = item_importado.get('az', '').strip().upper()
-        quantidade_importada = float(item_importado.get('quantidade', 0))
-        
-        print(f"\n--- Item {i+1}: {lote} ---")
-        print(f"   📍 Endereço: '{endereco_importado}'")
-        print(f"   🏭 Armazém: '{az_importado}'")
-        print(f"   🏷️  Produto: '{produto_importado}'")
-        print(f"   🔢 Quantidade: {quantidade_importada}")
-        
-        # 🔥 BUSCAR POR CHAVE COMPLETA primeiro
-        chave_completa = f"{lote}|{produto_importado}|{endereco_importado}|{az_importado}"
-        itens_correspondentes = estoque_dict.get(chave_completa, [])
-        
-        if itens_correspondentes:
-            item_estoque = itens_correspondentes[0]  # Pega o primeiro
-            
-            print(f"   ✅ ENCONTRADO por chave completa")
-            print(f"   📍 Endereço BD: '{item_estoque.endereco}'")
-            print(f"   🏭 Armazém BD: '{item_estoque.az}'")
-            print(f"   🔢 Quantidade BD: {item_estoque.saldo}")
-            
-            # 🔥 COMPARAÇÃO DETALHADA
-            diferencas = []
-            
-            # 1. COMPARAR QUANTIDADE (sempre comparar)
-            quantidade_bd = float(item_estoque.saldo or 0)
-            if abs(quantidade_bd - quantidade_importada) > 0.001:
-                diferencas.append(f"quantidade: {quantidade_bd} → {quantidade_importada}")
-                print(f"   🔢 DIFERENÇA DE QUANTIDADE!")
-            
-            # 2. COMPARAR OUTROS CAMPOS (apenas se houver diferença)
-            campos_comparacao = [
-                ('peneira', 'peneira', item_estoque.peneira.nome if item_estoque.peneira else ''),
-                ('cultivar', 'cultivar', item_estoque.cultivar.nome if item_estoque.cultivar else ''),
-                ('tratamento', 'tratamento', item_estoque.tratamento.nome if item_estoque.tratamento else ''),
-                ('peso_unitario', 'peso_unitario', float(item_estoque.peso_unitario or 0)),
-                ('embalagem', 'embalagem', item_estoque.embalagem or ''),
-            ]
-            
-            for campo_nome, campo_importado, valor_bd in campos_comparacao:
-                valor_importado = item_importado.get(campo_importado, '')
-                
-                if campo_nome in ['peso_unitario']:
-                    # Campo numérico
-                    valor_importado = float(valor_importado or 0)
-                    if abs(float(valor_bd or 0) - valor_importado) > 0.001:
-                        diferencas.append(f"{campo_nome}: {valor_bd} → {valor_importado}")
-                else:
-                    # Campo textual
-                    valor_bd_str = str(valor_bd or '').strip()
-                    valor_importado_str = str(valor_importado or '').strip()
-                    if valor_bd_str != valor_importado_str:
-                        if valor_importado_str not in ['', 'None', 'nan']:
-                            diferencas.append(f"{campo_nome}: '{valor_bd_str}' → '{valor_importado_str}'")
-            
-            if diferencas:
-                print(f"   🔄 DIFERENÇAS ENCONTRADAS: {len(diferencas)}")
-                comparacao['lotes_alterados'].append({
-                    'lote': lote,
-                    'endereco': endereco_importado,
-                    'az': az_importado,
-                    'endereco_original': item_estoque.endereco,
-                    'az_original': item_estoque.az,
-                    'divergencias': diferencas,
-                    'dados_novos': item_importado,
-                    'dados_atuais': {
-                        'id': item_estoque.id,
-                        'saldo': item_estoque.saldo,
-                        'endereco': item_estoque.endereco,
-                        'az': item_estoque.az,
-                        'peneira_id': item_estoque.peneira.id,
-                        'cultivar_id': item_estoque.cultivar.id,
-                        'tratamento_id': item_estoque.tratamento.id if item_estoque.tratamento else None,
-                        'peso_unitario': item_estoque.peso_unitario,
-                        'embalagem': item_estoque.embalagem
-                    }
-                })
-                comparacao['resumo']['atualizados'] += 1
-            else:
-                print(f"   ✅ SEM DIFERENÇAS")
-                comparacao['lotes_iguais'].append({
-                    'lote': lote,
-                    'endereco': endereco_importado,
-                    'az': az_importado,
-                    'dados': item_importado
-                })
-                comparacao['resumo']['iguais'] += 1
-                
-        else:
-            # Não encontrou por chave completa - NOVO LOTE
-            print(f"   🆕 NÃO ENCONTRADO - Novo lote (chave completa não encontrada)")
-            comparacao['novos_lotes'].append({
-                'lote': lote,
-                'endereco': endereco_importado,
-                'az': az_importado,
-                'dados': item_importado
-            })
-            comparacao['resumo']['novos'] += 1
-    
-    print(f"\n📊 RESUMO FINAL:")
-    print(f"   🆕 Novos: {comparacao['resumo']['novos']}")
-    print(f"   🔄 Para atualizar: {comparacao['resumo']['atualizados']}")
-    print(f"   ✅ Idênticos: {comparacao['resumo']['iguais']}")
-    
-    return comparacao
-
-@login_required
-def testar_comparacao(request):
-    """Teste manual da comparação"""
-    print("🧪 [TESTE COMPARAÇÃO]")
-    
-    # Dados de exemplo
-    dados_teste = [
-        {
-            'lote': 'PQH00208',
-            'endereco': 'R05 LN10 P06',  # Endereço diferente
-            'quantidade': 10,
-            'peneira': 'PENEIRA NÃO ESPECIFICADA', 
-            'cultivar': 'CULTIVAR NÃO ESPECIFICADO',
-            'tratamento': 'SEM TRATAMENTO',
-            'peso_unitario': 0,
-            'embalagem': 'BAG'
-        },
-        {
-            'lote': 'UCS0357-25', 
-            'endereco': 'GERAL',  # Mesmo endereço
-            'quantidade': 15,     # Quantidade diferente
-            'peneira': 'PENEIRA NÃO ESPECIFICADA',
-            'cultivar': 'CULTIVAR NÃO ESPECIFICADO',
-            'tratamento': 'SEM TRATAMENTO',
-            'peso_unitario': 0,
-            'embalagem': 'BAG'
-        }
-    ]
-    
-    resultado = comparar_com_estoque_atual_com_produto(dados_teste)
-    
-    return JsonResponse({
-        'success': True,
-        'resultado': resultado,
-        'message': 'Teste de comparação concluído - verifique o console'
-    })
-
-
-def verificar_diferencas_estoque(item_estoque, item_importado):
-    """
-    Verifica diferenças entre item do estoque e dados importados
-    """
-    diferencas = []
-    
-    campos_para_comparar = [
-        ('quantidade', 'quantidade'),
-        ('endereco', 'endereco'),
-        ('cultivar_id', 'cultivar_id'),
-        ('peneira_id', 'peneira_id'),
-        ('categoria_id', 'categoria_id'),
-        ('tratamento_id', 'tratamento_id'),
-        ('peso_unitario', 'peso_unitario'),
-        ('embalagem', 'embalagem'),
-        ('empresa', 'empresa'),
-        ('az', 'az'),
-        ('cultura', 'cultura')
-    ]
-    
-    for campo_estoque, campo_importado in campos_para_comparar:
-        valor_estoque = getattr(item_estoque, campo_estoque, None)
-        valor_importado = item_importado.get(campo_importado, None)
-        
-        # Tratamento especial para campos numéricos
-        if campo_estoque in ['quantidade', 'peso_unitario']:
-            valor_estoque = float(valor_estoque or 0)
-            valor_importado = float(valor_importado or 0)
-            
-            if abs(valor_estoque - valor_importado) > 0.001:  # Margem de erro para floats
-                diferencas.append(f"{campo_estoque}: {valor_estoque} → {valor_importado}")
-        
-        # Para campos textuais
-        elif str(valor_estoque or '').strip() != str(valor_importado or '').strip():
-            diferencas.append(f"{campo_estoque}: '{valor_estoque}' → '{valor_importado}'")
-    
-    return diferencas
-
-def comparacao_radical_simples(novos_dados):
-    """
-    COMPARAÇÃO RADICAL: Se o lote existe no banco, considera para ATUALIZAR
-    (ignora peneira/cultivar/tratamento por enquanto)
-    """
-    comparacao = {
-        'novos_lotes': [],
-        'lotes_alterados': [],
-        'lotes_iguais': [],
-        'resumo': {'novos': 0, 'atualizados': 0, 'iguais': 0}
-    }
-    
-    print("💥 [COMPARAÇÃO RADICAL] Apenas por lote")
-    
-    for i, novo_item in enumerate(novos_dados):
-        lote = novo_item.get('lote', '')
-        
-        print(f"\n--- Item {i+1}: {lote} ---")
-        
-        # Buscar QUALQUER registro com este lote
-        item_bd = Estoque.objects.filter(lote=lote).first()
-        
-        if item_bd:
-            print(f"   ✅ LOTE EXISTE NO BANCO - Marcando para ATUALIZAR")
-            comparacao['lotes_alterados'].append({
-                'lote': lote,
-                'endereco': novo_item.get('endereco', ''),
-                'dados_novos': novo_item,
-                'dados_atuais': {
-                    'id': item_bd.id,
-                    'saldo': item_bd.saldo,
-                    'endereco': item_bd.endereco
-                }
-            })
-            comparacao['resumo']['atualizados'] += 1
-        else:
-            print(f"   🆕 LOTE NÃO EXISTE - Marcando como NOVO")
-            comparacao['novos_lotes'].append({
-                'lote': lote,
-                'endereco': novo_item.get('endereco', ''),
-                'dados': novo_item
-            })
-            comparacao['resumo']['novos'] += 1
-    
-    return comparacao
-
-
-
-
-@login_required
-def aprovar_importacao(request):
-    """IMPORTAÇÃO INCREMENTAL - Apenas atualiza e cria, NÃO REMOVE lotes"""
-    if request.method == 'POST':
-        try:
-            print("🟡 [IMPORTAÇÃO INCREMENTAL] Iniciando processamento...")
-            print("📢 MODO: Apenas atualiza/cria lotes da planilha. NÃO remove lotes existentes!")
-            
-            data = json.loads(request.body)
-            user = request.user
-            
-            with transaction.atomic():
-                modificacoes = data.get('modificacoes', [])
-                
-                aplicados_count = 0
-                erros_count = 0
-                novos_count = 0
-                atualizados_count = 0
-                
-                print(f"📦 Total de modificações na planilha: {len(modificacoes)}")
-                
-                # Contar quantos lotes existem ANTES da importação
-                total_antes = Estoque.objects.count()
-                print(f"📊 Total de lotes no sistema antes: {total_antes}")
-                
-                for i, mod in enumerate(modificacoes):
-                    print(f"\n🔄 Processando {i+1}/{len(modificacoes)}: {mod.get('tipo')} - {mod.get('lote')}")
-                    
-                    if mod['tipo'] == 'novo':
-                        # CRIAR novo registro
-                        try:
-                            # Buscar/crear objetos relacionados
-                            cultivar = Cultivar.objects.get(id=mod['cultivar_id'])
-                            peneira = Peneira.objects.get(id=mod['peneira_id'])
-                            categoria = Categoria.objects.get(id=mod['categoria_id'])
-                            tratamento = Tratamento.objects.get(id=mod['tratamento_id']) if mod.get('tratamento_id') else None
-                            conferente = User.objects.get(id=mod['conferente_id'])
-                            
-                            # Processar valores
-                            # Por estas linhas:
-                            def safe_int(val, default=0):
-                                try:
-                                    return int(float(val))
-                                except:
-                                    return default
-
-                            def safe_decimal(val, default=Decimal('0.00')):
-                                try:
-                                    if isinstance(val, str):
-                                        val = val.replace(',', '.')
-                                    return Decimal(str(val)).quantize(Decimal('0.01'))
-                                except:
-                                    return default
-
-                            entrada = safe_int(mod.get('saldo', 0), 0)
-                            peso_unitario = safe_decimal(mod.get('peso_unitario', 0), Decimal('0.00'))
-                            peso_total = safe_decimal(mod.get('peso_total', 0), Decimal('0.00'))
-                            # Calcular peso total se não fornecido
-                            if peso_total == 0 and entrada > 0 and peso_unitario > 0:
-                                peso_total = Decimal(entrada) * peso_unitario
-                                peso_total = peso_total.quantize(Decimal('0.01'))
-                            
-                            # Converter data
-                            data_entrada = timezone.now()  # Usar data atual para novos
-                            data_entrada_str = mod.get('data_entrada', '')
-                            if data_entrada_str:
-                                try:
-                                    if '/' in data_entrada_str:
-                                        dia, mes, ano = data_entrada_str.split('/')
-                                        data_entrada = timezone.make_aware(
-                                            datetime.datetime(int(ano), int(mes), int(dia))
-                                        )
-                                except:
-                                    pass  # Usa data atual se houver erro
-                            
-                            # Verificar se já existe (por segurança)
-                            existe = Estoque.objects.filter(
-                                lote=mod['lote'],
-                                endereco=mod['endereco'],
-                                az=mod.get('az', ''),
-                                produto=mod.get('produto', '')
-                            ).first()
-                            
-                            if existe:
-                                print(f"   ⚠️  Já existe no sistema (ID: {existe.id}) - convertendo para ATUALIZAR")
-                                # Converter para atualização
-                                item = existe
-                                valores_antigos = {
-                                    'saldo': item.saldo,
-                                    'peso_unitario': item.peso_unitario,
-                                    'peso_total': item.peso_total,
-                                    'endereco': item.endereco,
-                                    'az': item.az
-                                }
-                                
-                                # Atualizar campos
-                                item.saldo = entrada
-                                item.entrada = entrada
-                                item.peso_unitario = peso_unitario
-                                item.peso_total = peso_total
-                                item.endereco = mod['endereco']
-                                item.az = mod.get('az', '')
-                                item.produto = mod.get('produto', '')
-                                item.observacao = f"Atualizado via importação em {timezone.now().strftime('%d/%m/%Y')}"
-                                item.conferente = conferente
-                                
-                                # Atualizar FKs
-                                item.cultivar = cultivar
-                                item.peneira = peneira
-                                item.categoria = categoria
-                                item.tratamento = tratamento
-                                
-                                item.save()
-                                
-                                # Registrar histórico
-                                HistoricoMovimentacao.objects.create(
-                                    estoque=item,
-                                    usuario=user,
-                                    tipo='Importação (Atualização)',
-                                    descricao=f"Lote atualizado na importação: Saldo {valores_antigos['saldo']} → {entrada}"
-                                )
-                                
-                                atualizados_count += 1
-                                print(f"   ✅ ATUALIZADO (existente): {mod['lote']}")
-                                
-                            else:
-                                # Criar novo
-                                novo_item = Estoque.objects.create(
-                                    lote=mod['lote'],
-                                    produto=mod.get('produto', ''),
-                                    cultivar=cultivar,
-                                    peneira=peneira,
-                                    categoria=categoria,
-                                    tratamento=tratamento,
-                                    endereco=mod['endereco'],
-                                    entrada=entrada,
-                                    saida=0,
-                                    saldo=entrada,
-                                    conferente=conferente,
-                                    origem_destino=mod.get('origem_destino', ''),
-                                    data_entrada=data_entrada,
-                                    especie=mod.get('especie', 'SOJA'),
-                                    empresa=mod.get('empresa', ''),
-                                    embalagem=mod.get('embalagem', 'BAG'),
-                                    peso_unitario=peso_unitario,
-                                    peso_total=peso_total,
-                                    az=mod.get('az', ''),
-                                    observacao=f"Criado via importação em {timezone.now().strftime('%d/%m/%Y')}",
-                                    
-                                )
-                                
-                                # Registrar histórico
-                                HistoricoMovimentacao.objects.create(
-                                    estoque=novo_item,
-                                    usuario=user,
-                                    tipo='Importação (Novo)',
-                                    descricao=f"Lote criado via importação: {mod['lote']} | Endereço: {mod['endereco']} | Saldo: {entrada}"
-                                )
-                                
-                                novos_count += 1
-                                print(f"   ✅ NOVO criado: {mod['lote']}")
-                            
-                            aplicados_count += 1
-                            
-                        except Exception as e:
-                            print(f"❌ Erro ao processar NOVO {mod['lote']}: {e}")
-                            erros_count += 1
-                    
-                    elif mod['tipo'] == 'atualizar':
-                        # ATUALIZAR registro existente
-                        try:
-                            item_id = mod.get('dados_atuais', {}).get('id')
-                            if not item_id:
-                                print(f"❌ ID não encontrado para atualização: {mod['lote']}")
-                                erros_count += 1
-                                continue
-                            
-                            item = Estoque.objects.get(id=item_id)
-                            
-                            # Registrar valores antigos
-                            valores_antigos = {
-                                'endereco': item.endereco,
-                                'saldo': item.saldo,
-                                'az': item.az,
-                                'produto': item.produto,
-                                'peso_unitario': item.peso_unitario,
-                                'peso_total': item.peso_total,
-                                'embalagem': item.embalagem
-                            }
-                            
-                            print(f"   🔄 ATUALIZANDO registro ID: {item_id}")
-                            
-                            # Processar novos valores
-                            novo_saldo = processar_inteiro(mod.get('saldo', 0), 0)
-                            novo_peso_unitario = processar_decimal(mod.get('peso_unitario', 0), Decimal('0.00'))
-                            novo_peso_total = processar_decimal(mod.get('peso_total', 0), Decimal('0.00'))
-                            
-                            # Calcular peso total se não fornecido
-                            if novo_peso_total == 0 and novo_saldo > 0 and novo_peso_unitario > 0:
-                                novo_peso_total = Decimal(novo_saldo) * novo_peso_unitario
-                                novo_peso_total = novo_peso_total.quantize(Decimal('0.01'))
-                            
-                            # Atualizar campos
-                            item.endereco = mod['endereco']
-                            item.produto = mod.get('produto', '')
-                            item.saldo = novo_saldo
-                            item.entrada = novo_saldo
-                            item.saida = 0
-                            item.peso_unitario = novo_peso_unitario
-                            item.peso_total = novo_peso_total
-                            item.az = mod.get('az', '')
-                            item.observacao = f"Atualizado via importação em {timezone.now().strftime('%d/%m/%Y')}"
-                            item.empresa = mod.get('empresa', '')
-                            item.origem_destino = mod.get('origem_destino', '')
-                            item.especie = mod.get('especie', 'SOJA')
-                            item.embalagem = mod.get('embalagem', 'BAG')
-                          
-                            
-                            # Atualizar FKs
-                            if mod.get('cultivar_id'):
-                                item.cultivar = Cultivar.objects.get(id=mod['cultivar_id'])
-                            if mod.get('peneira_id'):
-                                item.peneira = Peneira.objects.get(id=mod['peneira_id'])
-                            if mod.get('categoria_id'):
-                                item.categoria = Categoria.objects.get(id=mod['categoria_id'])
-                            if mod.get('tratamento_id'):
-                                item.tratamento = Tratamento.objects.get(id=mod['tratamento_id'])
-                            if mod.get('conferente_id'):
-                                item.conferente = User.objects.get(id=mod['conferente_id'])
-                            
-                            # Converter data se fornecida
-                            data_entrada_str = mod.get('data_entrada', '')
-                            if data_entrada_str:
-                                try:
-                                    if '/' in data_entrada_str:
-                                        dia, mes, ano = data_entrada_str.split('/')
-                                        item.data_entrada = timezone.make_aware(
-                                            datetime.datetime(int(ano), int(mes), int(dia))
-                                        )
-                                except:
-                                    pass  # Mantém a data atual
-                            
-                            item.save()
-                            
-                            # Registrar diferenças
-                            diferencas = []
-                            for campo, valor_antigo in valores_antigos.items():
-                                valor_novo = getattr(item, campo)
-                                if str(valor_antigo or '') != str(valor_novo or ''):
-                                    diferencas.append(f"{campo}: {valor_antigo} → {valor_novo}")
-                            
-                            if diferencas:
-                                HistoricoMovimentacao.objects.create(
-                                    estoque=item,
-                                    usuario=user,
-                                    tipo='Importação (Atualização)',
-                                    descricao=f"Lote atualizado: {', '.join(diferencas[:3])}"  # Limitar a 3 mudanças
-                                )
-                            
-                            aplicados_count += 1
-                            atualizados_count += 1
-                            print(f"   ✅ Lote ATUALIZADO: {mod['lote']}")
-                            
-                        except Estoque.DoesNotExist:
-                            print(f"❌ Lote não encontrado para atualização: {mod['lote']}")
-                            erros_count += 1
-                        except Exception as e:
-                            print(f"❌ Erro ao atualizar {mod['lote']}: {e}")
-                            erros_count += 1
-                
-                # 🔥 **NÃO REMOVER NENHUM LOTE** - IMPORTAÇÃO INCREMENTAL
-                print(f"\n📢 IMPORTANTE: Modo INCREMENTAL - Nenhum lote foi removido do sistema!")
-                
-                # Contar quantos lotes existem DEPOIS da importação
-                total_depois = Estoque.objects.count()
-                diferenca = total_depois - total_antes
-                
-                print(f"\n🎉 IMPORTAÇÃO INCREMENTAL CONCLUÍDA:")
-                print(f"   📊 Lotes antes: {total_antes}")
-                print(f"   📊 Lotes depois: {total_depois}")
-                print(f"   📈 Diferença: {'+' if diferenca >= 0 else ''}{diferenca}")
-                print(f"   ✅ Novos criados: {novos_count}")
-                print(f"   🔄 Atualizados: {atualizados_count}")
-                print(f"   ❌ Com erro: {erros_count}")
-                print(f"   📋 Total processado: {len(modificacoes)}")
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Importação concluída! {novos_count} novos lotes criados, {atualizados_count} atualizados, {erros_count} erros. Nenhum lote removido.',
-                    'stats': {
-                        'novos': novos_count,
-                        'atualizados': atualizados_count,
-                        'erros': erros_count,
-                        'total_antes': total_antes,
-                        'total_depois': total_depois
-                    }
-                })
-                
-        except Exception as e:
-            print(f"💥 Erro geral na importação: {e}")
-            import traceback
-            print(f"🔍 Traceback: {traceback.format_exc()}")
-            return JsonResponse({
-                'success': False,
-                'error': f'Erro ao processar importação: {str(e)}'
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
-@login_required
-def lotes_para_remover(request):
-    """Retorna os lotes que serão removidos (não estão na planilha atual)"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            lotes_na_planilha = data.get('lotes_na_planilha', [])
-            processed_count = data.get('processed_count', 0)
-            
-            print(f"🔍 [LOTES PARA REMOVER] Buscando lotes fora da planilha...")
-            print(f"📋 Lotes na planilha: {len(lotes_na_planilha)}")
-            print(f"📊 Processados: {processed_count}")
-            
-            # Buscar todos os lotes do banco que NÃO estão na planilha
-            if lotes_na_planilha:
-                lotes_para_remover = Estoque.objects.exclude(
-                    lote__in=lotes_na_planilha
-                ).select_related('cultivar').values(
-                    'lote', 'produto', 'endereco', 'az', 'saldo', 'cultivar__nome'
-                )
-            else:
-                # Se não há lotes na planilha, todos serão removidos
-                lotes_para_remover = Estoque.objects.all().select_related('cultivar').values(
-                    'lote', 'produto', 'endereco', 'az', 'saldo', 'cultivar__nome'
-                )
-            
-            lotes_list = []
-            for lote in lotes_para_remover:
-                lotes_list.append({
-                    'lote': lote['lote'],
-                    'produto': lote['produto'] or '',
-                    'endereco': lote['endereco'] or '',
-                    'az': lote['az'] or '',
-                    'saldo': lote['saldo'],
-                    'cultivar': lote['cultivar__nome'] or ''
-                })
-            
-            print(f"🗑️  Lotes para remover encontrados: {len(lotes_list)}")
-            
-            return JsonResponse({
-                'success': True,
-                'lotes_para_remover': lotes_list,
-                'total_remover': len(lotes_list)
-            })
-            
-        except Exception as e:
-            print(f"❌ Erro ao buscar lotes para remover: {e}")
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
-
-@login_required
-def consolidar_lotes_duplicados(request):
-    """Consolida lotes duplicados - AGORA CONSIDERA PESO UNITÁRIO"""
-    if request.method == 'POST':
-        try:
-            with transaction.atomic():
-                from django.db.models import Count
-                
-                # 🔥 MUDANÇA: Agrupar por lote + produto + endereço + az + peso_unitario
-                duplicados = Estoque.objects.values(
-                    'lote', 'produto', 'endereco', 'az', 'peso_unitario'  # 🔥 ADICIONADO peso_unitario
-                ).annotate(
-                    total=Count('id')
-                ).filter(total__gt=1)
-                
-                consolidados_count = 0
-                ignorados_count = 0
-                
-                for dup in duplicados:
-                    lote = dup['lote']
-                    produto = dup['produto']
-                    endereco = dup['endereco']
-                    az = dup['az']
-                    peso_unitario = dup['peso_unitario']
-                    
-                    print(f"🔍 Consolidando: {lote} | {produto} | {endereco} | {az} | Peso: {peso_unitario}")
-                    
-                    # Buscar todos os registros com MESMO PESO
-                    registros = Estoque.objects.filter(
-                        lote=lote,
-                        produto=produto,
-                        endereco=endereco,
-                        az=az,
-                        peso_unitario=peso_unitario  # 🔥 AGORA FILTRA POR PESO
-                    ).order_by('id')
-                    
-                    if registros.count() > 1:
-                        # Manter o primeiro e somar os outros (todos com mesmo peso)
-                        manter = registros.first()
-                        excluir = registros[1:]
-                        
-                        total_saldo = manter.saldo
-                        total_peso_total = manter.peso_total
-                        
-                        for reg in excluir:
-                            print(f"   ➕ Somando: {reg.id} (Saldo: {reg.saldo}, Peso: {reg.peso_unitario})")
-                            total_saldo += reg.saldo
-                            total_peso_total += reg.peso_total
-                            reg.delete()
-                        
-                        # Atualizar o registro mantido
-                        manter.saldo = total_saldo
-                        manter.peso_total = total_peso_total
-                        manter.save()
-                        
-                        consolidados_count += 1
-                        print(f"✅ Consolidado: {lote} | Saldo total: {total_saldo} | Peso unitário: {peso_unitario}")
-                
-                # 🔥 VERIFICAR LOTES COM MESMO CÓDIGO MAS PESOS DIFERENTES
-                lotes_com_pesos_diferentes = Estoque.objects.values(
-                    'lote', 'produto', 'endereco', 'az'
-                ).annotate(
-                    pesos_diferentes=Count('peso_unitario', distinct=True)
-                ).filter(pesos_diferentes__gt=1)
-                
-                for item in lotes_com_pesos_diferentes:
-                    print(f"⚠️ Lote {item['lote']} em {item['endereco']} tem múltiplos pesos - NÃO consolidado")
-                    ignorados_count += 1
-                
-                mensagem = f'{consolidados_count} grupos de lotes consolidados!'
-                if ignorados_count > 0:
-                    mensagem += f' {ignorados_count} lotes ignorados (possuem pesos diferentes)'
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': mensagem,
-                    'consolidados': consolidados_count,
-                    'ignorados': ignorados_count
-                })
-                
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Erro ao consolidar lotes: {str(e)}'
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
-
-@login_required
-def debug_import_data(request):
-    """Debug: mostra os dados que estão chegando na aprovação"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            print("🔍 [DEBUG IMPORT DATA]")
-            print("Dados recebidos:", json.dumps(data, indent=2, ensure_ascii=False))
-            
-            return JsonResponse({
-                'success': True,
-                'received_data': data
-            })
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
-
-
-@login_required
-def limpar_duplicados_manualmente(request):
-    """Limpa registros duplicados manualmente"""
-    if request.method == 'POST':
-        try:
-            with transaction.atomic():
-                # Encontrar lotes duplicados
-                from django.db.models import Count
-                
-                duplicados = Estoque.objects.values(
-                    'lote', 'peneira_id', 'cultivar_id', 'tratamento_id'
-                ).annotate(
-                    total=Count('id')
-                ).filter(total__gt=1)
-                
-                print(f"🔍 Encontrados {len(duplicados)} grupos de duplicados")
-                
-                total_excluidos = 0
-                
-                for dup in duplicados:
-                    lote = dup['lote']
-                    peneira_id = dup['peneira_id']
-                    cultivar_id = dup['cultivar_id']
-                    tratamento_id = dup['tratamento_id']
-                    
-                    # Manter apenas o mais recente
-                    registros = Estoque.objects.filter(
-                        lote=lote,
-                        peneira_id=peneira_id,
-                        cultivar_id=cultivar_id,
-                        tratamento_id=tratamento_id
-                    ).order_by('-id')
-                    
-                    manter = registros.first()
-                    excluir = registros[1:]
-                    
-                    for reg in excluir:
-                        print(f"🗑️  Excluindo duplicado: {lote} (ID: {reg.id})")
-                        reg.delete()
-                        total_excluidos += 1
-                
-                return JsonResponse({
-                    'success': True,
-                    'message': f'Duplicados limpos: {total_excluidos} registros excluídos'
-                })
-                
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': f'Erro ao limpar duplicados: {str(e)}'
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
-
-
-
-from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.db.models import Q, Sum
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
-from sapp.models import Estoque, Cultivar, Peneira, Categoria, Tratamento, Especie
 
 @login_required
 def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
@@ -2259,9 +567,6 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     }
     
     return render(request, template_name, context)
-    
-    
-# No arquivo views.py
 
 @login_required
 def registrar_saida(request, id):
@@ -2853,8 +1158,6 @@ def nova_entrada(request):
             
     return redirect('sapp:lista_estoque')
 
-
-
 @login_required
 def nova_saida(request):
     print("veio aqui na função  nova_saida")
@@ -2971,22 +1274,8 @@ def relatorio_saidas(request):
     
     return render(request, 'sapp/relatorio_saidas.html')
 
-        
-
-@login_required
-def limpar_cache_importacao(request):
-    """Limpa cache de importação"""
-    from django.core.cache import cache
-    cache_keys = cache.keys('*importacao*')
-    for key in cache_keys:
-        cache.delete(key)
-    return JsonResponse({'success': True, 'message': 'Cache limpo'})
-
-
 ############################################################################
-
 # NO VIEWS.PY - CORRIGIR A FUNÇÃO editar COMPLETAMENTE:
-
 @login_required
 def editar(request, id):
     item = get_object_or_404(Estoque, id=id)
@@ -3147,8 +1436,7 @@ def editar(request, id):
             messages.error(request, f"Erro ao editar lote: {str(e)}")
             
     return redirect('sapp:lista_estoque')
-    
-    
+      
 @login_required
 def excluir_lote(request, id):
     item = get_object_or_404(Estoque, id=id)
@@ -3164,8 +1452,6 @@ def excluir_lote(request, id):
         messages.success(request, "Lote excluído.")
     return redirect('sapp:lista_estoque')
 
-
-
 def logout_view(request):
     """
     Realiza o logout e redireciona para o login.
@@ -3173,53 +1459,6 @@ def logout_view(request):
     """
     logout(request)
     return redirect('sapp:login')
-
-
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.contrib.auth.models import User
-from .models import (
-    Configuracao, Cultivar, Peneira, Categoria, 
-    Tratamento, Especie, Produto
-)
-from .forms import (
-    ConfiguracaoForm, NovoConferenteUserForm,
-    CultivarForm, PeneiraForm, CategoriaForm, TratamentoForm
-)
-
-# views.py - ARQUIVO COMPLETO
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.contrib.auth.models import User
-from django.db.models import Q
-from .models import (
-    Configuracao, Cultivar, Peneira, Categoria, 
-    Tratamento, Especie, Produto, Estoque,
-    HistoricoMovimentacao, Empenho, ItemEmpenho,
-    ArmazemLayout, ElementoMapa
-)
-from .forms import (
-    ConfiguracaoForm, NovoConferenteUserForm,
-    CultivarForm, PeneiraForm, CategoriaForm, 
-    TratamentoForm, ProdutoForm, NovaEntradaForm
-)
-
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.contrib.auth.models import User
-from django.db.models import Q
-from .models import (
-    Configuracao, Cultivar, Peneira, Categoria, 
-    Tratamento, Especie, Produto, Estoque
-)
-from .forms import (
-    ConfiguracaoForm, NovoConferenteUserForm,
-    CultivarForm, PeneiraForm, CategoriaForm, 
-    TratamentoForm, ProdutoForm
-)
 
 @login_required
 def configuracoes(request):
@@ -3439,10 +1678,6 @@ def configuracoes(request):
     
     return render(request, 'sapp/configuracoes.html', context)
 
-
-
-
-# views.py - mantenha como estava
 @login_required
 def historico_geral(request):
     """Histórico completo para DataTables"""
@@ -3455,13 +1690,6 @@ def historico_geral(request):
     }
     
     return render(request, 'sapp/historico_geral.html', context)
-
-
-
-
-
-# Adicione isso no TOPO junto com os outros imports
-
 
 @login_required
 def mudar_senha(request):
@@ -3483,9 +1711,6 @@ def mudar_senha(request):
     else:
         form = MudarSenhaForm()
     return render(request, 'sapp/mudar_senha.html', {'form': form})
-
-
-
 
 def exportar_excel(request):
     estoque = Estoque.objects.filter(saldo__gt=0).select_related(
@@ -3549,16 +1774,10 @@ def exportar_pdf(request):
     estoque = Estoque.objects.filter(saldo__gt=0).select_related(
         'cultivar', 'peneira', 'categoria', 'tratamento', 'conferente'
     )[:100]  # Limitar para não sobrecarregar o PDF
-    
-    # Criar buffer para o PDF
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=30)
     elements = []
-    
-    # Estilos
     styles = getSampleStyleSheet()
-    
-    # Título
     title = Paragraph("RELATÓRIO DE ESTOQUE - SEMENTES", styles['Title'])
     elements.append(title)
     elements.append(Paragraph(f"Data: {timezone.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
@@ -3608,8 +1827,6 @@ def exportar_pdf(request):
     return response
 
 ################ DEBUG #####################
-
-
 @login_required
 def debug_estoque_completo(request):
     """Debug COMPLETO do estoque atual"""
@@ -3654,14 +1871,7 @@ def debug_estoque_status(request):
         'com_saldo': lotes_com_saldo,
         'sem_saldo': lotes_sem_saldo
     })
-    
-
 ################     API    ############################
-
-# ========== APIs para frontend ==========
-
-
-
 @login_required
 def api_saldo_lote(request, id):
     """API para obter saldo de um lote específico"""
@@ -3718,8 +1928,6 @@ def api_buscar_lote_completo(request):
     
     if not lote:
         return JsonResponse({'encontrado': False, 'error': 'Lote não especificado'})
-    
-    # Buscar o último lote com esse código
     item = Estoque.objects.filter(lote=lote).order_by('-id').first()
     
     if item:
@@ -3805,21 +2013,6 @@ def api_ultimas_movimentacoes(request):
         'movimentacoes': data
     })
     
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.db import transaction, models
-from django.db.models import Q
-
-from .models import (
-    Estoque,
-    Empenho,
-    ItemEmpenho,
-    EmpenhoStatus,
-    HistoricoMovimentacao
-)
-
-
 @login_required
 def pagina_rascunho(request):
     user = request.user
@@ -4074,19 +2267,14 @@ def pagina_rascunho(request):
         'cards': cards,
     })
 
-
 @login_required
 def api_buscar_dados_lote(request):
-    """API única e robusta para buscar dados do lote para edição ou transferência"""
     item_id = request.GET.get('item_id')
     
     try:
-        # Buscamos o item com todos os relacionamentos para evitar múltiplas consultas
         item = Estoque.objects.select_related(
             'cultivar', 'peneira', 'categoria', 'tratamento', 'especie'
         ).get(id=item_id)
-        
-        # O segredo é enviar os IDs brutos para os Selects e os valores formatados para os inputs de texto
         data = {
             'encontrado': True,
             'id': item.id,
@@ -4101,8 +2289,6 @@ def api_buscar_dados_lote(request):
             'peso_unitario': str(item.peso_unitario).replace(',', '.') if item.peso_unitario else '0.00',
             'embalagem': item.embalagem,
             'observacao': item.observacao or '',
-            
-            # IDs essenciais para os campos <select> do modal
             'especie_id': item.especie.id if item.especie else '',
             'cultivar_id': item.cultivar.id if item.cultivar else '',
             'peneira_id': item.peneira.id if item.peneira else '',
@@ -4114,7 +2300,6 @@ def api_buscar_dados_lote(request):
         return JsonResponse({'encontrado': False, 'erro': 'Lote não encontrado'}, status=404)
     except Exception as e:
         return JsonResponse({'encontrado': False, 'erro': str(e)}, status=500)
-
 
 @login_required
 def api_itens_empenhos(request):
@@ -4145,8 +2330,6 @@ def api_itens_empenhos(request):
         'total': len(itens_data)
     })
     
-    
-    
 @login_required
 def api_autocomplete_nova_entrada(request):
     """
@@ -4167,7 +2350,6 @@ def api_autocomplete_nova_entrada(request):
     
     for item in qs:
         if item.lote not in lotes_vistos:
-            # Prepara os dados manualmente para evitar erro de serialização
             dados_item = {
                 'lote': item.lote,
                 'produto': item.produto or '',
@@ -4175,8 +2357,6 @@ def api_autocomplete_nova_entrada(request):
                 'peneira__id': item.peneira.id if item.peneira else None,
                 'categoria__id': item.categoria.id if item.categoria else None,
                 'tratamento__id': item.tratamento.id if item.tratamento else None,
-                
-                # --- CORREÇÃO AQUI ---
                 'especie__id': item.especie.id if item.especie else None,
                 
                 'empresa': item.empresa or '',
@@ -4199,28 +2379,6 @@ def api_autocomplete_nova_entrada(request):
             
     return JsonResponse(resultados, safe=False)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-from django.contrib.admin.views.decorators import staff_member_required 
-
-
-
-
-
 @staff_member_required
 def api_status_enderecos(request):
     enderecos = MapeamentoEndereco.objects.filter(ativo=True)
@@ -4240,33 +2398,9 @@ def api_status_enderecos(request):
     
     return JsonResponse(resultado)
 
-    
-
-
-
-
-
-
-
-
-
-
-# sapp/views.py
-from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
-from .models import ArmazemLayout, ElementoMapa, Estoque
-import json
-
-
 # ============================================================================
 # APIs PARA O CANVAS (ADMIN APENAS)
 # ============================================================================
-
-
-
 
 def verificar_estoque_endereco(request, endereco):
     """API para verificar se existe estoque em um endereço"""
@@ -4302,8 +2436,6 @@ def verificar_estoque_endereco(request, endereco):
             })
     
     return JsonResponse({'success': False, 'error': 'Método não permitido'})
-
-
 
 def exportar_mapa_json(request, armazem_numero):
     """Exporta o layout do mapa como JSON"""
@@ -4403,10 +2535,6 @@ def importar_mapa_json(request, armazem_numero):
 # VIEW DE FALLBACK (para compatibilidade)
 # ============================================================================
 
-
-
-
-# sapp/views.py
 def lista_armazens(request):
     """Lista todos os armazéns disponíveis"""
     armazens = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
@@ -4417,9 +2545,6 @@ def lista_armazens(request):
         'titulo_pagina': 'Mapas dos Armazéns'
     }
     return render(request, 'sapp/lista_armazens.html', context)
-
-
-
 
 @staff_member_required
 def criar_armazem(request):
@@ -4455,27 +2580,9 @@ def editar_config_armazem(request, armazem_id):
         return redirect('sapp:editor_avancado', armazem_numero=armazem.numero)
     return redirect('sapp:lista_armazens')
 
-
-# sapp/views.py - ADICIONE/MODIFIQUE ESTAS FUNÇÕES
-
-from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404, redirect
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth.decorators import login_required
-from .models import ArmazemLayout, ElementoMapa, Estoque
-import json
-from django.utils import timezone
-
 # ============================================================================
 # EDITOR DE MAPA (ADMIN)
 # ============================================================================
-
-
-
-
-
-# No arquivo sapp/views.py
 
 @login_required
 def mapa_ocupacao_canvas(request, armazem_numero=1):
@@ -4554,9 +2661,6 @@ def mapa_ocupacao_canvas(request, armazem_numero=1):
 @staff_member_required
 @csrf_exempt
 def salvar_todos_elementos(request):
-    """
-    API: Recebe o JSON completo do editor e salva no banco.
-    """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
@@ -4564,11 +2668,6 @@ def salvar_todos_elementos(request):
             elementos_data = data.get('elementos', [])
             
             armazem = ArmazemLayout.objects.get(id=armazem_id)
-            
-            # Estratégia Segura: 
-            # 1. Limpar elementos atuais deste armazém (para remover os excluídos)
-            # 2. Recriar tudo baseado no que veio do editor
-            # Isso evita "lixo" no banco de dados.
             
             ElementoMapa.objects.filter(armazem=armazem).delete()
             
@@ -4610,7 +2709,6 @@ def salvar_todos_elementos(request):
 # ============================================================================
 
 def lista_armazens(request):
-    """Lista todos os armazéns disponíveis"""
     armazens = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
     
     context = {
@@ -4670,21 +2768,9 @@ def editor_avancado(request, armazem_numero=1):
     return render(request, 'sapp/editor_avancado.html', context)
 
 
-
-# EM views.py - GARANTIR QUE ESTÁ CORRETO
-
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
-
 @csrf_exempt  # Se precisar de POST, mas GET não precisa normalmente
 def api_buscar_produto(request):
-    """
-    API para buscar produto pelo código - BUSCA REAL DO BANCO DE DADOS
-    Método: GET
-    Parâmetro: codigo (string)
-    Retorno: JSON com {encontrado: bool, dados: dict, erro: string}
-    """
+
     try:
         # Log para debug
         print("=" * 50)
