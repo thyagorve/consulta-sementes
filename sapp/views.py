@@ -1276,6 +1276,103 @@ def relatorio_saidas(request):
     
     return render(request, 'sapp/relatorio_saidas.html')
 
+
+@login_required
+def api_estoque_estatisticas(request):
+    """
+    API para retornar estatísticas do estoque baseado nos filtros aplicados
+    """
+    try:
+        # QuerySet Base para MÉTRICAS - COMEÇA COM TODOS OS LOTES
+        qs_metrics = Estoque.objects.all()
+        
+        # APLICAR OS MESMOS FILTROS DA VIEW PRINCIPAL
+        
+        # Busca Global
+        busca = request.GET.get('busca', '').strip()
+        if busca:
+            for termo in busca.split():
+                qs_metrics = qs_metrics.filter(
+                    Q(lote__icontains=termo) | 
+                    Q(produto__icontains=termo) |
+                    Q(cultivar__nome__icontains=termo) | 
+                    Q(especie__nome__icontains=termo) |
+                    Q(endereco__icontains=termo) | 
+                    Q(cliente__icontains=termo) |
+                    Q(empresa__icontains=termo)
+                )
+        
+        # Filtros de seleção múltipla
+        filter_map = {
+            'az': 'az__in',
+            'lote': 'lote__in',
+            'produto': 'produto__in',
+            'cultivar': 'cultivar__nome__in',
+            'peneira': 'peneira__nome__in',
+            'categoria': 'categoria__nome__in',
+            'endereco': 'endereco__in',
+            'especie': 'especie__nome__in',
+            'tratamento': 'tratamento__nome__in',
+            'embalagem': 'embalagem__in',
+            'cliente': 'cliente__in',
+            'empresa': 'empresa__in',
+            'conferente': 'conferente__username__in'
+        }
+
+        for param, lookup in filter_map.items():
+            values = request.GET.getlist(param)
+            values = [v for v in values if v.strip()]
+            if values:
+                qs_metrics = qs_metrics.filter(**{lookup: values})
+
+        # Filtros numéricos
+        for field in ['saldo', 'peso_unitario', 'peso_total']:
+            min_val = request.GET.get(f'min_{field}')
+            max_val = request.GET.get(f'max_{field}')
+            if min_val:
+                qs_metrics = qs_metrics.filter(**{f'{field}__gte': min_val})
+            if max_val:
+                qs_metrics = qs_metrics.filter(**{f'{field}__lte': max_val})
+
+        # FILTRO POR STATUS
+        status = request.GET.get('status', 'todos')
+        if status == 'disponivel':
+            qs_metrics = qs_metrics.filter(saldo__gt=0)
+        elif status == 'esgotado':
+            qs_metrics = qs_metrics.filter(saldo=0)
+
+        # CALCULAR MÉTRICAS
+        saldo_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
+        saldo_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+        saldo_total_sc = (saldo_bags * 25) + saldo_sc
+        
+        total_itens = qs_metrics.count()
+        
+        clientes_unicos = qs_metrics.exclude(
+            cliente__isnull=True
+        ).exclude(
+            cliente=''
+        ).values('cliente').distinct().count()
+
+        # Retornar dados em JSON
+        return JsonResponse({
+            'success': True,
+            'total_itens': total_itens,
+            'total_sc': saldo_total_sc,
+            'total_bags': saldo_bags,
+            'total_sc_fisico': saldo_sc,
+            'clientes_unicos': clientes_unicos,
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+
+
 ############################################################################
 # NO VIEWS.PY - CORRIGIR A FUNÇÃO editar COMPLETAMENTE:
 @login_required
@@ -1473,6 +1570,12 @@ def editar(request, id):
             
     return redirect('sapp:lista_estoque')
       
+
+
+
+
+
+
 @login_required
 def excluir_lote(request, id):
     item = get_object_or_404(Estoque, id=id)

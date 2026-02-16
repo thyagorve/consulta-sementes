@@ -46,6 +46,8 @@ urlpatterns = [
     path('estoque/registrar-saida/<int:id>/', views.registrar_saida, name='registrar_saida'),
     path('estoque/nova-saida/', views.nova_saida, name='nova_saida'),
     path('relatorio-saidas/', views.relatorio_saidas, name='relatorio_saidas'),
+    path('api/estoque/estatisticas/', views.api_estoque_estatisticas, name='api_estoque_estatisticas'),
+
     
     # ============================================================================
     # CONFIGURAÇÕES, HISTÓRICO E EMPENHO

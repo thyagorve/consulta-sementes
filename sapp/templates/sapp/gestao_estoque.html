@@ -81,21 +81,16 @@
 
 <div class="container-fluid py-4">
     <!-- HEADER -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="text-success fw-bold mb-1"><i class="fa-solid fa-warehouse me-2"></i>Gestão de Estoque</h2>
-            <p class="text-muted mb-0">Controle completo do estoque atual</p>
-        </div>
-        
-    </div>
-
     <!-- CARDS DE ESTATÍSTICAS -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="stats-card">
                 <div class="d-flex align-items-center">
                     <div class="bg-success rounded-circle p-3 me-3"><i class="fa-solid fa-layer-group text-white"></i></div>
-                    <div><h4 class="mb-0 text-success">{{ total_itens|intcomma }}</h4><small class="text-muted">Lotes Ativos</small></div>
+                    <div>
+                        <h4 class="mb-0 text-success" id="totalItens">{{ total_itens|intcomma }}</h4>
+                        <small class="text-muted">Lotes Ativos</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -104,9 +99,9 @@
                 <div class="d-flex align-items-center">
                     <div class="bg-info rounded-circle p-3 me-3"><i class="fa-solid fa-weight-hanging text-white"></i></div>
                     <div>
-                        <h4 class="mb-0 text-info">{{ total_sc|intcomma }}</h4>
+                        <h4 class="mb-0 text-info" id="totalSc">{{ total_sc|intcomma }}</h4>
                         <small class="text-muted">Equivalente SC</small><br>
-                        <small class="text-muted">({{ total_bags|intcomma }} BAG × 25 + {{ total_sc_fisico|intcomma }} SC)</small>
+                        <small class="text-muted" id="detalheSc">({{ total_bags|intcomma }} BAG × 25 + {{ total_sc_fisico|intcomma }} SC)</small>
                     </div>
                 </div>
             </div>
@@ -115,7 +110,10 @@
             <div class="stats-card">
                 <div class="d-flex align-items-center">
                     <div class="bg-warning rounded-circle p-3 me-3"><i class="fa-solid fa-box text-white"></i></div>
-                    <div><h4 class="mb-0 text-warning">{{ total_bags|intcomma }}</h4><small class="text-muted">Unidades BAG</small></div>
+                    <div>
+                        <h4 class="mb-0 text-warning" id="totalBags">{{ total_bags|intcomma }}</h4>
+                        <small class="text-muted">Unidades BAG</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -123,7 +121,10 @@
             <div class="stats-card">
                 <div class="d-flex align-items-center">
                     <div class="bg-primary rounded-circle p-3 me-3"><i class="fa-solid fa-users text-white"></i></div>
-                    <div><h4 class="mb-0 text-primary">{{ clientes_unicos|intcomma }}</h4><small class="text-muted">Clientes Únicos</small></div>
+                    <div>
+                        <h4 class="mb-0 text-primary" id="clientesUnicos">{{ clientes_unicos|intcomma }}</h4>
+                        <small class="text-muted">Clientes Únicos</small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -340,14 +341,11 @@ document.addEventListener('DOMContentLoaded', function() {
     updateActiveFiltersUI();
     markActiveHeaders();
     
-    // ===== AUTOFOCO INTELIGENTE =====
-    // Só ativa se já existir um termo de busca
+    // AUTOFOCO INTELIGENTE
     const searchInput = document.getElementById('searchInput');
     if (searchInput && searchInput.value.trim() !== '') {
-        // Pequeno delay para garantir que a página carregou completamente
         setTimeout(() => {
             searchInput.focus();
-            // Coloca o cursor no final do texto
             searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
         }, 100);
     }
@@ -462,23 +460,19 @@ function setupSearch() {
     if (input) {
         if (input.value) btn.style.display = 'block';
         
-        // Remove o evento de keypress anterior
-        // input.removeEventListener('keypress', ...);
-        
-        // Adiciona evento de input com delay
         input.addEventListener('input', function() {
-            // Mostra/esconde botão de limpar
             btn.style.display = this.value ? 'block' : 'none';
             
-            // Limpa o timeout anterior
             if (searchTimeout) {
                 clearTimeout(searchTimeout);
             }
             
-            // Só busca se tiver 3 ou mais caracteres OU se estiver vazio (limpa busca)
+            // Só busca se tiver 3 ou mais caracteres OU se estiver vazio
             if (this.value.length >= 3 || this.value.length === 0) {
-                // Cria um novo timeout para buscar após 500ms de pausa na digitação
                 searchTimeout = setTimeout(() => {
+                    // ATUALIZAR CARDS ANTES DE RECARREGAR
+                    atualizarCardsComFiltros();
+                    
                     if (this.value.length >= 3) {
                         currentUrlParams.set('busca', this.value);
                     } else {
@@ -486,13 +480,17 @@ function setupSearch() {
                     }
                     currentUrlParams.set('page', 1);
                     reloadPage();
-                }, 500); // Aguarda 500ms após parar de digitar
+                }, 500);
             }
         });
         
-        // Mantém o botão de limpar
         btn.addEventListener('click', function() {
             input.value = '';
+            btn.style.display = 'none';
+            
+            // ATUALIZAR CARDS ANTES DE LIMPAR
+            atualizarCardsComFiltros();
+            
             currentUrlParams.delete('busca');
             reloadPage();
         });
@@ -504,7 +502,7 @@ function setupClearButtons() {
     if(btn) btn.onclick = clearAllFilters;
 }
 
-// LÓGICA
+// LÓGICA DOS FILTROS
 window.applyNumericFilter = function(columnName) {
     const min = document.getElementById(`${columnName}-min`).value;
     const max = document.getElementById(`${columnName}-max`).value;
@@ -513,6 +511,9 @@ window.applyNumericFilter = function(columnName) {
     if (min) currentUrlParams.set(`min_${columnName}`, min);
     if (max) currentUrlParams.set(`max_${columnName}`, max);
     currentUrlParams.set('page', 1);
+    
+    // ATUALIZAR CARDS ANTES DE RECARREGAR
+    atualizarCardsComFiltros();
     reloadPage();
 };
 
@@ -522,6 +523,9 @@ window.applySelectFilter = function(columnName) {
     currentUrlParams.delete(columnName);
     checkboxes.forEach(cb => { currentUrlParams.append(columnName, cb.value); });
     currentUrlParams.set('page', 1);
+    
+    // ATUALIZAR CARDS ANTES DE RECARREGAR
+    atualizarCardsComFiltros();
     reloadPage();
 };
 
@@ -529,12 +533,18 @@ window.clearColumnFilter = function(columnName) {
     currentUrlParams.delete(columnName);
     currentUrlParams.delete(`min_${columnName}`);
     currentUrlParams.delete(`max_${columnName}`);
+    
+    // ATUALIZAR CARDS ANTES DE RECARREGAR
+    atualizarCardsComFiltros();
     reloadPage();
 };
 
 window.clearAllFilters = function() {
     let baseUrl = window.location.pathname;
     if (currentUrlParams.has('page_size')) baseUrl += `?page_size=${currentUrlParams.get('page_size')}`;
+    
+    // ATUALIZAR CARDS ANTES DE RECARREGAR
+    atualizarCardsComFiltros();
     window.location.href = baseUrl;
 };
 
@@ -604,5 +614,102 @@ function updateActiveFiltersUI() {
     document.getElementById('activeFiltersContainer').style.display = count > 0 ? 'block' : 'none';
     document.getElementById('clearFiltersBtn').style.display = count > 0 ? 'inline-block' : 'none';
 }
+
+// ===== FUNÇÃO PRINCIPAL PARA ATUALIZAR OS CARDS COM OS FILTROS =====
+function atualizarCardsComFiltros() {
+    // Mostrar loading suave nos cards
+    document.querySelectorAll('.stats-card h4').forEach(el => {
+        el.style.opacity = '0.5';
+        el.style.transition = 'opacity 0.3s';
+    });
+    
+    // Mostrar ícone de loading nos cards
+    document.querySelectorAll('.stats-card .rounded-circle i').forEach(el => {
+        if (!el.classList.contains('fa-spinner')) {
+            el.classList.add('fa-spinner', 'fa-pulse');
+        }
+    });
+    
+    // Construir URL com os filtros atuais
+    const params = new URLSearchParams(currentUrlParams);
+    
+    // Fazer requisição AJAX para a nova API
+    fetch(`/api/estoque/estatisticas/?${params.toString()}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Erro na resposta da API');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Atualizar cards com os novos valores
+                document.getElementById('totalItens').textContent = Number(data.total_itens).toLocaleString('pt-BR');
+                document.getElementById('totalSc').textContent = Number(data.total_sc).toLocaleString('pt-BR');
+                document.getElementById('totalBags').textContent = Number(data.total_bags).toLocaleString('pt-BR');
+                document.getElementById('clientesUnicos').textContent = Number(data.clientes_unicos).toLocaleString('pt-BR');
+                
+                // Atualizar texto de detalhe
+                const detalheSc = document.getElementById('detalheSc');
+                if (detalheSc) {
+                    detalheSc.innerHTML = `(${Number(data.total_bags).toLocaleString('pt-BR')} BAG × 25 + ${Number(data.total_sc_fisico).toLocaleString('pt-BR')} SC)`;
+                }
+            }
+            
+            // Restaurar opacidade
+            document.querySelectorAll('.stats-card h4').forEach(el => {
+                el.style.opacity = '1';
+            });
+            
+            // Remover ícone de loading
+            document.querySelectorAll('.stats-card .rounded-circle i').forEach(el => {
+                el.classList.remove('fa-spinner', 'fa-pulse');
+            });
+        })
+        .catch(error => {
+            console.error('Erro ao atualizar cards:', error);
+            
+            // Restaurar opacidade mesmo com erro
+            document.querySelectorAll('.stats-card h4').forEach(el => {
+                el.style.opacity = '1';
+            });
+            
+            // Remover ícone de loading
+            document.querySelectorAll('.stats-card .rounded-circle i').forEach(el => {
+                el.classList.remove('fa-spinner', 'fa-pulse');
+            });
+        });
+}
+
+// ===== ATUALIZAR CARDS QUANDO A PÁGINA CARREGA COM FILTROS =====
+// Isso garante que se a página for recarregada com filtros, os cards mostram os valores corretos
+if (currentUrlParams.toString()) {
+    // Pequeno delay para garantir que a página carregou completamente
+    setTimeout(() => {
+        atualizarCardsComFiltros();
+    }, 100);
+}
+
+// ===== OBSERVAR MUDANÇAS NOS FILTROS VIA POPSTATE (BOTÃO VOLTAR/AVANÇAR) =====
+window.addEventListener('popstate', function() {
+    // Atualizar currentUrlParams com a nova URL
+    currentUrlParams = new URLSearchParams(window.location.search);
+    
+    // Atualizar a UI dos filtros ativos
+    updateActiveFiltersUI();
+    markActiveHeaders();
+    
+    // Atualizar campo de busca
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        const busca = currentUrlParams.get('busca') || '';
+        searchInput.value = busca;
+        document.getElementById('clearSearchBtn').style.display = busca ? 'block' : 'none';
+    }
+    
+    // Atualizar cards
+    atualizarCardsComFiltros();
+});
+
 </script>
 {% endblock %}
