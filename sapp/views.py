@@ -1292,6 +1292,9 @@ def editar(request, id):
                     'empresa': item.empresa or "",
                     'origem_destino': item.origem_destino or "",
                     'peso_unitario': item.peso_unitario,
+                    'entrada': item.entrada,  # NOVO
+                    'saida': item.saida,      # NOVO (para referência)
+                    'saldo': item.saldo,      # NOVO (para referência)
                     'embalagem': item.embalagem,
                     'az': item.az or "",
                     'observacao': item.observacao or "",
@@ -1299,18 +1302,27 @@ def editar(request, id):
                     'cultivar': item.cultivar.nome if item.cultivar else "",
                     'peneira': item.peneira.nome if item.peneira else "",
                     'categoria': item.categoria.nome if item.categoria else "",
-                    'especie': item.especie.nome if item.especie else "SOJA", # NOVO
+                    'especie': item.especie.nome if item.especie else "SOJA",
                     'tratamento': item.tratamento.nome if item.tratamento else "Sem Tratamento",
                     'produto': item.produto or "", 
                 }
 
                 # 2. CAPTURA OS NOVOS VALORES
                 novo_lote = request.POST.get('lote', '').strip()
-                novo_endereco = request.POST.get('endereco', '').strip().upper() # Padronizar maiúsculo
+                novo_endereco = request.POST.get('endereco', '').strip().upper()
                 novo_empresa = request.POST.get('empresa', '').strip()
                 novo_origem_destino = request.POST.get('origem_destino', '').strip()
                 novo_produto = request.POST.get('produto', '').strip()
                 novo_cliente = request.POST.get('cliente', '').strip()
+                
+                # NOVO: Capturar quantidade
+                nova_entrada_raw = request.POST.get('entrada', '0')
+                try:
+                    nova_entrada = int(float(nova_entrada_raw))
+                    if nova_entrada < 0:
+                        nova_entrada = 0
+                except:
+                    nova_entrada = item.entrada
                 
                 # Tratamento do peso
                 peso_raw = request.POST.get('peso_unitario', '0')
@@ -1327,14 +1339,13 @@ def editar(request, id):
                 novo_az = request.POST.get('az', '').strip()
                 novo_obs = request.POST.get('observacao', '').strip()
 
-                # 3. BUSCAR OBJETOS RELACIONADOS (CORREÇÃO DE ESPÉCIE AQUI)
-                # Espécie (CORREÇÃO)
+                # 3. BUSCAR OBJETOS RELACIONADOS
+                # Espécie
                 novo_especie_id = request.POST.get('especie')
                 if novo_especie_id:
-                    # Busca o objeto Espécie pelo ID
                     obj_especie = get_object_or_404(Especie, id=novo_especie_id)
                 else:
-                    obj_especie = item.especie # Mantém o original se não mudar
+                    obj_especie = item.especie
 
                 # Cultivar
                 try:
@@ -1366,6 +1377,8 @@ def editar(request, id):
 
                 # 4. COMPARAÇÃO DETALHADA PARA O HISTÓRICO
                 mudancas = []
+                
+                # Campos básicos (incluindo entrada)
                 campos_para_comparar = [
                     ('lote', 'Lote', antigo['lote'], novo_lote),
                     ('endereco', 'Endereço', antigo['endereco'], novo_endereco),
@@ -1374,13 +1387,14 @@ def editar(request, id):
                     ('produto', 'Produto', antigo['produto'], novo_produto),
                     ('cliente', 'Cliente', antigo['cliente'], novo_cliente),
                     ('peso_unitario', 'Peso Unitário', antigo['peso_unitario'], novo_peso),
+                    ('entrada', 'Quantidade (Entrada)', antigo['entrada'], nova_entrada),  # NOVO
                     ('embalagem', 'Embalagem', antigo['embalagem'], novo_emb),
                     ('az', 'AZ', antigo['az'], novo_az),
                     ('observacao', 'Observação', antigo['observacao'], novo_obs),
-                    ('cultivar', 'Cultivar', antigo['cultivar'], obj_cultivar.nome),
-                    ('peneira', 'Peneira', antigo['peneira'], obj_peneira.nome),
-                    ('categoria', 'Categoria', antigo['categoria'], obj_categoria.nome),
-                    ('especie', 'Espécie', antigo['especie'], obj_especie.nome if obj_especie else '-'), # NOVO
+                    ('cultivar', 'Cultivar', antigo['cultivar'], obj_cultivar.nome if obj_cultivar else '-'),
+                    ('peneira', 'Peneira', antigo['peneira'], obj_peneira.nome if obj_peneira else '-'),
+                    ('categoria', 'Categoria', antigo['categoria'], obj_categoria.nome if obj_categoria else '-'),
+                    ('especie', 'Espécie', antigo['especie'], obj_especie.nome if obj_especie else '-'),
                     ('tratamento', 'Tratamento', antigo['tratamento'], obj_tratamento.nome if obj_tratamento else 'Sem Tratamento'),
                 ]
                 
@@ -1396,23 +1410,43 @@ def editar(request, id):
                 item.produto = novo_produto
                 item.cliente = novo_cliente
                 item.peso_unitario = novo_peso
+                item.entrada = nova_entrada  # NOVO: Atualiza a entrada
+                # NÃO altera a saída - mantém o valor original
                 item.embalagem = novo_emb
                 item.az = novo_az
                 item.observacao = novo_obs
                 
-                # Atualizando Foreign Keys (Objetos)
+                # Atualizando Foreign Keys
                 item.cultivar = obj_cultivar
                 item.peneira = obj_peneira
                 item.categoria = obj_categoria
                 item.tratamento = obj_tratamento
-                item.especie = obj_especie # AGORA VAI FUNCIONAR (OBJETO)
+                item.especie = obj_especie
                 
                 item.conferente = request.user
                 
-                # 6. SALVAR E RECALCULAR
+                # 6. SALVAR (o método save() recalcula saldo e peso_total automaticamente)
                 item.save()
 
-                # 7. REGISTRAR HISTÓRICO
+                # 7. VERIFICAR SE HOUVE MUDANÇA NA QUANTIDADE E CRIAR HISTÓRICO ESPECÍFICO
+                if antigo['entrada'] != nova_entrada:
+                    diferenca = nova_entrada - antigo['entrada']
+                    if diferenca > 0:
+                        tipo_historico = 'Ajuste de Estoque (Adição)'
+                        descricao_adicional = f"<br><span class='text-success'>📦 Quantidade aumentada em <b>{diferenca}</b> unidades (entrada: {antigo['entrada']} → {nova_entrada})</span>"
+                    else:
+                        tipo_historico = 'Ajuste de Estoque (Redução)'
+                        descricao_adicional = f"<br><span class='text-danger'>📦 Quantidade reduzida em <b>{abs(diferenca)}</b> unidades (entrada: {antigo['entrada']} → {nova_entrada})</span>"
+                    
+                    # Adiciona ao histórico principal ou cria um separado
+                    HistoricoMovimentacao.objects.create(
+                        estoque=item,
+                        usuario=request.user,
+                        tipo=tipo_historico,
+                        descricao=f"<b>AJUSTE MANUAL DE QUANTIDADE:</b><br>{descricao_adicional}"
+                    )
+
+                # 8. REGISTRAR HISTÓRICO PRINCIPAL
                 if mudancas:
                     descricao_html = "<br>".join(mudancas)
                     HistoricoMovimentacao.objects.create(
@@ -1421,7 +1455,7 @@ def editar(request, id):
                         tipo='Edição de Lote',
                         descricao=f"<b>EDIÇÃO REALIZADA:</b><br>{descricao_html}"
                     )
-                else:
+                elif antigo['entrada'] == nova_entrada:  # Só cria se não houve mudança na quantidade
                     HistoricoMovimentacao.objects.create(
                         estoque=item,
                         usuario=request.user,
@@ -1429,7 +1463,7 @@ def editar(request, id):
                         descricao="Salvo sem alterações visíveis."
                     )
 
-                messages.success(request, f"✅ Lote {item.lote} atualizado com sucesso!")
+                messages.success(request, f"✅ Lote {item.lote} atualizado com sucesso! Saldo atual: {item.saldo} unidades")
                 
         except Exception as e:
             import traceback

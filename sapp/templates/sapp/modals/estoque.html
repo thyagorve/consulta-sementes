@@ -1083,125 +1083,167 @@
     </div>
 
     <!-- 4. MODAL DE EDITAR (COMPLETO E TURBINADO) -->
-    <div class="modal fade" id="modalEditar{{ item.id }}" tabindex="-1">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header bg-secondary text-white">
-                    <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Lote {{ item.lote }}</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <form method="POST" action="{% url 'sapp:editar' item.id %}">
-                    {% csrf_token %}
-                    <div class="modal-body text-start">
-                        
-                        <!-- Seção 1: Dados Principais -->
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fas fa-box me-1"></i> Dados do Lote</h6>
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Número do Lote</label>
-                                <input type="text" name="lote" class="form-control bg-light" value="{{ item.lote }}" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Armazém (AZ)</label>
-                                <input type="text" name="az" class="form-control" value="{{ item.az|default:'' }}">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label fw-bold">Endereço</label>
-                                <input type="text" name="endereco" class="form-control border-primary" value="{{ item.endereco }}" required>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Espécie</label>
-                                <select name="especie" class="form-select select2-modal">
-                                    <option value="">Selecione...</option>
-                                    {% for e in all_especies %}
-                                    <option value="{{ e.id }}" {% if item.especie_id == e.id %}selected{% endif %}>{{ e.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Embalagem</label>
-                                <select name="embalagem" class="form-select">
-                                    <option value="BAG" {% if item.embalagem == 'BAG' %}selected{% endif %}>Big Bag</option>
-                                    <option value="SC" {% if item.embalagem == 'SC' %}selected{% endif %}>Saco</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Seção 2: Classificação -->
-                        <h6 class="fw-bold text-success border-bottom pb-2 mb-3"><i class="fas fa-leaf me-1"></i> Classificação Técnica</h6>
-                        <div class="row g-3 mb-4">
-                            <div class="col-md-3">
-                                <label class="form-label">Cultivar</label>
-                                <select name="cultivar" class="form-select select2-modal">
-                                    {% for c in all_cultivares %}
-                                    <option value="{{ c.id }}" {% if c.id == item.cultivar.id %}selected{% endif %}>{{ c.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Peneira</label>
-                                <select name="peneira" class="form-select select2-modal">
-                                    {% for p in all_peneiras %}
-                                    <option value="{{ p.id }}" {% if p.id == item.peneira.id %}selected{% endif %}>{{ p.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Categoria</label>
-                                <select name="categoria" class="form-select select2-modal">
-                                    {% for c in all_categorias %}
-                                    <option value="{{ c.id }}" {% if c.id == item.categoria.id %}selected{% endif %}>{{ c.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Tratamento</label>
-                                <select name="tratamento" class="form-select select2-modal">
-                                    <option value="">Sem Tratamento</option>
-                                    {% for t in all_tratamentos %}
-                                    <option value="{{ t.id }}" {% if t.id == item.tratamento.id %}selected{% endif %}>{{ t.nome }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Seção 3: Logística e Info -->
-                        <h6 class="fw-bold text-info border-bottom pb-2 mb-3"><i class="fas fa-truck me-1"></i> Logística e Informações</h6>
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label">Produto / Descrição</label>
-                                <input type="text" name="produto" class="form-control" value="{{ item.produto|default:'' }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Cliente / Proprietário</label>
-                                <input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Empresa</label>
-                                <input type="text" name="empresa" class="form-control" value="{{ item.empresa|default:'' }}">
-                            </div>
-                            <div class="col-md-3">
-                                <label class="form-label">Peso Unitário (kg)</label>
-                                <input type="text" name="peso_unitario" class="form-control" value="{{ item.peso_unitario }}">
-                            </div>
-                         
-                            <div class="col-md-3">
-                                <label class="form-label">Origem/Destino</label>
-                                <input type="text" name="origem_destino" class="form-control" value="{{ item.origem_destino|default:'' }}">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Observações</label>
-                                <textarea name="observacao" class="form-control" rows="2">{{ item.observacao|default:'' }}</textarea>
-                            </div>
-                        </div>
-
-                    </div>
-                    <div class="modal-footer bg-light">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Alterações</button>
-                    </div>
-                </form>
+<!-- 4. MODAL DE EDITAR (COMPLETO E TURBINADO) -->
+<div class="modal fade" id="modalEditar{{ item.id }}" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Lote {{ item.lote }}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
+            <form method="POST" action="{% url 'sapp:editar' item.id %}">
+                {% csrf_token %}
+                <div class="modal-body text-start">
+                    
+                    <!-- Seção 1: Dados Principais -->
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fas fa-box me-1"></i> Dados do Lote</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Número do Lote</label>
+                            <input type="text" name="lote" class="form-control bg-light" value="{{ item.lote }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Armazém (AZ)</label>
+                            <input type="text" name="az" class="form-control" value="{{ item.az|default:'' }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Endereço</label>
+                            <input type="text" name="endereco" class="form-control border-primary" value="{{ item.endereco }}" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Espécie</label>
+                            <select name="especie" class="form-select select2-modal">
+                                <option value="">Selecione...</option>
+                                {% for e in all_especies %}
+                                <option value="{{ e.id }}" {% if item.especie_id == e.id %}selected{% endif %}>{{ e.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Embalagem</label>
+                            <select name="embalagem" class="form-select">
+                                <option value="BAG" {% if item.embalagem == 'BAG' %}selected{% endif %}>Big Bag</option>
+                                <option value="SC" {% if item.embalagem == 'SC' %}selected{% endif %}>Saco</option>
+                            </select>
+                        </div>
+                        <!-- NOVO CAMPO QUANTIDADE -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold text-danger">
+                                <i class="fas fa-cubes me-1"></i>Quantidade (Entrada)
+                            </label>
+                            <input type="number" name="entrada" class="form-control border-danger fw-bold" 
+                                   value="{{ item.entrada }}" min="0" step="1" required
+                                   oninput="atualizarPesoTotal(this)">
+                            <small class="text-muted">Saldo atual: <span class="fw-bold">{{ item.saldo }}</span></small>
+                        </div>
+                    </div>
+
+                    <!-- Seção 2: Classificação -->
+                    <h6 class="fw-bold text-success border-bottom pb-2 mb-3"><i class="fas fa-leaf me-1"></i> Classificação Técnica</h6>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-3">
+                            <label class="form-label">Cultivar</label>
+                            <select name="cultivar" class="form-select select2-modal">
+                                {% for c in all_cultivares %}
+                                <option value="{{ c.id }}" {% if c.id == item.cultivar.id %}selected{% endif %}>{{ c.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Peneira</label>
+                            <select name="peneira" class="form-select select2-modal">
+                                {% for p in all_peneiras %}
+                                <option value="{{ p.id }}" {% if p.id == item.peneira.id %}selected{% endif %}>{{ p.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Categoria</label>
+                            <select name="categoria" class="form-select select2-modal">
+                                {% for c in all_categorias %}
+                                <option value="{{ c.id }}" {% if c.id == item.categoria.id %}selected{% endif %}>{{ c.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Tratamento</label>
+                            <select name="tratamento" class="form-select select2-modal">
+                                <option value="">Sem Tratamento</option>
+                                {% for t in all_tratamentos %}
+                                <option value="{{ t.id }}" {% if t.id == item.tratamento.id %}selected{% endif %}>{{ t.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Seção 3: Logística e Info -->
+                    <h6 class="fw-bold text-info border-bottom pb-2 mb-3"><i class="fas fa-truck me-1"></i> Logística e Informações</h6>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Produto / Descrição</label>
+                            <input type="text" name="produto" class="form-control" value="{{ item.produto|default:'' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Cliente / Proprietário</label>
+                            <input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Empresa</label>
+                            <input type="text" name="empresa" class="form-control" value="{{ item.empresa|default:'' }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Peso Unitário (kg)</label>
+                            <input type="text" name="peso_unitario" class="form-control" value="{{ item.peso_unitario }}" id="pesoUnitario{{ item.id }}">
+                        </div>
+                        <!-- Peso Total (automático) -->
+                        <div class="col-md-3">
+                            <label class="form-label">Peso Total (kg)</label>
+                            <input type="text" class="form-control bg-light" id="pesoTotal{{ item.id }}" 
+                                   value="{{ item.peso_total }}" readonly>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Origem/Destino</label>
+                            <input type="text" name="origem_destino" class="form-control" value="{{ item.origem_destino|default:'' }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Observações</label>
+                            <textarea name="observacao" class="form-control" rows="2">{{ item.observacao|default:'' }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- AVISO SOBRE SAÍDAS -->
+                    <div class="alert alert-warning mt-3 mb-0 py-2 small">
+                        <i class="fas fa-info-circle me-1"></i> 
+                        <strong>Atenção:</strong> Alterar a quantidade afeta o saldo do lote. 
+                        As saídas registradas (<span class="fw-bold">{{ item.saida }}</span> unidades) não serão alteradas.
+                    </div>
+
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold">Salvar Alterações</button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
+
+<!-- SCRIPT PARA CALCULAR PESO TOTAL DINAMICAMENTE -->
+<script>
+function atualizarPesoTotal(input) {
+    // Encontra o modal correspondente
+    var modal = input.closest('.modal');
+    var itemId = modal.id.replace('modalEditar', '');
+    
+    // Pega os valores
+    var quantidade = parseInt(input.value) || 0;
+    var pesoUnitario = parseFloat(document.getElementById('pesoUnitario' + itemId).value.replace(',', '.')) || 0;
+    
+    // Calcula peso total
+    var pesoTotal = quantidade * pesoUnitario;
+    
+    // Atualiza o campo de peso total
+    document.getElementById('pesoTotal' + itemId).value = pesoTotal.toFixed(2).replace('.', ',');
+}
+</script>
 {% endfor %}
