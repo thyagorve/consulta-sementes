@@ -301,17 +301,20 @@
 
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
 <script>
     const StockApp = {
-        debounce: null,
         isSubmitting: false,
+        debounce: null,
         
         init() {
+            this.isSubmitting = false;
             this.setupAutocomplete();
             this.setupSKUSearch();
             this.setupValidation();
             this.setupClean();
             this.preventDoubleSubmit();
+            this.setupEnterKey();
         },
 
         preventDoubleSubmit() {
@@ -319,72 +322,122 @@
             const submitBtn = document.getElementById('btnSubmit');
             const spinner = document.getElementById('submitSpinner');
             const submitText = document.getElementById('submitText');
+            
+            // Referência ao objeto StockApp
+            const self = this;
 
-            // NOVO CÓDIGO PARA O EVENTO SUBMIT (Substitua no seu script)
             form.addEventListener('submit', function(e) {
-                if (isSubmitting) {
+                // VERIFICAÇÃO DE DUPLO ENVIO
+                if (self.isSubmitting) {
                     e.preventDefault();
+                    e.stopPropagation();
+                    console.log('⛔ Envio bloqueado - já em processamento');
+                    
+                    // Feedback visual para o usuário
+                    if (submitBtn.disabled) {
+                        alert('Registro em andamento. Aguarde...');
+                    }
                     return false;
                 }
 
-                // Validar quantidade
-                const quantidade = document.getElementById('transf_quantidade');
-                const saldoAtual = parseInt(document.getElementById('transf_saldo_atual').textContent) || 0;
+                // VALIDAÇÕES
+                // Quantidade
+                const quantidade = document.getElementById('inputQtd');
+                if (!quantidade || !quantidade.value) {
+                    e.preventDefault();
+                    alert('A quantidade é obrigatória');
+                    if (quantidade) {
+                        quantidade.focus();
+                        quantidade.classList.add('is-invalid');
+                    }
+                    return false;
+                }
+
                 const qtdValue = parseInt(quantidade.value) || 0;
-                
                 if (qtdValue <= 0) {
                     e.preventDefault();
                     alert('A quantidade deve ser maior que zero');
                     quantidade.focus();
-                    return false;
-                }
-                
-                if (qtdValue > saldoAtual) {
-                    e.preventDefault();
-                    alert(`Quantidade não pode ser maior que o saldo atual (${saldoAtual})`);
-                    quantidade.focus();
-                    return false;
-                }
-                
-                // Validar endereço no modo normal
-                if (tipoNormal.checked && !enderecoInput.value.trim()) {
-                    e.preventDefault();
-                    alert('Endereço de destino é obrigatório');
-                    enderecoInput.focus();
+                    quantidade.classList.add('is-invalid');
                     return false;
                 }
 
-                // SE PASSOU NAS VALIDAÇÕES:
-                isSubmitting = true;
-                btnConfirmar.disabled = true;
-                btnSpinner.classList.remove('d-none');
-                
-                // CORREÇÃO CRÍTICA AQUI:
-                // Desabilita apenas inputs que NÃO sejam o CSRF token para que ele possa ser enviado
-                const inputsParaDesabilitar = form.querySelectorAll('input:not([name="csrfmiddlewaretoken"]), select, textarea');
-                inputsParaDesabilitar.forEach(input => {
-                    // Usamos readonly ou um pequeno timeout para desabilitar 
-                    // mas o ideal para o CSRF é apenas ignorá-lo na lista de desabilitados
-                    input.readOnly = true; 
-                });
+                // Campos obrigatórios
+                const camposObrigatorios = [
+                    { id: 'inputLote', nome: 'Lote' },
+                    { id: 'inputOrigem', nome: 'Origem/Destino' },
+                    { id: 'inputEndereco', nome: 'Endereço' },
+                    { id: 'inputAz', nome: 'Armazém (AZ)' },
+                    { id: 'selEspecie', nome: 'Espécie' },
+                    { id: 'selCultivar', nome: 'Cultivar' },
+                    { id: 'selPeneira', nome: 'Peneira' },
+                    { id: 'selCategoria', nome: 'Categoria' }
+                ];
 
-                return true; // Envia o form com o CSRF habilitado
+                for (let campo of camposObrigatorios) {
+                    const el = document.getElementById(campo.id);
+                    if (!el) {
+                        e.preventDefault();
+                        alert(`Campo ${campo.nome} não encontrado`);
+                        return false;
+                    }
+                    
+                    const valor = el.tagName === 'SELECT' ? el.value : el.value.trim();
+                    
+                    if (!valor) {
+                        e.preventDefault();
+                        alert(`O campo "${campo.nome}" é obrigatório`);
+                        el.focus();
+                        el.classList.add('is-invalid');
+                        return false;
+                    }
+                }
+
+                // SE TUDO OK: BLOQUEIA DUPLO ENVIO
+                self.isSubmitting = true;
+                submitBtn.disabled = true;
+                spinner.classList.remove('d-none');
+                submitText.textContent = 'Registrando...';
+                
+                // Feedback visual
+                submitBtn.classList.add('btn-secondary');
+                submitBtn.classList.remove('btn-primary');
+                
+                console.log('✅ Enviando formulário...');
+                
+                // Timeout de segurança (caso algo dê errado)
+                setTimeout(() => {
+                    if (self.isSubmitting) {
+                        console.warn('⚠️ Timeout de segurança - liberando formulário');
+                        self.isSubmitting = false;
+                        submitBtn.disabled = false;
+                        spinner.classList.add('d-none');
+                        submitText.textContent = 'Confirmar Registro';
+                        submitBtn.classList.remove('btn-secondary');
+                        submitBtn.classList.add('btn-primary');
+                    }
+                }, 10000); // 10 segundos
+                
+                return true; // Envia o formulário
             });
         },
 
         setupAutocomplete() {
             const input = document.getElementById('inputLote');
             const list = document.getElementById('autoCompleteList');
+            const self = this;
+
+            if (!input || !list) return;
 
             input.addEventListener('input', (e) => {
-                clearTimeout(this.debounce);
+                clearTimeout(self.debounce);
                 const term = e.target.value;
                 if (term.length < 3) { 
                     list.style.display = 'none'; 
                     return; 
                 }
 
-                this.debounce = setTimeout(() => {
+                self.debounce = setTimeout(() => {
                     fetch(`/api/autocomplete-lotes/?term=${encodeURIComponent(term)}`)
                         .then(r => r.json())
                         .then(data => {
@@ -398,7 +451,7 @@
                                     div.innerHTML = `<strong>${d.lote}</strong><small>Prod: ${d.produto || 'N/A'} | End: ${d.endereco || '?'}</small>`;
                                     div.addEventListener('mousedown', (evt) => {
                                         evt.preventDefault();
-                                        this.fillFromData(d);
+                                        self.fillFromData(d);
                                     });
                                     list.appendChild(div);
                                 });
@@ -426,6 +479,10 @@
         setupSKUSearch() {
             const input = document.getElementById('inputSKU');
             const loading = document.getElementById('skuLoading');
+            const self = this;
+            
+            if (!input || !loading) return;
+            
             let searchTimeout;
 
             input.addEventListener('input', () => {
@@ -441,7 +498,7 @@
                         .then(data => {
                             loading.classList.add('d-none');
                             if (data.encontrado) {
-                                this.fillFields(data.dados);
+                                self.fillFields(data.dados);
                             }
                         })
                         .catch(() => {
@@ -452,36 +509,74 @@
         },
 
         fillFromData(d) {
-            document.getElementById('inputLote').value = d.lote || '';
-            document.getElementById('inputSKU').value = d.produto || '';
-            document.getElementById('inputOrigem').value = d.origem_destino || '';
-            document.getElementById('inputEndereco').value = d.endereco || '';
-            document.getElementById('inputAz').value = d.az || '';
-            this.fillFields(d);
+            const campos = {
+                'inputLote': d.lote || '',
+                'inputSKU': d.produto || '',
+                'inputOrigem': d.origem_destino || '',
+                'inputEndereco': d.endereco || '',
+                'inputAz': d.az || '',
+                'selEspecie': d.especie_id || d.especie__id,
+                'selCultivar': d.cultivar_id || d.cultivar__id,
+                'selPeneira': d.peneira_id || d.peneira__id,
+                'selCategoria': d.categoria_id || d.categoria__id,
+                'selTratamento': d.tratamento_id || d.tratamento__id,
+                'inputEmpresa': d.empresa || '',
+                'inputCliente': d.cliente || '',
+                'inputPeso': d.peso_unitario || '',
+                'selEmbalagem': d.embalagem || 'BAG'
+            };
+
+            for (let [id, valor] of Object.entries(campos)) {
+                const el = document.getElementById(id);
+                if (el && valor) {
+                    if (el.tagName === 'SELECT') {
+                        // Para selects, tenta selecionar a opção
+                        const option = Array.from(el.options).find(opt => opt.value == valor);
+                        if (option) {
+                            el.value = valor;
+                        }
+                    } else {
+                        el.value = valor;
+                    }
+                }
+            }
+
             document.getElementById('autoCompleteList').style.display = 'none';
             document.getElementById('inputQtd').focus();
         },
 
         fillFields(d) {
-            const setValue = (id, val) => {
-                const el = document.getElementById(id);
-                if (el && val) el.value = val;
+            const campos = {
+                'selEspecie': d.especie_id || d.especie__id,
+                'selCultivar': d.cultivar_id || d.cultivar__id,
+                'selPeneira': d.peneira_id || d.peneira__id,
+                'selCategoria': d.categoria_id || d.categoria__id,
+                'selTratamento': d.tratamento_id || d.tratamento__id,
+                'inputEmpresa': d.empresa,
+                'inputCliente': d.cliente,
+                'inputPeso': d.peso_unitario,
+                'selEmbalagem': d.embalagem
             };
 
-            setValue('selEspecie', d.especie_id || d.especie__id);
-            setValue('selCultivar', d.cultivar_id || d.cultivar__id);
-            setValue('selPeneira', d.peneira_id || d.peneira__id);
-            setValue('selCategoria', d.categoria_id || d.categoria__id);
-            setValue('selTratamento', d.tratamento_id || d.tratamento__id);
-            
-            setValue('inputEmpresa', d.empresa);
-            setValue('inputCliente', d.cliente);
-            setValue('inputPeso', d.peso_unitario);
-            setValue('selEmbalagem', d.embalagem);
+            for (let [id, valor] of Object.entries(campos)) {
+                const el = document.getElementById(id);
+                if (el && valor) {
+                    if (el.tagName === 'SELECT') {
+                        const option = Array.from(el.options).find(opt => opt.value == valor);
+                        if (option) {
+                            el.value = valor;
+                        }
+                    } else {
+                        el.value = valor;
+                    }
+                }
+            }
         },
 
         setupValidation() {
             const form = document.getElementById('formNovaEntrada');
+            if (!form) return;
+            
             const inputs = form.querySelectorAll('[required]');
             
             inputs.forEach(input => {
@@ -494,24 +589,97 @@
                 input.addEventListener('blur', () => {
                     if (!input.value.trim()) {
                         input.classList.add('is-invalid');
+                    } else {
+                        input.classList.remove('is-invalid');
                     }
                 });
+                
+                // Para selects
+                if (input.tagName === 'SELECT') {
+                    input.addEventListener('change', () => {
+                        if (input.value) {
+                            input.classList.remove('is-invalid');
+                        } else {
+                            input.classList.add('is-invalid');
+                        }
+                    });
+                }
             });
         },
 
         setupClean() {
             const modal = document.getElementById('modalNovaEntrada');
-            modal.addEventListener('hidden.bs.modal', () => {
-                document.getElementById('formNovaEntrada').reset();
+            if (!modal) return;
+            
+            const self = this;
+
+            modal.addEventListener('hidden.bs.modal', function() {
+                // Reset do formulário
+                const form = document.getElementById('formNovaEntrada');
+                if (form) {
+                    form.reset();
+                }
+                
+                // Remove classes de erro
                 document.querySelectorAll('.is-invalid').forEach(el => {
                     el.classList.remove('is-invalid');
                 });
-                StockApp.isSubmitting = false;
+                
+                // Reset do estado de submissão
+                self.isSubmitting = false;
+                
+                // Reset do botão
                 const submitBtn = document.getElementById('btnSubmit');
-                submitBtn.disabled = false;
-                document.getElementById('submitSpinner').classList.add('d-none');
-                document.getElementById('submitText').textContent = 'Confirmar Registro';
-                ScannerApp.stop();
+                const spinner = document.getElementById('submitSpinner');
+                const submitText = document.getElementById('submitText');
+                
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('btn-secondary');
+                    submitBtn.classList.add('btn-primary');
+                }
+                
+                if (spinner) {
+                    spinner.classList.add('d-none');
+                }
+                
+                if (submitText) {
+                    submitText.textContent = 'Confirmar Registro';
+                }
+                
+                // Para o scanner se estiver ativo
+                if (typeof ScannerApp !== 'undefined') {
+                    ScannerApp.stop();
+                }
+            });
+        },
+
+        setupEnterKey() {
+            const form = document.getElementById('formNovaEntrada');
+            if (!form) return;
+            
+            form.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    
+                    // Se não for textarea, previne o enter de submeter automaticamente
+                    const submitBtn = document.getElementById('btnSubmit');
+                    if (submitBtn && !submitBtn.disabled) {
+                        // Foca no próximo campo ou no botão de submit após o último campo
+                        const inputs = Array.from(form.querySelectorAll('input:not([type="file"]):not([type="hidden"]), select, textarea'));
+                        const index = inputs.indexOf(e.target);
+                        
+                        if (index < inputs.length - 1) {
+                            // Foca no próximo campo
+                            inputs[index + 1].focus();
+                        } else {
+                            // Se for o último, submete o formulário
+                            if (!this.isSubmitting) {
+                                submitBtn.click();
+                            }
+                        }
+                    }
+                }
             });
         }
     };
@@ -545,6 +713,8 @@
             
             const scannerDiv = document.getElementById('scannerFullscreen');
             const formContent = document.getElementById('formContent');
+            
+            if (!scannerDiv || !formContent) return;
             
             // Esconder formulário e mostrar scanner fullscreen
             formContent.style.display = 'none';
@@ -624,7 +794,10 @@
                         const track = stream.getVideoTracks()[0];
                         this.hasFlash = track.getCapabilities().torch || false;
                         
-                        document.getElementById('btnFlash').disabled = !this.hasFlash;
+                        const btnFlash = document.getElementById('btnFlash');
+                        if (btnFlash) {
+                            btnFlash.disabled = !this.hasFlash;
+                        }
                         
                         stream.getTracks().forEach(t => t.stop());
                     }
@@ -649,13 +822,22 @@
             const scannerDiv = document.getElementById('scannerFullscreen');
             const formContent = document.getElementById('formContent');
             
-            // Mostrar formulário e esconder scanner
-            formContent.style.display = 'block';
-            scannerDiv.classList.add('d-none');
+            if (scannerDiv && formContent) {
+                // Mostrar formulário e esconder scanner
+                formContent.style.display = 'block';
+                scannerDiv.classList.add('d-none');
+            }
             
-            document.getElementById('btnFlash').disabled = true;
-            document.getElementById('btnFlash').innerHTML = '<i class="bi bi-lightning"></i> Flash';
-            document.getElementById('scannerStatus').innerHTML = '';
+            const btnFlash = document.getElementById('btnFlash');
+            if (btnFlash) {
+                btnFlash.disabled = true;
+                btnFlash.innerHTML = '<i class="bi bi-lightning"></i> Flash';
+            }
+            
+            const scannerStatus = document.getElementById('scannerStatus');
+            if (scannerStatus) {
+                scannerStatus.innerHTML = '';
+            }
         },
 
         async toggleFlash() {
@@ -670,12 +852,14 @@
                     });
                     
                     const btnFlash = document.getElementById('btnFlash');
-                    if (torch) {
-                        btnFlash.innerHTML = '<i class="bi bi-lightning-fill"></i> Flash';
-                        btnFlash.classList.replace('btn-outline-light', 'btn-warning');
-                    } else {
-                        btnFlash.innerHTML = '<i class="bi bi-lightning"></i> Flash';
-                        btnFlash.classList.replace('btn-warning', 'btn-outline-light');
+                    if (btnFlash) {
+                        if (torch) {
+                            btnFlash.innerHTML = '<i class="bi bi-lightning-fill"></i> Flash';
+                            btnFlash.classList.replace('btn-outline-light', 'btn-warning');
+                        } else {
+                            btnFlash.innerHTML = '<i class="bi bi-lightning"></i> Flash';
+                            btnFlash.classList.replace('btn-warning', 'btn-outline-light');
+                        }
                     }
                 }
             } catch (err) {
@@ -684,7 +868,17 @@
         }
     };
 
-    document.addEventListener('DOMContentLoaded', () => StockApp.init());
+    // Inicialização quando o DOM estiver pronto
+    document.addEventListener('DOMContentLoaded', () => {
+        StockApp.init();
+    });
+
+    // Para garantir que o scanner pare quando o modal fechar
+    document.addEventListener('hidden.bs.modal', (event) => {
+        if (event.target.id === 'modalNovaEntrada') {
+            ScannerApp.stop();
+        }
+    });
 </script>
 
 
