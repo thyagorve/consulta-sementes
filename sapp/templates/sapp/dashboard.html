@@ -5,32 +5,27 @@
 
 {% block content %}
 <div class="container-fluid mt-3">
-    <!-- Cabeçalho -->
+    <!-- Cabeçalho com gradiente melhorado -->
     <div class="page-title text-center mb-4">
-        <h1 class="mb-2"><i class="fas fa-boxes me-2"></i>Dashboard do Estoque</h1>
-        <p class="mb-0 text-muted">Bem-vindo, {{ user.username }}! Visão geral em tempo real</p>
+        <h1 class="mb-2"><i class="fas fa-chart-pie me-2"></i>Dashboard Analítico</h1>
+        <p class="mb-0 opacity-75">Bem-vindo, {{ user.username }}! Dados atualizados em {% now "d/m/Y H:i" %}</p>
     </div>
 
-    <!-- KPIs Cards -->
+    <!-- KPIs Cards com design melhorado -->
     <div class="row mb-4">
         <!-- Total Estoque -->
         <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100" style="border-left-width: 4px !important;">
-                <div class="card-body py-3">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <div class="small font-weight-bold text-uppercase text-success mb-1">
-                                Total Estoque
-                            </div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">
-                                {{ total_sc_convertido|intcomma }} sc
-                            </div>
-                            <div class="small text-muted">
-                                {{ total_bag }} bgs + {{ total_sc }} sc físicos
-                            </div>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-pallet fa-2x text-success opacity-50"></i>
+            <div class="card stats-card stats-success h-100">
+                <div class="card-body">
+                    <div class="stats-icon">
+                        <i class="fas fa-pallet"></i>
+                    </div>
+                    <div class="stats-content">
+                        <span class="stats-label">Total Estoque</span>
+                        <div class="stats-value">{{ total_sc_convertido|intcomma }}</div>
+                        <div class="stats-sub">
+                            <span class="badge bg-light text-dark me-1">{{ total_bag }} bags</span>
+                            <span class="badge bg-light text-dark">{{ total_sc }} sc</span>
                         </div>
                     </div>
                 </div>
@@ -39,21 +34,15 @@
 
         <!-- Peso Total -->
         <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100" style="border-left-width: 4px !important;">
-                <div class="card-body py-3">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <div class="small font-weight-bold text-uppercase text-primary mb-1">
-                                Peso Total
-                            </div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">
-                                {{ peso_total|floatformat:0|intcomma }} kg
-                            </div>
-                            <div class="small text-muted">Em estoque atual</div>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-weight-hanging fa-2x text-primary opacity-50"></i>
-                        </div>
+            <div class="card stats-card stats-primary h-100">
+                <div class="card-body">
+                    <div class="stats-icon">
+                        <i class="fas fa-weight-scale"></i>
+                    </div>
+                    <div class="stats-content">
+                        <span class="stats-label">Peso Total</span>
+                        <div class="stats-value">{{ peso_total|floatformat:0|intcomma }}</div>
+                        <div class="stats-sub">kg em estoque</div>
                     </div>
                 </div>
             </div>
@@ -61,23 +50,17 @@
 
         <!-- Lotes Ativos -->
         <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100" style="border-left-width: 4px !important;">
-                <div class="card-body py-3">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <div class="small font-weight-bold text-uppercase text-info mb-1">
-                                Lotes Ativos
-                            </div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">
-                                {{ itens_ativos }}
-                            </div>
-                            <div class="small text-muted">
-                                <span class="text-success">{{ itens_ativos }}</span> ativos | 
-                                <span class="text-danger">{{ itens_esgotados }}</span> esgotados
-                            </div>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-box-open fa-2x text-info opacity-50"></i>
+            <div class="card stats-card stats-info h-100">
+                <div class="card-body">
+                    <div class="stats-icon">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                    <div class="stats-content">
+                        <span class="stats-label">Lotes Ativos</span>
+                        <div class="stats-value">{{ itens_ativos }}</div>
+                        <div class="stats-sub">
+                            <span class="text-success me-2">{{ itens_ativos }} ativos</span>
+                            <span class="text-danger">{{ itens_esgotados }} esgotados</span>
                         </div>
                     </div>
                 </div>
@@ -86,89 +69,94 @@
 
         <!-- Movimentação -->
         <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100" style="border-left-width: 4px !important;">
-                <div class="card-body py-3">
-                    <div class="d-flex align-items-center">
-                        <div class="flex-grow-1">
-                            <div class="small font-weight-bold text-uppercase text-warning mb-1">
-                                Movimentação
-                            </div>
-                            <div class="h4 mb-0 font-weight-bold text-gray-800">
-                                {{ movimentacao_mes }}
-                            </div>
-                            <div class="small text-muted">Registros este mês</div>
-                        </div>
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-exchange-alt fa-2x text-warning opacity-50"></i>
-                        </div>
+            <div class="card stats-card stats-warning h-100">
+                <div class="card-body">
+                    <div class="stats-icon">
+                        <i class="fas fa-arrows-spin"></i>
+                    </div>
+                    <div class="stats-content">
+                        <span class="stats-label">Movimentação</span>
+                        <div class="stats-value">{{ movimentacao_mes }}</div>
+                        <div class="stats-sub">registros este mês</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Linha 1: Gráficos principais -->
+    <!-- Linha 1: Gráficos principais com mini cards -->
     <div class="row mb-4">
         <!-- Top Cultivares -->
         <div class="col-xl-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header py-3" style="background: linear-gradient(135deg, var(--brand-green), #3aa55c);">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-white">
-                            <i class="fas fa-seedling me-2"></i>Top Cultivares
-                        </h6>
-                        <span class="badge bg-light text-dark">{{ top_cultivares|length }} cultivares</span>
+            <div class="card chart-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-seedling me-2 text-success"></i>
+                        Top Cultivares
+                    </h5>
+                    <div class="chart-legend-mini">
+                        {% for item in top_cultivares|slice:":3" %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                            {{ item.cultivar__nome }}: {{ item.total_saldo }} sc
+                        </span>
+                        {% endfor %}
                     </div>
                 </div>
-                <div class="card-body p-3">
-                    <div style="height: 220px; position: relative;">
+                <div class="card-body">
+                    <div class="chart-container">
                         <canvas id="cultivarChart"></canvas>
                     </div>
-                    <div class="mt-3" id="cultivarLegend" style="max-height: 100px; overflow-y: auto;"></div>
+                    <div class="chart-legend-detailed" id="cultivarLegend"></div>
                 </div>
             </div>
         </div>
 
         <!-- Distribuição por Peneira -->
         <div class="col-xl-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header py-3" style="background: linear-gradient(135deg, var(--brand-dark), #2a3d38);">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-white">
-                            <i class="fas fa-filter me-2"></i>Distribuição por Peneira
-                        </h6>
-                        <span class="badge bg-light text-dark">{{ categorias_distribuicao|length }} peneiras</span>
+            <div class="card chart-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-filter me-2 text-info"></i>
+                        Distribuição por Peneira
+                    </h5>
+                    <div class="chart-legend-mini">
+                        <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
+                            {{ categorias_distribuicao|length }} peneiras ativas
+                        </span>
                     </div>
                 </div>
-                <div class="card-body p-3">
-                    <div style="height: 220px; position: relative;">
+                <div class="card-body">
+                    <div class="chart-container">
                         <canvas id="peneiraChart"></canvas>
                     </div>
-                    <div class="mt-3" id="peneiraLegend" style="max-height: 100px; overflow-y: auto;"></div>
+                    <div class="chart-legend-detailed" id="peneiraLegend"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Linha 2: Armazém e Movimentação -->
+    <!-- Linha 2: Gráficos de ocupação e estoque por AZ -->
     <div class="row mb-4">
         <!-- Ocupação por Armazém -->
         <div class="col-xl-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header py-3" style="background: linear-gradient(135deg, #FF9F40, #FF6B6B);">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-white">
-                            <i class="fas fa-warehouse me-2"></i>Ocupação por Armazém
-                        </h6>
-                        <span class="badge bg-light text-dark">{{ capacidade_armazem|length }} armazéns</span>
+            <div class="card chart-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-warehouse me-2 text-warning"></i>
+                        Ocupação por Armazém
+                    </h5>
+                    <div class="chart-legend-mini">
+                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25">
+                            Total: {{ capacidade_armazem|length }} AZs
+                        </span>
                     </div>
                 </div>
-                <div class="card-body p-3">
+                <div class="card-body">
                     {% if capacidade_armazem %}
-                    <div style="height: 240px; position: relative;">
+                    <div class="chart-container">
                         <canvas id="armazemChart"></canvas>
                     </div>
-                    <div class="mt-3" id="armazemLegend" style="max-height: 120px; overflow-y: auto;"></div>
+                    <div class="chart-legend-detailed" id="armazemLegend"></div>
                     {% else %}
                     <div class="text-center text-muted py-5">
                         <i class="fas fa-warehouse fa-3x mb-3 opacity-25"></i>
@@ -179,59 +167,160 @@
             </div>
         </div>
 
-        <!-- Movimentação Recente -->
+        <!-- NOVO GRÁFICO: Tendência de Movimentação -->
         <div class="col-xl-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header py-3" style="background: linear-gradient(135deg, #36A2EB, #4BC0C0);">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <h6 class="m-0 font-weight-bold text-white">
-                            <i class="fas fa-history me-2"></i>Movimentação Recente
-                        </h6>
-                        <span class="badge bg-light text-dark">{{ movimentacao_recente|length }} registros</span>
+            <div class="card chart-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2 text-primary"></i>
+                        Tendência de Movimentação
+                    </h5>
+                    <div class="chart-legend-mini">
+                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                            Últimos 7 dias
+                        </span>
                     </div>
                 </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="tendenciaChart"></canvas>
+                    </div>
+                    <div class="chart-legend-detailed" id="tendenciaLegend"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linha 3: Mini KPIs e Indicadores -->
+    <div class="row mb-4">
+        <!-- Mini KPIs de Embalagens -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card mini-stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="mini-stats-icon bg-success bg-opacity-10 text-success">
+                            <i class="fas fa-sack"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="mini-stats-label">Bags</div>
+                            <div class="mini-stats-value">{{ total_bag|intcomma }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card mini-stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="mini-stats-icon bg-info bg-opacity-10 text-info">
+                            <i class="fas fa-cubes"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="mini-stats-label">Sacas Físicas</div>
+                            <div class="mini-stats-value">{{ total_sc|intcomma }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card mini-stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="mini-stats-icon bg-warning bg-opacity-10 text-warning">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="mini-stats-label">Clientes Ativos</div>
+                            <div class="mini-stats-value">{{ clientes_unicos|default:"0" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card mini-stats-card">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="mini-stats-icon bg-danger bg-opacity-10 text-danger">
+                            <i class="fas fa-percent"></i>
+                        </div>
+                        <div class="ms-3">
+                            <div class="mini-stats-label">Taxa Ocupação</div>
+                            <div class="mini-stats-value">{{ taxa_ocupacao|default:"0" }}%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linha 4: Movimentação Recente e Ações Rápidas -->
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clock-rotate-left me-2 text-secondary"></i>
+                        Movimentações Recentes
+                    </h5>
+                </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
-                        <table class="table table-hover table-sm mb-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
                             <thead class="bg-light">
                                 <tr>
-                                    <th class="ps-3" style="min-width: 120px;">Data/Hora</th>
-                                    <th class="text-center" style="min-width: 100px;">Tipo</th>
-                                    <th style="min-width: 100px;">Lote</th>
-                                    <th style="min-width: 100px;">Usuário</th>
+                                    <th class="ps-3">Data/Hora</th>
+                                    <th>Tipo</th>
+                                    <th>Lote</th>
+                                    <th>Usuário</th>
+                                    <th class="text-end pe-3">Detalhes</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for mov in movimentacao_recente %}
                                 <tr>
                                     <td class="ps-3">
-                                        <div class="small text-muted">{{ mov.data_hora|date:"d/m" }}</div>
-                                        <div class="small">{{ mov.data_hora|date:"H:i" }}</div>
+                                        <span class="text-nowrap">{{ mov.data_hora|date:"d/m H:i" }}</span>
                                     </td>
-                                    <td class="text-center">
+                                    <td>
                                         {% if 'Entrada' in mov.tipo %}
-                                        <span class="badge bg-success" style="font-size: 0.7rem; padding: 2px 6px;">ENTRADA</span>
+                                        <span class="badge badge-tipo bg-success">ENTRADA</span>
                                         {% elif 'Saída' in mov.tipo or 'Expedição' in mov.tipo %}
-                                        <span class="badge bg-danger" style="font-size: 0.7rem; padding: 2px 6px;">SAÍDA</span>
+                                        <span class="badge badge-tipo bg-danger">SAÍDA</span>
                                         {% elif 'Transferência' in mov.tipo %}
-                                        <span class="badge bg-warning text-dark" style="font-size: 0.7rem; padding: 2px 6px;">TRANSF.</span>
+                                        <span class="badge badge-tipo bg-warning text-dark">TRANSF.</span>
                                         {% elif 'Edição' in mov.tipo %}
-                                        <span class="badge bg-info" style="font-size: 0.7rem; padding: 2px 6px;">EDIÇÃO</span>
+                                        <span class="badge badge-tipo bg-info">EDIÇÃO</span>
                                         {% else %}
-                                        <span class="badge bg-secondary" style="font-size: 0.7rem; padding: 2px 6px;">OUTRO</span>
+                                        <span class="badge badge-tipo bg-secondary">{{ mov.tipo|truncatechars:8 }}</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <div class="small">{{ mov.lote_ref|default:"--"|truncatechars:12 }}</div>
+                                        <span class="fw-medium">{{ mov.lote_ref|default:"--"|truncatechars:15 }}</span>
                                     </td>
                                     <td>
-                                        <div class="small">{{ mov.usuario.username|default:"Sistema"|truncatechars:12 }}</div>
+                                        <div class="d-flex align-items-center">
+                                            <div class="user-avatar bg-secondary bg-opacity-10 rounded-circle me-2" style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-user-circle text-secondary" style="font-size: 1rem;"></i>
+                                            </div>
+                                            <span class="small">{{ mov.usuario.username|default:"Sistema"|truncatechars:12 }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <button class="btn btn-sm btn-link text-primary" data-bs-toggle="tooltip" title="{{ mov.descricao|striptags|truncatechars:100 }}">
+                                            <i class="fas fa-info-circle"></i>
+                                        </button>
                                     </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">
-                                        <i class="fas fa-history fa-lg mb-2 opacity-25"></i>
+                                    <td colspan="5" class="text-center text-muted py-5">
+                                        <i class="fas fa-history fa-2x mb-2 opacity-25"></i>
                                         <p class="mb-0">Nenhuma movimentação recente</p>
                                     </td>
                                 </tr>
@@ -242,29 +331,53 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Ações Rápidas -->
-    <div class="row">
-        <div class="col-lg-12">
-            <div class="card shadow">
-                <div class="card-header py-3 bg-light">
-                    <h6 class="m-0 font-weight-bold" style="color: var(--brand-dark);">
-                        <i class="fas fa-bolt me-2"></i>Ações Rápidas
-                    </h6>
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-bolt me-2 text-warning"></i>
+                        Ações Rápidas
+                    </h5>
                 </div>
-                <div class="card-body p-3">
-                    <div class="d-flex flex-wrap justify-content-center gap-2">
-                        <a href="{% url 'sapp:lista_estoque' %}" class="btn btn-success btn-sm px-3">
-                            <i class="fas fa-boxes me-1"></i>Ver Estoque
+                <div class="card-body">
+                    <div class="quick-actions-grid">
+                        <a href="{% url 'sapp:lista_estoque' %}" class="quick-action-item">
+                            <div class="quick-action-icon bg-success bg-opacity-10 text-success">
+                                <i class="fas fa-boxes"></i>
+                            </div>
+                            <span>Ver Estoque</span>
                         </a>
-                        <a href="{% url 'sapp:nova_entrada' %}" class="btn btn-primary btn-sm px-3">
-                            <i class="fas fa-plus me-1"></i>Nova Entrada
+                        <a href="{% url 'sapp:nova_entrada' %}" class="quick-action-item">
+                            <div class="quick-action-icon bg-primary bg-opacity-10 text-primary">
+                                <i class="fas fa-plus"></i>
+                            </div>
+                            <span>Nova Entrada</span>
                         </a>
-                        <a href="{% url 'sapp:configuracoes' %}" class="btn btn-dark btn-sm px-3">
-                            <i class="fas fa-cog me-1"></i>Configurações
+                        <a href="{% url 'sapp:configuracoes' %}" class="quick-action-item">
+                            <div class="quick-action-icon bg-dark bg-opacity-10 text-dark">
+                                <i class="fas fa-gear"></i>
+                            </div>
+                            <span>Configurações</span>
                         </a>
-
+                        <a href="{% url 'sapp:gestao_estoque' %}" class="quick-action-item">
+                            <div class="quick-action-icon bg-info bg-opacity-10 text-info">
+                                <i class="fas fa-chart-simple"></i>
+                            </div>
+                            <span>Gestão</span>
+                        </a>
+                        <a href="{% url 'sapp:pagina_rascunho' %}" class="quick-action-item">
+                            <div class="quick-action-icon bg-warning bg-opacity-10 text-warning">
+                                <i class="fas fa-pen-to-square"></i>
+                            </div>
+                            <span>Rascunhos</span>
+                        </a>
+                        <a href="{% url 'sapp:historico_geral' %}" class="quick-action-item">
+                            <div class="quick-action-icon bg-secondary bg-opacity-10 text-secondary">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <span>Histórico</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -273,47 +386,393 @@
 </div>
 
 <!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+<style>
+:root {
+    --chart-height: 240px;
+    --legend-max-height: 120px;
+}
+
+/* Cards de estatísticas */
+.stats-card {
+    border: none;
+    border-radius: 16px !important;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.stats-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.stats-card .card-body {
+    padding: 1.5rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.stats-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    flex-shrink: 0;
+}
+
+.stats-success .stats-icon {
+    background: linear-gradient(135deg, #10b98120, #05966920);
+    color: #059669;
+}
+
+.stats-primary .stats-icon {
+    background: linear-gradient(135deg, #3b82f620, #2563eb20);
+    color: #2563eb;
+}
+
+.stats-info .stats-icon {
+    background: linear-gradient(135deg, #06b6d420, #0891b220);
+    color: #0891b2;
+}
+
+.stats-warning .stats-icon {
+    background: linear-gradient(135deg, #f59e0b20, #d9770620);
+    color: #d97706;
+}
+
+.stats-content {
+    flex: 1;
+}
+
+.stats-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.stats-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.2;
+    margin-bottom: 0.25rem;
+}
+
+.stats-sub {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+
+/* Cards de gráficos */
+.chart-card {
+    border: none;
+    border-radius: 16px !important;
+    background: white;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+}
+
+.chart-card .card-header {
+    background: white;
+    border-bottom: 1px solid #e9eef2;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.chart-card .card-header h5 {
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.chart-legend-mini {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.chart-container {
+    height: var(--chart-height);
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.chart-legend-detailed {
+    max-height: var(--legend-max-height);
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+/* Mini stats cards */
+.mini-stats-card {
+    border: none;
+    border-radius: 12px !important;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    transition: all 0.2s ease;
+}
+
+.mini-stats-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.mini-stats-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.mini-stats-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 0.1rem;
+}
+
+.mini-stats-value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* Badges de tipo */
+.badge-tipo {
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+/* Ações rápidas */
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.quick-action-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1rem 0.5rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    color: #1e293b;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.quick-action-item:hover {
+    background: #f1f5f9;
+    transform: translateY(-2px);
+    color: #1e293b;
+}
+
+.quick-action-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.quick-action-item span {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Page title */
+.page-title {
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    color: white;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Table styles */
+.table {
+    font-size: 0.85rem;
+}
+
+.table thead th {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    padding: 0.75rem 1rem;
+}
+
+.table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+}
+
+/* Scrollbar */
+.table-responsive::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Legend items */
+.legend-item {
+    display: flex;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-size: 0.8rem;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+}
+
+.legend-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.legend-value {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.legend-percentage {
+    color: #64748b;
+    font-size: 0.7rem;
+    margin-left: 0.25rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .page-title {
+        padding: 1.5rem;
+    }
+    
+    .stats-value {
+        font-size: 1.4rem;
+    }
+    
+    .stats-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1.5rem;
+    }
+    
+    .quick-actions-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .quick-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .chart-card .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Paleta de cores otimizada
+    // Registrar plugin de datalabels
+    Chart.register(ChartDataLabels);
+    
+    // Paleta de cores moderna e acessível
     const themeColors = [
-        '#2f8f4e', '#36A2EB', '#FFCE56', '#FF6384', '#4BC0C0',
-        '#9966FF', '#FF9F40', '#8AC926', '#6A4C93', '#1982C4',
-        '#FF595E', '#FFCA3A', '#6A4C93', '#1982C4', '#FF595E'
+        '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
+        '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#14b8a6',
+        '#d946ef', '#22c55e', '#eab308', '#a855f7', '#64748b'
     ];
 
-    // Função para criar legenda responsiva
-    function createCustomLegend(chartId, labels, values, colors, suffix = '') {
+    // Função para truncar texto
+    function truncate(str, length) {
+        return str.length > length ? str.substring(0, length) + '...' : str;
+    }
+
+    // Função melhorada para criar legenda
+    function createEnhancedLegend(chartId, labels, values, colors, unit = 'sc', suffix = '') {
         const legendContainer = document.getElementById(chartId + 'Legend');
         if (!legendContainer) return;
         
-        let html = '<div class="row g-2">';
         const total = values.reduce((a, b) => a + b, 0);
+        let html = '<div class="legend-grid">';
         
-        labels.forEach((label, index) => {
-            if (index < 6) { // Mostrar apenas top 6 na legenda
-                const percentage = total > 0 ? ((values[index] / total) * 100).toFixed(1) : 0;
-                const displayValue = values[index].toLocaleString('pt-BR');
-                
-                html += `
-                    <div class="col-6 col-md-4 col-lg-6">
-                        <div class="d-flex align-items-center mb-1">
-                            <div class="flex-shrink-0 me-2" style="width: 12px; height: 12px; background-color: ${colors[index]}; border-radius: 2px;"></div>
-                            <div class="flex-grow-1 small">
-                                <div class="text-truncate" title="${label}" style="max-width: 120px;">${label}</div>
-                                <div class="text-muted">${displayValue}${suffix} (${percentage}%)</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-        });
+        // Mostrar top 8 itens na legenda
+        const displayCount = Math.min(labels.length, 8);
         
-        if (labels.length > 6) {
-            html += `<div class="col-12 mt-1 text-center">
-                        <small class="text-muted">+${labels.length - 6} outros</small>
+        for (let i = 0; i < displayCount; i++) {
+            const percentage = total > 0 ? ((values[i] / total) * 100).toFixed(1) : 0;
+            const displayValue = values[i].toLocaleString('pt-BR');
+            
+            html += `
+                <div class="legend-item" title="${labels[i]}">
+                    <div class="legend-color" style="background-color: ${colors[i]};"></div>
+                    <div class="legend-label">${truncate(labels[i], 15)}</div>
+                    <div class="legend-value">${displayValue}${suffix}</div>
+                    <div class="legend-percentage">(${percentage}%)</div>
+                </div>
+            `;
+        }
+        
+        if (labels.length > displayCount) {
+            html += `<div class="legend-item text-muted text-center mt-2">
+                        <small>+${labels.length - displayCount} outros itens</small>
                     </div>`;
         }
         
@@ -321,30 +780,52 @@ document.addEventListener('DOMContentLoaded', function() {
         legendContainer.innerHTML = html;
     }
 
-    // Configuração comum dos gráficos
+    // Configuração comum dos gráficos com melhorias de legibilidade
     const commonChartOptions = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
             tooltip: {
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                padding: 10,
-                cornerRadius: 6,
+                backgroundColor: '#1e293b',
+                titleColor: '#f1f5f9',
+                bodyColor: '#e2e8f0',
+                padding: 12,
+                cornerRadius: 8,
+                titleFont: { size: 13, weight: '600' },
+                bodyFont: { size: 12 },
                 callbacks: {
                     label: function(context) {
                         const label = context.label || '';
                         const value = context.raw || 0;
                         const total = context.dataset.data.reduce((a, b) => a + b, 0);
                         const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                        return `${label}: ${value.toLocaleString('pt-BR')} bgs (${percentage}%)`;
+                        return `${label}: ${value.toLocaleString('pt-BR')} (${percentage}%)`;
                     }
+                }
+            },
+            datalabels: {
+                display: function(context) {
+                    const value = context.dataset.data[context.dataIndex];
+                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                    const percentage = (value / total) * 100;
+                    return percentage > 5; // Mostrar apenas se > 5%
+                },
+                color: '#ffffff',
+                font: {
+                    weight: 'bold',
+                    size: 11
+                },
+                formatter: function(value, context) {
+                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                    const percentage = ((value / total) * 100).toFixed(1);
+                    return percentage + '%';
                 }
             }
         }
     };
 
-    // 1. Gráfico de Cultivares
+    // 1. Gráfico de Cultivares (Doughnut)
     const cultivarLabels = [{% for item in top_cultivares %}'{{ item.cultivar__nome }}',{% endfor %}];
     const cultivarValues = [{% for item in top_cultivares %}{{ item.total_saldo }},{% endfor %}];
     
@@ -357,19 +838,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     data: cultivarValues,
                     backgroundColor: themeColors.slice(0, cultivarLabels.length),
-                    borderWidth: 1.5,
-                    borderColor: '#fff'
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 6
                 }]
             },
             options: {
                 ...commonChartOptions,
-                cutout: '65%'
+                cutout: '65%',
+                plugins: {
+                    ...commonChartOptions.plugins,
+                    datalabels: {
+                        ...commonChartOptions.plugins.datalabels,
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        borderRadius: 12,
+                        padding: { top: 4, bottom: 4, left: 8, right: 8 }
+                    }
+                }
             }
         });
-        createCustomLegend('cultivar', cultivarLabels, cultivarValues, themeColors.slice(0, cultivarLabels.length), ' bgs');
+        createEnhancedLegend('cultivar', cultivarLabels, cultivarValues, themeColors, 'sc');
     }
 
-    // 2. Gráfico de Peneira
+    // 2. Gráfico de Peneira (Pie)
     const peneiraLabels = [{% for item in categorias_distribuicao %}'{{ item.peneira__nome }}',{% endfor %}];
     const peneiraValues = [{% for item in categorias_distribuicao %}{{ item.total }},{% endfor %}];
     
@@ -382,16 +873,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     data: peneiraValues,
                     backgroundColor: themeColors.slice(0, peneiraLabels.length),
-                    borderWidth: 1.5,
-                    borderColor: '#fff'
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
                 }]
             },
-            options: commonChartOptions
+            options: {
+                ...commonChartOptions,
+                plugins: {
+                    ...commonChartOptions.plugins,
+                    datalabels: {
+                        ...commonChartOptions.plugins.datalabels,
+                        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                        borderRadius: 12,
+                        padding: { top: 4, bottom: 4, left: 8, right: 8 }
+                    }
+                }
+            }
         });
-        createCustomLegend('peneira', peneiraLabels, peneiraValues, themeColors.slice(0, peneiraLabels.length), ' bgs');
+        createEnhancedLegend('peneira', peneiraLabels, peneiraValues, themeColors, 'sc');
     }
 
-    // 3. Gráfico de Armazém
+    // 3. Gráfico de Armazém (Bar)
     const armazemLabels = [{% for item in capacidade_armazem %}'AZ {{ item.az }}',{% endfor %}];
     const armazemValues = [{% for item in capacidade_armazem %}{{ item.total_sc }},{% endfor %}];
     const armazemLotes = [{% for item in capacidade_armazem %}{{ item.total_lotes }},{% endfor %}];
@@ -403,12 +905,12 @@ document.addEventListener('DOMContentLoaded', function() {
             data: {
                 labels: armazemLabels,
                 datasets: [{
-                    label: 'Volume (bgs)',
+                    label: 'Volume (sc)',
                     data: armazemValues,
-                    backgroundColor: themeColors.slice(0, armazemLabels.length),
+                    backgroundColor: themeColors.slice(0, armazemLabels.length).map(c => c + 'cc'),
+                    borderColor: themeColors.slice(0, armazemLabels.length),
                     borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                    borderRadius: 4
+                    borderRadius: 6
                 }]
             },
             options: {
@@ -417,62 +919,72 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        backgroundColor: '#1e293b',
+                        titleColor: '#f1f5f9',
+                        bodyColor: '#e2e8f0',
                         padding: 12,
-                        cornerRadius: 6,
+                        cornerRadius: 8,
                         callbacks: {
                             label: function(context) {
                                 const index = context.dataIndex;
                                 const volume = context.raw.toLocaleString('pt-BR');
                                 const lotes = armazemLotes[index] || 0;
+                                const media = lotes > 0 ? (context.raw / lotes).toFixed(1) : 0;
                                 return [
-                                    `Volume: ${volume} bgs`,
+                                    `Volume: ${volume} sc`,
                                     `Lotes: ${lotes}`,
-                                    `Média: ${lotes > 0 ? Math.round(context.raw / lotes) : 0} bgs/lote`
+                                    `Média: ${media} sc/lote`
                                 ];
                             }
                         }
+                    },
+                    datalabels: {
+                        display: function(context) {
+                            return context.raw > 0;
+                        },
+                        color: '#1e293b',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: function(value) {
+                            return value.toLocaleString('pt-BR') + ' sc';
+                        },
+                        anchor: 'end',
+                        align: 'top',
+                        offset: 4
                     }
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.05)'
-                        },
+                        grid: { color: '#e9eef2' },
                         ticks: {
                             callback: function(value) {
-                                return value.toLocaleString('pt-BR') + ' bgs';
+                                return value.toLocaleString('pt-BR') + ' sc';
                             }
                         }
                     },
                     x: {
-                        grid: {
-                            display: false
-                        },
+                        grid: { display: false },
                         ticks: {
                             maxRotation: 45,
-                            minRotation: 0
+                            minRotation: 0,
+                            font: { size: 11 }
                         }
                     }
                 }
             }
         });
         
-        // Legenda para armazém
+        // Legenda para armazém (formato melhorado)
         const armazemLegend = document.getElementById('armazemLegend');
         if (armazemLegend) {
-            let armazemHtml = '<div class="row g-2">';
+            let armazemHtml = '<div class="legend-grid">';
             armazemLabels.forEach((label, index) => {
                 armazemHtml += `
-                    <div class="col-6 col-md-4">
-                        <div class="border-start border-3 ps-2 py-1" style="border-color: ${themeColors[index]} !important;">
-                            <div class="small fw-bold">${label}</div>
-                            <div class="small text-muted">
-                                ${armazemValues[index].toLocaleString('pt-BR')} bgs<br>
-                                ${armazemLotes[index]} lotes
-                            </div>
-                        </div>
+                    <div class="legend-item" title="${label}">
+                        <div class="legend-color" style="background-color: ${themeColors[index]}cc;"></div>
+                        <div class="legend-label">${label}</div>
+                        <div class="legend-value">${armazemValues[index].toLocaleString('pt-BR')} sc</div>
+                        <div class="legend-percentage">(${armazemLotes[index]} lotes)</div>
                     </div>
                 `;
             });
@@ -480,125 +992,143 @@ document.addEventListener('DOMContentLoaded', function() {
             armazemLegend.innerHTML = armazemHtml;
         }
     }
+
+    // 4. NOVO GRÁFICO: Tendência de Movimentação (dados simulados)
+    const ctx4 = document.getElementById('tendenciaChart');
+    if (ctx4) {
+        // Buscar dados reais de movimentação dos últimos 7 dias
+        {% if movimentacoes_diarias %}
+        const tendenciaLabels = [{% for item in movimentacoes_diarias %}'{{ item.dia }}',{% endfor %}];
+        const tendenciaEntradas = [{% for item in movimentacoes_diarias %}{{ item.entradas }},{% endfor %}];
+        const tendenciaSaidas = [{% for item in movimentacoes_diarias %}{{ item.saidas }},{% endfor %}];
+        {% else %}
+        // Dados de exemplo (serão substituídos pelos reais)
+        const tendenciaLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+        const tendenciaEntradas = [65, 72, 48, 83, 59, 38, 45];
+        const tendenciaSaidas = [45, 58, 42, 61, 55, 32, 40];
+        {% endif %}
+
+        new Chart(ctx4, {
+            type: 'line',
+            data: {
+                labels: tendenciaLabels,
+                datasets: [
+                    {
+                        label: 'Entradas',
+                        data: tendenciaEntradas,
+                        borderColor: '#10b981',
+                        backgroundColor: '#10b98120',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: false,
+                        pointBackgroundColor: '#10b981',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Saídas',
+                        data: tendenciaSaidas,
+                        borderColor: '#ef4444',
+                        backgroundColor: '#ef444420',
+                        borderWidth: 3,
+                        tension: 0.3,
+                        fill: false,
+                        pointBackgroundColor: '#ef4444',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 15,
+                            font: { size: 11, weight: '600' }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1e293b',
+                        titleColor: '#f1f5f9',
+                        bodyColor: '#e2e8f0',
+                        padding: 10,
+                        cornerRadius: 8
+                    },
+                    datalabels: {
+                        display: false // Desabilitar para linha
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#e9eef2' },
+                        ticks: { 
+                            stepSize: 20,
+                            callback: function(value) {
+                                return value + ' mov.';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+        
+        // Legenda para tendência
+        const tendenciaLegend = document.getElementById('tendenciaLegend');
+        if (tendenciaLegend) {
+            const totalEntradas = tendenciaEntradas.reduce((a, b) => a + b, 0);
+            const totalSaidas = tendenciaSaidas.reduce((a, b) => a + b, 0);
+            const mediaEntradas = (totalEntradas / tendenciaEntradas.length).toFixed(1);
+            const mediaSaidas = (totalSaidas / tendenciaSaidas.length).toFixed(1);
+            
+            tendenciaLegend.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success me-2">${totalEntradas}</span>
+                        <span class="small">Total Entradas</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-danger me-2">${totalSaidas}</span>
+                        <span class="small">Total Saídas</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-info me-2">${mediaEntradas}/${mediaSaidas}</span>
+                        <span class="small">Média dia</span>
+                    </div>
+                </div>
+            `;
+        }
+    }
 });
 
-// Ajustar gráficos quando a tela for redimensionada
+// Inicializar tooltips do Bootstrap
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+// Ajustar gráficos no redimensionamento
 window.addEventListener('resize', function() {
     if (typeof Chart !== 'undefined') {
         Chart.getChart('cultivarChart')?.resize();
         Chart.getChart('peneiraChart')?.resize();
         Chart.getChart('armazemChart')?.resize();
+        Chart.getChart('tendenciaChart')?.resize();
     }
 });
 </script>
-
-<style>
-.page-title {
-    background: linear-gradient(135deg, #2f8f4e, #1f2d2a);
-    color: white;
-    padding: 1.5rem;
-    border-radius: 12px;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 12px rgba(47, 143, 78, 0.15);
-}
-
-.card {
-    border: none;
-    border-radius: 10px !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08) !important;
-}
-
-.card-header {
-    border-radius: 10px 10px 0 0 !important;
-    padding: 0.75rem 1rem;
-}
-
-.card-body {
-    padding: 1rem;
-}
-
-@media (max-width: 768px) {
-    .page-title {
-        padding: 1rem;
-        margin-bottom: 1rem;
-    }
-    
-    .page-title h1 {
-        font-size: 1.5rem;
-    }
-    
-    .card {
-        margin-bottom: 1rem !important;
-    }
-    
-    .card-header h6 {
-        font-size: 0.9rem;
-    }
-    
-    .btn-sm {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.8rem;
-    }
-}
-
-.table-responsive::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-
-.table-responsive::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 3px;
-}
-
-.table-responsive::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.table-responsive::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-.badge {
-    font-size: 0.7rem;
-    padding: 0.25rem 0.5rem;
-    font-weight: 500;
-}
-
-.table-sm th,
-.table-sm td {
-    padding: 0.5rem 0.75rem;
-    vertical-align: middle;
-}
-
-.table thead th {
-    font-weight: 600;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #6c757d;
-    background-color: #f8f9fa;
-    border-bottom: 2px solid #dee2e6;
-}
-
-.table-hover tbody tr:hover {
-    background-color: rgba(47, 143, 78, 0.05);
-}
-
-@media (max-width: 576px) {
-    .col-md-6 .card-body .h4 {
-        font-size: 1.25rem;
-    }
-    
-    .col-md-6 .small {
-        font-size: 0.75rem;
-    }
-}
-</style>
-{% endblock %}
+{% endblock %}  

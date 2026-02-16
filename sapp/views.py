@@ -720,7 +720,9 @@ def registrar_saida(request, id):
             
     return redirect('sapp:lista_estoque')
 
+from django.views.decorators.csrf import csrf_protect
 
+@csrf_protect
 @login_required
 def transferir(request, id):
     origem = get_object_or_404(Estoque, id=id)
@@ -1685,8 +1687,52 @@ def historico_geral(request):
         'estoque', 'usuario'
     ).order_by('-data_hora')
     
+    # Estatísticas para os cards
+    total_registros = historico_completo.count()
+    
+    total_entradas = historico_completo.filter(
+        Q(tipo__icontains='Entrada') | Q(tipo__icontains='entrada')
+    ).count()
+    
+    total_saidas = historico_completo.filter(
+        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição')
+    ).count()
+    
+    total_transferencias = historico_completo.filter(
+        tipo__icontains='Transferência'
+    ).count()
+    
+    # Totais de bags e sc (opcional)
+    entradas_bags = historico_completo.filter(
+        tipo__icontains='Entrada', 
+        estoque__embalagem='BAG'
+    ).aggregate(total=Sum('quantidade'))['total'] or 0
+    
+    entradas_sc = historico_completo.filter(
+        tipo__icontains='Entrada',
+        estoque__embalagem='SC'
+    ).aggregate(total=Sum('quantidade'))['total'] or 0
+    
+    saidas_bags = historico_completo.filter(
+        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição'),
+        estoque__embalagem='BAG'
+    ).aggregate(total=Sum('quantidade'))['total'] or 0
+    
+    saidas_sc = historico_completo.filter(
+        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição'),
+        estoque__embalagem='SC'
+    ).aggregate(total=Sum('quantidade'))['total'] or 0
+    
     context = {
         'historico_lista': historico_completo,
+        'total_registros': total_registros,
+        'total_entradas': total_entradas,
+        'total_saidas': total_saidas,
+        'total_transferencias': total_transferencias,
+        'entradas_bags': entradas_bags,
+        'entradas_sc': entradas_sc,
+        'saidas_bags': saidas_bags,
+        'saidas_sc': saidas_sc,
     }
     
     return render(request, 'sapp/historico_geral.html', context)
