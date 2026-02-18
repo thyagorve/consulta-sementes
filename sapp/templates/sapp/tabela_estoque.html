@@ -240,6 +240,31 @@
 </style>
 
 <div class="container-fluid py-4">
+
+    <!-- MENSAGENS DO SISTEMA (TOAST) -->
+{% if messages %}
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    {% for message in messages %}
+    <div class="toast align-items-center text-white bg-{% if message.tags == 'success' %}success{% elif message.tags == 'error' %}danger{% else %}primary{% endif %} border-0 show" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="5000">
+        <div class="d-flex">
+            <div class="toast-body">
+                {% if message.tags == 'success' %}
+                <i class="fas fa-check-circle me-2"></i>
+                {% elif message.tags == 'error' %}
+                <i class="fas fa-exclamation-circle me-2"></i>
+                {% else %}
+                <i class="fas fa-info-circle me-2"></i>
+                {% endif %}
+                {{ message }}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+
     <!-- TITULO E BOTÃO NOVO -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -396,6 +421,10 @@
                                                 {% endif %}
                                                 <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
                                                     <i class="fas fa-pen-to-square me-2"></i> Editar Dados
+                                                </button>
+
+                                                <button class="btn btn-outline-danger" onclick="abrirModalExcluir({{ item.id }}, '{{ item.lote|escapejs }}', '{{ item.produto|default:""|escapejs }}', '{{ item.cultivar.nome|escapejs }}', '{{ item.saldo }}', '{{ item.endereco|escapejs }}')">
+                                                    <i class="fas fa-trash-alt me-2"></i> Excluir Lote
                                                 </button>
                                             </div>
                                         </div>
@@ -1314,6 +1343,74 @@ function testarAPIManutalmente(codigoTeste = null) {
         })
         .catch(err => alert("💥 Erro: " + err.message));
 }
+
+
+// ============================================
+// FUNÇÃO PARA ABRIR MODAL DE EXCLUSÃO (SIMPLIFICADA)
+// ============================================
+function abrirModalExcluir(id, lote, produto, cultivar, saldo, endereco) {
+    console.log("🗑️ Abrindo modal de exclusão para ID:", id);
+    
+    // Preencher o modal com os dados recebidos
+    document.getElementById('excluir_lote').innerText = lote || 'N/A';
+    document.getElementById('excluir_produto').innerText = produto || 'N/A';
+    document.getElementById('excluir_cultivar').innerText = cultivar || 'N/A';
+    document.getElementById('excluir_saldo').innerText = saldo + ' BAGs';
+    document.getElementById('excluir_endereco').innerText = endereco || 'N/A';
+    
+    // Configurar o formulário com a URL correta
+    const form = document.getElementById('formExcluirLote');
+    form.action = `/estoque/excluir/${id}/`;  // URL direta baseada na sua URL pattern
+    
+    // Limpar e configurar campo de confirmação
+    const confirmInput = document.getElementById('confirmarExclusao');
+    const btnConfirmar = document.getElementById('btnConfirmarExclusao');
+    
+    confirmInput.value = '';
+    btnConfirmar.disabled = true;
+    
+    // Evento para habilitar/desabilitar botão
+    confirmInput.oninput = function() {
+        btnConfirmar.disabled = this.value.toUpperCase() !== 'EXCLUIR';
+    };
+    
+    // Limpar evento anterior para evitar múltiplas execuções
+    confirmInput.onkeyup = null;
+    
+    // Abrir o modal
+    const modal = new bootstrap.Modal(document.getElementById('modalExcluirLote'));
+    modal.show();
+}
+
+// Também manter a versão antiga que buscava da DOM como fallback
+function abrirModalExcluirLegacy(id) {
+    console.log("🗑️ Abrindo modal de exclusão (legacy) para ID:", id);
+    
+    // Buscar a linha do lote
+    const row = document.querySelector(`tr[onclick*="details-${id}"]`);
+    
+    if (!row) {
+        console.error("❌ Linha do lote não encontrada");
+        return;
+    }
+    
+    // Extrair dados da linha
+    const lote = row.querySelector('td:nth-child(2) .fw-bold')?.innerText || "N/A";
+    const produto = row.querySelector('td:nth-child(2) .text-muted:first-child')?.innerText.replace('Sem código', 'N/A') || "N/A";
+    const cultivar = row.querySelector('td:nth-child(3) .fw-bold')?.innerText || "N/A";
+    const endereco = row.querySelector('td:nth-child(4) .badge')?.innerText || "N/A";
+    
+    // Extrair saldo
+    let saldo = "0";
+    const saldoElement = row.querySelector('.fs-5, .fs-4, .fs-3');
+    if (saldoElement) {
+        saldo = saldoElement.innerText.split(' ')[0].trim();
+    }
+    
+    // Chamar a função principal
+    abrirModalExcluir(id, lote, produto, cultivar, saldo, endereco);
+}
+
 
 // ============================================
 // 10. EXPORTAR FUNÇÕES PARA CONSOLE
