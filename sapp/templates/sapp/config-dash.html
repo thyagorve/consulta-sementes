@@ -1,0 +1,1043 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- SortableJS -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+    /* ===== VARIÁVEIS ===== */
+    :root {
+        --primary: #198754;
+        --primary-dark: #146c43;
+        --primary-light: #d1e7dd;
+        --secondary: #6c757d;
+        --success: #198754;
+        --info: #0dcaf0;
+        --warning: #ffc107;
+        --danger: #dc3545;
+        --light: #f8f9fa;
+        --dark: #212529;
+        --border-radius: 16px;
+        --border-radius-sm: 10px;
+        --shadow: 0 10px 30px rgba(0,0,0,0.08);
+        --shadow-hover: 0 15px 40px rgba(25, 135, 84, 0.15);
+    }
+
+    /* ===== LAYOUT ===== */
+    body {
+        background: linear-gradient(135deg, #f8faf9 0%, #edf7f1 100%);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .dashboard-config-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    /* ===== CABEÇALHO ===== */
+    .config-header {
+        background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%);
+        padding: 2rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        margin-bottom: 2rem;
+        border-left: 8px solid var(--primary);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .config-header::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, rgba(25,135,84,0.03) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+
+    .config-title {
+        font-size: 2.2rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #1a2a27, #198754);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+
+    /* ===== GRID DE CARDS ===== */
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    /* ===== CARD DE CONFIGURAÇÃO ===== */
+    .config-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease;
+        border: 1px solid rgba(0,0,0,0.05);
+        overflow: hidden;
+        height: fit-content;
+    }
+
+    .config-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-hover);
+    }
+
+    .config-card-header {
+        padding: 1.2rem 1.5rem;
+        background: linear-gradient(135deg, #f8faf9, #f0f7f4);
+        border-bottom: 3px solid var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: move;
+        user-select: none;
+    }
+
+    .config-card-header.dragging {
+        opacity: 0.5;
+        background: var(--primary-light);
+    }
+
+    .config-card-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .config-card-body {
+        padding: 1.5rem;
+    }
+
+    /* ===== FORMULÁRIOS ===== */
+    .form-section {
+        background: #f8faf9;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid var(--primary);
+    }
+
+    .form-section-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .form-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #2d4a3e;
+        margin-bottom: 0.3rem;
+    }
+
+    .form-control, .form-select {
+        border: 2px solid #eef5f1;
+        border-radius: 10px;
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(25,135,84,0.15);
+    }
+
+    /* ===== BADGES E INDICADORES ===== */
+    .badge-grafico {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.4rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: var(--primary-light);
+        color: var(--primary-dark);
+        border: 1px solid var(--primary);
+    }
+
+    .badge-filtro {
+        background: #e9ecef;
+        color: var(--secondary);
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin: 0.2rem;
+    }
+
+    /* ===== FILTROS ===== */
+    .filtros-container {
+        background: white;
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .filtro-item {
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.8rem;
+        border: 1px solid #e2e8f0;
+        position: relative;
+        transition: all 0.2s;
+    }
+
+    .filtro-item:hover {
+        border-color: var(--primary);
+        background: #f0f9f4;
+    }
+
+    .filtro-item .remove-filtro {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        color: var(--danger);
+        cursor: pointer;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+    }
+
+    .filtro-item .remove-filtro:hover {
+        opacity: 1;
+    }
+
+    /* ===== PRÉ-VISUALIZAÇÃO DO GRÁFICO ===== */
+    .preview-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1.5rem;
+        border: 1px solid #e2e8f0;
+    }
+
+    .preview-chart {
+        height: 200px;
+        position: relative;
+    }
+
+    /* ===== TOOLBAR ===== */
+    .toolbar {
+        background: white;
+        border-radius: 50px;
+        padding: 0.8rem 1.5rem;
+        box-shadow: var(--shadow);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .btn-toolbar {
+        border-radius: 30px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-toolbar-primary {
+        background: linear-gradient(135deg, var(--primary), #20c997);
+        color: white;
+        border: none;
+    }
+
+    .btn-toolbar-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(25,135,84,0.3);
+    }
+
+    /* ===== MODAL DE FILTROS ===== */
+    .modal-filtros .modal-content {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    .modal-filtros .modal-header {
+        background: linear-gradient(135deg, var(--primary), #20c997);
+        color: white;
+        border-radius: 20px 20px 0 0;
+        padding: 1.5rem;
+    }
+
+    .filtro-categoria {
+        font-weight: 700;
+        color: var(--primary-dark);
+        margin: 1rem 0 0.5rem;
+        padding-bottom: 0.3rem;
+        border-bottom: 2px solid var(--primary-light);
+    }
+
+    /* ===== ANIMAÇÕES ===== */
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .config-card {
+        animation: slideIn 0.3s ease-out;
+    }
+
+    /* ===== RESPONSIVIDADE ===== */
+    @media (max-width: 768px) {
+        .config-title {
+            font-size: 1.5rem;
+        }
+        
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .toolbar {
+            border-radius: 20px;
+            flex-direction: column;
+        }
+    }
+</style>
+
+<div class="dashboard-config-container">
+    
+    <!-- ===== CABEÇALHO ===== -->
+    <div class="config-header">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h1 class="config-title">
+                    <i class="fas fa-chart-pie me-3"></i>
+                    Studio de Dashboards
+                </h1>
+                <p class="text-muted mb-0">
+                    Crie gráficos poderosos como tabelas dinâmicas do Excel. Arraste, solte, filtre e personalize.
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                <div class="d-flex gap-2 justify-content-lg-end">
+                    <span class="badge-grafico">
+                        <i class="fas fa-chart-line me-1"></i>
+                        {{ graficos|length }} gráficos
+                    </span>
+                    <span class="badge-grafico">
+                        <i class="fas fa-filter me-1"></i>
+                        Filtros dinâmicos
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TOOLBAR ===== -->
+    <div class="toolbar">
+        <div class="d-flex gap-2">
+            <button class="btn btn-toolbar btn-toolbar-primary" onclick="criarNovoGrafico()">
+                <i class="fas fa-plus-circle"></i>
+                Novo Gráfico
+            </button>
+            <button class="btn btn-toolbar btn-outline-secondary" onclick="duplicarGrafico()">
+                <i class="fas fa-copy"></i>
+                Duplicar
+            </button>
+        </div>
+        
+        <div class="d-flex gap-2">
+            <button class="btn btn-toolbar btn-outline-success" onclick="salvarTudo()">
+                <i class="fas fa-save"></i>
+                Salvar Tudo
+            </button>
+            <button class="btn btn-toolbar btn-outline-primary" onclick="visualizarDashboard()">
+                <i class="fas fa-eye"></i>
+                Visualizar
+            </button>
+            <button class="btn btn-toolbar btn-outline-danger" onclick="exportarConfig()">
+                <i class="fas fa-download"></i>
+                Exportar
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== GRID DE GRÁFICOS ===== -->
+    <div id="graficosGrid" class="dashboard-grid">
+        {% for grafico in graficos %}
+        <div class="config-card" data-id="{{ grafico.id }}" data-ordem="{{ grafico.ordem }}">
+            <div class="config-card-header handle">
+                <div class="config-card-title">
+                    <i class="fas fa-grip-vertical text-muted" style="cursor: move;"></i>
+                    <span class="badge-grafico">{{ grafico.tipo_grafico|upper }}</span>
+                    <span>{{ grafico.nome }}</span>
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-link text-dark" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="editarGrafico({{ grafico.id }})">
+                            <i class="fas fa-edit me-2"></i>Editar
+                        </a></li>
+                        <li><a class="dropdown-item" href="#" onclick="duplicarGrafico({{ grafico.id }})">
+                            <i class="fas fa-copy me-2"></i>Duplicar
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="excluirGrafico({{ grafico.id }})">
+                            <i class="fas fa-trash me-2"></i>Excluir
+                        </a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="config-card-body">
+                <!-- PRÉ-VISUALIZAÇÃO DO GRÁFICO -->
+                <div class="preview-container">
+                    <canvas id="preview-{{ grafico.id }}" style="height: 150px;"></canvas>
+                </div>
+                
+                <!-- CONFIGURAÇÕES RESUMIDAS -->
+                <div class="row g-2 mt-3">
+                    <div class="col-6">
+                        <small class="text-muted d-block">Agrupamento</small>
+                        <span class="fw-bold">{{ grafico.get_agrupamento_principal_display }}</span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">Métrica</small>
+                        <span class="fw-bold">{{ grafico.get_metrica_display }}</span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">Limite</small>
+                        <span class="fw-bold">{{ grafico.limite_itens }} itens</span>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted d-block">Ordenação</small>
+                        <span class="fw-bold">{{ grafico.get_ordenacao_display|truncatechars:15 }}</span>
+                    </div>
+                </div>
+                
+                <!-- FILTROS ATIVOS -->
+                {% with filtros=grafico.get_filtros %}
+                {% if filtros %}
+                <div class="mt-3">
+                    <small class="text-muted d-block mb-1">Filtros ativos:</small>
+                    <div>
+                        {% for chave, valor in filtros.items %}
+                        {% if valor and valor != 'todos' %}
+                        <span class="badge-filtro">
+                            <i class="fas fa-filter"></i>
+                            {{ chave }}: {{ valor }}
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+        {% empty %}
+        <!-- CARD VAZIO PARA PRIMEIRO GRÁFICO -->
+        <div class="config-card" style="grid-column: 1 / -1;">
+            <div class="config-card-body text-center py-5">
+                <i class="fas fa-chart-pie fa-4x text-muted mb-3 opacity-25"></i>
+                <h4 class="text-muted mb-3">Nenhum gráfico configurado</h4>
+                <p class="text-muted mb-4">Comece criando seu primeiro gráfico personalizado</p>
+                <button class="btn btn-success btn-lg" onclick="criarNovoGrafico()">
+                    <i class="fas fa-plus-circle me-2"></i>
+                    Criar Primeiro Gráfico
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- ===== MODAL DE CRIAÇÃO/EDIÇÃO DE GRÁFICO ===== -->
+<div class="modal fade modal-filtros" id="modalGrafico" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-magic me-2"></i>
+                    <span id="modalTitulo">Criar Novo Gráfico</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="modal-body p-4">
+                <form id="formGrafico" method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" name="id" id="grafico_id">
+                    
+                    <!-- LINHA 1: INFORMAÇÕES BÁSICAS -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold">Nome do Gráfico *</label>
+                            <input type="text" class="form-control" name="nome" id="nome" 
+                                   placeholder="Ex: Top 10 Cultivares por Saldo" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Ordem</label>
+                            <input type="number" class="form-control" name="ordem" id="ordem" value="0" min="0">
+                        </div>
+                    </div>
+                    
+                    <!-- LINHA 2: TIPO E APARÊNCIA -->
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-paint-brush"></i>
+                            Tipo e Aparência
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Tipo de Gráfico</label>
+                                <select class="form-select" name="tipo_grafico" id="tipo_grafico">
+                                    <option value="bar">📊 Barras Verticais</option>
+                                    <option value="bar_horizontal">📈 Barras Horizontais</option>
+                                    <option value="pie">🥧 Pizza</option>
+                                    <option value="doughnut">🍩 Rosca</option>
+                                    <option value="line">📉 Linha</option>
+                                    <option value="area">📊 Área</option>
+                                    <option value="radar">🕷️ Radar</option>
+                                    <option value="polar">🌀 Polar</option>
+                                    <option value="scatter">🔵 Dispersão</option>
+                                    <option value="bubble">⚪ Bolhas</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label class="form-label">Largura</label>
+                                <select class="form-select" name="largura" id="largura">
+                                    <option value="4">25% (3 col)</option>
+                                    <option value="6" selected>50% (6 col)</option>
+                                    <option value="8">66% (8 col)</option>
+                                    <option value="12">100% (12 col)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label class="form-label">Altura (px)</label>
+                                <input type="number" class="form-control" name="altura" id="altura" value="400">
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Cor Principal</label>
+                                <div class="d-flex gap-2">
+                                    <input type="color" class="form-control form-control-color" 
+                                           name="cor_principal" id="cor_principal" value="#198754">
+                                    <input type="text" class="form-control" id="cor_principal_hex" value="#198754">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Título (opcional)</label>
+                                <input type="text" class="form-control" name="titulo" id="titulo"
+                                       placeholder="Título do gráfico">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Descrição</label>
+                                <input type="text" class="form-control" name="descricao" id="descricao"
+                                       placeholder="Breve descrição">
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="mostrar_legenda" id="mostrar_legenda" checked>
+                                    <label class="form-check-label">Mostrar Legenda</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="mostrar_valores" id="mostrar_valores" checked>
+                                    <label class="form-check-label">Mostrar Valores</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="mostrar_percentual" id="mostrar_percentual">
+                                    <label class="form-check-label">Mostrar Percentual</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="ativo" id="ativo" checked>
+                                    <label class="form-check-label">Ativo no Dashboard</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- LINHA 3: CONFIGURAÇÃO DOS DADOS -->
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-database"></i>
+                            Configuração dos Dados
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Agrupar por (principal)</label>
+                                <select class="form-select" name="agrupamento_principal" id="agrupamento_principal">
+                                    {% for value, label in agrupamentos %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Agrupar por (secundário)</label>
+                                <select class="form-select" name="agrupamento_secundario" id="agrupamento_secundario">
+                                    <option value="">Nenhum (único nível)</option>
+                                    {% for value, label in agrupamentos %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Métrica</label>
+                                <select class="form-select" name="metrica" id="metrica">
+                                    {% for value, label in metricas %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Ordenar por</label>
+                                <select class="form-select" name="ordenacao" id="ordenacao">
+                                    {% for value, label in ordenacoes %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <label class="form-label">Limite de Itens</label>
+                                <input type="number" class="form-control" name="limite_itens" id="limite_itens" 
+                                       value="10" min="0" max="100">
+                                <small class="text-muted">0 = sem limite</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- LINHA 4: FILTROS DINÂMICOS -->
+                    <div class="form-section">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="form-section-title mb-0">
+                                <i class="fas fa-filter"></i>
+                                Filtros Dinâmicos
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="adicionarFiltro()">
+                                <i class="fas fa-plus me-1"></i> Novo Filtro
+                            </button>
+                        </div>
+                        
+                        <div id="filtrosContainer" class="filtros-container">
+                            <!-- FILTROS SERÃO INSERIDOS AQUI VIA JS -->
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Data Início</label>
+                                <input type="date" class="form-control" name="data_inicio" id="data_inicio">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Data Fim</label>
+                                <input type="date" class="form-control" name="data_fim" id="data_fim">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- PRÉ-VISUALIZAÇÃO AO VIVO -->
+                    <div class="form-section">
+                        <div class="form-section-title">
+                            <i class="fas fa-eye"></i>
+                            Pré-visualização ao Vivo
+                        </div>
+                        <div class="preview-container">
+                            <canvas id="previewVivo" style="height: 300px;"></canvas>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="salvarGrafico()">
+                    <i class="fas fa-save me-2"></i>Salvar Gráfico
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TEMPLATE PARA FILTRO (escondido) -->
+<template id="filtroTemplate">
+    <div class="filtro-item">
+        <span class="remove-filtro" onclick="removerFiltro(this)">
+            <i class="fas fa-times-circle"></i>
+        </span>
+        
+        <div class="row">
+            <div class="col-md-5">
+                <select class="form-select filtro-campo">
+                    <option value="cultivar">Cultivar</option>
+                    <option value="peneira">Peneira</option>
+                    <option value="especie">Espécie</option>
+                    <option value="categoria">Categoria</option>
+                    <option value="tratamento">Tratamento</option>
+                    <option value="embalagem">Embalagem</option>
+                    <option value="cliente">Cliente</option>
+                    <option value="empresa">Empresa</option>
+                    <option value="az">Armazém (AZ)</option>
+                    <option value="lote_contem">Lote contém</option>
+                    <option value="saldo_min">Saldo mínimo</option>
+                    <option value="saldo_max">Saldo máximo</option>
+                </select>
+            </div>
+            
+            <div class="col-md-5">
+                <select class="form-select filtro-operador">
+                    <option value="exato">É exatamente</option>
+                    <option value="contem">Contém</option>
+                    <option value="inicia">Inicia com</option>
+                    <option value="termina">Termina com</option>
+                    <option value="maior">Maior que</option>
+                    <option value="menor">Menor que</option>
+                    <option value="entre">Entre</option>
+                </select>
+            </div>
+            
+            <div class="col-md-2">
+                <input type="text" class="form-control filtro-valor" placeholder="Valor">
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+// ===== VARIÁVEIS GLOBAIS =====
+let chartPreview = null;
+let graficoAtual = null;
+
+// ===== DRAG AND DROP PARA REORDENAR =====
+document.addEventListener('DOMContentLoaded', function() {
+    const grid = document.getElementById('graficosGrid');
+    if (grid) {
+        new Sortable(grid, {
+            animation: 150,
+            handle: '.handle',
+            ghostClass: 'dragging',
+            onEnd: function(evt) {
+                // Atualizar ordens
+                const cards = document.querySelectorAll('.config-card');
+                cards.forEach((card, index) => {
+                    card.dataset.ordem = index;
+                });
+                salvarOrdem();
+            }
+        });
+    }
+    
+    // Atualizar preview quando mudar configurações
+    document.querySelectorAll('#formGrafico select, #formGrafico input').forEach(el => {
+        el.addEventListener('change', atualizarPreview);
+        el.addEventListener('keyup', atualizarPreview);
+    });
+    
+    // Carregar previews existentes
+    {% for grafico in graficos %}
+    carregarPreview({{ grafico.id }}, '{{ grafico.tipo_grafico }}', {{ grafico.get_dados_grafico|safe }});
+    {% endfor %}
+});
+
+// ===== FUNÇÕES PRINCIPAIS =====
+function criarNovoGrafico() {
+    document.getElementById('modalTitulo').textContent = 'Criar Novo Gráfico';
+    document.getElementById('formGrafico').reset();
+    document.getElementById('grafico_id').value = '';
+    document.getElementById('filtrosContainer').innerHTML = '';
+    
+    new bootstrap.Modal(document.getElementById('modalGrafico')).show();
+}
+
+function editarGrafico(id) {
+    document.getElementById('modalTitulo').textContent = 'Editar Gráfico';
+    
+    fetch(`/api/dashboard-config/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+            // Preencher formulário
+            for (let [key, value] of Object.entries(data)) {
+                const campo = document.getElementById(key);
+                if (campo) {
+                    if (campo.type === 'checkbox') {
+                        campo.checked = value;
+                    } else {
+                        campo.value = value;
+                    }
+                }
+            }
+            
+            // Carregar filtros
+            const filtrosContainer = document.getElementById('filtrosContainer');
+            filtrosContainer.innerHTML = '';
+            if (data.filtros) {
+                Object.entries(data.filtros).forEach(([campo, valor]) => {
+                    adicionarFiltro(campo, 'contem', valor);
+                });
+            }
+            
+            new bootstrap.Modal(document.getElementById('modalGrafico')).show();
+            atualizarPreview();
+        });
+}
+
+function salvarGrafico() {
+    const form = document.getElementById('formGrafico');
+    const formData = new FormData(form);
+    
+    // Coletar filtros
+    const filtros = {};
+    document.querySelectorAll('.filtro-item').forEach(item => {
+        const campo = item.querySelector('.filtro-campo').value;
+        const operador = item.querySelector('.filtro-operador').value;
+        const valor = item.querySelector('.filtro-valor').value;
+        if (campo && valor) {
+            filtros[`${campo}_${operador}`] = valor;
+        }
+    });
+    formData.append('filtros', JSON.stringify(filtros));
+    
+    fetch('/api/dashboard-config/salvar/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalGrafico')).hide();
+            location.reload(); // Recarregar para mostrar o novo gráfico
+        } else {
+            alert('Erro ao salvar: ' + data.error);
+        }
+    });
+}
+
+function salvarOrdem() {
+    const ordens = [];
+    document.querySelectorAll('.config-card').forEach((card, index) => {
+        ordens.push({
+            id: card.dataset.id,
+            ordem: index
+        });
+    });
+    
+    fetch('/api/dashboard-config/reordenar/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({ ordens: ordens })
+    });
+}
+
+function excluirGrafico(id) {
+    if (confirm('Tem certeza que deseja excluir este gráfico?')) {
+        fetch(`/api/dashboard-config/${id}/excluir/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+
+function duplicarGrafico(id) {
+    fetch(`/api/dashboard-config/${id}/duplicar/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    });
+}
+
+// ===== FILTROS =====
+function adicionarFiltro(campo = 'cultivar', operador = 'exato', valor = '') {
+    const template = document.getElementById('filtroTemplate');
+    const clone = template.content.cloneNode(true);
+    
+    const filtroItem = clone.querySelector('.filtro-item');
+    filtroItem.querySelector('.filtro-campo').value = campo;
+    filtroItem.querySelector('.filtro-operador').value = operador;
+    filtroItem.querySelector('.filtro-valor').value = valor;
+    
+    document.getElementById('filtrosContainer').appendChild(clone);
+}
+
+function removerFiltro(elemento) {
+    elemento.closest('.filtro-item').remove();
+    atualizarPreview();
+}
+
+// ===== PRÉ-VISUALIZAÇÃO =====
+function atualizarPreview() {
+    const formData = new FormData(document.getElementById('formGrafico'));
+    
+    fetch('/api/dashboard-config/preview/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const ctx = document.getElementById('previewVivo').getContext('2d');
+            
+            if (chartPreview) {
+                chartPreview.destroy();
+            }
+            
+            chartPreview = new Chart(ctx, {
+                type: data.tipo_grafico,
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.valores,
+                        backgroundColor: gerarCores(data.labels.length),
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: document.getElementById('mostrar_legenda').checked
+                        }
+                    }
+                }
+            });
+        }
+    });
+}
+
+function carregarPreview(id, tipo, dados) {
+    const canvas = document.getElementById(`preview-${id}`);
+    if (canvas && dados.labels && dados.labels.length) {
+        new Chart(canvas, {
+            type: tipo,
+            data: {
+                labels: dados.labels.slice(0, 5),
+                datasets: [{
+                    data: dados.valores.slice(0, 5),
+                    backgroundColor: gerarCores(5),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            }
+        });
+    }
+}
+
+function gerarCores(quantidade) {
+    const cores = [
+        '#198754', '#20c997', '#3b82f6', '#f59e0b', '#ef4444',
+        '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1'
+    ];
+    
+    if (quantidade <= cores.length) {
+        return cores.slice(0, quantidade);
+    }
+    
+    // Gerar cores adicionais
+    const resultado = [...cores];
+    for (let i = cores.length; i < quantidade; i++) {
+        const hue = (i * 137) % 360;
+        resultado.push(`hsl(${hue}, 70%, 50%)`);
+    }
+    return resultado;
+}
+
+// ===== AÇÕES EM MASSA =====
+function salvarTudo() {
+    // Implementar
+    alert('Todas as configurações foram salvas!');
+}
+
+function visualizarDashboard() {
+    window.open('/dashboard/', '_blank');
+}
+
+function exportarConfig() {
+    fetch('/api/dashboard-config/exportar/')
+        .then(response => response.json())
+        .then(data => {
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'dashboard-config.json';
+            a.click();
+        });
+}
+</script>
+{% endblock %}

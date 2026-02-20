@@ -366,6 +366,75 @@
             font-size: 1rem;
         }
     }
+
+
+
+
+
+
+
+
+
+    /* Estilos para a aba de configuração do dashboard */
+#dashboard-config .card {
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition);
+}
+
+#dashboard-config .card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--card-shadow-hover) !important;
+}
+
+#dashboard-config .card-header {
+    border-top-left-radius: var(--border-radius-sm) !important;
+    border-top-right-radius: var(--border-radius-sm) !important;
+}
+
+#dashboard-config .form-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+#dashboard-config .form-check-label {
+    font-size: 0.9rem;
+}
+
+#dashboard-config .form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+#dashboard-config hr {
+    opacity: 0.2;
+    margin: 1.5rem 0;
+}
+
+/* Estilo para os inputs de número */
+#dashboard-config input[type="number"] {
+    border: 2px solid #eef5f1;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+}
+
+#dashboard-config input[type="number"]:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+}
+
+/* Estilo para selects */
+#dashboard-config select {
+    border: 2px solid #eef5f1;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    background-color: white;
+}
+
+#dashboard-config select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1);
+}
 </style>
 
 <div class="container-fluid config-container">
@@ -452,6 +521,14 @@
                     <span>Tratamentos</span>
                 </button>
             </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="dashboard-config-tab" data-bs-toggle="tab" 
+                        data-bs-target="#dashboard-config" type="button" role="tab">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Dashboard</span>
+                </button>
+            </li>
+
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="conferente-tab" data-bs-toggle="tab" 
                         data-bs-target="#conferente" type="button" role="tab">
@@ -686,14 +763,7 @@
                                     <span class="badge bg-secondary">sp</span> | 
                                     <strong>Conceito Sementes</strong>
                                 </div>
-                                <div>
-                                    <span class="codigo-produto">4605000001</span> - 
-                                    <strong>71IX72RSF I2X</strong> | 
-                                    <span class="badge bg-info">milho</span> | 
-                                    SEM. SOJA 71IX72RSF I2X (RAPTOR) BB 5M S/T | 
-                                    <span class="badge bg-secondary">p1</span> | 
-                                    <strong>Conceito Sementes</strong>
-                                </div>
+                                
                             </div>
                         </div>
                         
@@ -1254,6 +1324,461 @@
             </div>
         </div>
         
+
+        <!-- ===== ABA CONFIGURAÇÃO DO DASHBOARD ===== -->
+<div class="tab-pane fade" id="dashboard-config" role="tabpanel">
+    <div class="produto-card">
+        <h3 class="h4 fw-bold text-success mb-4">
+            <i class="fa-solid fa-sliders me-2"></i>
+            Configuração dos Gráficos do Dashboard
+        </h3>
+        
+        <!-- Grid de Cards de Configuração -->
+        <div class="row g-4">
+            
+            <!-- CARD 1: Gráfico de Cultivares -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-success bg-opacity-10 border-0 py-3">
+                        <h5 class="fw-bold text-success mb-0">
+                            <i class="fa-solid fa-seedling me-2"></i>
+                            Gráfico de Cultivares
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" id="formCultivarConfig">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="config_cultivar">
+                            
+                            <!-- Tipo de Gráfico -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Tipo de Visualização</label>
+                                <select name="cultivar_tipo" class="form-select">
+                                    <option value="doughnut" {% if config.cultivar_tipo == 'doughnut' %}selected{% endif %}>
+                                        <i class="fa-regular fa-circle"></i> Rosca (Doughnut)
+                                    </option>
+                                    <option value="pie" {% if config.cultivar_tipo == 'pie' %}selected{% endif %}>
+                                        <i class="fa-solid fa-chart-pie"></i> Pizza (Pie)
+                                    </option>
+                                    <option value="bar" {% if config.cultivar_tipo == 'bar' %}selected{% endif %}>
+                                        <i class="fa-solid fa-chart-bar"></i> Barras
+                                    </option>
+                                </select>
+                            </div>
+                            
+                            <!-- Quantidade de Itens -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Quantidade de Itens</label>
+                                <input type="number" name="cultivar_qtd" class="form-control" 
+                                       value="{{ config.cultivar_qtd|default:'10' }}" min="3" max="20">
+                                <small class="text-muted">Número de cultivares a serem exibidos</small>
+                            </div>
+                            
+                            <!-- Ordenação -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Ordenar por</label>
+                                <select name="cultivar_ordem" class="form-select">
+                                    <option value="saldo_desc" {% if config.cultivar_ordem == 'saldo_desc' %}selected{% endif %}>
+                                        Maior Saldo
+                                    </option>
+                                    <option value="saldo_asc" {% if config.cultivar_ordem == 'saldo_asc' %}selected{% endif %}>
+                                        Menor Saldo
+                                    </option>
+                                    <option value="nome_asc" {% if config.cultivar_ordem == 'nome_asc' %}selected{% endif %}>
+                                        Nome (A-Z)
+                                    </option>
+                                    <option value="nome_desc" {% if config.cultivar_ordem == 'nome_desc' %}selected{% endif %}>
+                                        Nome (Z-A)
+                                    </option>
+                                </select>
+                            </div>
+                            
+                            <!-- Filtros Adicionais -->
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Filtros</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="cultivar_zerados" id="cultivarZerados"
+                                           {% if config.cultivar_zerados %}checked{% endif %}>
+                                    <label class="form-check-label" for="cultivarZerados">
+                                        Incluir cultivares com saldo zero
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="cultivar_agrupar" id="cultivarAgrupar"
+                                           {% if config.cultivar_agrupar %}checked{% endif %}>
+                                    <label class="form-check-label" for="cultivarAgrupar">
+                                        Agrupar "Outros" (itens menores)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fa-solid fa-save me-2"></i> Salvar Configuração
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CARD 2: Gráfico de Peneiras -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-info bg-opacity-10 border-0 py-3">
+                        <h5 class="fw-bold text-info mb-0">
+                            <i class="fa-solid fa-filter me-2"></i>
+                            Gráfico de Peneiras
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" id="formPeneiraConfig">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="config_peneira">
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Tipo de Visualização</label>
+                                <select name="peneira_tipo" class="form-select">
+                                    <option value="pie" {% if config.peneira_tipo == 'pie' %}selected{% endif %}>Pizza (Pie)</option>
+                                    <option value="doughnut" {% if config.peneira_tipo == 'doughnut' %}selected{% endif %}>Rosca (Doughnut)</option>
+                                    <option value="bar" {% if config.peneira_tipo == 'bar' %}selected{% endif %}>Barras</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Quantidade de Itens</label>
+                                <input type="number" name="peneira_qtd" class="form-control" 
+                                       value="{{ config.peneira_qtd|default:'8' }}" min="3" max="15">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Ordenar por</label>
+                                <select name="peneira_ordem" class="form-select">
+                                    <option value="volume_desc" {% if config.peneira_ordem == 'volume_desc' %}selected{% endif %}>Maior Volume</option>
+                                    <option value="volume_asc" {% if config.peneira_ordem == 'volume_asc' %}selected{% endif %}>Menor Volume</option>
+                                    <option value="nome_asc" {% if config.peneira_ordem == 'nome_asc' %}selected{% endif %}>Nome (A-Z)</option>
+                                </select>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-info w-100 text-white">
+                                <i class="fa-solid fa-save me-2"></i> Salvar Configuração
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CARD 3: Gráfico de Armazéns (AZ) -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-warning bg-opacity-10 border-0 py-3">
+                        <h5 class="fw-bold text-warning mb-0">
+                            <i class="fa-solid fa-warehouse me-2"></i>
+                            Gráfico de Armazéns
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" id="formArmazemConfig">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="config_armazem">
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Tipo de Visualização</label>
+                                <select name="armazem_tipo" class="form-select">
+                                    <option value="bar" {% if config.armazem_tipo == 'bar' %}selected{% endif %}>Barras</option>
+                                    <option value="horizontalBar" {% if config.armazem_tipo == 'horizontalBar' %}selected{% endif %}>Barras Horizontais</option>
+                                    <option value="line" {% if config.armazem_tipo == 'line' %}selected{% endif %}>Linha</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Ordenar por</label>
+                                <select name="armazem_ordem" class="form-select">
+                                    <option value="az_asc" {% if config.armazem_ordem == 'az_asc' %}selected{% endif %}>AZ (crescente)</option>
+                                    <option value="az_desc" {% if config.armazem_ordem == 'az_desc' %}selected{% endif %}>AZ (decrescente)</option>
+                                    <option value="volume_desc" {% if config.armazem_ordem == 'volume_desc' %}selected{% endif %}>Maior Volume</option>
+                                    <option value="lotes_desc" {% if config.armazem_ordem == 'lotes_desc' %}selected{% endif %}>Mais Lotes</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Métrica Principal</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="armazem_metrica" 
+                                           id="metricaVolume" value="volume" 
+                                           {% if config.armazem_metrica == 'volume' or not config.armazem_metrica %}checked{% endif %}>
+                                    <label class="form-check-label" for="metricaVolume">
+                                        Volume (SC)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="armazem_metrica" 
+                                           id="metricaLotes" value="lotes"
+                                           {% if config.armazem_metrica == 'lotes' %}checked{% endif %}>
+                                    <label class="form-check-label" for="metricaLotes">
+                                        Quantidade de Lotes
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="armazem_metrica" 
+                                           id="metricaPeso" value="peso"
+                                           {% if config.armazem_metrica == 'peso' %}checked{% endif %}>
+                                    <label class="form-check-label" for="metricaPeso">
+                                        Peso Total (kg)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-warning w-100 text-white">
+                                <i class="fa-solid fa-save me-2"></i> Salvar Configuração
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CARD 4: Gráfico de Tendência -->
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-primary bg-opacity-10 border-0 py-3">
+                        <h5 class="fw-bold text-primary mb-0">
+                            <i class="fa-solid fa-chart-line me-2"></i>
+                            Gráfico de Tendência
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" id="formTendenciaConfig">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="config_tendencia">
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Período</label>
+                                <select name="tendencia_periodo" class="form-select">
+                                    <option value="7" {% if config.tendencia_periodo == '7' %}selected{% endif %}>Últimos 7 dias</option>
+                                    <option value="15" {% if config.tendencia_periodo == '15' %}selected{% endif %}>Últimos 15 dias</option>
+                                    <option value="30" {% if config.tendencia_periodo == '30' %}selected{% endif %}>Últimos 30 dias</option>
+                                    <option value="90" {% if config.tendencia_periodo == '90' %}selected{% endif %}>Últimos 90 dias</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Tipo de Dados</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="tendencia_entradas" id="tendenciaEntradas" checked disabled>
+                                    <label class="form-check-label" for="tendenciaEntradas">
+                                        Entradas (sempre ativo)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="tendencia_saidas" id="tendenciaSaidas" 
+                                           {% if config.tendencia_saidas %}checked{% endif %}>
+                                    <label class="form-check-label" for="tendenciaSaidas">
+                                        Saídas
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" 
+                                           name="tendencia_transferencias" id="tendenciaTransferencias"
+                                           {% if config.tendencia_transferencias %}checked{% endif %}>
+                                    <label class="form-check-label" for="tendenciaTransferencias">
+                                        Transferências
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Agrupamento</label>
+                                <select name="tendencia_agrupamento" class="form-select">
+                                    <option value="day" {% if config.tendencia_agrupamento == 'day' %}selected{% endif %}>Por Dia</option>
+                                    <option value="week" {% if config.tendencia_agrupamento == 'week' %}selected{% endif %}>Por Semana</option>
+                                    <option value="month" {% if config.tendencia_agrupamento == 'month' %}selected{% endif %}>Por Mês</option>
+                                </select>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fa-solid fa-save me-2"></i> Salvar Configuração
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CARD 5: Configurações Gerais -->
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-secondary bg-opacity-10 border-0 py-3">
+                        <h5 class="fw-bold text-secondary mb-0">
+                            <i class="fa-solid fa-gears me-2"></i>
+                            Configurações Gerais do Dashboard
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" id="formGeralConfig">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="config_geral_dashboard">
+                            
+                            <div class="row">
+                                <!-- Atualização Automática -->
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Atualização Automática</label>
+                                    <select name="auto_refresh" class="form-select">
+                                        <option value="0" {% if config.auto_refresh == '0' %}selected{% endif %}>Desativado</option>
+                                        <option value="30" {% if config.auto_refresh == '30' %}selected{% endif %}>A cada 30 segundos</option>
+                                        <option value="60" {% if config.auto_refresh == '60' %}selected{% endif %}>A cada 1 minuto</option>
+                                        <option value="300" {% if config.auto_refresh == '300' %}selected{% endif %}>A cada 5 minutos</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Moeda/Unidade -->
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Unidade de Medida Padrão</label>
+                                    <select name="unidade_padrao" class="form-select">
+                                        <option value="sc" {% if config.unidade_padrao == 'sc' %}selected{% endif %}>Sacas (SC)</option>
+                                        <option value="bags" {% if config.unidade_padrao == 'bags' %}selected{% endif %}>Bags</option>
+                                        <option value="kg" {% if config.unidade_padrao == 'kg' %}selected{% endif %}>Quilogramas (kg)</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Cores -->
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Tema de Cores</label>
+                                    <select name="tema_cores" class="form-select">
+                                        <option value="default" {% if config.tema_cores == 'default' %}selected{% endif %}>Padrão (Verde)</option>
+                                        <option value="modern" {% if config.tema_cores == 'modern' %}selected{% endif %}>Moderno (Azul)</option>
+                                        <option value="pastel" {% if config.tema_cores == 'pastel' %}selected{% endif %}>Pastel</option>
+                                        <option value="dark" {% if config.tema_cores == 'dark' %}selected{% endif %}>Escuro</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <!-- Exibição de Legendas -->
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="mostrar_legendas" id="mostrarLegendas"
+                                               {% if config.mostrar_legendas %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="mostrarLegendas">
+                                            Mostrar legendas detalhadas nos gráficos
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="mostrar_percentuais" id="mostrarPercentuais"
+                                               {% if config.mostrar_percentuais %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="mostrarPercentuais">
+                                            Mostrar percentuais nos gráficos
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            
+                            <button type="submit" class="btn btn-secondary w-100">
+                                <i class="fa-solid fa-save me-2"></i> Salvar Configurações Gerais
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CARD 6: Filtros Rápidos -->
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-success bg-opacity-10 border-0 py-3">
+                        <h5 class="fw-bold text-success mb-0">
+                            <i class="fa-solid fa-filter me-2"></i>
+                            Filtros Rápidos para o Dashboard
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="POST" id="formFiltrosConfig">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="config_filtros">
+                            
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="filtro_cultivar" id="filtroCultivar"
+                                               {% if config.filtro_cultivar %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="filtroCultivar">
+                                            Filtro por Cultivar
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="filtro_peneira" id="filtroPeneira"
+                                               {% if config.filtro_peneira %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="filtroPeneira">
+                                            Filtro por Peneira
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="filtro_armazem" id="filtroArmazem"
+                                               {% if config.filtro_armazem %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="filtroArmazem">
+                                            Filtro por Armazém
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" 
+                                               name="filtro_periodo" id="filtroPeriodo"
+                                               {% if config.filtro_periodo %}checked{% endif %}>
+                                        <label class="form-check-label fw-bold" for="filtroPeriodo">
+                                            Filtro por Período
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fa-solid fa-save me-2"></i> Salvar Configuração de Filtros
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Exemplo de Pré-visualização -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 bg-light">
+                    <div class="card-body text-center py-3">
+                        <i class="fa-solid fa-eye me-2 text-success"></i>
+                        <span class="text-muted">As configurações acima afetarão a visualização dos gráficos no Dashboard Principal.</span>
+                        <br>
+                        <small class="text-muted">
+                            <i class="fa-solid fa-circle-info me-1"></i>
+                            Após salvar as configurações, os gráficos serão atualizados automaticamente.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
         <!-- ===== ABA USUÁRIOS ===== -->
         <div class="tab-pane fade" id="conferente" role="tabpanel">
             <div class="produto-card">

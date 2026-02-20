@@ -99,7 +99,8 @@ urlpatterns = [
 
 # Caso alguém acesse sem número, manda para o armazém 1 por padrão:
     path('editor-mapa/', views.editor_avancado, {'armazem_numero': 1}, name='editor_avancado_default'),
-       
+    
+    path('api/atualizar-status-sistemico/', views.api_atualizar_status_sistemico, name='api_atualizar_status_sistemico'),   
        
        
    # No seu urls.py

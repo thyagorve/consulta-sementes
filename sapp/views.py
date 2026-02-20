@@ -3035,3 +3035,53 @@ def api_buscar_produto(request):
             'encontrado': False, 
             'erro': f'Erro interno do servidor: {str(e)}'
         }, status=500)
+    
+
+
+
+@login_required
+def api_atualizar_status_sistemico(request):
+    """API para atualizar o status sistêmico de um lote (qualquer usuário)"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            lote_id = data.get('lote_id')
+            
+            if not lote_id:
+                return JsonResponse({'success': False, 'error': 'ID do lote não fornecido'})
+            
+            lote = get_object_or_404(Estoque, id=lote_id)
+            
+            # Ciclo: critico -> parcial -> ok -> critico
+            novo_status = {
+                'critico': 'parcial',
+                'parcial': 'ok',
+                'ok': 'critico'
+            }.get(lote.status_sistemico, 'critico')
+            
+            lote.status_sistemico = novo_status
+            lote.status_sistemico_alterado_por = request.user
+            lote.status_sistemico_alterado_em = timezone.now()
+            lote.save()
+            
+            # Registrar no histórico
+            HistoricoMovimentacao.objects.create(
+                estoque=lote,
+                usuario=request.user,
+                tipo='Status Sistêmico',
+                descricao=f'Status alterado para: {lote.get_status_sistemico_display()}'
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'novo_status': lote.status_sistemico,
+                'display': lote.get_status_sistemico_display(),
+                'alterado_por': request.user.get_full_name() or request.user.username,
+                'alterado_em': lote.status_sistemico_alterado_em.strftime('%d/%m/%Y %H:%M')
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método não permitido'})
+
