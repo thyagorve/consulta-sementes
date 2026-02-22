@@ -10,6 +10,8 @@ from django.core.paginator import Paginator
 from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash
 from django.core.serializers.json import DjangoJSONEncoder 
+from .models import HistoricoMovimentacao
+
 # Adicione no topo com os outros imports
 import datetime
 from django import forms  #
@@ -3084,4 +3086,304 @@ def api_atualizar_status_sistemico(request):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Método não permitido'})
+
+
+
+
+################# dashboard ###########################################
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import JsonResponse
+from django.db.models import Sum, Count, Q, Avg
+from django.utils import timezone
+from datetime import timedelta
+import json
+from .models import (
+    Estoque, Cultivar, Peneira, Categoria, Especie, Tratamento, Produto,
+    DashboardConfig, HistoricoMovimentacao, ArmazemLayout
+)
+from django.contrib import messages
+
+def is_admin(user):
+    return user.is_superuser or user.groups.filter(name='Administradores').exists()
+
+@login_required
+def dashboard_view(request):
+    """Dashboard principal com gráficos dinâmicos"""
+    
+    # ==================== CONFIGURAÇÃO DO DASHBOARD ====================
+    try:
+        config = DashboardConfig.objects.get(criado_por=request.user)
+    except DashboardConfig.DoesNotExist:
+        config = DashboardConfig.objects.create(criado_por=request.user)
+    
+    # ==================== QUERYSET BASE COM FILTROS ====================
+    queryset = Estoque.objects.all()
+    
+    # APLICAR FILTRO PL (peneira é null ou nome='sp')
+    tipo_filtro = request.GET.get('tipo', 'todos')
+    if tipo_filtro == 'pl':
+        # PL = Sem peneira (peneira_id is null) OU peneira.nome = 'sp'
+        queryset = queryset.filter(
+            Q(peneira__isnull=True) | 
+            Q(peneira__nome__iexact='sp')
+        )
+    elif tipo_filtro == 'nao_pl':
+        # Não PL = Tem peneira e não é 'sp'
+        queryset = queryset.filter(
+            peneira__isnull=False
+        ).exclude(peneira__nome__iexact='sp')
+    
+    # Outros filtros
+    if request.GET.get('cultivar'):
+        queryset = queryset.filter(cultivar_id=request.GET.get('cultivar'))
+    if request.GET.get('peneira') and request.GET.get('peneira') != 'sp':
+        queryset = queryset.filter(peneira_id=request.GET.get('peneira'))
+    if request.GET.get('armazem'):
+        queryset = queryset.filter(az=request.GET.get('armazem'))
+    if request.GET.get('especie'):
+        queryset = queryset.filter(especie_id=request.GET.get('especie'))
+    
+    # ==================== DADOS PARA O TEMPLATE ====================
+    
+    # KPIs principais
+    total_sc = queryset.aggregate(total=Sum('saldo'))['total'] or 0
+    total_bag = queryset.filter(embalagem='BAG').aggregate(total=Sum('saldo'))['total'] or 0
+    peso_total = queryset.aggregate(total=Sum('peso_total'))['total'] or 0
+    
+    # Totais PL e Não PL
+    total_pl_geral = Estoque.objects.filter(
+        Q(peneira__isnull=True) | Q(peneira__nome__iexact='sp')
+    ).count()
+    total_nao_pl_geral = Estoque.objects.filter(
+        peneira__isnull=False
+    ).exclude(peneira__nome__iexact='sp').count()
+    
+    # Lotes ativos e esgotados
+    itens_ativos = queryset.filter(saldo__gt=0).count()
+    itens_esgotados = queryset.filter(saldo=0).count()
+    
+    # Movimentação do mês
+    inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0)
+    movimentacao_mes = HistoricoMovimentacao.objects.filter(data_hora__gte=inicio_mes).count()
+    
+    # TOP CULTIVARES
+    top_cultivares = list(queryset.filter(
+        saldo__gt=0, cultivar__isnull=False
+    ).values('cultivar__nome').annotate(
+        total_saldo=Sum('saldo')
+    ).order_by('-total_saldo')[:10])
+    
+    # Dados para gráfico de ESPÉCIE
+    dados_especie = list(queryset.filter(
+        especie__isnull=False, saldo__gt=0
+    ).values('especie__nome').annotate(
+        total=Sum('saldo')
+    ).order_by('-total')[:10])
+    
+    # Dados para gráfico de PENEIRA
+    categorias_distribuicao = list(queryset.filter(
+        saldo__gt=0, peneira__isnull=False
+    ).exclude(peneira__nome__iexact='sp').values('peneira__nome').annotate(
+        total=Sum('saldo')
+    ).order_by('-total'))
+    
+    # ==================== GRÁFICO DE ARMAZÉM COM FILTROS ====================
+    # Aplicar filtros ao queryset de armazém
+    armazem_queryset = queryset.filter(az__isnull=False).exclude(az='')
+    
+    # Aplicar filtro por espécie no armazém
+    if request.GET.get('armazem_especie'):
+        armazem_queryset = armazem_queryset.filter(especie_id=request.GET.get('armazem_especie'))
+    
+    # Aplicar filtro por peneira no armazém
+    if request.GET.get('armazem_peneira'):
+        if request.GET.get('armazem_peneira') == 'pl':
+            armazem_queryset = armazem_queryset.filter(
+                Q(peneira__isnull=True) | Q(peneira__nome__iexact='sp')
+            )
+        elif request.GET.get('armazem_peneira') == 'nao_pl':
+            armazem_queryset = armazem_queryset.filter(
+                peneira__isnull=False
+            ).exclude(peneira__nome__iexact='sp')
+        else:
+            armazem_queryset = armazem_queryset.filter(peneira_id=request.GET.get('armazem_peneira'))
+    
+    # Dados para gráfico de ARMAZÉM
+    capacidade_armazem = list(armazem_queryset.values('az').annotate(
+        total_sc=Sum('saldo'),
+        total_lotes=Count('id'),
+        peso_total=Sum('peso_total')
+    ).order_by('az'))
+    
+    # ==================== GRÁFICO DE TENDÊNCIA CORRIGIDO ====================
+    # Período baseado na configuração ou parâmetro da URL
+    dias_tendencia = int(request.GET.get('tendencia_dias', 7))
+    data_limite = timezone.now() - timedelta(days=dias_tendencia)
+    
+    from django.db.models.functions import TruncDate
+    
+    # Base queryset para tendência
+    tendencia_queryset = HistoricoMovimentacao.objects.filter(
+        data_hora__gte=data_limite
+    )
+    
+    # Aplicar filtros à tendência
+    if request.GET.get('tendencia_tipo'):
+        if request.GET.get('tendencia_tipo') == 'pl':
+            tendencia_queryset = tendencia_queryset.filter(
+                Q(estoque__peneira__isnull=True) | 
+                Q(estoque__peneira__nome__iexact='sp')
+            )
+        elif request.GET.get('tendencia_tipo') == 'nao_pl':
+            tendencia_queryset = tendencia_queryset.filter(
+                estoque__peneira__isnull=False
+            ).exclude(estoque__peneira__nome__iexact='sp')
+    
+    if request.GET.get('tendencia_especie'):
+        tendencia_queryset = tendencia_queryset.filter(
+            estoque__especie_id=request.GET.get('tendencia_especie')
+        )
+    
+    # Entradas por dia
+    entradas = tendencia_queryset.filter(
+        tipo__icontains='Entrada'
+    ).annotate(
+        dia=TruncDate('data_hora')
+    ).values('dia').annotate(
+        total=Count('id')
+    ).order_by('dia')
+    
+    # Saídas por dia
+    saidas = tendencia_queryset.filter(
+        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição')
+    ).annotate(
+        dia=TruncDate('data_hora')
+    ).values('dia').annotate(
+        total=Count('id')
+    ).order_by('dia')
+    
+    # Criar dicionários para fácil acesso
+    entradas_dict = {item['dia']: item['total'] for item in entradas}
+    saidas_dict = {item['dia']: item['total'] for item in saidas}
+    
+    # Gerar lista de dias do período
+    dias = []
+    for i in range(dias_tendencia):
+        dia = (timezone.now() - timedelta(days=i)).date()
+        dias.append(dia)
+    dias.reverse()
+    
+    movimentacoes_diarias = []
+    for dia in dias:
+        movimentacoes_diarias.append({
+            'dia': dia.strftime('%d/%m'),
+            'entradas': entradas_dict.get(dia, 0),
+            'saidas': saidas_dict.get(dia, 0)
+        })
+    
+    # Clientes únicos
+    clientes_unicos = queryset.exclude(
+        cliente__isnull=True
+    ).exclude(cliente='').values('cliente').distinct().count()
+    
+    # Taxa de ocupação
+    total_armazens = ArmazemLayout.objects.filter(ativo=True).count()
+    if capacidade_armazem and total_armazens > 0:
+        total_ocupado = sum([item['total_sc'] for item in capacidade_armazem])
+        # Considerando capacidade média de 1000 SC por armazém
+        taxa_ocupacao = min(round((total_ocupado / (total_armazens * 1000)) * 100), 100)
+    else:
+        taxa_ocupacao = 0
+    
+    # Movimentações recentes
+    movimentacao_recente = HistoricoMovimentacao.objects.select_related(
+        'usuario', 'estoque'
+    ).order_by('-data_hora')[:10]
+    
+    # ==================== CONTEXTO ====================
+    context = {
+        # Configuração
+        'config': config,
+        'is_admin': is_admin(request.user),
+        
+        # KPIs principais
+        'total_sc': total_sc,
+        'total_sc_convertido': total_sc,
+        'total_bag': total_bag,
+        'peso_total': peso_total,
+        'itens_ativos': itens_ativos,
+        'itens_esgotados': itens_esgotados,
+        'movimentacao_mes': movimentacao_mes,
+        'clientes_unicos': clientes_unicos,
+        'taxa_ocupacao': taxa_ocupacao,
+        
+        # Totais PL/Não PL
+        'total_pl': total_pl_geral,
+        'total_nao_pl': total_nao_pl_geral,
+        
+        # Dados para gráficos
+        'top_cultivares': top_cultivares,
+        'dados_especie': dados_especie,
+        'categorias_distribuicao': categorias_distribuicao,
+        'capacidade_armazem': capacidade_armazem,
+        'movimentacoes_diarias': movimentacoes_diarias,
+        'movimentacao_recente': movimentacao_recente,
+        
+        # Dados para filtros
+        'cultivares': Cultivar.objects.all().order_by('nome'),
+        'peneiras': Peneira.objects.all().order_by('nome'),
+        'armazens': ArmazemLayout.objects.filter(ativo=True).order_by('numero'),
+        'especies': Especie.objects.all().order_by('nome'),
+        
+        # Filtro ativo
+        'tipo_filtro_ativo': tipo_filtro,
+        'tendencia_dias_atual': dias_tendencia,
+        
+        'page_title': 'Dashboard Analítico',
+    }
+    
+    return render(request, 'sapp/dashboard.html', context)
+
+
+@login_required
+@user_passes_test(is_admin)
+def salvar_config_dashboard(request):
+    """Salva configurações do dashboard (apenas admin)"""
+    if request.method == 'POST':
+        config, created = DashboardConfig.objects.update_or_create(
+            criado_por=request.user,
+            defaults={
+                'cultivar_tipo': request.POST.get('cultivar_tipo', 'doughnut'),
+                'cultivar_qtd': int(request.POST.get('cultivar_qtd', 10)),
+                'cultivar_ordem': request.POST.get('cultivar_ordem', 'valor_desc'),
+                'cultivar_zerados': request.POST.get('cultivar_zerados') == 'on',
+                'cultivar_agrupar_outros': request.POST.get('cultivar_agrupar_outros') == 'on',
+                'peneira_tipo': request.POST.get('peneira_tipo', 'pie'),
+                'peneira_qtd': int(request.POST.get('peneira_qtd', 8)),
+                'peneira_ordem': request.POST.get('peneira_ordem', 'valor_desc'),
+                'armazem_tipo': request.POST.get('armazem_tipo', 'bar'),
+                'armazem_ordem': request.POST.get('armazem_ordem', 'nome_asc'),
+                'armazem_metrica': request.POST.get('armazem_metrica', 'volume'),
+                'tendencia_periodo': int(request.POST.get('tendencia_periodo', 7)),
+                'tendencia_saidas': request.POST.get('tendencia_saidas') == 'on',
+                'tendencia_transferencias': request.POST.get('tendencia_transferencias') == 'on',
+                'tendencia_agrupamento': request.POST.get('tendencia_agrupamento', 'day'),
+                'auto_refresh': int(request.POST.get('auto_refresh', 0)),
+                'unidade_padrao': request.POST.get('unidade_padrao', 'sc'),
+                'tema_cores': request.POST.get('tema_cores', 'default'),
+                'mostrar_legendas': request.POST.get('mostrar_legendas') == 'on',
+                'mostrar_percentuais': request.POST.get('mostrar_percentuais') == 'on',
+                'filtro_cultivar': request.POST.get('filtro_cultivar') == 'on',
+                'filtro_peneira': request.POST.get('filtro_peneira') == 'on',
+                'filtro_armazem': request.POST.get('filtro_armazem') == 'on',
+                'filtro_periodo': request.POST.get('filtro_periodo') == 'on',
+            }
+        )
+        
+        messages.success(request, 'Configurações salvas com sucesso!')
+        return redirect('sapp:dashboard')
+    
+    return redirect('sapp:dashboard')
+################################################## fim dashbord ##################
 

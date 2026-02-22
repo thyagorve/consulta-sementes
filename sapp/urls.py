@@ -17,20 +17,13 @@ urlpatterns = [
     # ============================================================================
     # DASHBOARD E PÁGINAS PRINCIPAIS
     # ============================================================================
-    path('', views.dashboard, name='dashboard'),
+    path('', views.dashboard, name='dashboard'),  # Mantém o dashboard original
+    path('dashboard/', views.dashboard_view, name='dashboard_novo'),  # Renomeado para não conflitar
     
-    # 1. Página Antiga (Tabela Simples)
     path('estoque/', views.lista_estoque, name='lista_estoque'),
-    
-    # 2. Página Nova (Gestão Avançada)
     path('estoque/gestao/', views.gestao_estoque, name='gestao_estoque'),
-    
-    # 3. Mapa de Ocupação (Canvas HTML5 - Sistema Novo)
     path('mapa-armazem/', views.lista_armazens, name='lista_armazens'),
     path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
-    
-    # 4. Mapa de Ocupação (Legado - compatibilidade)
-    # path('mapa-ocupacao/', views.mapa_ocupacao_legacy, name='mapa_ocupacao_legacy'), # Removido se não usado
 
     # ============================================================================
     # OPERAÇÕES CRUD - ESTOQUE
@@ -48,7 +41,6 @@ urlpatterns = [
     path('relatorio-saidas/', views.relatorio_saidas, name='relatorio_saidas'),
     path('api/estoque/estatisticas/', views.api_estoque_estatisticas, name='api_estoque_estatisticas'),
 
-    
     # ============================================================================
     # CONFIGURAÇÕES, HISTÓRICO E EMPENHO
     # ============================================================================
@@ -59,18 +51,21 @@ urlpatterns = [
     
     # ============================================================================
     # IMPORT/EXPORT
-
+    # ============================================================================
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
     
+    # ============================================================================
+    # CONFIGURAÇÃO DO DASHBOARD
+    # ============================================================================
+    path('salvar-config-dashboard/', views.salvar_config_dashboard, name='salvar_config_dashboard'),  # APENAS UMA VEZ
+
     # ============================================================================
     # DEBUG E MANUTENÇÃO
     # ============================================================================
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
     path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
     path('api/autocomplete-entrada/', views.api_autocomplete_nova_entrada, name='api_autocomplete_entrada'),
-    path('api/autocomplete-lotes/', views.api_autocomplete_nova_entrada, name='api_autocomplete_nova_entrada'),
-    
     path('api/saldo/<int:id>/', views.api_saldo_lote, name='api_saldo_lote'),
     path('api/buscar-lotes/', views.api_buscar_lotes, name='api_buscar_lotes'),
     path('api/buscar-lote-completo/', views.api_buscar_lote_completo, name='api_buscar_lote_completo'),
@@ -78,45 +73,24 @@ urlpatterns = [
     path('api/estoque-resumo/', views.api_estoque_resumo, name='api_estoque_resumo'),
     path('api/ultimas-movimentacoes/', views.api_ultimas_movimentacoes, name='api_ultimas_movimentacoes'),
     path('api/itens-empenhos/', views.api_itens_empenhos, name='api_itens_empenhos'),
-
     path('api/buscar-produto/', views.api_buscar_produto, name='api_buscar_produto'),
-   
     path('api/salvar-todos-elementos/', views.salvar_todos_elementos, name='salvar_todos_elementos'),
-  
     path('api/verificar-estoque/<str:endereco>/', views.verificar_estoque_endereco, name='verificar_estoque_endereco'),
     path('api/status-enderecos/', views.api_status_enderecos, name='api_status_enderecos'),
-    
-    # 2. Importação/exportação do mapa
     path('api/exportar-mapa/<int:armazem_numero>/', views.exportar_mapa_json, name='exportar_mapa_json'),
     path('api/importar-mapa/<int:armazem_numero>/', views.importar_mapa_json, name='importar_mapa_json'),
-    
-    # 3. Gerenciamento de armazéns
     path('api/criar-armazens-automaticos/', views.criar_armazens_automaticos, name='criar_armazens_automaticos'),
-    
-    # 4. Armazém e editor
     path('armazem/novo/', views.criar_armazem, name='criar_armazem'),
-    
-
-# Caso alguém acesse sem número, manda para o armazém 1 por padrão:
     path('editor-mapa/', views.editor_avancado, {'armazem_numero': 1}, name='editor_avancado_default'),
-    
-    path('api/atualizar-status-sistemico/', views.api_atualizar_status_sistemico, name='api_atualizar_status_sistemico'),   
-       
-       
-   # No seu urls.py
-    path('api/estoque/<int:id>/detalhes/', views.detalhes_estoque_api, name='detalhes_estoque_api'),    
-    # Exemplo no urls.py
+    path('api/atualizar-status-sistemico/', views.api_atualizar_status_sistemico, name='api_atualizar_status_sistemico'),
+    path('api/estoque/<int:id>/detalhes/', views.detalhes_estoque_api, name='detalhes_estoque_api'),
     path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
     path('editor-mapa/<int:armazem_numero>/', views.editor_avancado, name='editor_avancado'),
-    path('api/salvar-mapa-completo/', views.salvar_todos_elementos, name='salvar_todos_elementos'),
-    
     path('armazem/editar-config/<int:armazem_id>/', views.editar_config_armazem, name='editar_config_armazem'),
-
-    
 ]
 
 # ============================================================================
-# CONFIGURAÇÃO DE ARQUIVOS ESTÁTICOS E MÍDIA (APENAS EM DESENVOLVIMENTO)
+# CONFIGURAÇÃO DE ARQUIVOS ESTÁTICOS E MÍDIA
 # ============================================================================
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

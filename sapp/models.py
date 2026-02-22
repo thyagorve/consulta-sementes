@@ -110,7 +110,7 @@ class Estoque(models.Model):
         null=True,
         blank=True
     )
-    
+
     def save(self, *args, **kwargs):
         self.saldo = self.entrada - self.saida
         self.status = 'ESGOTADO' if self.saldo <= 0 else 'ATIVO'
@@ -240,6 +240,7 @@ class ItemEmpenho(models.Model):
     saldo_anterior = models.IntegerField(default=0)
     data_criacao = models.DateTimeField(auto_now_add=True)
     class Meta: ordering = ['-data_criacao']; unique_together = ['empenho', 'estoque']
+
     def __str__(self): return f"{self.lote} - {self.quantidade} unidades"
     def save(self, *args, **kwargs):
         if self.estoque and not self.lote:
@@ -300,224 +301,197 @@ from django.contrib.auth.models import User
 import json
 
 class DashboardConfig(models.Model):
-    """Configuração geral do dashboard"""
+    """Configurações dos gráficos do dashboard"""
+    
     TIPO_GRAFICO_CHOICES = [
-        ('bar', 'Barras Verticais'),
-        ('bar_horizontal', 'Barras Horizontais'),
-        ('pie', 'Pizza'),
-        ('doughnut', 'Rosca'),
+        ('doughnut', 'Rosca (Doughnut)'),
+        ('pie', 'Pizza (Pie)'),
+        ('bar', 'Barras'),
+        ('horizontalBar', 'Barras Horizontais'),
         ('line', 'Linha'),
         ('area', 'Área'),
-        ('radar', 'Radar'),
-        ('polar', 'Polar'),
-        ('scatter', 'Dispersão'),
-        ('bubble', 'Bolhas'),
     ]
     
-    AGRUPAMENTO_CHOICES = [
-        ('cultivar', 'Cultivar'),
-        ('peneira', 'Peneira'),
-        ('especie', 'Espécie'),
-        ('categoria', 'Categoria'),
-        ('tratamento', 'Tratamento'),
-        ('embalagem', 'Embalagem'),
-        ('cliente', 'Cliente'),
-        ('empresa', 'Empresa'),
-        ('az', 'Armazém (AZ)'),
-        ('endereco', 'Endereço'),
-        ('lote_prefix', 'Prefixo do Lote'),
-        ('lote_sufix', 'Sufixo do Lote'),
-        ('lote_pattern', 'Padrão no Lote'),
-        ('conferente', 'Conferente'),
-        ('mes_entrada', 'Mês de Entrada'),
-        ('trimestre', 'Trimestre'),
-        ('semestre', 'Semestre'),
-        ('ano', 'Ano'),
-    ]
-    
-    METRICA_CHOICES = [
-        ('saldo', 'Saldo (Quantidade)'),
-        ('entrada', 'Total de Entradas'),
-        ('saida', 'Total de Saídas'),
-        ('peso_total', 'Peso Total (kg)'),
-        ('qtd_lotes', 'Quantidade de Lotes'),
-        ('media_peso', 'Média de Peso por Lote'),
-        ('taxa_giro', 'Taxa de Giro'),
-        ('dias_estoque', 'Dias em Estoque'),
-    ]
-    
-    ORDENACAO_CHOICES = [
-        ('valor_desc', 'Maior para Menor'),
-        ('valor_asc', 'Menor para Maior'),
+    ORDEM_CHOICES = [
+        ('valor_desc', 'Maior Valor'),
+        ('valor_asc', 'Menor Valor'),
         ('nome_asc', 'Nome (A-Z)'),
         ('nome_desc', 'Nome (Z-A)'),
-        ('data_desc', 'Mais Recente'),
-        ('data_asc', 'Mais Antigo'),
     ]
     
-    nome = models.CharField('Nome do Gráfico', max_length=100)
-    descricao = models.TextField('Descrição', blank=True)
-    ordem = models.IntegerField('Ordem de Exibição', default=0)
-    ativo = models.BooleanField('Ativo', default=True)
+    PERIODO_CHOICES = [
+        (7, 'Últimos 7 dias'),
+        (15, 'Últimos 15 dias'),
+        (30, 'Últimos 30 dias'),
+        (90, 'Últimos 90 dias'),
+    ]
     
-    # Tipo e aparência
-    tipo_grafico = models.CharField('Tipo de Gráfico', max_length=20, choices=TIPO_GRAFICO_CHOICES, default='bar')
-    largura = models.IntegerField('Largura (colunas)', default=6, help_text='1-12 colunas do Bootstrap')
-    altura = models.IntegerField('Altura (px)', default=400)
-    titulo = models.CharField('Título', max_length=200, blank=True)
-    cor_principal = models.CharField('Cor Principal', max_length=20, default='#198754')
-    mostrar_legenda = models.BooleanField('Mostrar Legenda', default=True)
-    mostrar_valores = models.BooleanField('Mostrar Valores', default=True)
-    mostrar_percentual = models.BooleanField('Mostrar %', default=False)
+    # Gráfico de Cultivares
+    cultivar_tipo = models.CharField(max_length=20, choices=TIPO_GRAFICO_CHOICES, default='doughnut')
+    cultivar_qtd = models.IntegerField(default=10)
+    cultivar_ordem = models.CharField(max_length=20, choices=ORDEM_CHOICES, default='valor_desc')
+    cultivar_zerados = models.BooleanField(default=False)
+    cultivar_agrupar_outros = models.BooleanField(default=True)
     
-    # Configuração dos dados
-    agrupamento_principal = models.CharField('Agrupar por', max_length=30, choices=AGRUPAMENTO_CHOICES)
-    agrupamento_secundario = models.CharField('Agrupar por (2º nível)', max_length=30, choices=AGRUPAMENTO_CHOICES, blank=True, null=True)
-    metrica = models.CharField('Métrica', max_length=20, choices=METRICA_CHOICES, default='saldo')
-    ordenacao = models.CharField('Ordenar por', max_length=20, choices=ORDENACAO_CHOICES, default='valor_desc')
-    limite_itens = models.IntegerField('Limite de Itens', default=10, help_text='0 = sem limite')
+    # Gráfico de Peneiras
+    peneira_tipo = models.CharField(max_length=20, choices=TIPO_GRAFICO_CHOICES, default='pie')
+    peneira_qtd = models.IntegerField(default=8)
+    peneira_ordem = models.CharField(max_length=20, choices=ORDEM_CHOICES, default='valor_desc')
     
-    # Filtros (salvos como JSON)
-    filtros_json = models.TextField('Filtros', blank=True, help_text='Configuração dos filtros em JSON')
+    # Gráfico de Armazéns
+    armazem_tipo = models.CharField(max_length=20, choices=TIPO_GRAFICO_CHOICES, default='bar')
+    armazem_ordem = models.CharField(max_length=20, choices=ORDEM_CHOICES, default='nome_asc')
+    armazem_metrica = models.CharField(max_length=20, choices=[
+        ('volume', 'Volume (SC)'),
+        ('lotes', 'Quantidade de Lotes'),
+        ('peso', 'Peso Total (kg)'),
+    ], default='volume')
     
-    # Datas
-    data_inicio = models.DateField('Data Início', null=True, blank=True)
-    data_fim = models.DateField('Data Fim', null=True, blank=True)
+    # Gráfico de Tendência
+    tendencia_periodo = models.IntegerField(choices=PERIODO_CHOICES, default=7)
+    tendencia_saidas = models.BooleanField(default=True)
+    tendencia_transferencias = models.BooleanField(default=False)
+    tendencia_agrupamento = models.CharField(max_length=10, choices=[
+        ('day', 'Por Dia'),
+        ('week', 'Por Semana'),
+        ('month', 'Por Mês'),
+    ], default='day')
+    
+    # Configurações Gerais
+    auto_refresh = models.IntegerField(default=0, help_text="Tempo em segundos (0 = desativado)")
+    unidade_padrao = models.CharField(max_length=10, choices=[
+        ('sc', 'Sacas (SC)'),
+        ('bags', 'Bags'),
+        ('kg', 'Quilogramas (kg)'),
+    ], default='sc')
+    
+    tema_cores = models.CharField(max_length=20, choices=[
+        ('default', 'Padrão (Verde)'),
+        ('modern', 'Moderno (Azul)'),
+        ('pastel', 'Pastel'),
+        ('dark', 'Escuro'),
+    ], default='default')
+    
+    mostrar_legendas = models.BooleanField(default=True)
+    mostrar_percentuais = models.BooleanField(default=True)
+    
+    # Filtros Rápidos
+    filtro_cultivar = models.BooleanField(default=True)
+    filtro_peneira = models.BooleanField(default=True)
+    filtro_armazem = models.BooleanField(default=True)
+    filtro_periodo = models.BooleanField(default=True)
+    
+    # Layout dos gráficos (posições e tamanhos)
+    layout_config = models.TextField(default='{}', help_text="Configuração de layout em JSON")
     
     # Metadados
-    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
+    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dashboard_configs')
     
     class Meta:
-        ordering = ['ordem', 'nome']
-        verbose_name = 'Configuração de Dashboard'
-        verbose_name_plural = 'Configurações de Dashboards'
+        verbose_name = "Configuração do Dashboard"
+        verbose_name_plural = "Configurações do Dashboard"
+        unique_together = ['criado_por']  # Garante apenas uma config por usuário
+
+    def __str__(self):
+        return f"Dashboard Config - {self.criado_em.strftime('%d/%m/%Y %H:%M')}"
+    
+    def get_layout_config(self):
+        try:
+            return json.loads(self.layout_config)
+        except:
+            return {}
+    
+    def set_layout_config(self, config_dict):
+        self.layout_config = json.dumps(config_dict)
+
+
+class DashboardFiltroSalvo(models.Model):
+    """Filtros salvos pelos usuários"""
+    
+    nome = models.CharField(max_length=100)
+    descricao = models.TextField(blank=True, null=True)
+    filtros = models.TextField(help_text="Filtros em JSON")
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='filtros_salvos')
+    compartilhado = models.BooleanField(default=False)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Filtro Salvo"
+        verbose_name_plural = "Filtros Salvos"
+        ordering = ['-criado_em']
     
     def __str__(self):
-        return f"{self.ordem}. {self.nome}"
+        return f"{self.nome} - {self.usuario.username}"
     
     def get_filtros(self):
-        """Retorna os filtros como dicionário"""
-        if self.filtros_json:
-            try:
-                return json.loads(self.filtros_json)
-            except:
-                return {}
-        return {}
+        try:
+            return json.loads(self.filtros)
+        except:
+            return {}
+
+
+class DashboardWidget(models.Model):
+    """Widgets personalizados para o dashboard"""
     
-    def set_filtros(self, filtros_dict):
-        """Salva os filtros como JSON"""
-        self.filtros_json = json.dumps(filtros_dict)
+    TIPO_WIDGET_CHOICES = [
+        ('grafico', 'Gráfico'),
+        ('tabela', 'Tabela'),
+        ('kpi', 'Indicador KPI'),
+        ('lista', 'Lista'),
+    ]
     
-    def get_dados_grafico(self):
-        """Método principal que busca os dados conforme a configuração"""
-        from django.db.models import Sum, Count, Avg, Q, F, DecimalField
-        from django.db.models.functions import TruncMonth, TruncYear, TruncQuarter
-        from datetime import timedelta
-        from decimal import Decimal
-        
-        # Query base
-        queryset = Estoque.objects.all()
-        
-        # Aplicar filtros de data
-        if self.data_inicio:
-            queryset = queryset.filter(data_entrada__gte=self.data_inicio)
-        if self.data_fim:
-            queryset = queryset.filter(data_entrada__lte=self.data_fim)
-        
-        # Aplicar filtros personalizados do JSON
-        filtros = self.get_filtros()
-        for campo, valor in filtros.items():
-            if valor and valor != 'todos':
-                if campo == 'lote_contem':
-                    queryset = queryset.filter(lote__icontains=valor)
-                elif campo == 'cultivar':
-                    queryset = queryset.filter(cultivar__id=valor)
-                elif campo == 'peneira':
-                    queryset = queryset.filter(peneira__id=valor)
-                elif campo == 'especie':
-                    queryset = queryset.filter(especie__id=valor)
-                elif campo == 'cliente':
-                    queryset = queryset.filter(cliente__icontains=valor)
-                elif campo == 'az':
-                    queryset = queryset.filter(az=valor)
-                elif campo == 'saldo_min':
-                    queryset = queryset.filter(saldo__gte=int(valor))
-                elif campo == 'saldo_max':
-                    queryset = queryset.filter(saldo__lte=int(valor))
-        
-        # Definir agrupamento
-        agrupamentos = {
-            'cultivar': 'cultivar__nome',
-            'peneira': 'peneira__nome',
-            'especie': 'especie__nome',
-            'categoria': 'categoria__nome',
-            'tratamento': 'tratamento__nome',
-            'embalagem': 'embalagem',
-            'cliente': 'cliente',
-            'empresa': 'empresa',
-            'az': 'az',
-            'endereco': 'endereco',
-            'lote_prefix': "SUBSTR(lote, 1, 4)",
-            'lote_sufix': "SUBSTR(lote, -4)",
-            'conferente': 'conferente__username',
-            'mes_entrada': TruncMonth('data_entrada'),
-            'trimestre': TruncQuarter('data_entrada'),
-            'semestre': "CASE WHEN EXTRACT(month FROM data_entrada) <= 6 THEN '1º Semestre' ELSE '2º Semestre' END",
-            'ano': TruncYear('data_entrada'),
-        }
-        
-        # Definir métrica
-        metricas = {
-            'saldo': Sum('saldo'),
-            'entrada': Sum('entrada'),
-            'saida': Sum('saida'),
-            'peso_total': Sum('peso_total'),
-            'qtd_lotes': Count('id'),
-            'media_peso': Avg('peso_unitario'),
-        }
-        
-        agrupamento_field = agrupamentos.get(self.agrupamento_principal, 'cultivar__nome')
-        metrica_field = metricas.get(self.metrica, Sum('saldo'))
-        
-        # Se for uma expressão SQL raw (como SUBSTR)
-        if isinstance(agrupamento_field, str) and '(' in agrupamento_field:
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute(f"""
-                    SELECT {agrupamento_field} as grupo, {metrica_field.field} as valor 
-                    FROM sapp_estoque 
-                    GROUP BY grupo
-                    ORDER BY valor DESC
-                """)
-                resultados = cursor.fetchall()
-            labels = [r[0] for r in resultados]
-            valores = [float(r[1]) for r in resultados]
-        else:
-            # Query normal do Django
-            resultados = queryset.values(agrupamento_field).annotate(
-                valor=metrica_field
-            ).order_by('-valor')
-            
-            labels = [item[agrupamento_field] or 'Não informado' for item in resultados]
-            valores = [float(item['valor']) for item in resultados]
-        
-        # Aplicar limite
-        if self.limite_itens > 0 and len(labels) > self.limite_itens:
-            labels = labels[:self.limite_itens]
-            valores = valores[:self.limite_itens]
-        
-        # Calcular percentuais se necessário
-        percentuais = []
-        if self.mostrar_percentual and sum(valores) > 0:
-            total = sum(valores)
-            percentuais = [(v / total * 100) for v in valores]
-        
-        return {
-            'labels': labels,
-            'valores': valores,
-            'percentuais': percentuais,
-            'total': sum(valores),
-            'qtd_itens': len(labels)
-        }
+    ORIGEM_DADOS_CHOICES = [
+        ('cultivares', 'Top Cultivares'),
+        ('peneiras', 'Distribuição por Peneira'),
+        ('armazens', 'Ocupação por Armazém'),
+        ('tendencia', 'Tendência de Movimentação'),
+        ('estoque_resumo', 'Resumo do Estoque'),
+        ('ultimas_mov', 'Últimas Movimentações'),
+        ('clientes_top', 'Top Clientes'),
+        ('produtos_top', 'Top Produtos'),
+    ]
+    
+    nome = models.CharField(max_length=100)
+    tipo = models.CharField(max_length=20, choices=TIPO_WIDGET_CHOICES)
+    origem_dados = models.CharField(max_length=30, choices=ORIGEM_DADOS_CHOICES)
+    
+    # Configurações
+    titulo = models.CharField(max_length=200, blank=True)
+    subtitulo = models.CharField(max_length=200, blank=True)
+    
+    # Posição e tamanho
+    pos_x = models.IntegerField(default=0)
+    pos_y = models.IntegerField(default=0)
+    largura = models.IntegerField(default=6)
+    altura = models.IntegerField(default=4)
+    
+    # Configurações específicas
+    config = models.TextField(default='{}', help_text="Configurações específicas do widget em JSON")
+    
+    # Visibilidade
+    ativo = models.BooleanField(default=True)
+    visivel_para_todos = models.BooleanField(default=False)
+    usuarios_permitidos = models.ManyToManyField(User, blank=True, related_name='widgets_permitidos')
+    
+    # Ordem
+    ordem = models.IntegerField(default=0)
+    
+    # Metadados
+    criado_em = models.DateTimeField(auto_now_add=True)
+    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='widgets_criados')
+    
+    class Meta:
+        verbose_name = "Widget do Dashboard"
+        verbose_name_plural = "Widgets do Dashboard"
+        ordering = ['ordem', 'pos_y', 'pos_x']
+    
+    def __str__(self):
+        return f"{self.nome} ({self.get_tipo_display()})"
+    
+    def get_config(self):
+        try:
+            return json.loads(self.config)
+        except:
+            return {}

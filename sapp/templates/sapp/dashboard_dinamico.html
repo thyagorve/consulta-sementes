@@ -1,0 +1,758 @@
+{% extends "sapp/base.html" %}
+{% load humanize %}
+
+{% block title %}Comando Operacional | Sementes App{% endblock %}
+
+{% block content %}
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+<!-- DEBUG VISÍVEL - REMOVA DEPOIS -->
+<div style="background: #1a1a1a; color: #00ff00; padding: 10px; margin: 10px; border-radius: 5px; font-family: monospace; font-size: 12px; border: 1px solid #333;">
+    <strong>🔍 DEBUG - DADOS RECEBIDOS:</strong><br>
+    total_sc: {{ total_sc|default:"0" }}<br>
+    clientes_unicos: {{ clientes_unicos|default:"0" }}<br>
+    taxa_ocupacao: {{ taxa_ocupacao|default:"0" }}%<br>
+    movimentacao_mes: {{ movimentacao_mes|default:"0" }}<br>
+    movimentacoes_diarias: {{ movimentacoes_diarias|length }} dias<br>
+    tendencia_dias_atual: {{ tendencia_dias_atual }}<br>
+    {% for item in movimentacoes_diarias %}
+        Dia: {{ item.dia }} | Entradas: {{ item.entradas }} | Saídas: {{ item.saidas }}<br>
+    {% endfor %}
+</div>
+
+<style>
+/* 
+██╗  ██╗██╗   ██╗██████╗ ███████╗██████╗ 
+██║  ██║██║   ██║██╔══██╗██╔════╝██╔══██╗
+███████║██║   ██║██████╔╝█████╗  ██████╔╝
+██╔══██║██║   ██║██╔═══╝ ██╔══╝  ██╔══██╗
+██║  ██║╚██████╔╝██║     ███████╗██║  ██║
+╚═╝  ╚═╝ ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═╝
+    DASHBOARD OPERACIONAL - VERSÃO CORRIGIDA
+*/
+
+:root {
+    --deep-obsidian: #0a0f1c;
+    --navy-surface: #141d2f;
+    --surface-hover: #1e2a3a;
+    --neon-blue: #38bdf8;
+    --neon-blue-glow: rgba(56, 189, 248, 0.3);
+    --neon-green: #22c55e;
+    --neon-green-glow: rgba(34, 197, 94, 0.3);
+    --neon-rose: #f43f5e;
+    --neon-rose-glow: rgba(244, 63, 94, 0.3);
+    --neon-amber: #fbbf24;
+    --border-glass: rgba(255, 255, 255, 0.06);
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.7);
+    --text-tertiary: rgba(255, 255, 255, 0.4);
+}
+
+body { 
+    background: var(--deep-obsidian); 
+    font-family: 'Plus Jakarta Sans', sans-serif; 
+}
+
+.dash-ultra-wrapper { 
+    padding: 1.5rem 2rem; 
+    max-width: 1600px; 
+    margin: 0 auto;
+}
+
+/* HEADER SECTION */
+.header-section {
+    background: linear-gradient(145deg, var(--navy-surface) 0%, #0e1625 100%);
+    border-radius: 32px;
+    padding: 2rem;
+    border: 1px solid var(--border-glass);
+    position: relative;
+    overflow: hidden;
+}
+
+.header-section::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(56,189,248,0.03) 0%, transparent 70%);
+    animation: pulse 10s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    33% { transform: translate(-5%, -5%) rotate(120deg); }
+    66% { transform: translate(5%, 5%) rotate(240deg); }
+}
+
+.bg-primary-soft { 
+    background: rgba(56, 189, 248, 0.15); 
+    padding: 0.5rem 1.2rem;
+    border-radius: 100px;
+    display: inline-block;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+}
+
+/* KPI CARDS */
+.kpi-neo-card {
+    background: linear-gradient(145deg, var(--navy-surface), #121a29);
+    padding: 1.8rem 1.5rem;
+    border-radius: 28px;
+    border: 1px solid var(--border-glass);
+    display: flex;
+    gap: 1.2rem;
+    align-items: center;
+    box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+}
+
+.kpi-neo-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.05), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.kpi-neo-card:hover {
+    transform: translateY(-8px);
+    border-color: var(--neon-blue);
+    box-shadow: 0 30px 40px -15px var(--neon-blue-glow);
+}
+
+.kpi-neo-card:hover::after {
+    opacity: 1;
+}
+
+.card-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 22px;
+    display: grid;
+    place-items: center;
+    font-size: 1.8rem;
+    position: relative;
+    z-index: 2;
+}
+
+.bg-blue-dim { 
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(56, 189, 248, 0.05)); 
+    color: var(--neon-blue);
+    box-shadow: 0 0 30px var(--neon-blue-glow);
+}
+.bg-green-dim { 
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(34, 197, 94, 0.05)); 
+    color: var(--neon-green);
+    box-shadow: 0 0 30px var(--neon-green-glow);
+}
+.bg-amber-dim { 
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05)); 
+    color: var(--neon-amber);
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.3);
+}
+.bg-rose-dim { 
+    background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(244, 63, 94, 0.05)); 
+    color: var(--neon-rose);
+    box-shadow: 0 0 30px var(--neon-rose-glow);
+}
+
+.card-info {
+    flex: 1;
+    z-index: 2;
+}
+
+.label { 
+    font-size: 0.7rem; 
+    text-transform: uppercase; 
+    letter-spacing: 1.5px; 
+    color: var(--text-tertiary); 
+    font-weight: 700; 
+    display: block;
+    margin-bottom: 0.3rem;
+}
+
+.val { 
+    font-weight: 800; 
+    margin-bottom: 0.2rem; 
+    font-size: 2.2rem;
+    line-height: 1.2;
+    color: white;
+}
+
+.val small { 
+    font-size: 0.9rem; 
+    margin-left: 6px; 
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+.indicator {
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* PROGRESS BAR */
+.progress {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 100px;
+    overflow: hidden;
+    margin-top: 0.8rem;
+}
+
+.progress-bar {
+    background: linear-gradient(90deg, var(--neon-amber), #f59e0b);
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* ANALYTICS CARD */
+.analytics-card {
+    background: linear-gradient(145deg, var(--navy-surface), #121a29);
+    border-radius: 32px;
+    border: 1px solid var(--border-glass);
+    overflow: hidden;
+    height: 100%;
+    transition: all 0.3s;
+}
+
+.analytics-card:hover {
+    border-color: var(--neon-blue);
+    box-shadow: 0 0 30px var(--neon-blue-glow);
+}
+
+.analytics-header {
+    padding: 1.8rem;
+    border-bottom: 1px solid var(--border-glass);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* SIDE LOG CARD */
+.side-log-card {
+    background: linear-gradient(145deg, var(--navy-surface), #121a29);
+    border-radius: 32px;
+    border: 1px solid var(--border-glass);
+    height: 100%;
+    transition: all 0.3s;
+}
+
+.side-log-card:hover {
+    border-color: var(--neon-rose);
+    box-shadow: 0 0 30px var(--neon-rose-glow);
+}
+
+.log-scroll {
+    height: 400px;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.log-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 8px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.log-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-glass);
+    transform: translateX(5px);
+}
+
+.log-type-tag {
+    width: 6px;
+    height: 45px;
+    border-radius: 10px;
+    transition: all 0.3s;
+}
+
+.log-item:hover .log-type-tag {
+    transform: scaleY(1.2);
+}
+
+.tag-in { 
+    background: linear-gradient(180deg, var(--neon-green), #16a34a); 
+    box-shadow: 0 0 15px var(--neon-green-glow);
+}
+.tag-out { 
+    background: linear-gradient(180deg, var(--neon-rose), #dc2626); 
+    box-shadow: 0 0 15px var(--neon-rose-glow);
+}
+
+.log-info span:first-child {
+    color: white;
+    font-weight: 700;
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+}
+
+.log-info span:last-child {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* CUSTOM SCROLLBAR */
+.log-scroll::-webkit-scrollbar {
+    width: 5px;
+}
+
+.log-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+.log-scroll::-webkit-scrollbar-thumb {
+    background: var(--neon-blue);
+    border-radius: 10px;
+}
+
+/* BUTTONS */
+.btn-filter {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glass);
+    color: white;
+    padding: 0.8rem 1.5rem;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    transition: all 0.3s;
+}
+
+.btn-filter:hover {
+    background: rgba(56, 189, 248, 0.1);
+    border-color: var(--neon-blue);
+    color: var(--neon-blue);
+    transform: translateY(-2px);
+}
+
+.btn-refresh {
+    width: 45px;
+    height: 45px;
+    border-radius: 45px;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid var(--border-glass);
+    color: var(--neon-blue);
+    display: grid;
+    place-items: center;
+    transition: all 0.3s;
+}
+
+.btn-refresh:hover {
+    background: var(--neon-blue);
+    color: var(--deep-obsidian);
+    transform: rotate(180deg);
+}
+
+/* DROPDOWN */
+.dropdown-menu {
+    background: var(--navy-surface);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 0.5rem;
+}
+
+.dropdown-item {
+    color: white;
+    border-radius: 12px;
+    padding: 0.7rem 1rem;
+    transition: all 0.2s;
+}
+
+.dropdown-item:hover {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--neon-blue);
+    transform: translateX(5px);
+}
+
+/* RESPONSIVE */
+@media (max-width: 1200px) {
+    .dash-ultra-wrapper { padding: 1rem; }
+    .kpi-neo-card { padding: 1.2rem; }
+    .card-icon { width: 50px; height: 50px; font-size: 1.4rem; }
+    .val { font-size: 1.8rem; }
+}
+
+@media (max-width: 768px) {
+    .header-section .row { flex-direction: column; gap: 1rem; }
+    .btn-filter { width: 100%; }
+}
+</style>
+
+<div class="dash-ultra-wrapper animate__animated animate__fadeIn">
+    
+    <!-- HEADER COM GRADIENTE -->
+    <div class="header-section mb-4">
+        <div class="row align-items-center">
+            <div class="col-md">
+                <span class="bg-primary-soft text-primary mb-2 fw-800">
+                    <i class="fas fa-crown me-1"></i> COMANDO OPERACIONAL
+                </span>
+                <h1 class="fw-800 text-white mb-0" style="font-size: 2.5rem;">
+                    Monitor de Controle 
+                    <span style="background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                        Sementes App
+                    </span>
+                </h1>
+                <p class="text-white-50 mt-2">
+                    <i class="fas fa-calendar-alt me-2"></i> {% now "l, d F Y" %}
+                    <span class="mx-2">•</span> 
+                    <i class="fas fa-clock me-2"></i> Dados em tempo real
+                </p>
+            </div>
+            <div class="col-md-auto d-flex gap-2 mt-3 mt-md-0">
+                <div class="dropdown">
+                    <button class="btn-filter dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="fas fa-calendar-day me-2 text-primary"></i>{{ tendencia_dias_atual }} Dias
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="?tendencia_dias=7">7 Dias</a></li>
+                        <li><a class="dropdown-item" href="?tendencia_dias=15">15 Dias</a></li>
+                        <li><a class="dropdown-item" href="?tendencia_dias=30">30 Dias</a></li>
+                    </ul>
+                </div>
+                <button onclick="location.href='?'" class="btn-refresh" title="Atualizar dados">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPIS - AGORA COM DADOS REAIS -->
+    <div class="row g-4 mb-4">
+        <!-- Estoque Disponível -->
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-neo-card">
+                <div class="card-icon bg-blue-dim">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div class="card-info">
+                    <span class="label">VOLUME FÍSICO</span>
+                    <h2 class="val">{{ total_sc|default:"0"|intcomma }} <small>sc</small></h2>
+                    <div class="indicator text-success">
+                        <i class="fas fa-check-circle me-1"></i> Total em estoque
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parceiros Ativos - CORRIGIDO -->
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-neo-card">
+                <div class="card-icon bg-green-dim">
+                    <i class="fas fa-handshake"></i>
+                </div>
+                <div class="card-info">
+                    <span class="label">PARCEIROS ATIVOS</span>
+                    <h2 class="val">{{ clientes_unicos|default:"0" }}</h2>
+                    <div class="indicator text-success">
+                        <i class="fas fa-user-check me-1"></i> Clientes com estoque
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Taxa de Ocupação - CORRIGIDO -->
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-neo-card">
+                <div class="card-icon bg-amber-dim">
+                    <i class="fas fa-warehouse"></i>
+                </div>
+                <div class="card-info">
+                    <span class="label">TAXA OCUPAÇÃO</span>
+                    <h2 class="val">{{ taxa_ocupacao|default:"0" }}%</h2>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: {{ taxa_ocupacao|default:0 }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fluxo Logístico - CORRIGIDO -->
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-neo-card">
+                <div class="card-icon bg-rose-dim">
+                    <i class="fas fa-truck-fast"></i>
+                </div>
+                <div class="card-info">
+                    <span class="label">FLUXO OPERACIONAL</span>
+                    <h2 class="val">{{ movimentacao_mes|default:"0" }}</h2>
+                    <div class="indicator text-rose">
+                        <i class="fas fa-calendar me-1"></i> Movimentações no mês
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GRÁFICO DE TENDÊNCIA E MOVIMENTAÇÕES -->
+    <div class="row g-4 mb-4">
+        <div class="col-xl-9">
+            <div class="analytics-card">
+                <div class="analytics-header d-flex justify-content-between align-items-center flex-wrap">
+                    <div>
+                        <h4 class="fw-800 text-white mb-1">
+                            <i class="fas fa-chart-line me-2 text-primary"></i>
+                            Tendência de Movimentação
+                        </h4>
+                        <p class="text-white-50 small mb-0">
+                            Últimos {{ tendencia_dias_atual }} dias | Entradas vs Saídas
+                        </p>
+                    </div>
+                    <div class="d-flex gap-4 mt-2 mt-lg-0" style="background: rgba(255,255,255,0.03); padding: 0.8rem 1.5rem; border-radius: 100px;">
+                        <div class="text-center">
+                            <span class="text-white-50 d-block small">ENTRADAS</span>
+                            <span class="h5 fw-800 text-success mb-0" id="totalEntradas">0</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-white-50 d-block small">SAÍDAS</span>
+                            <span class="h5 fw-800 text-rose mb-0" id="totalSaidas">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="analytics-body p-4">
+                    <div style="height: 400px;">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MOVIMENTAÇÕES RECENTES -->
+        <div class="col-xl-3">
+            <div class="side-log-card">
+                <div class="p-4 border-bottom border-white-10 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-800 text-white mb-0">
+                        <i class="fas fa-bell me-2 text-rose"></i>
+                        Últimas Movimentações
+                    </h5>
+                    <span class="badge bg-rose px-2">{{ movimentacao_recente|length }}</span>
+                </div>
+                <div class="p-3">
+                    <div class="log-scroll">
+                        {% for mov in movimentacao_recente %}
+                        <div class="log-item">
+                            <div class="log-type-tag {% if 'Entrada' in mov.tipo %}tag-in{% else %}tag-out{% endif %}"></div>
+                            <div class="log-info">
+                                <span class="d-block">{{ mov.lote_ref|default:"Sem lote"|truncatechars:18 }}</span>
+                                <span class="small">
+                                    <i class="far fa-clock me-1"></i> {{ mov.data_hora|date:"d/m H:i" }}
+                                    <span class="mx-1">•</span> 
+                                    <span class="{% if 'Entrada' in mov.tipo %}text-success{% else %}text-rose{% endif %}">
+                                        {{ mov.tipo|truncatechars:12 }}
+                                    </span>
+                                </span>
+                                {% if mov.cliente %}
+                                <span class="small text-white-50 d-block mt-1">
+                                    <i class="fas fa-user me-1"></i> {{ mov.cliente|truncatechars:20 }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-white-50 mb-3"></i>
+                            <p class="text-white-50">Nenhuma movimentação recente</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <a href="{% url 'sapp:historico_geral' %}" class="btn btn-outline-primary w-100 fw-700 mt-3" style="border-color: var(--border-glass); color: white; border-radius: 18px; padding: 12px;">
+                        <i class="fas fa-search me-2"></i> Ver Histórico Completo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- STATUS DO SISTEMA -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center p-3" style="background: rgba(30, 41, 59, 0.5); border-radius: 20px; border: 1px solid var(--border-glass);">
+                <div class="d-flex gap-4 flex-wrap">
+                    <div><i class="fas fa-circle text-success me-2" style="font-size: 0.6rem;"></i> <span class="text-white-50">Sistema Online</span></div>
+                    <div><i class="fas fa-circle text-info me-2" style="font-size: 0.6rem;"></i> <span class="text-white-50">Última atualização: {% now "H:i:s" %}</span></div>
+                    <div><i class="fas fa-database me-2 text-white-50"></i> <span class="text-white-50">{{ total_sc|default:"0" }} SC em estoque</span></div>
+                </div>
+                <div>
+                    <span class="badge bg-success px-3 py-2">● OPERACIONAL</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPT DO GRÁFICO - CORRIGIDO -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // DADOS DO DJANGO
+    const movimentacoes = [
+        {% for item in movimentacoes_diarias %}
+        {
+            dia: '{{ item.dia }}',
+            entradas: {{ item.entradas|default:0 }},
+            saidas: {{ item.saidas|default:0 }}
+        },
+        {% endfor %}
+    ];
+    
+    console.log('📊 Dados recebidos:', movimentacoes);
+    
+    if (!movimentacoes || movimentacoes.length === 0) {
+        document.getElementById('trendChart').innerHTML = 
+            '<div class="text-center text-white-50 p-5">Sem dados para o período selecionado</div>';
+        return;
+    }
+    
+    const labels = movimentacoes.map(item => item.dia);
+    const entradas = movimentacoes.map(item => item.entradas);
+    const saidas = movimentacoes.map(item => item.saidas);
+    
+    // Calcular totais
+    const totalEntradas = entradas.reduce((a, b) => a + b, 0);
+    const totalSaidas = saidas.reduce((a, b) => a + b, 0);
+    
+    // Atualizar os totais no header
+    document.getElementById('totalEntradas').innerText = totalEntradas;
+    document.getElementById('totalSaidas').innerText = totalSaidas;
+    
+    console.log('📈 Totais - Entradas:', totalEntradas, 'Saídas:', totalSaidas);
+    
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    
+    // Gradientes
+    const gradIn = ctx.createLinearGradient(0, 0, 0, 400);
+    gradIn.addColorStop(0, 'rgba(34, 197, 94, 0.3)');
+    gradIn.addColorStop(1, 'rgba(34, 197, 94, 0)');
+    
+    const gradOut = ctx.createLinearGradient(0, 0, 0, 400);
+    gradOut.addColorStop(0, 'rgba(244, 63, 94, 0.3)');
+    gradOut.addColorStop(1, 'rgba(244, 63, 94, 0)');
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Entradas',
+                    data: entradas,
+                    borderColor: '#22c55e',
+                    backgroundColor: gradIn,
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true,
+                    pointBackgroundColor: '#22c55e',
+                    pointBorderColor: 'white',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Saídas',
+                    data: saidas,
+                    borderColor: '#f43f5e',
+                    backgroundColor: gradOut,
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true,
+                    pointBackgroundColor: '#f43f5e',
+                    pointBorderColor: 'white',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        color: 'rgba(255,255,255,0.7)',
+                        font: { weight: '600', size: 12 },
+                        usePointStyle: true,
+                        pointStyle: 'circle'
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    titleColor: 'white',
+                    bodyColor: 'rgba(255,255,255,0.7)',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 12
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { 
+                        color: 'rgba(255,255,255,0.05)',
+                        borderDash: [5, 5]
+                    },
+                    ticks: { 
+                        color: 'rgba(255,255,255,0.5)',
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { 
+                        color: 'rgba(255,255,255,0.5)',
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            }
+        }
+    });
+
+    // Auto-refresh a cada 30 segundos (opcional)
+    // setTimeout(() => location.reload(), 30000);
+});
+</script>
+
+<!-- REMOVA O DEBUG DEPOIS DE TESTAR -->
+{% endblock %}
