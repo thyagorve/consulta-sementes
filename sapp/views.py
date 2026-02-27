@@ -3387,3 +3387,287 @@ def salvar_config_dashboard(request):
     return redirect('sapp:dashboard')
 ################################################## fim dashbord ##################
 
+@login_required
+def ficha_rastreabilidade(request):
+    """
+    View para exibir a ficha de rastreabilidade
+    Usa os MESMOS FILTROS da página de gestão
+    """
+    # Capturar TODOS os filtros da URL original
+    filtros = {}
+    
+    # Mapeamento de filtros de texto
+    campos_texto = [
+        'lote', 'az', 'produto', 'endereco', 'cliente', 'empresa'
+    ]
+    
+    for campo in campos_texto:
+        valor = request.GET.get(campo, '')
+        if valor and valor.strip():
+            filtros[f'{campo}__icontains'] = valor.strip()
+    
+    # Filtros de seleção (múltiplos)
+    campos_selecao = [
+        ('cultivar', 'cultivar__id__in'),
+        ('peneira', 'peneira__id__in'),
+        ('categoria', 'categoria__id__in'),
+        ('especie', 'especie__id__in'),
+        ('tratamento', 'tratamento__id__in'),
+        ('embalagem', 'embalagem__in'),
+        ('conferente', 'conferente__id__in'),
+    ]
+    
+    for param, lookup in campos_selecao:
+        values = request.GET.getlist(param)
+        values = [v for v in values if v and v.strip()]
+        if values:
+            filtros[lookup] = values
+    
+    # Filtro por status
+    status = request.GET.get('status', 'todos')
+    if status == 'disponivel':
+        filtros['saldo__gt'] = 0
+    elif status == 'esgotado':
+        filtros['saldo'] = 0
+    
+    # Buscar itens com os filtros
+    itens_filtrados = Estoque.objects.filter(**filtros).distinct()
+    
+    # VERIFICAR SE TEM EXATAMENTE 1 LOTE
+    if itens_filtrados.count() != 1:
+        messages.error(
+            request, 
+            f"É necessário ter exatamente 1 lote filtrado. Encontrados: {itens_filtrados.count()}"
+        )
+        return redirect(request.META.get('HTTP_REFERER', 'sapp:gestao_estoque'))
+    
+    # PEGAR O ÚNICO ITEM
+    item = itens_filtrados.first()
+    
+    # Extrair código do produto (se houver)
+    codigo_produto = ''
+    if item.produto:
+        import re
+        match = re.search(r'\b(\d{10})\b', item.produto)
+        if match:
+            codigo_produto = match.group(1)
+    
+    # Buscar produto pelo código
+    produto_obj = None
+    descricao_completa = str(item.cultivar) if item.cultivar else item.produto or ''
+    
+    if codigo_produto:
+        produto_obj = Produto.objects.filter(codigo=codigo_produto).first()
+        if produto_obj and produto_obj.descricao:
+            descricao_completa = produto_obj.descricao
+    
+    # Formatar QR Code
+    qrcode_texto = item.lote
+    if codigo_produto:
+        qrcode_texto = f"{codigo_produto}/{item.lote}"
+    
+    # Extrair safra
+    safra = extrair_safra(item.lote)
+    
+    # Dados completos
+    item_data = {
+        'id': item.id,
+        'lote': item.lote,
+        'safra': safra,
+        'codigo_produto': codigo_produto,
+        'descricao': descricao_completa,
+        'produto': descricao_completa,
+        'az': item.az or (item.endereco[:2] if item.endereco else ''),
+        'endereco': item.endereco or '',
+        'empresa': item.empresa or 'GRUPO CONCEITO',
+        'peneira': item.peneira.nome if item.peneira else '',
+        'categoria': item.categoria.nome if item.categoria else '',
+        'cultivar': item.cultivar.nome if item.cultivar else '',
+        'peso_unitario': item.peso_unitario,
+        'peso_total': item.peso_total,
+        'embalagem': item.get_embalagem_display() if hasattr(item, 'get_embalagem_display') else item.embalagem,
+        'cliente': item.cliente or '',
+        'status': item.status,
+        'status_sistemico': item.status_sistemico,
+        'saldo': item.saldo,
+        'qrcode_texto': qrcode_texto,
+    }
+    
+    # Buscar configuração da logo
+    from .models import ConfiguracaoLogo
+    config_logo = ConfiguracaoLogo.get_logo()
+    
+    context = {
+        'item': item_data,
+        'config_logo': config_logo,
+        'erro': None,
+        'lote_buscado': item.lote,
+    }
+    
+    return render(request, 'sapp/ficha_rastreabilidade.html', context)
+
+
+def extrair_safra(lote):
+    """
+    Extrai a safra do número do lote
+    Exemplos: 2025/2026, 2025, 25/26, SAFRA25
+    """
+    if not lote:
+        return '______________'
+    
+    lote_str = str(lote)
+    
+    # Padrão: 2025/2026
+    padrao1 = r'(20\d{2}[/-]20\d{2})'
+    match = re.search(padrao1, lote_str)
+    if match:
+        return match.group(1)
+    
+    # Padrão: 25/26
+    padrao2 = r'(\d{2}[/-]\d{2})'
+    match = re.search(padrao2, lote_str)
+    if match:
+        ano1 = match.group(1)[:2]
+        ano2 = match.group(1)[-2:]
+        return f"20{ano1}/20{ano2}"
+    
+    # Padrão: SAFRA25 ou SAFRA2025
+    padrao3 = r'SAFRA[-\s]*(\d{2,4})'
+    match = re.search(padrao3, lote_str, re.IGNORECASE)
+    if match:
+        ano = match.group(1)
+        if len(ano) == 2:
+            return f"20{ano}"
+        return ano
+    
+    # Padrão: apenas ano 2025
+    padrao4 = r'(20\d{2})'
+    match = re.search(padrao4, lote_str)
+    if match:
+        return match.group(1)
+    
+    return '______________'
+
+def get_safra_from_lote(lote):
+    """
+    Função auxiliar para extrair safra do número do lote
+    Adapte conforme o formato dos seus lotes
+    """
+    if not lote:
+        return '______________'
+    
+    # Tenta encontrar padrões comuns de safra (ex: 22/23, 2022, SAFRA22)
+    import re
+    
+    # Padrão: XX/XX (ex: 22/23)
+    safra_pattern = r'(\d{2}[/-]\d{2})'
+    match = re.search(safra_pattern, lote)
+    if match:
+        return match.group(1)
+    
+    # Padrão: 20XX (ex: 2022)
+    ano_pattern = r'(20\d{2})'
+    match = re.search(ano_pattern, lote)
+    if match:
+        return match.group(1)
+    
+    # Padrão: SAFRAXX
+    safra_text_pattern = r'(SAFRA\d{2})'
+    match = re.search(safra_text_pattern, lote, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    
+    return '______________'
+
+# View alternativa que busca por ID (caso queira usar ID em vez de lote)
+@login_required
+def ficha_rastreabilidade_por_id(request, estoque_id):
+    """
+    View para exibir ficha de rastreabilidade por ID do estoque
+    URL: /ficha-rastreabilidade/<int:estoque_id>/
+    """
+    try:
+        item = get_object_or_404(Estoque, id=estoque_id)
+        
+        item_data = {
+            'lote': item.lote,
+            'safra': get_safra_from_lote(item.lote),
+            'produto': str(item.cultivar) if item.cultivar else item.produto,
+            'az': item.az or item.endereco[:2] if item.endereco else '',
+            'empresa': item.empresa or 'GRUPO CONCEITO',
+            'peneira': item.peneira,
+            'categoria': item.categoria,
+            'cultivar': item.cultivar,
+            'endereco': item.endereco,
+            'saldo': item.saldo,
+            'peso_unitario': item.peso_unitario,
+            'peso_total': item.peso_total,
+            'embalagem': item.get_embalagem_display(),
+            'cliente': item.cliente,
+            'status': item.status,
+            'status_sistemico': item.status_sistemico,
+        }
+        
+        context = {
+            'item': item_data,
+            'erro': None,
+            'lote_buscado': item.lote,
+        }
+    except Exception as e:
+        context = {
+            'item': {
+                'lote': '______________',
+                'safra': '______________',
+                'produto': '______________',
+                'az': '______________',
+                'empresa': '______________',
+                'peneira': None,
+                'categoria': None,
+                'cultivar': None,
+                'endereco': '______________',
+                'saldo': 0,
+                'peso_unitario': 0,
+                'peso_total': 0,
+                'embalagem': '---',
+                'cliente': '______________',
+                'status': '---',
+                'status_sistemico': 'critico',
+            },
+            'erro': f"Erro ao buscar item: {str(e)}",
+            'lote_buscado': None,
+        }
+    
+    return render(request, 'ficha_rastreabilidade.html', context)
+
+# View para múltiplos lotes (caso queira uma ficha com vários itens)
+@login_required
+def ficha_rastreabilidade_multipla(request):
+    """
+    View para exibir fichas de múltiplos lotes
+    Uso: /ficha-rastreabilidade/multipla/?lotes=123,456,789
+    """
+    lotes_param = request.GET.get('lotes', '')
+    itens = []
+    
+    if lotes_param:
+        lista_lotes = [l.strip() for l in lotes_param.split(',') if l.strip()]
+        for lote in lista_lotes:
+            item = Estoque.objects.filter(lote=lote).first()
+            if item:
+                itens.append({
+                    'lote': item.lote,
+                    'safra': get_safra_from_lote(item.lote),
+                    'produto': str(item.cultivar) if item.cultivar else item.produto,
+                    'az': item.az or item.endereco[:2] if item.endereco else '',
+                    'empresa': item.empresa or 'GRUPO CONCEITO',
+                    'peneira': item.peneira,
+                    'categoria': item.categoria,
+                    'endereco': item.endereco,
+                    'saldo': item.saldo,
+                })
+    
+    context = {
+        'itens': itens,
+        'total_itens': len(itens),
+    }
+    return render(request, 'ficha_rastreabilidade_multipla.html', context)

@@ -707,7 +707,6 @@
 </style>
 
 <div class="container-fluid py-3">
-    <!-- CARDS DE ESTATÍSTICAS -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
             <div class="stats-card">
@@ -769,23 +768,26 @@
         <div id="activeFilters" class="d-flex flex-wrap"></div>
     </div>
 
-    <!-- BOTÕES DE AÇÃO -->
-    <div class="action-buttons">
-        <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
-            <i class="fa-solid fa-download"></i><span>Exportar</span>
-        </button>
-        <button class="btn btn-print" onclick="window.print()">
-            <i class="fa-solid fa-print"></i><span>Imprimir</span>
-        </button>
-        <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;">
-            <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpar Filtros</span>
-        </button>
-        <div class="search-container">
-            <i class="fa-solid fa-search search-icon"></i>
-            <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar em todas as colunas..." value="{{ busca }}">
-            <button class="clear-search" id="clearSearchBtn"><i class="fa-solid fa-times"></i></button>
-        </div>
+
+<div class="action-buttons">
+    <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
+        <i class="fa-solid fa-download"></i><span>Exportar</span>
+    </button>
+    
+    <button class="btn btn-primary" id="btnAbrirFicha" onclick="abrirFichaLoteUnico()" disabled>
+        <i class="fa-solid fa-qrcode"></i><span>Ficha do Lote</span>
+    </button>
+    
+    <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;">
+        <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpar Filtros</span>
+    </button>
+    
+    <div class="search-container">
+        <i class="fa-solid fa-search search-icon"></i>
+        <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar em todas as colunas..." value="{{ busca }}">
+        <button class="clear-search" id="clearSearchBtn"><i class="fa-solid fa-times"></i></button>
     </div>
+</div>
 
     <!-- TABELA DE ESTOQUE -->
     <div class="table-container">
@@ -1702,5 +1704,51 @@ window.addEventListener('popstate', function() {
     
     atualizarCardsComFiltros();
 });
+
+
+function verificarQtdLotes() {
+    const linhasTabela = document.querySelectorAll('#tableBody tr');
+    const qtdLotes = linhasTabela.length;
+    const btnFicha = document.getElementById('btnAbrirFicha');
+    
+    // Se houver exatamente 1 lote na tabela (após filtros), habilita o botão
+    if (qtdLotes === 1) {
+        btnFicha.disabled = false;
+        btnFicha.title = "Abrir ficha do lote filtrado";
+    } else {
+        btnFicha.disabled = true;
+        btnFicha.title = qtdLotes === 0 ? "Nenhum lote encontrado" : "Selecione exatamente 1 lote (use os filtros)";
+    }
+    
+    return qtdLotes === 1;
+}
+
+function abrirFichaLoteUnico() {
+    // Pega a URL atual com todos os filtros
+    const urlAtual = window.location.href;
+    
+    // Abre a ficha mantendo os mesmos filtros
+    window.open('/ficha-rastreabilidade/?' + window.location.search.substring(1), '_blank');
+}
+
+// Inicializa quando a página carregar
+document.addEventListener('DOMContentLoaded', function() {
+    observarMudancasTabela();
+    
+    // Também verifica quando os filtros são aplicados
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            setTimeout(verificarQtdLotes, 600); // Aguarda a atualização da tabela
+        });
+    }
+});
+
+// Sobrescreve a função reloadPage para verificar após recarregar
+const originalReloadPage = reloadPage;
+reloadPage = function() {
+    originalReloadPage();
+    setTimeout(verificarQtdLotes, 500);
+};
 </script>
 {% endblock %}

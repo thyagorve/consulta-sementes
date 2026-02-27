@@ -495,3 +495,61 @@ class DashboardWidget(models.Model):
             return json.loads(self.config)
         except:
             return {}
+        
+
+
+
+
+from django.db import models
+from django.contrib.auth.models import User
+
+class ConfiguracaoLogo(models.Model):
+    """Configuração da logo da empresa - gerenciada via Django Admin"""
+    logo = models.ImageField(
+        upload_to='logos/',
+        null=True,
+        blank=True,
+        verbose_name="Logo da Empresa",
+        help_text="Tamanho recomendado: 200x100px. Faça upload pelo Django Admin."
+    )
+    nome_empresa = models.CharField(
+        max_length=100,
+        default='GRUPO CONCEITO',
+        verbose_name="Nome da Empresa"
+    )
+    ativo = models.BooleanField(
+        default=True,
+        verbose_name="Ativo",
+        help_text="Apenas uma configuração deve estar ativa"
+    )
+    atualizado_em = models.DateTimeField(auto_now=True)
+    atualizado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Atualizado por"
+    )
+    
+    class Meta:
+        verbose_name = "Configuração da Logo"
+        verbose_name_plural = "Configurações da Logo"
+    
+    def save(self, *args, **kwargs):
+        # Garante que apenas um registro está ativo
+        if self.ativo:
+            ConfiguracaoLogo.objects.filter(ativo=True).exclude(pk=self.pk).update(ativo=False)
+        super().save(*args, **kwargs)
+    
+    @classmethod
+    def get_logo(cls):
+        """Retorna a logo ativa ou None"""
+        try:
+            return cls.objects.get(ativo=True)
+        except cls.DoesNotExist:
+            return None
+        except cls.MultipleObjectsReturned:
+            # Se houver múltiplos, pega o primeiro e desativa os outros
+            primeira = cls.objects.filter(ativo=True).first()
+            cls.objects.filter(ativo=True).exclude(pk=primeira.pk).update(ativo=False)
+            return primeira

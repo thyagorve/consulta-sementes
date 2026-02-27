@@ -87,6 +87,18 @@ urlpatterns = [
     path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
     path('editor-mapa/<int:armazem_numero>/', views.editor_avancado, name='editor_avancado'),
     path('armazem/editar-config/<int:armazem_id>/', views.editar_config_armazem, name='editar_config_armazem'),
+
+
+
+
+    path('ficha-rastreabilidade/', views.ficha_rastreabilidade, name='ficha_rastreabilidade'),
+    
+    # Ficha de rastreabilidade por ID (URL amigável)
+    path('ficha-rastreabilidade/<int:estoque_id>/', views.ficha_rastreabilidade_por_id, name='ficha_rastreabilidade_id'),
+    
+    # Ficha múltipla (vários lotes)
+    path('ficha-rastreabilidade/multipla/', views.ficha_rastreabilidade_multipla, name='ficha_rastreabilidade_multipla'),
+    
 ]
 
 # ============================================================================
