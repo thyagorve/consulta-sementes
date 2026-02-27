@@ -1,16 +1,11 @@
 # Dockerfile
 FROM python:3.12-slim
 
-# Evita que o Python escreva arquivos .pyc
 ENV PYTHONDONTWRITEBYTECODE=1
-
-# Garante que a saída do python seja exibida no terminal
 ENV PYTHONUNBUFFERED=1
 
-# Diretório de trabalho
 WORKDIR /app
 
-# Instala dependências do sistema
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
@@ -18,16 +13,23 @@ RUN apt-get update \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Instala dependências Python
 COPY requirements.txt .
 RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+    && pip install -r requirements.txt gunicorn
 
-# Copia o projeto
 COPY . .
 
-# Porta que o Django vai usar
+# 🔥 CRIAR DIRETÓRIOS E PERMISSÕES
+RUN mkdir -p /app/media/logos /app/media/historico_fotos /app/staticfiles \
+    && chmod -R 755 /app/media \
+    && chmod -R 755 /app/staticfiles
+
 EXPOSE 8001
 
-# Comando para rodar a aplicação
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8001"]
+# 🔥 MUDANÇA CRÍTICA: Usar Gunicorn em vez de runserver
+CMD gunicorn --bind 0.0.0.0:8001 \
+             --workers 3 \
+             --timeout 120 \
+             --access-logfile - \
+             --error-logfile - \
+             sementes.wsgi:application
