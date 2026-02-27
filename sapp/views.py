@@ -3386,6 +3386,12 @@ def salvar_config_dashboard(request):
     
     return redirect('sapp:dashboard')
 ################################################## fim dashbord ##################
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from django.db.models import Q
+from .models import Estoque, Produto, ConfiguracaoLogo
+import re
 
 @login_required
 def ficha_rastreabilidade(request):
@@ -3393,20 +3399,31 @@ def ficha_rastreabilidade(request):
     View para exibir a ficha de rastreabilidade
     Usa os MESMOS FILTROS da página de gestão
     """
-    # Capturar TODOS os filtros da URL original
-    filtros = {}
+    # ========== CAPTURAR TODOS OS FILTROS DA URL ==========
+    filtros = Q()
     
-    # Mapeamento de filtros de texto
-    campos_texto = [
-        'lote', 'az', 'produto', 'endereco', 'cliente', 'empresa'
-    ]
-    
+    # Campos de texto (busca parcial)
+    campos_texto = ['lote', 'az', 'produto', 'endereco', 'cliente', 'empresa']
     for campo in campos_texto:
         valor = request.GET.get(campo, '')
         if valor and valor.strip():
-            filtros[f'{campo}__icontains'] = valor.strip()
+            filtros &= Q(**{f'{campo}__icontains': valor.strip()})
     
-    # Filtros de seleção (múltiplos)
+    # Busca global
+    busca = request.GET.get('busca', '')
+    if busca and busca.strip():
+        for termo in busca.split():
+            filtros &= (
+                Q(lote__icontains=termo) | 
+                Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) | 
+                Q(especie__nome__icontains=termo) |
+                Q(endereco__icontains=termo) | 
+                Q(cliente__icontains=termo) |
+                Q(empresa__icontains=termo)
+            )
+    
+    # Filtros de seleção
     campos_selecao = [
         ('cultivar', 'cultivar__id__in'),
         ('peneira', 'peneira__id__in'),
@@ -3414,26 +3431,39 @@ def ficha_rastreabilidade(request):
         ('especie', 'especie__id__in'),
         ('tratamento', 'tratamento__id__in'),
         ('embalagem', 'embalagem__in'),
-        ('conferente', 'conferente__id__in'),
     ]
     
     for param, lookup in campos_selecao:
         values = request.GET.getlist(param)
-        values = [v for v in values if v and v.strip()]
+        values = [v for v in values if v and str(v).strip()]
         if values:
-            filtros[lookup] = values
+            filtros &= Q(**{lookup: values})
     
     # Filtro por status
     status = request.GET.get('status', 'todos')
     if status == 'disponivel':
-        filtros['saldo__gt'] = 0
+        filtros &= Q(saldo__gt=0)
     elif status == 'esgotado':
-        filtros['saldo'] = 0
+        filtros &= Q(saldo=0)
     
-    # Buscar itens com os filtros
-    itens_filtrados = Estoque.objects.filter(**filtros).distinct()
+    # Filtros numéricos
+    for field in ['saldo', 'peso_unitario', 'peso_total']:
+        min_val = request.GET.get(f'min_{field}')
+        max_val = request.GET.get(f'max_{field}')
+        if min_val and min_val.strip():
+            try:
+                filtros &= Q(**{f'{field}__gte': float(min_val)})
+            except:
+                pass
+        if max_val and max_val.strip():
+            try:
+                filtros &= Q(**{f'{field}__lte': float(max_val)})
+            except:
+                pass
     
-    # VERIFICAR SE TEM EXATAMENTE 1 LOTE
+    # ========== BUSCAR ITENS COM OS FILTROS ==========
+    itens_filtrados = Estoque.objects.filter(filtros).distinct()
+    
     if itens_filtrados.count() != 1:
         messages.error(
             request, 
@@ -3444,30 +3474,45 @@ def ficha_rastreabilidade(request):
     # PEGAR O ÚNICO ITEM
     item = itens_filtrados.first()
     
-    # Extrair código do produto (se houver)
+    # ========== PREPARAR DADOS DO ITEM ==========
+    # Extrair código do produto do campo produto
     codigo_produto = ''
+    descricao_completa = ''
+    produto_obj = None
+    
+    print(f"🔍 Debug - item.produto: '{item.produto}'")  # Debug
+    
+    # Tenta encontrar o código do produto
     if item.produto:
-        import re
+        # Primeiro tenta encontrar padrão de 10 dígitos
         match = re.search(r'\b(\d{10})\b', item.produto)
         if match:
             codigo_produto = match.group(1)
+            produto_obj = Produto.objects.filter(codigo=codigo_produto).first()
+            print(f"🔍 Debug - Código extraído (10 dígitos): '{codigo_produto}'")
+        
+        # Se não achou com 10 dígitos, usa o próprio produto como código
+        if not produto_obj:
+            codigo_produto = item.produto
+            produto_obj = Produto.objects.filter(codigo=item.produto).first()
+            print(f"🔍 Debug - Usando produto como código: '{codigo_produto}'")
     
-    # Buscar produto pelo código
-    produto_obj = None
-    descricao_completa = str(item.cultivar) if item.cultivar else item.produto or ''
+    # Se encontrou o produto, usa a descrição EXATA que está no model
+    if produto_obj and produto_obj.descricao:
+        descricao_completa = produto_obj.descricao
+        print(f"✅ Descrição encontrada no Produto: '{descricao_completa}'")
+    else:
+        # Fallback: vazio
+        descricao_completa = ''
+        print(f"⚠️ Nenhuma descrição encontrada")
     
-    if codigo_produto:
-        produto_obj = Produto.objects.filter(codigo=codigo_produto).first()
-        if produto_obj and produto_obj.descricao:
-            descricao_completa = produto_obj.descricao
-    
-    # Formatar QR Code
+    # QR Code: código_produto/lote
     qrcode_texto = item.lote
     if codigo_produto:
         qrcode_texto = f"{codigo_produto}/{item.lote}"
     
-    # Extrair safra
-    safra = extrair_safra(item.lote)
+    # Safra padrão 2025/2026
+    safra = "2025/2026"
     
     # Dados completos
     item_data = {
@@ -3494,7 +3539,6 @@ def ficha_rastreabilidade(request):
     }
     
     # Buscar configuração da logo
-    from .models import ConfiguracaoLogo
     config_logo = ConfiguracaoLogo.get_logo()
     
     context = {
@@ -3502,9 +3546,17 @@ def ficha_rastreabilidade(request):
         'config_logo': config_logo,
         'erro': None,
         'lote_buscado': item.lote,
+        'filtros_aplicados': request.GET.urlencode(),
     }
     
     return render(request, 'sapp/ficha_rastreabilidade.html', context)
+
+
+def extrair_safra(lote):
+    """Mantida para compatibilidade, mas não usada"""
+    return "2025/2026"
+
+
 
 
 def extrair_safra(lote):

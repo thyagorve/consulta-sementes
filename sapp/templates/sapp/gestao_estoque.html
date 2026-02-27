@@ -773,11 +773,10 @@
     <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
         <i class="fa-solid fa-download"></i><span>Exportar</span>
     </button>
-    
+
     <button class="btn btn-primary" id="btnAbrirFicha" onclick="abrirFichaLoteUnico()" disabled>
         <i class="fa-solid fa-qrcode"></i><span>Ficha do Lote</span>
     </button>
-    
     <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;">
         <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpar Filtros</span>
     </button>
@@ -1119,6 +1118,7 @@
 
 <!-- SCRIPTS -->
 <script>
+// SCRIPTS COMPLETO - Preserva todo código original e adiciona correções
 let backendOptions = {};
 let currentUrlParams = new URLSearchParams(window.location.search);
 
@@ -1146,6 +1146,9 @@ document.addEventListener('DOMContentLoaded', function() {
             searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
         }, 100);
     }
+    
+    // ===== NOVO: Inicializar verificação de lotes =====
+    observarMudancasTabela();
 });
 
 function initStatusTooltips() {
@@ -1682,6 +1685,131 @@ function getCookie(name) {
     return cookieValue;
 }
 
+// ===== NOVAS FUNÇÕES PARA O BOTÃO DA FICHA =====
+function verificarQtdLotes() {
+    const linhasTabela = document.querySelectorAll('#tableBody tr');
+    // Filtra linhas que não são a mensagem "Nenhum item encontrado"
+    const linhasValidas = Array.from(linhasTabela).filter(tr => {
+        return !tr.querySelector('td[colspan]') && tr.cells.length > 1;
+    });
+    
+    const qtdLotes = linhasValidas.length;
+    const btnFicha = document.getElementById('btnAbrirFicha');
+    
+    if (!btnFicha) return false;
+    
+    if (qtdLotes === 1) {
+        btnFicha.disabled = false;
+        btnFicha.title = "Abrir ficha do lote filtrado";
+        btnFicha.classList.remove('btn-secondary');
+        btnFicha.classList.add('btn-primary');
+    } else {
+        btnFicha.disabled = true;
+        btnFicha.title = qtdLotes === 0 ? "Nenhum lote encontrado" : "Selecione exatamente 1 lote (use os filtros)";
+        btnFicha.classList.remove('btn-primary');
+        btnFicha.classList.add('btn-secondary');
+    }
+    
+    return qtdLotes === 1;
+}
+
+window.abrirFichaLoteUnico = function() {
+    if (!verificarQtdLotes()) {
+        const linhas = document.querySelectorAll('#tableBody tr');
+        const qtd = Array.from(linhas).filter(tr => !tr.querySelector('td[colspan]')).length;
+        
+        if (qtd === 0) {
+            alert('❌ Nenhum lote encontrado. Aplique filtros para encontrar um lote.');
+        } else {
+            alert(`❌ É necessário ter exatamente 1 lote filtrado. Encontrados: ${qtd} lotes.`);
+        }
+        return;
+    }
+    
+    // Pega a URL atual com todos os parâmetros
+    const params = new URLSearchParams(window.location.search);
+    
+    // Remove parâmetros de paginação que podem atrapalhar
+    params.delete('page');
+    params.delete('page_size');
+    
+    // Constrói a URL da ficha
+    const urlFicha = `/ficha-rastreabilidade/?${params.toString()}`;
+    
+    // Abre em nova aba
+    window.open(urlFicha, '_blank');
+};
+
+function observarMudancasTabela() {
+    // Verifica imediatamente
+    verificarQtdLotes();
+    
+    const tabelaBody = document.getElementById('tableBody');
+    if (tabelaBody) {
+        const observer = new MutationObserver(function() {
+            verificarQtdLotes();
+        });
+        
+        observer.observe(tabelaBody, { 
+            childList: true, 
+            subtree: true,
+            characterData: true,
+            attributes: true
+        });
+    }
+    
+    // Também verifica quando os filtros são aplicados
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            setTimeout(verificarQtdLotes, 600);
+        });
+    }
+}
+
+// ===== SOBRESCREVER FUNÇÕES DE FILTRO PARA VERIFICAR LOTES =====
+// Preservar funções originais
+const originalApplySelectFilter = window.applySelectFilter;
+if (originalApplySelectFilter) {
+    window.applySelectFilter = function(columnName) {
+        originalApplySelectFilter(columnName);
+        setTimeout(verificarQtdLotes, 500);
+    };
+}
+
+const originalApplyNumericFilter = window.applyNumericFilter;
+if (originalApplyNumericFilter) {
+    window.applyNumericFilter = function(columnName) {
+        originalApplyNumericFilter(columnName);
+        setTimeout(verificarQtdLotes, 500);
+    };
+}
+
+const originalClearColumnFilter = window.clearColumnFilter;
+if (originalClearColumnFilter) {
+    window.clearColumnFilter = function(columnName) {
+        originalClearColumnFilter(columnName);
+        setTimeout(verificarQtdLotes, 500);
+    };
+}
+
+const originalClearAllFilters = window.clearAllFilters;
+if (originalClearAllFilters) {
+    window.clearAllFilters = function() {
+        originalClearAllFilters();
+        setTimeout(verificarQtdLotes, 500);
+    };
+}
+
+// Sobrescreve reloadPage se existir
+if (typeof reloadPage === 'function') {
+    const originalReloadPage = reloadPage;
+    window.reloadPage = function() {
+        originalReloadPage();
+        setTimeout(verificarQtdLotes, 800);
+    };
+}
+
 // Atualizar cards ao carregar com filtros
 if (currentUrlParams.toString()) {
     setTimeout(() => {
@@ -1703,52 +1831,7 @@ window.addEventListener('popstate', function() {
     }
     
     atualizarCardsComFiltros();
+    setTimeout(verificarQtdLotes, 100);
 });
-
-
-function verificarQtdLotes() {
-    const linhasTabela = document.querySelectorAll('#tableBody tr');
-    const qtdLotes = linhasTabela.length;
-    const btnFicha = document.getElementById('btnAbrirFicha');
-    
-    // Se houver exatamente 1 lote na tabela (após filtros), habilita o botão
-    if (qtdLotes === 1) {
-        btnFicha.disabled = false;
-        btnFicha.title = "Abrir ficha do lote filtrado";
-    } else {
-        btnFicha.disabled = true;
-        btnFicha.title = qtdLotes === 0 ? "Nenhum lote encontrado" : "Selecione exatamente 1 lote (use os filtros)";
-    }
-    
-    return qtdLotes === 1;
-}
-
-function abrirFichaLoteUnico() {
-    // Pega a URL atual com todos os filtros
-    const urlAtual = window.location.href;
-    
-    // Abre a ficha mantendo os mesmos filtros
-    window.open('/ficha-rastreabilidade/?' + window.location.search.substring(1), '_blank');
-}
-
-// Inicializa quando a página carregar
-document.addEventListener('DOMContentLoaded', function() {
-    observarMudancasTabela();
-    
-    // Também verifica quando os filtros são aplicados
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            setTimeout(verificarQtdLotes, 600); // Aguarda a atualização da tabela
-        });
-    }
-});
-
-// Sobrescreve a função reloadPage para verificar após recarregar
-const originalReloadPage = reloadPage;
-reloadPage = function() {
-    originalReloadPage();
-    setTimeout(verificarQtdLotes, 500);
-};
 </script>
 {% endblock %}
