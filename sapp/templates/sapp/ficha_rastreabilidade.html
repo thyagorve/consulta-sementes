@@ -10,21 +10,22 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
-        /* ===== RESET E CONFIGURAÇÕES GERAIS ===== */
+        /* ===== FORÇA IMPRESSÃO DE CORES ===== */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             font-family: Arial, Helvetica, sans-serif;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
         }
         
         body {
-            background: white;
-            padding: 0;
-            min-height: 100vh;
+            background: #e9ecef; /* Apenas fundo de visualização na tela */
             display: flex;
             justify-content: center;
-            align-items: center;
+            padding: 20px;
         }
         
         /* ===== CONTAINER PRINCIPAL - TAMANHO A4 ===== */
@@ -33,244 +34,154 @@
             min-height: 29.7cm;
             background: white;
             border: 2px solid #000;
-            padding: 0.8cm 0.7cm 0.7cm 0.7cm; /* Reduzido padding-top */
-            margin: 0 auto;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
+            padding: 0.8cm 1cm;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             position: relative;
-            overflow: hidden;
         }
-        
-        /* ===== ESPAÇO PARA CORTE / JACAREZINHO ===== */
-        .espaco-corte {
-            position: absolute;
-            top: 0;
-            left: 0;
+
+        /* ===== ÁREA LIVRE PARA O JACAREZINHO (FURO) ===== */
+        .area-livre-furo {
             width: 100%;
-            height: 0.6cm; /* Reduzido */
-            background: transparent;
-            border-bottom: 1px dashed #ccc;
-            z-index: 5;
-            pointer-events: none;
+            height: 1cm; /* Altura exata em branco no topo para não atingir o design ao grampear/furar */
         }
         
         /* ===== MARCA D'ÁGUA ===== */
         .marca-dagua {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            opacity: 0.05;
             pointer-events: none;
-            opacity: 0.06;
             z-index: 0;
         }
         
         .marca-dagua img {
-            max-width: 70%;
-            max-height: 70%;
-            object-fit: contain;
+            width: 600px;
         }
-        
-        .marca-dagua-texto {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 60px;
-            font-weight: bold;
-            color: #cccccc;
-            opacity: 0.1;
-            transform: rotate(-30deg);
-            white-space: nowrap;
-            text-transform: uppercase;
-            pointer-events: none;
-            z-index: 0;
-        }
-        
-        /* Todo conteúdo fica acima da marca d'água */
-        .cabecalho-superior,
-        .titulo-central,
-        .dados-lote-container,
-        .tabela-movimentacao,
-        .info-rodape {
-            position: relative;
-            z-index: 1;
-        }
-        
-        /* ===== CABEÇALHO SUPERIOR ===== */
+
+        /* ===== NOVO CABEÇALHO ===== */
         .cabecalho-superior {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 0.2cm;
-            margin-top: 0.1cm; /* Reduzido */
-            margin-bottom: 0.3cm; /* Reduzido */
+            display: grid;
+            grid-template-columns: 35% 35% 30%;
+            border: 2px solid #000;
+            margin-bottom: 5px;
+            background: #fff;
+            position: relative;
+            z-index: 2;
         }
-        
-        .logo-area {
-            width: 30%;
+
+        .cabecalho-bloco {
             display: flex;
             flex-direction: column;
+            border-right: 2px solid #000;
+        }
+        
+        .cabecalho-bloco:last-child {
+            border-right: none;
+        }
+
+        /* Logo Totalmente Expandida */
+        .bloco-logo {
             align-items: center;
-            text-align: center;
+            justify-content: center;
+            overflow: hidden;
+            height: 85px; /* Tamanho fixo para dar limite à logo */
+            padding: 0;   /* Sem espaço limitante para maximizar imagem */
         }
-        
-        .logo-empresa {
-            max-width: 180px;
-            max-height: 70px;
-            width: auto;
-            height: auto;
-            object-fit: contain;
+
+        .bloco-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Ou cover se preferir esticar estourando extremidades */
         }
-        
-        .nome-empresa {
-            font-size: 14px;
-            font-weight: bold;
-            margin-top: 3px;
-            color: #333;
-            text-align: center;
-        }
-        
-        .codigo-area {
-            width: 40%;
-            text-align: center;
-            font-size: 12px;
-            border-left: 1px solid #999;
-            border-right: 1px solid #999;
-            padding: 0.2cm 10px;
-        }
-        
-        .codigo-area p {
-            margin: 2px 0;
-            font-weight: bold;
-        }
-        
-        .publicacao-area {
-            width: 30%;
-            text-align: right;
+
+        /* Código/Revisão alinhados embaixo */
+        .bloco-central, .bloco-direita {
+            justify-content: flex-end; /* Joga todo o conteúdo desse quadrado para baixo! */
+            padding: 5px 10px;
             font-size: 12px;
         }
+
+        .bloco-direita { text-align: right; }
         
-        .publicacao-area p {
-            margin: 2px 0;
-        }
-        
-        .campo-branco {
-            display: inline-block;
-            min-width: 80px;
-            border-bottom: 1px solid #333;
-            margin-left: 5px;
-            padding: 0 5px;
-        }
-        
+        .bloco-central p, .bloco-direita p { margin: 2px 0; font-weight: bold;}
+
         /* ===== TÍTULO PRINCIPAL ===== */
         .titulo-central {
             text-align: center;
-            margin: 0.2cm 0 0.4cm 0; /* Reduzido */
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 17px;
+            font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 1px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 0.1cm;
+            background-color: #000;
+            color: #fff;
+            padding: 6px;
+            margin-bottom: 12px;
         }
         
-        /* ===== ÁREA DE DADOS DO LOTE ===== */
+        /* ===== ÁREA DE DADOS DO PRODUTO/LOTE ===== */
         .dados-lote-container {
             display: flex;
-            gap: 0.3cm;
-            margin-bottom: 0.4cm; /* Reduzido */
-            border: 1px solid #000;
-            padding: 0.2cm;
+            border: 2px solid #000;
+            margin-bottom: 15px;
+            z-index: 2;
+            position: relative;
         }
         
         .dados-lote-tabela {
-            flex: 2;
+            flex: 1;
             border-collapse: collapse;
             width: 100%;
         }
         
-        .dados-lote-tabela tr td {
+        .dados-lote-tabela td {
             border: 1px solid #000;
-            padding: 4px 6px; /* Reduzido */
-            font-size: 11px;
-            font-weight: normal;
+            padding: 6px 8px;
+            font-size: 12px;
+            color: #111;
         }
         
-        .dados-lote-tabela tr td:first-child {
+        .celula-fundo {
             background-color: #f0f0f0;
             font-weight: bold;
-            width: 25%;
+            width: 18%; /* Ajusta a proporção visual entre label e resposta */
+            color: #333;
+            text-transform: uppercase;
+            font-size: 11px !important;
         }
         
-        .dados-lote-tabela tr td:last-child {
-            width: 75%;
-            font-weight: bold;
-        }
-        
-        /* ===== QR CODE ===== */
+        /* ===== QR CODE MODIFICADO ===== */
         .qrcode-area {
-            flex: 1;
-            border: 2px solid #000;
-            padding: 0.1cm;
+            width: 120px;
+            min-width: 120px;
+            border-left: 2px solid #000;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-width: 120px;
-            max-width: 130px;
+            background: #fff;
+            padding: 5px;
         }
-        
+
         .qrcode-label {
-            font-size: 9px;
-            text-align: center;
-            margin-bottom: 3px;
+            font-size: 10px;
             font-weight: bold;
-            text-transform: uppercase;
-            background: #f0f0f0;
-            width: 100%;
-            padding: 2px 0;
-        }
-        
-        #qrcode {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 3px 0;
+            margin-bottom: 5px;
         }
         
         #qrcode canvas, #qrcode img {
             width: 90px !important;
             height: 90px !important;
-            border: 1px solid #ccc;
         }
         
-        .qrcode-hash {
-            font-size: 7px;
-            word-break: break-all;
-            text-align: center;
-            max-width: 90px;
-            background: #f9f9f9;
-            padding: 2px;
-            margin-top: 2px;
-        }
-        
-        /* ===== TABELA DE MOVIMENTAÇÃO ===== */
+        /* ===== TABELA DE MOVIMENTAÇÃO (TAMANHOS MILIMÉTRICOS) ===== */
         .tabela-movimentacao {
             width: 100%;
             border-collapse: collapse;
-            margin: 0.2cm 0;
-            flex: 1;
+            z-index: 2;
+            position: relative;
+            margin-bottom: 15px;
         }
         
         .tabela-movimentacao th {
@@ -278,184 +189,153 @@
             color: white;
             font-weight: bold;
             font-size: 11px;
-            padding: 6px 4px;
+            padding: 6px 2px;
             text-align: center;
             border: 1px solid #000;
+            border-bottom: 2px solid #000;
             text-transform: uppercase;
         }
         
         .tabela-movimentacao td {
-            border: 1px solid #000;
-            padding: 6px 4px;
-            font-size: 10px;
-            height: 0.7cm;
+            border: 1px solid #555; /* Linhas mais sóbrias */
+            height: 33px; /* Espaço excelente para escrever à caneta */
         }
         
-        /* Ajuste de largura */
-        .tabela-movimentacao th:nth-child(1) { width: 8%; }
-        .tabela-movimentacao th:nth-child(2) { width: 8%; }
-        .tabela-movimentacao th:nth-child(3) { width: 8%; }
-        .tabela-movimentacao th:nth-child(4) { width: 8%; }
-        .tabela-movimentacao th:nth-child(5) { width: 8%; }
-        .tabela-movimentacao th:nth-child(6) { width: 8%; }
-        .tabela-movimentacao th:nth-child(7) { width: 10%; }
-        .tabela-movimentacao th:nth-child(8) { width: 20%; }
-        .tabela-movimentacao th:nth-child(9) { width: 22%; }
-        
-        /* ===== INFORMAÇÕES ADICIONAIS ===== */
-        .info-rodape {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 0.1cm;
-            font-size: 9px;
-            color: #333;
-            border-top: 1px solid #ccc;
-            padding-top: 0.1cm;
+        /* Classes Definindo a Largura Pedida nas Colunas */
+        .col-azrualn { width: 45px; } /* Locais curtos */
+        .col-movs { width: 90px; }    /* Ent, Sai, Sal -> Mini */
+        .col-data { width: 110px; }   /* Campo data Gigante */
+        .col-resp { width: auto; }    /* O resto para assinar */
+
+        /* ===== RODAPÉ: PROPAGANDA SEMENTES APP ===== */
+        .propaganda-app {
+            text-align: right;
+            border-top: 1px dashed #aaa;
+            padding-top: 8px;
+            font-size: 11px;
+            font-style: italic;
+            color: #555;
+            z-index: 2;
+            position: relative;
         }
         
-        /* ===== MEDIA PRINT ===== */
+        .propaganda-app span {
+            font-weight: bold;
+            color: #FF8C00; /* Dando uma piscadinha visual combinando com a tabela */
+            font-style: normal;
+        }
+        
+        /* ===== MEDIA PRINT / QUANDO FOR IMPRIMIR ===== */
         @media print {
-            body {
-                padding: 0;
-                background: white;
-            }
-            
+            body { background: white; padding: 0; }
             .ficha-a4 {
-                width: 100%;
-                height: 100%;
-                margin: 0;
-                padding: 0.8cm 0.5cm 0.5cm 0.5cm;
-                border: 1px solid #000;
-                box-shadow: none;
-                page-break-after: avoid;
-                page-break-inside: avoid;
-            }
-            
-            .marca-dagua {
-                opacity: 0.06;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            
-            @page {
-                size: A4;
-                margin: 0;
+                width: 100%; margin: 0; padding: 0.6cm;
+                border: none; box-shadow: none;
             }
         }
     </style>
 </head>
 <body>
     <div class="ficha-a4">
-        <!-- ESPAÇO PARA CORTE / JACAREZINHO -->
-        <div class="espaco-corte"></div>
+        
+        <!-- O espaço para você passar o alicate / Jacarezinho no bloco de folhas sem afetar a impressao -->
+        <div class="area-livre-furo"></div>
         
         <!-- MARCA D'ÁGUA -->
         <div class="marca-dagua">
             {% if config_logo and config_logo.logo %}
-                <img src="{{ config_logo.logo.url }}" alt="Marca d'água">
-            {% else %}
-                <div class="marca-dagua-texto">GRUPO CONCEITO</div>
+                <img src="{{ config_logo.logo.url }}">
             {% endif %}
         </div>
         
-        <!-- CABEÇALHO SUPERIOR -->
+        <!-- CABEÇALHO DIVIDIDO EM 3 -->
         <div class="cabecalho-superior">
-            <div class="logo-area">
+            <div class="cabecalho-bloco bloco-logo">
                 {% if config_logo and config_logo.logo %}
-                    <img src="{{ config_logo.logo.url }}" alt="{{ config_logo.nome_empresa }}" class="logo-empresa">
-                    <div class="nome-empresa">{{ config_logo.nome_empresa }}</div>
+                    <img src="{{ config_logo.logo.url }}">
                 {% else %}
-                    <div style="width: 180px; height: 70px; background: #2f8f4e; display: flex; align-items: center; justify-content: center; border: 1px solid #1a5f33;">
-                        <span style="font-size: 20px; font-weight: bold; color: white;">CONCEITO</span>
-                    </div>
-                    <div class="nome-empresa">GRUPO CONCEITO</div>
+                    <!-- Caso n tenha img configurada ainda -->
+                    <div style="font-weight: 00; font-size: 20px;">GRUPO CONCEITO</div>
                 {% endif %}
             </div>
             
-            <div class="codigo-area">
-                <p><strong>Código:</strong> FOR.017</p>
-                <p><strong>Revisão:</strong> 01</p>
+            <div class="cabecalho-bloco bloco-central">
+                <!-- Essas escritas desceram, e o topo está liberado -->
+                <p>CÓDIGO: FOR.017</p>
+                <p>REVISÃO: 01</p>
             </div>
             
-            <div class="publicacao-area">
-                <p><strong>Data:</strong> {% now "d/m/Y" %}</p>
-                <p><strong>Aprovador:</strong> <span class="campo-branco"></span></p>
+            <div class="cabecalho-bloco bloco-direita">
+                <!-- Desceram, e o topo liberado -->
+                <p>EMISSÃO: {% now "d/m/Y" %}</p>
+                <p>APROVAÇÃO: ________________</p>
             </div>
         </div>
         
-        <!-- TÍTULO PRINCIPAL -->
-        <div class="titulo-central">
-            FICHA DE CONTROLE DE ESTOQUE FÍSICO
-        </div>
+        <div class="titulo-central">FICHA DE CONTROLE DE ESTOQUE FÍSICO</div>
         
-        <!-- DADOS DO LOTE + QR CODE -->
+        <!-- O DADO DO SEU DJANGO MANTIDO ILESAMENTE AQUI -->
         <div class="dados-lote-container">
             <table class="dados-lote-tabela">
-                <!-- Linha 1: Código e Safra -->
                 <tr>
-                    <td>Código:</td>
+                    <td class="celula-fundo">Código:</td>
                     <td><strong>{{ item.codigo_produto|default:"______________" }}</strong></td>
-                    <td style="background-color: #f0f0f0; font-weight: bold; width: 15%;">Safra:</td>
+                    <td class="celula-fundo" style="width: 12%;">Safra:</td>
                     <td><strong>{{ item.safra|default:"2025/2026" }}</strong></td>
                 </tr>
-                
-                <!-- Linha 2: Descrição -->
                 <tr>
-                    <td style="background-color: #f0f0f0; font-weight: bold;">Descrição:</td>
+                    <td class="celula-fundo">Descrição:</td>
                     <td colspan="3"><strong>{{ item.descricao|default:"______________" }}</strong></td>
                 </tr>
-                
-                <!-- Linha 3: Lote e PME -->
                 <tr>
-                    <td>Lote:</td>
-                    <td><strong>{{ item.lote|default:"______________" }}</strong></td>
-                    <td style="background-color: #f0f0f0; font-weight: bold;">PME:</td>
+                    <td class="celula-fundo" style="background:#ddd; font-size:13px!important;">Lote:</td>
+                    <td style="font-size:16px;"><strong>{{ item.lote|default:"______________" }}</strong></td>
+                    <td class="celula-fundo">PME (KG):</td>
                     <td><strong>
                         {% if item.peso_unitario %}{{ item.peso_unitario|floatformat:2 }} kg
                         {% else %}______________{% endif %}
                     </strong></td>
                 </tr>
-                
-                <!-- Linha 4: Armazém e Empresa -->
                 <tr>
-                    <td>Armazém:</td>
+                    <td class="celula-fundo">Armazém / AZ:</td>
                     <td><strong>{{ item.az|default:item.endereco|default:"______________" }}</strong></td>
-                    <td style="background-color: #f0f0f0; font-weight: bold;">Produtor:</td>
+                    <td class="celula-fundo">Produtor:</td>
                     <td><strong>{{ item.empresa|default:"______________" }}</strong></td>
                 </tr>
-                
-                <!-- Linha 5: Peneira e CAT -->
                 <tr>
-                    <td>Peneira:</td>
+                    <td class="celula-fundo">Peneira:</td>
                     <td><strong>{{ item.peneira|default:"______________" }}</strong></td>
-                    <td style="background-color: #f0f0f0; font-weight: bold;">CAT:</td>
+                    <td class="celula-fundo">CAT:</td>
                     <td><strong>{{ item.categoria|default:"______________" }}</strong></td>
                 </tr>
             </table>
             
             <div class="qrcode-area">
-                <div class="qrcode-label">QR CODE DO LOTE</div>
+                <div class="qrcode-label">QR CODE LOTE</div>
                 <div id="qrcode"></div>
-                <div class="qrcode-hash">{{ item.qrcode_texto|default:item.lote }}</div>
             </div>
         </div>
         
+        <!-- MOVIMENTAÇÕES: COLUNAS FININHAS vs COLUNA DATA GIGANTE -->
         <table class="tabela-movimentacao">
             <thead>
                 <tr>
-                    <th>AZ</th>
-                    <th>RUA</th>
-                    <th>LN</th>
-                    <th>PS</th>
-                    <th>ENTRADA</th>
-                    <th>SAÍDA</th>
-                    <th>SALDO</th>
-                    <th>DATA</th>
-                    <th>CONFERENTE</th>
+                    <th class="col-azrualn"> AZ </th>
+                    <th class="col-azrualn">RUA</th>
+                    <th class="col-azrualn"> LN </th>
+                    <th class="col-azrualn"> PS </th>
+                    <!-- Para comportar na largura de "3 dígitos" com beleza alterei o texto pra ENT, SAÍ, SAL -->
+                    <th class="col-movs">ENTRADA</th>
+                    <th class="col-movs"> SAÍDA </th>
+                    <th class="col-movs"> SALDO </th>
+                    <!-- Data Ficou larga como solicitado -->
+                    <th class="col-data">DATA</th>
+                    <th class="col-resp">VISTO DO RESPONSÁVEL</th>
                 </tr>
             </thead>
             <tbody>
-                {% for i in "123456789012345"|make_list %}
+                <!-- Para preencher um lado da folha perfeitamente em branco usando FOR  -->
+                {% for i in "1234567890123456789"|make_list %}
                 <tr>
                     <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                 </tr>
@@ -463,36 +343,31 @@
             </tbody>
         </table>
         
-        <div class="info-rodape">
-            <span>Saldo Atual: <strong>{{ item.saldo|default:"0" }}</strong> un</span>
-            <span>Embalagem: <strong>{{ item.embalagem|default:"---" }}</strong></span>
-            <span>Cultivar: <strong>{{ item.cultivar|default:"---" }}</strong></span>
+        <!-- Nova Aba Promocional Exclusiva na Parte Baixa -->
+        <div class="propaganda-app">
+            Documento eletrônico rastreável gerado e auditado via sistema <span>Sementes APP</span>
         </div>
+
     </div>
     
     <script>
-        function gerarQRCode() {
-            const qrcodeTexto = '{{ item.qrcode_texto|default:item.lote|escapejs }}';
-            const qrcodeDiv = document.getElementById('qrcode');
-            qrcodeDiv.innerHTML = '';
+        // O código js sem mudar regras gerando em base Lote limpa!
+        window.onload = function() {
+            var el = document.getElementById("qrcode");
+            var tx = '{{ item.qrcode_texto|default:item.lote|escapejs }}';
             
-            try {
-                new QRCode(qrcodeDiv, {
-                    text: qrcodeTexto,
+            if(el) {
+                new QRCode(el, {
+                    text: tx,
                     width: 90,
                     height: 90,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
+                    correctLevel: QRCode.CorrectLevel.M
                 });
-            } catch (error) {
-                qrcodeDiv.innerHTML = '<div style="color:red;">Erro</div>';
             }
-        }
-        
-        window.onload = function() {
-            gerarQRCode();
-            setTimeout(() => window.print(), 300);
+            // Retira timer e bota print para disparar sem chance da pagina branca
+            setTimeout(() => window.print(), 350);
         };
     </script>
 </body>
