@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
-        /* ===== FORÇA IMPRESSÃO DE CORES ===== */
+        /* ===== FORÇA IMPRESSÃO DE CORES E SEM MARGENS ===== */
         * {
             margin: 0;
             padding: 0;
@@ -21,28 +21,49 @@
             color-adjust: exact !important;
         }
         
-        body {
-            background: #e9ecef; /* Apenas fundo de visualização na tela */
-            display: flex;
-            justify-content: center;
-            padding: 20px;
+        /* CONFIGURAÇÃO PARA OCUPAR 100% DA PÁGINA NA IMPRESSÃO */
+        @page {
+            size: A4;
+            margin: 0 !important;
+            padding: 0 !important;
         }
         
-        /* ===== CONTAINER PRINCIPAL - TAMANHO A4 ===== */
+        /* VISUALIZAÇÃO NA TELA - MELHORADA */
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 20px; /* Espaço para visualização na tela */
+            background: #e9ecef;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        
+        body {
+            background: #e9ecef;
+            min-height: 100vh;
+        }
+        
+        /* ===== CONTAINER PRINCIPAL - VISUALIZAÇÃO NA TELA ===== */
         .ficha-a4 {
-            width: 21cm;
-            min-height: 29.7cm;
+            width: 21cm; /* Largura A4 para visualização */
+            min-height: 29.7cm; /* Altura A4 para visualização */
             background: white;
             border: 2px solid #000;
-            padding: 0.8cm 1cm;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            padding: 0.5cm 0.5cm 0.3cm 0.5cm;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             position: relative;
+            margin: 0 auto;
+            page-break-after: avoid;
+            page-break-before: avoid;
         }
 
         /* ===== ÁREA LIVRE PARA O JACAREZINHO (FURO) ===== */
         .area-livre-furo {
             width: 100%;
-            height: 1cm; /* Altura exata em branco no topo para não atingir o design ao grampear/furar */
+            height: 0.5cm;
+            background: transparent; /* Visualização mais limpa */
         }
         
         /* ===== MARCA D'ÁGUA ===== */
@@ -57,18 +78,21 @@
         }
         
         .marca-dagua img {
-            width: 600px;
+            max-width: 500px;
+            max-height: 500px;
         }
 
-        /* ===== NOVO CABEÇALHO ===== */
+        /* ===== CABEÇALHO ===== */
         .cabecalho-superior {
             display: grid;
             grid-template-columns: 35% 35% 30%;
             border: 2px solid #000;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
             background: #fff;
             position: relative;
             z-index: 2;
+            height: 80px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .cabecalho-bloco {
@@ -81,52 +105,61 @@
             border-right: none;
         }
 
-        /* Logo Totalmente Expandida */
         .bloco-logo {
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            height: 85px; /* Tamanho fixo para dar limite à logo */
-            padding: 0;   /* Sem espaço limitante para maximizar imagem */
+            padding: 3px;
+            background: #f8f9fa; /* Fundo suave para visualização */
         }
 
         .bloco-logo img {
             width: 100%;
             height: 100%;
-            object-fit: contain; /* Ou cover se preferir esticar estourando extremidades */
+            object-fit: contain;
         }
 
-        /* Código/Revisão alinhados embaixo */
         .bloco-central, .bloco-direita {
-            justify-content: flex-end; /* Joga todo o conteúdo desse quadrado para baixo! */
+            justify-content: flex-end;
             padding: 5px 10px;
             font-size: 12px;
+            background: #f8f9fa;
         }
 
-        .bloco-direita { text-align: right; }
+        .bloco-direita { 
+            text-align: right; 
+        }
         
-        .bloco-central p, .bloco-direita p { margin: 2px 0; font-weight: bold;}
+        .bloco-central p, .bloco-direita p { 
+            margin: 2px 0; 
+            font-weight: bold;
+            color: #2c3e50;
+        }
 
         /* ===== TÍTULO PRINCIPAL ===== */
         .titulo-central {
             text-align: center;
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 900;
             text-transform: uppercase;
             letter-spacing: 1px;
-            background-color: #000;
+            background: linear-gradient(145deg, #000, #333);
             color: #fff;
             padding: 6px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
+            border-radius: 2px; /* Leve arredondado para visualização */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         
         /* ===== ÁREA DE DADOS DO PRODUTO/LOTE ===== */
         .dados-lote-container {
             display: flex;
             border: 2px solid #000;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             z-index: 2;
             position: relative;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         
         .dados-lote-tabela {
@@ -137,7 +170,7 @@
         
         .dados-lote-tabela td {
             border: 1px solid #000;
-            padding: 6px 8px;
+            padding: 5px 8px;
             font-size: 12px;
             color: #111;
         }
@@ -145,16 +178,22 @@
         .celula-fundo {
             background-color: #f0f0f0;
             font-weight: bold;
-            width: 18%; /* Ajusta a proporção visual entre label e resposta */
-            color: #333;
+            width: 15%;
+            color: #2c3e50;
             text-transform: uppercase;
             font-size: 11px !important;
         }
         
-        /* ===== QR CODE MODIFICADO ===== */
+        /* Melhor visualização das células */
+        .dados-lote-tabela td strong {
+            color: #000;
+            font-size: 13px;
+        }
+        
+        /* ===== QR CODE ===== */
         .qrcode-area {
-            width: 120px;
-            min-width: 120px;
+            width: 110px;
+            min-width: 110px;
             border-left: 2px solid #000;
             display: flex;
             flex-direction: column;
@@ -165,27 +204,40 @@
         }
 
         .qrcode-label {
-            font-size: 10px;
+            font-size: 9px;
             font-weight: bold;
             margin-bottom: 5px;
+            color: #2c3e50;
+            text-transform: uppercase;
+        }
+        
+        #qrcode {
+            background: white;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
         
         #qrcode canvas, #qrcode img {
-            width: 90px !important;
-            height: 90px !important;
+            width: 85px !important;
+            height: 85px !important;
+            display: block;
         }
         
-        /* ===== TABELA DE MOVIMENTAÇÃO (TAMANHOS MILIMÉTRICOS) ===== */
+        /* ===== TABELA DE MOVIMENTAÇÃO ===== */
         .tabela-movimentacao {
             width: 100%;
             border-collapse: collapse;
             z-index: 2;
             position: relative;
-            margin-bottom: 15px;
+            table-layout: fixed;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: white;
         }
         
         .tabela-movimentacao th {
-            background-color: #FF8C00;
+            background: linear-gradient(145deg, #FF8C00, #e67e22);
             color: white;
             font-weight: bold;
             font-size: 11px;
@@ -194,43 +246,109 @@
             border: 1px solid #000;
             border-bottom: 2px solid #000;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
         }
         
         .tabela-movimentacao td {
-            border: 1px solid #555; /* Linhas mais sóbrias */
-            height: 33px; /* Espaço excelente para escrever à caneta */
+            border: 1px solid #999;
+            height: 28px;
+            background: white;
         }
         
-        /* Classes Definindo a Largura Pedida nas Colunas */
-        .col-azrualn { width: 45px; } /* Locais curtos */
-        .col-movs { width: 90px; }    /* Ent, Sai, Sal -> Mini */
-        .col-data { width: 110px; }   /* Campo data Gigante */
-        .col-resp { width: auto; }    /* O resto para assinar */
+        /* Efeito zebrado para melhor visualização na tela */
+        .tabela-movimentacao tbody tr:nth-child(even) td {
+            background-color: #f9f9f9;
+        }
+        
+        .tabela-movimentacao tbody tr:hover td {
+            background-color: #f0f7ff; /* Efeito hover para visualização */
+        }
+        
+        /* Larguras das colunas */
+        .col-azrualn { width: 40px; }
+        .col-movs { width: 68px; }
+        .col-data { width: 130px; }
+        .col-resp { width: auto; }
 
-        /* ===== RODAPÉ: PROPAGANDA SEMENTES APP ===== */
+        /* ===== RODAPÉ ===== */
         .propaganda-app {
             text-align: right;
-            border-top: 1px dashed #aaa;
-            padding-top: 8px;
-            font-size: 11px;
+            border-top: 2px solid #ddd;
+            padding-top: 5px;
+            margin-top: 5px;
+            font-size: 10px;
             font-style: italic;
-            color: #555;
+            color: #666;
             z-index: 2;
             position: relative;
+            background: white;
         }
         
         .propaganda-app span {
             font-weight: bold;
-            color: #FF8C00; /* Dando uma piscadinha visual combinando com a tabela */
+            color: #FF8C00;
             font-style: normal;
+            background: #fff3e0;
+            padding: 2px 6px;
+            border-radius: 3px;
         }
         
-        /* ===== MEDIA PRINT / QUANDO FOR IMPRIMIR ===== */
+        /* ===== MEDIA PRINT ===== */
         @media print {
-            body { background: white; padding: 0; }
+            html, body {
+                padding: 0 !important;
+                margin: 0 !important;
+                background: white !important;
+                display: block;
+            }
+            
+            @page {
+                size: A4;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
             .ficha-a4 {
-                width: 100%; margin: 0; padding: 0.6cm;
-                border: none; box-shadow: none;
+                width: 100%;
+                height: 100%;
+                margin: 0 !important;
+                padding: 0.4cm 0.4cm 0.2cm 0.4cm;
+                border: none !important;
+                box-shadow: none !important;
+                page-break-after: avoid;
+                page-break-before: avoid;
+                background: white;
+            }
+            
+            /* Reset de estilos para impressão */
+            .tabela-movimentacao th {
+                background: #FF8C00 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            .tabela-movimentacao tbody tr:nth-child(even) td {
+                background-color: white !important;
+            }
+            
+            .propaganda-app span {
+                background: none !important;
+                padding: 0 !important;
+            }
+            
+            .cabecalho-superior {
+                box-shadow: none !important;
+            }
+            
+            .titulo-central {
+                background: black !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }
+            
+            .area-livre-furo {
+                background: transparent !important;
             }
         }
     </style>
@@ -238,7 +356,7 @@
 <body>
     <div class="ficha-a4">
         
-        <!-- O espaço para você passar o alicate / Jacarezinho no bloco de folhas sem afetar a impressao -->
+        <!-- Espaço para o furo -->
         <div class="area-livre-furo"></div>
         
         <!-- MARCA D'ÁGUA -->
@@ -248,25 +366,22 @@
             {% endif %}
         </div>
         
-        <!-- CABEÇALHO DIVIDIDO EM 3 -->
+        <!-- CABEÇALHO -->
         <div class="cabecalho-superior">
             <div class="cabecalho-bloco bloco-logo">
                 {% if config_logo and config_logo.logo %}
                     <img src="{{ config_logo.logo.url }}">
                 {% else %}
-                    <!-- Caso n tenha img configurada ainda -->
-                    <div style="font-weight: 00; font-size: 20px;">GRUPO CONCEITO</div>
+                    <div style="font-weight: 900; font-size: 20px; color: #333;">GRUPO CONCEITO</div>
                 {% endif %}
             </div>
             
             <div class="cabecalho-bloco bloco-central">
-                <!-- Essas escritas desceram, e o topo está liberado -->
                 <p>CÓDIGO: FOR.017</p>
                 <p>REVISÃO: 01</p>
             </div>
             
             <div class="cabecalho-bloco bloco-direita">
-                <!-- Desceram, e o topo liberado -->
                 <p>EMISSÃO: {% now "d/m/Y" %}</p>
                 <p>APROVAÇÃO: ________________</p>
             </div>
@@ -274,13 +389,13 @@
         
         <div class="titulo-central">FICHA DE CONTROLE DE ESTOQUE FÍSICO</div>
         
-        <!-- O DADO DO SEU DJANGO MANTIDO ILESAMENTE AQUI -->
+        <!-- DADOS DO LOTE -->
         <div class="dados-lote-container">
             <table class="dados-lote-tabela">
                 <tr>
                     <td class="celula-fundo">Código:</td>
                     <td><strong>{{ item.codigo_produto|default:"______________" }}</strong></td>
-                    <td class="celula-fundo" style="width: 12%;">Safra:</td>
+                    <td class="celula-fundo" style="width: 10%;">Safra:</td>
                     <td><strong>{{ item.safra|default:"2025/2026" }}</strong></td>
                 </tr>
                 <tr>
@@ -288,8 +403,8 @@
                     <td colspan="3"><strong>{{ item.descricao|default:"______________" }}</strong></td>
                 </tr>
                 <tr>
-                    <td class="celula-fundo" style="background:#ddd; font-size:13px!important;">Lote:</td>
-                    <td style="font-size:16px;"><strong>{{ item.lote|default:"______________" }}</strong></td>
+                    <td class="celula-fundo" style="background:#e5e5e5;">Lote:</td>
+                    <td style="font-size: 15px;"><strong>{{ item.lote|default:"______________" }}</strong></td>
                     <td class="celula-fundo">PME (KG):</td>
                     <td><strong>
                         {% if item.peso_unitario %}{{ item.peso_unitario|floatformat:2 }} kg
@@ -316,26 +431,24 @@
             </div>
         </div>
         
-        <!-- MOVIMENTAÇÕES: COLUNAS FININHAS vs COLUNA DATA GIGANTE -->
+        <!-- TABELA DE MOVIMENTAÇÃO -->
         <table class="tabela-movimentacao">
             <thead>
                 <tr>
-                    <th class="col-azrualn"> AZ </th>
+                    <th class="col-azrualn">AZ</th>
                     <th class="col-azrualn">RUA</th>
-                    <th class="col-azrualn"> LN </th>
-                    <th class="col-azrualn"> PS </th>
-                    <!-- Para comportar na largura de "3 dígitos" com beleza alterei o texto pra ENT, SAÍ, SAL -->
+                    <th class="col-azrualn">LN</th>
+                    <th class="col-azrualn">PS</th>
                     <th class="col-movs">ENTRADA</th>
-                    <th class="col-movs"> SAÍDA </th>
-                    <th class="col-movs"> SALDO </th>
-                    <!-- Data Ficou larga como solicitado -->
+                    <th class="col-movs">SAÍDA</th>
+                    <th class="col-movs">SALDO</th>
                     <th class="col-data">DATA</th>
-                    <th class="col-resp">VISTO DO RESPONSÁVEL</th>
+                    <th class="col-resp">VISTO RESPONSÁVEL</th>
                 </tr>
             </thead>
             <tbody>
-                <!-- Para preencher um lado da folha perfeitamente em branco usando FOR  -->
-                {% for i in "1234567890123456789"|make_list %}
+                <!-- 25 LINHAS -->
+                {% for i in "1234567890123456789012345"|make_list %}
                 <tr>
                     <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
                 </tr>
@@ -343,15 +456,14 @@
             </tbody>
         </table>
         
-        <!-- Nova Aba Promocional Exclusiva na Parte Baixa -->
+        <!-- RODAPÉ -->
         <div class="propaganda-app">
-            Documento eletrônico rastreável gerado e auditado via sistema <span>Sementes APP</span>
+            Documento eletrônico rastreável gerado via sistema <span>Sementes APP</span>
         </div>
 
     </div>
     
     <script>
-        // O código js sem mudar regras gerando em base Lote limpa!
         window.onload = function() {
             var el = document.getElementById("qrcode");
             var tx = '{{ item.qrcode_texto|default:item.lote|escapejs }}';
@@ -359,14 +471,15 @@
             if(el) {
                 new QRCode(el, {
                     text: tx,
-                    width: 90,
-                    height: 90,
+                    width: 85,
+                    height: 85,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.M
                 });
             }
-            // Retira timer e bota print para disparar sem chance da pagina branca
+            
+            // Delay para impressão
             setTimeout(() => window.print(), 350);
         };
     </script>
