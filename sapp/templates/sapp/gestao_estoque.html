@@ -1,4 +1,4 @@
-<!-- templates/sapp/lista_estoque.html -->
+
 {% extends 'sapp/base.html' %}
 {% load humanize %}
 
@@ -11,6 +11,13 @@
         --vermelho-status: #dc3545;
         --primary-dark: #2f8f4e;
         --primary-light: #4aae68;
+        --secondary-bg: #f8f9fa;
+        --border-color: #e9ecef;
+        --text-muted: #6c757d;
+        --shadow-sm: 0 2px 10px rgba(0,0,0,0.05);
+        --shadow-md: 0 4px 15px rgba(0,0,0,0.1);
+        --shadow-lg: 0 8px 30px rgba(0,0,0,0.15);
+        --transition: all 0.2s ease;
     }
     
     * {
@@ -25,7 +32,7 @@
         overflow-x: hidden;
     }
     
-    /* ===== CARDS DE ESTATÍSTICAS ===== */
+    /* ===== CARDS DE ESTATÍSTICAS OTIMIZADOS ===== */
     .stats-row {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -35,37 +42,62 @@
     
     .stats-card {
         background: white;
-        border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        border: 1px solid #e9ecef;
-        transition: all 0.3s ease;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
+        transition: var(--transition);
         height: 100%;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .stats-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-dark), var(--primary-light));
+        opacity: 0;
+        transition: var(--transition);
     }
     
     .stats-card:hover {
         transform: translateY(-3px);
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .stats-card:hover::before {
+        opacity: 1;
     }
     
     .stats-card .rounded-circle {
-        width: 50px;
-        height: 50px;
+        width: 52px;
+        height: 52px;
         display: flex;
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+        box-shadow: 0 4px 10px rgba(47, 143, 78, 0.2);
     }
     
     .stats-card h4 {
-        font-size: 1.5rem;
-        margin-bottom: 2px;
+        font-size: 1.6rem;
+        font-weight: 700;
+        margin-bottom: 4px;
         line-height: 1.2;
+        color: #2c3e50;
     }
     
     .stats-card small {
         font-size: 0.8rem;
-        display: block;
+        color: var(--text-muted);
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
     }
     
     @media (max-width: 992px) {
@@ -79,89 +111,128 @@
             padding: 12px;
         }
         .stats-card .rounded-circle {
-            width: 40px;
-            height: 40px;
+            width: 44px;
+            height: 44px;
         }
         .stats-card h4 {
-            font-size: 1.2rem;
+            font-size: 1.3rem;
         }
     }
     
-    /* ===== BOTÕES DE AÇÃO ===== */
+    @media (max-width: 480px) {
+        .stats-row {
+            grid-template-columns: 1fr;
+        }
+    }
+    
+    /* ===== BOTÕES DE AÇÃO OTIMIZADOS ===== */
     .action-buttons {
         display: flex;
-        gap: 10px;
+        gap: 12px;
         flex-wrap: wrap;
         margin-bottom: 20px;
         align-items: center;
     }
     
     .action-buttons .btn {
-        padding: 8px 16px;
-        font-weight: 500;
-        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 600;
+        border-radius: 10px;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
         white-space: nowrap;
-        transition: all 0.2s;
+        transition: var(--transition);
+        border: none;
+        font-size: 0.95rem;
+        letter-spacing: 0.3px;
+    }
+    
+    .action-buttons .btn i {
+        font-size: 1.1rem;
     }
     
     .btn-export {
-        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        border: none;
+        background: linear-gradient(135deg, #28a745, #20c997);
         color: white;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
     }
     
     .btn-export:hover {
-        background: linear-gradient(135deg, #20c997 0%, #28a745 100%);
+        background: linear-gradient(135deg, #20c997, #28a745);
         transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+        box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+    }
+    
+    .btn-ficha {
+        background: linear-gradient(135deg, #007bff, #00bcd4);
+        color: white;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+    }
+    
+    .btn-ficha:hover:not(:disabled) {
+        background: linear-gradient(135deg, #00bcd4, #007bff);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+    }
+    
+    .btn-ficha:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: #6c757d;
+        box-shadow: none;
     }
     
     .btn-clear-filters {
-        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-        border: none;
+        background: linear-gradient(135deg, #dc3545, #c82333);
         color: white;
+        box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
     }
     
     .btn-clear-filters:hover {
-        background: linear-gradient(135deg, #c82333 0%, #dc3545 100%);
+        background: linear-gradient(135deg, #c82333, #dc3545);
         transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
     }
     
-    /* ===== BUSCA ===== */
+    /* ===== BUSCA OTIMIZADA ===== */
     .search-container {
         position: relative;
         flex: 1;
-        min-width: 250px;
+        min-width: 280px;
         max-width: 400px;
     }
     
     .search-input {
-        padding-left: 40px;
-        padding-right: 40px;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        height: 42px;
+        padding: 10px 40px 10px 45px;
+        border: 2px solid var(--border-color);
+        border-radius: 30px;
+        height: 46px;
         width: 100%;
-        font-size: 0.9rem;
-        transition: all 0.2s;
+        font-size: 0.95rem;
+        transition: var(--transition);
+        background: white;
     }
     
     .search-input:focus {
         border-color: var(--primary-dark);
-        box-shadow: 0 0 0 3px rgba(47, 143, 78, 0.1);
+        box-shadow: 0 0 0 4px rgba(47, 143, 78, 0.1);
         outline: none;
+    }
+    
+    .search-input::placeholder {
+        color: #adb5bd;
+        font-style: italic;
     }
     
     .search-icon {
         position: absolute;
-        left: 14px;
+        left: 16px;
         top: 50%;
         transform: translateY(-50%);
-        color: #6c757d;
+        color: var(--primary-dark);
         z-index: 5;
+        font-size: 1.1rem;
     }
     
     .clear-search {
@@ -171,30 +242,32 @@
         transform: translateY(-50%);
         background: none;
         border: none;
-        color: #6c757d;
+        color: var(--text-muted);
         cursor: pointer;
         display: none;
         z-index: 5;
-        width: 20px;
-        height: 20px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         align-items: center;
         justify-content: center;
+        background: #f1f3f5;
+        transition: var(--transition);
     }
     
     .clear-search:hover {
-        background: #e9ecef;
-        color: #dc3545;
+        background: #dc3545;
+        color: white;
     }
     
-    /* ===== TABELA RESPONSIVA ===== */
+    /* ===== TABELA OTIMIZADA ===== */
     .table-container {
         background: white;
-        border-radius: 12px;
+        border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        box-shadow: var(--shadow-md);
         margin-bottom: 20px;
-        border: 1px solid #e9ecef;
+        border: 1px solid var(--border-color);
         width: 100%;
         position: relative;
     }
@@ -205,6 +278,7 @@
         scrollbar-width: thin;
         scrollbar-color: var(--primary-dark) #f1f1f1;
         max-width: 100%;
+        border-radius: 16px;
     }
     
     .table-responsive::-webkit-scrollbar {
@@ -235,10 +309,10 @@
     }
     
     .table-advanced th {
-        background: linear-gradient(135deg, var(--primary-dark) 0%, #267a41 100%);
+        background: linear-gradient(135deg, var(--primary-dark), #1e5f34);
         color: white;
         font-weight: 600;
-        padding: 14px 8px;
+        padding: 16px 10px;
         position: sticky;
         top: 0;
         z-index: 10;
@@ -246,31 +320,27 @@
         border: none;
         cursor: pointer;
         font-size: 0.85rem;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
         transition: background 0.2s;
     }
     
     .table-advanced th:hover {
-        background: linear-gradient(135deg, #267a41 0%, var(--primary-dark) 100%);
+        background: linear-gradient(135deg, #1e5f34, var(--primary-dark));
     }
     
     .table-advanced th.filter-active {
-        background: linear-gradient(135deg, #1f6a36 0%, #16572b 100%);
+        background: linear-gradient(135deg, #1a4f2b, #0f3a1e);
         position: relative;
+        box-shadow: inset 0 -2px 0 #ffc107;
     }
     
-    .table-advanced th.filter-active::after {
-        content: '✓';
-        position: absolute;
-        right: 5px;
-        top: 50%;
-        transform: translateY(-50%);
+    .table-advanced th.filter-active i {
         color: #ffc107;
-        font-weight: bold;
-        font-size: 14px;
     }
     
     .table-advanced th i {
-        margin-left: 5px;
+        margin-left: 6px;
         font-size: 0.75rem;
         opacity: 0.8;
         transition: opacity 0.2s;
@@ -281,17 +351,26 @@
     }
     
     .table-advanced td {
-        padding: 12px 8px;
+        padding: 14px 10px;
         vertical-align: middle;
-        border-bottom: 1px solid #e9ecef;
+        border-bottom: 1px solid var(--border-color);
         white-space: nowrap;
+        background: white;
+    }
+    
+    .table-advanced tbody tr {
+        transition: var(--transition);
     }
     
     .table-advanced tbody tr:hover {
         background-color: rgba(47, 143, 78, 0.05);
     }
     
-    /* ===== COLUNA DE STATUS ===== */
+    .table-advanced tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    /* ===== COLUNA DE STATUS MELHORADA ===== */
     .status-column {
         text-align: center;
         vertical-align: middle;
@@ -305,8 +384,8 @@
     }
     
     .status-sistemico-indicator {
-        width: 32px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
         border-radius: 50%;
         border: 3px solid white;
         box-shadow: 0 3px 10px rgba(0,0,0,0.2);
@@ -319,23 +398,23 @@
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
     
-    /* Tooltip */
+    /* Tooltip melhorado */
     .status-tooltip-custom {
         display: none;
         position: absolute;
         bottom: 100%;
         left: 50%;
         transform: translateX(-50%);
-        background: rgba(33, 37, 41, 0.95);
+        background: rgba(33, 37, 41, 0.98);
         color: white;
-        padding: 10px 15px;
-        border-radius: 8px;
+        padding: 12px 16px;
+        border-radius: 10px;
         font-size: 12px;
         white-space: nowrap;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
         z-index: 10000;
         pointer-events: none;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        box-shadow: var(--shadow-lg);
         backdrop-filter: blur(4px);
         border: 1px solid rgba(255,255,255,0.1);
     }
@@ -346,133 +425,167 @@
         top: 100%;
         left: 50%;
         transform: translateX(-50%);
-        border-width: 6px;
+        border-width: 8px;
         border-style: solid;
-        border-color: rgba(33, 37, 41, 0.95) transparent transparent transparent;
+        border-color: rgba(33, 37, 41, 0.98) transparent transparent transparent;
     }
     
     .status-tooltip-custom strong {
         display: block;
-        margin-bottom: 5px;
+        margin-bottom: 6px;
         text-align: center;
+        font-size: 13px;
     }
     
     .status-tooltip-custom small {
         color: #adb5bd;
         font-size: 11px;
         display: block;
+        line-height: 1.6;
     }
     
-    /* ===== ENDEREÇO ===== */
+    /* ===== ENDEREÇO MELHORADO ===== */
     .endereco-badge {
-        background: #f8f9fa;
-        color: #495057;
-        padding: 5px 10px;
-        border-radius: 20px;
+        background: #f1f5f9;
+        color: #1e293b;
+        padding: 6px 12px;
+        border-radius: 30px;
         font-size: 0.8rem;
-        font-weight: 500;
-        border: 1px solid #dee2e6;
-        display: inline-block;
-        transition: all 0.2s;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: var(--transition);
     }
     
     .endereco-badge:hover {
-        background: #e9ecef;
+        background: #e2e8f0;
         border-color: var(--primary-dark);
+        transform: translateY(-1px);
     }
     
     .endereco-badge i {
         color: var(--primary-dark);
+        font-size: 0.75rem;
     }
     
-    /* ===== BADGES ===== */
+    /* ===== BADGES MELHORADAS ===== */
     .badge-saldo {
-        font-size: 0.75rem;
-        padding: 5px 10px;
-        border-radius: 20px;
+        font-size: 0.8rem;
+        padding: 6px 14px;
+        border-radius: 30px;
         font-weight: 600;
         display: inline-block;
+        letter-spacing: 0.3px;
     }
     
     .badge-cliente {
-        background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+        background: linear-gradient(135deg, #8b5cf6, #6d28d9);
         color: white;
-        padding: 4px 10px;
-        border-radius: 20px;
-        max-width: 150px;
+        padding: 5px 12px;
+        border-radius: 30px;
+        max-width: 160px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(109, 40, 217, 0.3);
     }
     
     .badge-empresa {
-        background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        background: linear-gradient(135deg, #06b6d4, #0891b2);
         color: white;
-        padding: 4px 10px;
-        border-radius: 20px;
-        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 30px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
     }
     
     .badge-null {
-        background: #e9ecef;
-        color: #6c757d;
-        padding: 4px 10px;
-        border-radius: 20px;
+        background: #f1f5f9;
+        color: #64748b;
+        padding: 5px 12px;
+        border-radius: 30px;
         font-size: 0.75rem;
-        font-weight: normal;
+        font-weight: 500;
         font-style: italic;
+        border: 1px dashed #cbd5e1;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
     
-    /* ===== FILTROS ATIVOS ===== */
+    .badge-null i {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+    
+    /* ===== FILTROS ATIVOS MELHORADOS ===== */
     .active-filters-container {
-        background: #f8f9fa;
-        border-radius: 8px;
-        padding: 12px 15px;
-        margin-bottom: 15px;
-        border: 1px solid #e9ecef;
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        border: 1px solid var(--border-color);
         display: none;
+        box-shadow: var(--shadow-sm);
     }
     
     .active-filter-badge {
         background: var(--primary-dark);
         color: white;
-        padding: 5px 12px;
+        padding: 6px 14px;
         border-radius: 30px;
-        font-size: 0.8rem;
+        font-size: 0.85rem;
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        margin: 3px;
-        transition: all 0.2s;
+        gap: 10px;
+        margin: 4px;
+        transition: var(--transition);
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(47, 143, 78, 0.3);
     }
     
     .active-filter-badge:hover {
         background: #dc3545;
         transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
     }
     
     .active-filter-badge i {
         cursor: pointer;
-        font-size: 0.7rem;
+        font-size: 0.8rem;
+        opacity: 0.8;
+    }
+    
+    .active-filter-badge i:hover {
+        opacity: 1;
     }
     
     .active-filter-badge.null-filter {
         background: #6c757d;
     }
     
-    /* ===== FILTROS EXCEL ===== */
+    /* ===== FILTROS EXCEL MELHORADOS ===== */
     .excel-filter-container {
         position: absolute;
         background: white;
-        border: 1px solid #dee2e6;
-        border-radius: 12px;
-        box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        border: none;
+        border-radius: 16px;
+        box-shadow: var(--shadow-lg);
         z-index: 1060;
-        min-width: 280px;
-        max-width: 350px;
+        min-width: 300px;
+        max-width: 380px;
         animation: slideDown 0.2s ease;
         overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.05);
     }
     
     @keyframes slideDown {
@@ -481,62 +594,71 @@
     }
     
     .filter-header {
-        padding: 12px 15px;
-        background: #f8f9fa;
+        padding: 15px 20px;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
         border-bottom: 1px solid #dee2e6;
-        font-weight: 600;
-        color: #495057;
+        font-weight: 700;
+        color: #2c3e50;
+        font-size: 1rem;
     }
     
     .filter-header small {
-        font-weight: normal;
-        color: #6c757d;
+        font-weight: 400;
+        color: var(--text-muted);
         margin-left: 8px;
+        font-size: 0.75rem;
+        background: white;
+        padding: 2px 8px;
+        border-radius: 20px;
     }
     
     .filter-search {
-        padding: 10px 15px;
+        padding: 12px 15px;
         border-bottom: 1px solid #dee2e6;
+        background: white;
     }
     
     .filter-search input {
         width: 100%;
-        padding: 8px 12px;
-        border: 1px solid #dee2e6;
-        border-radius: 6px;
-        font-size: 0.875rem;
-        transition: all 0.2s;
+        padding: 10px 15px;
+        border: 2px solid #e9ecef;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        transition: var(--transition);
     }
     
     .filter-search input:focus {
         border-color: var(--primary-dark);
-        box-shadow: 0 0 0 2px rgba(47, 143, 78, 0.1);
+        box-shadow: 0 0 0 3px rgba(47, 143, 78, 0.1);
         outline: none;
     }
     
     .filter-options {
-        max-height: 250px;
+        max-height: 280px;
         overflow-y: auto;
         padding: 5px 0;
+        background: white;
     }
     
     .filter-option {
-        padding: 8px 15px;
+        padding: 10px 18px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
         cursor: pointer;
         transition: background 0.2s;
+        border-left: 3px solid transparent;
     }
     
     .filter-option:hover {
-        background: #f8f9fa;
+        background: #f1f5f9;
+        border-left-color: var(--primary-dark);
     }
     
     .filter-option input[type="checkbox"] {
         margin: 0;
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         cursor: pointer;
         accent-color: var(--primary-dark);
     }
@@ -545,147 +667,182 @@
         flex: 1;
         cursor: pointer;
         margin: 0;
-        font-size: 0.875rem;
+        font-size: 0.9rem;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        color: #2c3e50;
+        font-weight: 500;
     }
     
     .filter-option.null-option {
         border-bottom: 1px dashed #dee2e6;
-        background: #f8f9fa;
+        background: #f8fafc;
     }
     
     .filter-option.null-option label {
         font-style: italic;
-        color: #6c757d;
+        color: #64748b;
+        font-weight: 400;
     }
     
     .filter-actions {
-        padding: 10px 15px;
+        padding: 15px 20px;
         border-top: 1px solid #dee2e6;
         background: #f8f9fa;
         display: flex;
-        gap: 8px;
-        justify-content: flex-end;
+        gap: 15px;
+        justify-content: space-between;
+        align-items: center;
     }
     
     .filter-actions .btn-sm {
-        padding: 4px 10px;
-        font-size: 0.8rem;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        border-radius: 30px;
+        font-weight: 600;
     }
     
     .filter-actions .btn-link {
         color: var(--primary-dark);
         text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 6px 12px;
     }
     
     .filter-actions .btn-link:hover {
-        text-decoration: underline;
+        background: rgba(47, 143, 78, 0.1);
+        border-radius: 30px;
+        text-decoration: none;
     }
     
-    /* ===== PAGINAÇÃO ===== */
+    /* ===== PAGINAÇÃO MELHORADA ===== */
     .pagination-container {
         background: white;
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: 16px;
+        padding: 20px 25px;
         margin-top: 20px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-        border: 1px solid #e9ecef;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-color);
     }
     
     .pagination-info {
         font-size: 0.95rem;
-        color: #495057;
+        color: #2c3e50;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .pagination-info i {
+        color: var(--primary-dark);
     }
     
     .pagination-controls {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 5px;
+        gap: 8px;
         flex-wrap: wrap;
     }
     
     .pagination-btn {
-        min-width: 40px;
-        height: 40px;
+        min-width: 42px;
+        height: 42px;
         display: flex;
         align-items: center;
         justify-content: center;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
+        border: 2px solid #e9ecef;
+        border-radius: 12px;
         background: white;
         color: var(--primary-dark);
-        font-weight: 500;
+        font-weight: 700;
         text-decoration: none;
-        transition: all 0.2s ease;
+        transition: var(--transition);
         font-size: 0.95rem;
     }
     
-    .pagination-btn:hover:not(.disabled) {
-        background: #f8f9fa;
+    .pagination-btn:hover:not(.disabled):not(.active) {
+        background: #f1f5f9;
         border-color: var(--primary-dark);
         transform: translateY(-2px);
-        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     
     .pagination-btn.active {
         background: var(--primary-dark);
         border-color: var(--primary-dark);
         color: white;
+        box-shadow: 0 4px 12px rgba(47, 143, 78, 0.3);
     }
     
     .pagination-btn.disabled {
-        opacity: 0.5;
+        opacity: 0.4;
         cursor: not-allowed;
         background: #f8f9fa;
-        pointer-events: none;
+        border-color: #dee2e6;
+        color: #adb5bd;
     }
     
     .pagination-dots {
-        padding: 0 8px;
-        color: #6c757d;
-        font-size: 1rem;
+        padding: 0 10px;
+        color: var(--text-muted);
+        font-size: 1.1rem;
+        font-weight: 700;
     }
     
     .pagination-items-select {
-        padding: 8px 35px 8px 15px;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
+        padding: 10px 40px 10px 18px;
+        border: 2px solid #e9ecef;
+        border-radius: 30px;
         font-size: 0.95rem;
         cursor: pointer;
         background: white;
-        transition: all 0.2s;
+        transition: var(--transition);
         appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232f8f4e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%232f8f4e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
         background-repeat: no-repeat;
-        background-position: right 10px center;
+        background-position: right 12px center;
+        font-weight: 600;
+        color: #2c3e50;
     }
     
     .pagination-items-select:hover {
         border-color: var(--primary-dark);
         background-color: #f8f9fa;
+        transform: translateY(-1px);
     }
     
     .pagination-items-select:focus {
         outline: none;
         border-color: var(--primary-dark);
-        box-shadow: 0 0 0 3px rgba(47, 143, 78, 0.1);
+        box-shadow: 0 0 0 4px rgba(47, 143, 78, 0.1);
     }
     
-    /* ===== MODAL ===== */
+    /* ===== MODAL MELHORADO ===== */
     .modal-content {
-        border-radius: 16px;
+        border-radius: 24px;
         border: none;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        box-shadow: 0 25px 60px rgba(0,0,0,0.3);
+        overflow: hidden;
     }
     
     .modal-header {
-        background: linear-gradient(135deg, var(--primary-dark) 0%, #267a41 100%);
+        background: linear-gradient(135deg, var(--primary-dark), #1a4f2b);
         color: white;
-        border-radius: 16px 16px 0 0;
-        padding: 15px 20px;
+        border-radius: 0;
+        padding: 20px 25px;
+        border: none;
+    }
+    
+    .modal-header .modal-title {
+        font-weight: 700;
+        font-size: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
     
     .modal-header .btn-close {
@@ -699,21 +856,57 @@
     }
     
     .modal-body {
-        padding: 20px;
+        padding: 30px;
     }
     
     .modal-footer {
-        padding: 15px 20px;
-        border-top: 1px solid #e9ecef;
+        padding: 20px 25px;
+        border-top: 2px solid #f1f5f9;
+        background: #f8fafc;
+    }
+    
+    .modal-footer .btn {
+        padding: 10px 24px;
+        border-radius: 30px;
+        font-weight: 600;
     }
     
     /* ===== UTILITÁRIOS ===== */
     .text-truncate-custom {
-        max-width: 150px;
+        max-width: 160px;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
         display: inline-block;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .notificacao-flutuante {
+        animation: slideIn 0.3s ease;
+        border-radius: 12px;
+        font-weight: 500;
+        box-shadow: var(--shadow-lg);
+        border: none;
+    }
+    
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
     }
     
     @media (max-width: 768px) {
@@ -733,71 +926,77 @@
         .action-buttons .btn span {
             display: none;
         }
+        
         .action-buttons .btn i {
             margin: 0;
+            font-size: 1.2rem;
+        }
+        
+        .action-buttons .btn {
+            padding: 10px;
         }
     }
 </style>
 
 <div class="container-fluid py-3">
-    <!-- CARDS DE ESTATÍSTICAS - 5 CARDS -->
+    <!-- CARDS DE ESTATÍSTICAS -->
     <div class="stats-row">
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="bg-success rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-layer-group text-white"></i>
+                <div class="rounded-circle me-3">
+                    <i class="fa-solid fa-layer-group text-white fa-lg"></i>
                 </div>
                 <div class="overflow-hidden">
-                    <h4 class="mb-0 text-success text-truncate" id="totalItens">{{ total_itens|intcomma }}</h4>
-                    <small class="text-muted text-truncate d-block">Lotes Ativos (Saldo > 0)</small>
+                    <h4 class="mb-0 text-truncate" id="totalItens">{{ total_itens|intcomma }}</h4>
+                    <small class="text-truncate d-block">Lotes Ativos</small>
                 </div>
             </div>
         </div>
         
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="bg-info rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-weight-hanging text-white"></i>
+                <div class="rounded-circle me-3">
+                    <i class="fa-solid fa-weight-hanging text-white fa-lg"></i>
                 </div>
                 <div class="overflow-hidden">
-                    <h4 class="mb-0 text-info text-truncate" id="totalSc">{{ total_sc|intcomma }}</h4>
-                    <small class="text-muted text-truncate d-block">Equivalente SC</small>
+                    <h4 class="mb-0 text-truncate" id="totalSc">{{ total_sc|intcomma }}</h4>
+                    <small class="text-truncate d-block">Equivalente SC</small>
                 </div>
             </div>
         </div>
         
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="bg-warning rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-box text-white"></i>
+                <div class="rounded-circle me-3">
+                    <i class="fa-solid fa-box text-white fa-lg"></i>
                 </div>
                 <div class="overflow-hidden">
-                    <h4 class="mb-0 text-warning text-truncate" id="totalBags">{{ total_bags|intcomma }}</h4>
-                    <small class="text-muted text-truncate d-block">Unidades BAG</small>
+                    <h4 class="mb-0 text-truncate" id="totalBags">{{ total_bags|intcomma }}</h4>
+                    <small class="text-truncate d-block">Unidades BAG</small>
                 </div>
             </div>
         </div>
         
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="bg-primary rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-weight-scale text-white"></i>
+                <div class="rounded-circle me-3">
+                    <i class="fa-solid fa-weight-scale text-white fa-lg"></i>
                 </div>
                 <div class="overflow-hidden">
-                    <h4 class="mb-0 text-primary text-truncate" id="totalPme">{{ total_pme|default:"0"|floatformat:2|intcomma }}</h4>
-                    <small class="text-muted text-truncate d-block">PME Total (KG)</small>
+                    <h4 class="mb-0 text-truncate" id="totalPme">{{ total_pme|default:"0"|floatformat:2|intcomma }}</h4>
+                    <small class="text-truncate d-block">Peso Total (KG)</small>
                 </div>
             </div>
         </div>
         
         <div class="stats-card">
             <div class="d-flex align-items-center">
-                <div class="bg-secondary rounded-circle p-3 me-3">
-                    <i class="fa-solid fa-users text-white"></i>
+                <div class="rounded-circle me-3">
+                    <i class="fa-solid fa-users text-white fa-lg"></i>
                 </div>
                 <div class="overflow-hidden">
-                    <h4 class="mb-0 text-secondary text-truncate" id="clientesUnicos">{{ clientes_unicos|intcomma }}</h4>
-                    <small class="text-muted text-truncate d-block">Clientes Únicos</small>
+                    <h4 class="mb-0 text-truncate" id="clientesUnicos">{{ clientes_unicos|intcomma }}</h4>
+                    <small class="text-truncate d-block">Clientes Únicos</small>
                 </div>
             </div>
         </div>
@@ -805,18 +1004,22 @@
 
     <!-- FILTROS ATIVOS -->
     <div class="active-filters-container" id="activeFiltersContainer">
-        <small class="text-muted d-block mb-2">Filtros Ativos:</small>
+        <small class="text-muted d-block mb-2">
+            <i class="fa-solid fa-filter me-1"></i>Filtros Ativos:
+        </small>
         <div id="activeFilters" class="d-flex flex-wrap"></div>
     </div>
 
+    <!-- BOTÕES DE AÇÃO -->
     <div class="action-buttons">
         <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
             <i class="fa-solid fa-download"></i><span>Exportar</span>
         </button>
 
-        <button class="btn btn-primary" id="btnAbrirFicha" onclick="abrirFichaLoteUnico()" disabled>
+        <button class="btn btn-ficha" id="btnAbrirFicha" disabled>
             <i class="fa-solid fa-qrcode"></i><span>Ficha do Lote</span>
         </button>
+        
         <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;">
             <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpar Filtros</span>
         </button>
@@ -824,7 +1027,9 @@
         <div class="search-container">
             <i class="fa-solid fa-search search-icon"></i>
             <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar em todas as colunas..." value="{{ busca }}">
-            <button class="clear-search" id="clearSearchBtn"><i class="fa-solid fa-times"></i></button>
+            <button class="clear-search" id="clearSearchBtn" title="Limpar busca">
+                <i class="fa-solid fa-times"></i>
+            </button>
         </div>
     </div>
 
@@ -838,13 +1043,13 @@
                             <i class="fa-regular fa-circle me-1"></i>
                             <i class="fa-solid fa-filter filter-indicator"></i>
                         </th>
-                        <th data-column="az" data-type="text" onclick="showFilter(this, 'az', 'text')">
+                        <th data-column="az" data-type="select" onclick="showFilter(this, 'az', 'select')">
                             AZ <i class="fa-solid fa-filter filter-indicator"></i>
                         </th>
-                        <th data-column="lote" data-type="text" onclick="showFilter(this, 'lote', 'text')">
+                        <th data-column="lote" data-type="select" onclick="showFilter(this, 'lote', 'select')">
                             Lote <i class="fa-solid fa-filter filter-indicator"></i>
                         </th>
-                        <th data-column="produto" data-type="text" onclick="showFilter(this, 'produto', 'text')">
+                        <th data-column="produto" data-type="select" onclick="showFilter(this, 'produto', 'select')">
                             Produto <i class="fa-solid fa-filter filter-indicator"></i>
                         </th>
                         <th data-column="cultivar" data-type="select" onclick="showFilter(this, 'cultivar', 'select')">
@@ -856,7 +1061,7 @@
                         <th data-column="categoria" data-type="select" onclick="showFilter(this, 'categoria', 'select')">
                             Cat <i class="fa-solid fa-filter filter-indicator"></i>
                         </th>
-                        <th data-column="endereco" data-type="text" onclick="showFilter(this, 'endereco', 'text')">
+                        <th data-column="endereco" data-type="select" onclick="showFilter(this, 'endereco', 'select')">
                             Endereço <i class="fa-solid fa-filter filter-indicator"></i>
                         </th>
                         <th data-column="saldo" data-type="number" onclick="showFilter(this, 'saldo', 'number')">
@@ -896,7 +1101,7 @@
                         <!-- COLUNA DE STATUS -->
                         <td class="status-column">
                             <div class="status-sistemico-container" 
-                                 onclick="event.stopPropagation(); abrirModalStatusSistemico({{ item.id }}, this)">
+                                 onclick="abrirModalStatusSistemico(event, {{ item.id }}, this)">
                                 
                                 <div class="status-sistemico-indicator" 
                                      data-id="{{ item.id }}"
@@ -924,27 +1129,57 @@
                         </td>
                         
                         <!-- AZ -->
-                        <td><span class="badge bg-secondary bg-opacity-10 text-dark">{{ item.az|default:"-" }}</span></td>
+                        <td>
+                            {% if item.az %}
+                                <span class="badge bg-secondary bg-opacity-10 text-dark px-3 py-2">{{ item.az }}</span>
+                            {% else %}
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
+                            {% endif %}
+                        </td>
                         
                         <!-- Lote -->
                         <td><span class="fw-bold text-primary">{{ item.lote }}</span></td>
                         
                         <!-- Produto -->
-                        <td><span class="text-truncate-custom" title="{{ item.produto|default:'' }}">{{ item.produto|default:"-" }}</span></td>
+                        <td>
+                            {% if item.produto %}
+                                <span class="text-truncate-custom" title="{{ item.produto }}">{{ item.produto }}</span>
+                            {% else %}
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
+                            {% endif %}
+                        </td>
                         
                         <!-- Cultivar -->
-                        <td>{{ item.cultivar.nome|default:"-" }}</td>
+                        <td>
+                            {% if item.cultivar %}
+                                {{ item.cultivar.nome }}
+                            {% else %}
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
+                            {% endif %}
+                        </td>
                         
                         <!-- Peneira -->
-                        <td>{{ item.peneira.nome|default:"-" }}</td>
+                        <td>
+                            {% if item.peneira %}
+                                {{ item.peneira.nome }}
+                            {% else %}
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
+                            {% endif %}
+                        </td>
                         
                         <!-- Categoria -->
-                        <td>{{ item.categoria.nome|default:"-" }}</td>
+                        <td>
+                            {% if item.categoria %}
+                                {{ item.categoria.nome }}
+                            {% else %}
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
+                            {% endif %}
+                        </td>
                         
                         <!-- Endereço -->
                         <td>
                             <span class="endereco-badge" title="{{ item.endereco }}">
-                                <i class="fa-solid fa-location-dot me-1"></i>{{ item.endereco }}
+                                <i class="fa-solid fa-location-dot"></i>{{ item.endereco }}
                             </span>
                         </td>
                         
@@ -959,23 +1194,32 @@
                         <td>{{ item.peso_unitario|floatformat:2 }}</td>
                         
                         <!-- Peso Total -->
-                        <td><strong>{{ item.peso_total|floatformat:2 }}</strong></td>
+                        <td><strong class="text-primary">{{ item.peso_total|floatformat:2 }}</strong></td>
                         
                         <!-- Espécie -->
-                        <td>{{ item.especie|default:"-" }}</td>
+                        <td>
+                            {% if item.especie %}
+                                {{ item.especie.nome }}
+                            {% else %}
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
+                            {% endif %}
+                        </td>
                         
                         <!-- Tratamento -->
                         <td>
                             {% if item.tratamento %}
-                                <span class="badge bg-info" title="{{ item.tratamento.nome }}">{{ item.tratamento.nome|truncatechars:10 }}</span>
+                                <span class="badge bg-info text-white px-3 py-2" title="{{ item.tratamento.nome }}">
+                                    <i class="fa-solid fa-flask me-1"></i>{{ item.tratamento.nome|truncatechars:10 }}
+                                </span>
                             {% else %}
-                                <span class="badge bg-secondary">-</span>
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
                             {% endif %}
                         </td>
                         
                         <!-- Embalagem -->
                         <td>
-                            <span class="badge {% if item.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %}">
+                            <span class="badge {% if item.embalagem == 'BAG' %}bg-primary{% else %}bg-secondary{% endif %} px-3 py-2">
+                                <i class="fa-solid {% if item.embalagem == 'BAG' %}fa-box{% else %}fa-weight-hanging{% endif %} me-1"></i>
                                 {{ item.get_embalagem_display }}
                             </span>
                         </td>
@@ -984,10 +1228,10 @@
                         <td>
                             {% if item.cliente %}
                                 <span class="badge badge-cliente" title="{{ item.cliente }}">
-                                    <i class="fas fa-user-tag me-1"></i>{{ item.cliente|truncatechars:12 }}
+                                    <i class="fas fa-user-tag"></i>{{ item.cliente|truncatechars:15 }}
                                 </span>
                             {% else %}
-                                <span class="badge-null">(vazio)</span>
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
                             {% endif %}
                         </td>
                         
@@ -995,29 +1239,32 @@
                         <td>
                             {% if item.empresa %}
                                 <span class="badge badge-empresa" title="{{ item.empresa }}">
-                                    {{ item.empresa|truncatechars:15 }}
+                                    <i class="fas fa-building"></i>{{ item.empresa|truncatechars:15 }}
                                 </span>
                             {% else %}
-                                <span class="badge-null">(vazio)</span>
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
                             {% endif %}
                         </td>
                         
                         <!-- Conferente -->
                         <td>
                             {% if item.conferente %}
-                                <small title="{{ item.conferente.get_full_name|default:item.conferente.username }}">
-                                    {{ item.conferente.first_name|default:item.conferente.username|truncatechars:12 }}
-                                </small>
+                                <span class="badge bg-secondary text-white px-3 py-2" title="{{ item.conferente.get_full_name|default:item.conferente.username }}">
+                                    <i class="fa-solid fa-user-check me-1"></i>{{ item.conferente.first_name|default:item.conferente.username|truncatechars:12 }}
+                                </span>
                             {% else %}
-                                <span class="badge-null">(vazio)</span>
+                                <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
                             {% endif %}
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
                         <td colspan="17" class="text-center py-5">
-                            <i class="fa-solid fa-inbox fa-3x mb-3 text-muted"></i>
-                            <p class="text-muted">Nenhum item encontrado em estoque</p>
+                            <div class="empty-state">
+                                <i class="fa-solid fa-box-open fa-4x mb-3 text-muted opacity-50"></i>
+                                <h5 class="text-muted">Nenhum item encontrado em estoque</h5>
+                                <p class="text-muted small">Tente ajustar os filtros ou cadastrar novos lotes</p>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
@@ -1032,8 +1279,8 @@
         <div class="row align-items-center">
             <div class="col-lg-4 mb-3 mb-lg-0">
                 <div class="pagination-info">
-                    <i class="fa-solid fa-list me-2 text-success"></i>
-                    Mostrando {{ estoque.start_index }} - {{ estoque.end_index }} de {{ estoque.paginator.count }} itens
+                    <i class="fa-solid fa-list"></i>
+                    <span>Mostrando {{ estoque.start_index }} - {{ estoque.end_index }} de {{ estoque.paginator.count }} itens</span>
                 </div>
             </div>
             
@@ -1095,9 +1342,12 @@
 <!-- DADOS DO BACKEND -->
 {{ filter_options|json_script:"filter-options-data" }}
 
+<!-- URL da ficha de rastreabilidade -->
+<input type="hidden" id="fichaRastreabilidadeUrl" value="{% url 'sapp:ficha_rastreabilidade' %}">
+
 <!-- MODAL DE EXPORTAÇÃO -->
 <div class="modal fade" id="exportModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
@@ -1106,10 +1356,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p>Escolha o formato para exportar:</p>
+                <p class="mb-4">Escolha o formato para exportar os dados:</p>
                 <div class="d-grid gap-3">
                     <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success btn-lg">
-                        <i class="fa-solid fa-file-excel me-2"></i>Excel
+                        <i class="fa-solid fa-file-excel me-2"></i>Excel (.xlsx)
                     </a>
                 </div>
             </div>
@@ -1128,27 +1378,30 @@
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body text-center">
-                <div class="mb-4">
+            <div class="modal-body">
+                <div class="text-center mb-4">
                     <div class="small text-muted mb-2">Status Atual:</div>
-                    <div class="d-flex align-items-center justify-content-center gap-2">
-                        <div id="previewStatusAtual" style="width: 32px; height: 32px; border-radius: 50%;"></div>
-                        <span id="textoStatusAtual" class="fw-bold"></span>
+                    <div class="d-flex align-items-center justify-content-center gap-3">
+                        <div id="previewStatusAtual" style="width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 3px 10px rgba(0,0,0,0.2);"></div>
+                        <span id="textoStatusAtual" class="fw-bold fs-5"></span>
                     </div>
                 </div>
-                <div class="mb-3">
+                
+                <div class="text-center mb-3">
                     <i class="fa-solid fa-arrow-down fa-2x text-muted"></i>
                 </div>
-                <div class="mb-4">
+                
+                <div class="text-center mb-4">
                     <div class="small text-muted mb-2">Novo Status:</div>
-                    <div class="d-flex align-items-center justify-content-center gap-2">
-                        <div id="previewNovoStatus" style="width: 32px; height: 32px; border-radius: 50%;"></div>
-                        <span id="textoNovoStatus" class="fw-bold"></span>
+                    <div class="d-flex align-items-center justify-content-center gap-3">
+                        <div id="previewNovoStatus" style="width: 40px; height: 40px; border-radius: 50%; box-shadow: 0 3px 10px rgba(0,0,0,0.2);"></div>
+                        <span id="textoNovoStatus" class="fw-bold fs-5"></span>
                     </div>
                 </div>
-                <div class="alert alert-info small">
-                    <i class="fa-solid fa-info-circle me-1"></i>
-                    Ciclo: 🔴 Crítico → 🟡 Parcial → 🟢 OK → 🔴 Crítico
+                
+                <div class="alert alert-info d-flex align-items-center gap-2 small">
+                    <i class="fa-solid fa-info-circle fa-lg"></i>
+                    <span>Ciclo: 🔴 Crítico → 🟡 Parcial → 🟢 OK → 🔴 Crítico</span>
                 </div>
             </div>
             <div class="modal-footer">
@@ -1163,15 +1416,14 @@
     </div>
 </div>
 
-<!-- SCRIPTS -->
 <script>
-// SCRIPTS COMPLETO - COM FILTROS ENCADEADOS, BOTÕES TODOS/NENHUM E VALORES VAZIOS CORRIGIDOS
-// SCRIPTS COMPLETO - CORREÇÃO DO FILTRO VAZIOS E BOTÃO FICHA
+// ===== SCRIPTS COMPLETO OTIMIZADO =====
 let backendOptions = {};
 let currentUrlParams = new URLSearchParams(window.location.search);
 let verificarLotesTimeout = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Carregar opções do backend
     const dataScript = document.getElementById('filter-options-data');
     if (dataScript) {
         try {
@@ -1182,12 +1434,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // Inicializar componentes
     setupSearch();
     setupClearButtons();
     updateActiveFiltersUI();
     markActiveHeaders();
     initStatusTooltips();
     
+    // Configurar botão da ficha
+    document.getElementById('btnAbrirFicha').addEventListener('click', abrirFichaLoteUnico);
+    
+    // Focar no search se tiver valor
     const searchInput = document.getElementById('searchInput');
     if (searchInput && searchInput.value.trim() !== '') {
         setTimeout(() => {
@@ -1199,10 +1456,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Verificar lotes após carregar
     setTimeout(verificarQtdLotes, 200);
     
-    // Observer para quando a tabela for atualizada
+    // Observer para atualizações da tabela
     observarMudancasTabela();
 });
 
+// ===== TOOLTIPS =====
 function initStatusTooltips() {
     document.querySelectorAll('.status-sistemico-container').forEach(container => {
         const tooltip = container.querySelector('.status-tooltip-custom');
@@ -1218,7 +1476,7 @@ function initStatusTooltips() {
     });
 }
 
-// ===== FUNÇÕES PARA O BOTÃO DA FICHA - VERSÃO FINAL =====
+// ===== BOTÃO DA FICHA - CORRIGIDO PARA USAR ID =====
 function verificarQtdLotes() {
     if (verificarLotesTimeout) {
         clearTimeout(verificarLotesTimeout);
@@ -1228,87 +1486,89 @@ function verificarQtdLotes() {
         const btnFicha = document.getElementById('btnAbrirFicha');
         if (!btnFicha) return;
         
+        // PEGAR SOMENTE AS LINHAS VISÍVEIS NO MOMENTO
         const linhasTabela = document.querySelectorAll('#tableBody tr');
         
-        // Se não houver linhas
-        if (linhasTabela.length === 0) {
+        // Filtrar apenas linhas que NÃO são a linha de "nenhum item"
+        const linhasVisiveis = Array.from(linhasTabela).filter(tr => {
+            return !tr.querySelector('td[colspan]');
+        });
+        
+        console.log('Linhas visíveis:', linhasVisiveis.length);
+        
+        // Se não houver linhas visíveis
+        if (linhasVisiveis.length === 0) {
             desabilitarBotaoFicha(btnFicha, "Nenhum lote encontrado");
+            btnFicha.dataset.itemId = '';
+            btnFicha.dataset.loteUnico = '';
             return;
         }
         
-        // Verificar se é a linha de "Nenhum item encontrado"
-        const primeiraLinha = linhasTabela[0];
-        if (linhasTabela.length === 1 && primeiraLinha.querySelector('td[colspan]')) {
-            desabilitarBotaoFicha(btnFicha, "Nenhum lote encontrado");
-            return;
-        }
-        
-        // Se o backend já filtra apenas saldo > 0, TODAS as linhas são válidas
-        // Então contamos todas as linhas que não são a mensagem de vazio
-        let qtdLotesValidos = 0;
-        
-        for (let tr of linhasTabela) {
-            if (tr.querySelector('td[colspan]')) continue;
-            if (tr.cells.length < 3) continue;
+        // Se houver EXATAMENTE 1 LINHA VISÍVEL
+        if (linhasVisiveis.length === 1) {
+            const trUnica = linhasVisiveis[0];
             
-            // Verifica se tem um lote válido (não vazio)
-            const loteCell = tr.cells[2];
-            if (loteCell && loteCell.innerText.trim()) {
-                qtdLotesValidos++;
+            // PEGAR O ID DO ITEM (do atributo data-id no indicador de status)
+            const statusIndicator = trUnica.querySelector('.status-sistemico-indicator');
+            const itemId = statusIndicator ? statusIndicator.dataset.id : '';
+            
+            // PEGAR O LOTE DA CÉLULA
+            const loteCell = trUnica.cells[2];
+            const loteVisivel = loteCell ? loteCell.innerText.trim() : '';
+            
+            if (itemId && loteVisivel) {
+                // Habilita o botão
+                btnFicha.disabled = false;
+                btnFicha.title = `Abrir ficha do item ID: ${itemId}`;
+                btnFicha.classList.remove('btn-secondary');
+                btnFicha.classList.add('btn-ficha');
+                
+                // ARMAZENA O ID E O LOTE (usaremos o ID)
+                btnFicha.dataset.itemId = itemId;
+                btnFicha.dataset.loteUnico = loteVisivel;
+                
+                console.log('✅ Item único selecionado - ID:', itemId, 'Lote:', loteVisivel);
             }
-        }
-        
-        console.log(`Total de lotes na tabela: ${linhasTabela.length}, Válidos: ${qtdLotesValidos}`);
-        
-        // Habilita se tiver EXATAMENTE 1 lote
-        if (qtdLotesValidos === 1) {
-            btnFicha.disabled = false;
-            btnFicha.title = "Abrir ficha do lote";
-            btnFicha.classList.remove('btn-secondary');
-            btnFicha.classList.add('btn-primary');
         } else {
+            // Mais de uma linha visível
             desabilitarBotaoFicha(
                 btnFicha, 
-                qtdLotesValidos === 0 
-                    ? "Nenhum lote encontrado" 
-                    : `Selecione exatamente 1 lote (encontrados: ${qtdLotesValidos})`
+                `Selecione exatamente 1 lote (encontrados: ${linhasVisiveis.length})`
             );
+            btnFicha.dataset.itemId = '';
+            btnFicha.dataset.loteUnico = '';
         }
     }, 50);
+}
+
+function abrirFichaLoteUnico() {
+    const btnFicha = document.getElementById('btnAbrirFicha');
+    if (btnFicha.disabled) {
+        mostrarNotificacao('❌ Selecione exatamente 1 lote para abrir a ficha.', 'warning');
+        return;
+    }
+    
+    // PEGAR O ID DO ITEM (NÃO APENAS O LOTE)
+    const itemId = btnFicha.dataset.itemId;
+    
+    if (itemId) {
+        const fichaUrl = document.getElementById('fichaRastreabilidadeUrl').value;
+        console.log('🔍 Abrindo ficha do item ID:', itemId);
+        // Passar o ID em vez do lote
+        window.open(`${fichaUrl}?item_id=${encodeURIComponent(itemId)}`, '_blank');
+    } else {
+        mostrarNotificacao('Erro: ID do item não encontrado', 'danger');
+    }
 }
 
 function desabilitarBotaoFicha(btnFicha, mensagem) {
     btnFicha.disabled = true;
     btnFicha.title = mensagem;
-    btnFicha.classList.remove('btn-primary');
+    btnFicha.classList.remove('btn-ficha');
     btnFicha.classList.add('btn-secondary');
 }
 
-window.abrirFichaLoteUnico = function() {
-    const btnFicha = document.getElementById('btnAbrirFicha');
-    if (btnFicha.disabled) {
-        alert('❌ Nenhum lote único disponível para abrir a ficha.');
-        return;
-    }
-    
-    // Pega o PRIMEIRO lote da tabela (já que só tem 1)
-    const linhas = document.querySelectorAll('#tableBody tr');
-    let loteEncontrado = null;
-    
-    for (let tr of linhas) {
-        if (tr.querySelector('td[colspan]')) continue;
-        
-        const loteCell = tr.cells[2];
-        if (loteCell) {
-            loteEncontrado = loteCell.innerText.trim();
-            break;
-        }
-    }
-    
-    if (loteEncontrado) {
-        window.open(`/ficha-rastreabilidade/?lote=${encodeURIComponent(loteEncontrado)}`, '_blank');
-    }
-};
+
 
 function observarMudancasTabela() {
     const tabelaBody = document.getElementById('tableBody');
@@ -1355,11 +1615,11 @@ window.showFilter = function(thElement, columnName, columnType) {
         filterContainer.style.left = (rect.left + scrollLeft) + 'px';
     }
     
-    // Mostrar loading
-    filterContainer.innerHTML = '<div class="p-3 text-center"><i class="fa-solid fa-spinner fa-pulse"></i> Carregando...</div>';
+    // Loading
+    filterContainer.innerHTML = '<div class="p-4 text-center"><div class="loading-spinner me-2"></div> Carregando opções...</div>';
     document.body.appendChild(filterContainer);
     
-    // Buscar opções atualizadas baseadas nos filtros atuais
+    // Buscar opções atualizadas
     buscarOpcoesFiltro(columnName).then(({opcoes, temNull}) => {
         if (columnType === 'number') {
             filterContainer.innerHTML = createNumericFilterHTML(columnName);
@@ -1383,13 +1643,12 @@ window.showFilter = function(thElement, columnName, columnType) {
         }, 10);
     }).catch(error => {
         console.error('Erro ao carregar opções:', error);
-        filterContainer.innerHTML = '<div class="p-3 text-center text-danger">Erro ao carregar opções</div>';
+        filterContainer.innerHTML = '<div class="p-4 text-center text-danger"><i class="fa-solid fa-exclamation-circle me-2"></i>Erro ao carregar opções</div>';
     });
 };
 
 async function buscarOpcoesFiltro(columnName) {
     try {
-        // Se for status_sistemico, retorna opções fixas
         if (columnName === 'status_sistemico') {
             return {
                 opcoes: [
@@ -1397,11 +1656,10 @@ async function buscarOpcoesFiltro(columnName) {
                     {value: 'parcial', label: '🟡 Parcial'},
                     {value: 'critico', label: '🔴 Crítico'}
                 ],
-                temNull: false // Status sistêmico nunca é nulo
+                temNull: false
             };
         }
         
-        // Construir URL com os filtros atuais (exceto a coluna atual)
         const params = new URLSearchParams(currentUrlParams);
         params.delete(columnName);
         params.delete(`min_${columnName}`);
@@ -1420,7 +1678,6 @@ async function buscarOpcoesFiltro(columnName) {
         console.error('Erro ao buscar opções:', error);
     }
     
-    // Fallback para opções do backend inicial
     const rawOptions = backendOptions[columnName] || [];
     return {
         opcoes: rawOptions.map(opt => ({value: opt, label: opt})),
@@ -1435,16 +1692,16 @@ function createNumericFilterHTML(columnName) {
         <div class="filter-header"><strong>Filtrar ${columnName}</strong></div>
         <div class="filter-numeric p-3">
             <div class="mb-2">
-                <small>Mínimo</small>
-                <input type="number" id="${columnName}-min" class="form-control form-control-sm" value="${minVal}" step="0.01">
+                <small class="text-muted">Mínimo</small>
+                <input type="number" id="${columnName}-min" class="form-control" value="${minVal}" step="0.01" placeholder="0">
             </div>
             <div class="mb-3">
-                <small>Máximo</small>
-                <input type="number" id="${columnName}-max" class="form-control form-control-sm" value="${maxVal}" step="0.01">
+                <small class="text-muted">Máximo</small>
+                <input type="number" id="${columnName}-max" class="form-control" value="${maxVal}" step="0.01" placeholder="9999">
             </div>
-            <div class="d-flex justify-content-between">
-                <button class="btn btn-sm btn-secondary" onclick="clearColumnFilter('${columnName}')">Limpar</button>
-                <button class="btn btn-sm btn-primary" onclick="applyNumericFilter('${columnName}')">Aplicar</button>
+            <div class="d-flex justify-content-between gap-2">
+                <button class="btn btn-sm btn-secondary w-50" onclick="clearColumnFilter('${columnName}')">Limpar</button>
+                <button class="btn btn-sm btn-primary w-50" onclick="applyNumericFilter('${columnName}')">Aplicar</button>
             </div>
         </div>
     `;
@@ -1456,12 +1713,12 @@ function createSelectFilterHTML(columnName, options, temNull) {
     
     let optionsHtml = '';
     
-    // Só mostra opção de vazio se realmente existirem valores nulos
+    // Só mostra (vazio) se realmente existir
     if (temNull) {
         optionsHtml += `
             <div class="filter-option null-option">
-                <input type="checkbox" class="filter-checkbox" id="chk-${columnName}-null" value="__null__" ${hasNullSelected ? 'checked' : ''}>
-                <label for="chk-${columnName}-null" style="font-style: italic; color: #6c757d;">
+                <input type="checkbox" class="filter-checkbox" id="chk-${columnName}-null-${Date.now()}" value="__null__" ${hasNullSelected ? 'checked' : ''}>
+                <label for="chk-${columnName}-null-${Date.now()}">
                     <i class="fa-regular fa-circle-xmark me-1"></i>(vazio)
                 </label>
             </div>
@@ -1469,14 +1726,16 @@ function createSelectFilterHTML(columnName, options, temNull) {
     }
     
     if (options && options.length > 0) {
-        options.forEach(opt => {
+        options.sort((a, b) => a.label.localeCompare(b.label));
+        
+        options.forEach((opt, index) => {
             const safeValue = String(opt.value);
             const isChecked = selectedValues.includes(safeValue) ? 'checked' : '';
-            const id = `chk-${columnName}-${safeValue.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const uniqueId = `chk-${columnName}-${safeValue.replace(/[^a-zA-Z0-9]/g, '_')}-${index}-${Date.now()}`;
             optionsHtml += `
                 <div class="filter-option">
-                    <input type="checkbox" class="filter-checkbox" id="${id}" value="${safeValue}" ${isChecked}>
-                    <label for="${id}" class="text-truncate" title="${opt.label}">${opt.label}</label>
+                    <input type="checkbox" class="filter-checkbox" id="${uniqueId}" value="${safeValue}" ${isChecked}>
+                    <label for="${uniqueId}" class="text-truncate" title="${opt.label}">${opt.label}</label>
                 </div>
             `;
         });
@@ -1485,18 +1744,18 @@ function createSelectFilterHTML(columnName, options, temNull) {
     return `
         <div class="filter-header">
             <strong>${columnName}</strong>
-            <small>✓ marque as opções</small>
+            <small>${options.length} opções</small>
         </div>
         <div class="filter-search">
-            <input type="text" class="form-control form-control-sm" placeholder="Buscar..." onkeyup="filterOptionsList(this)">
+            <input type="text" class="form-control form-control-sm" placeholder="Buscar opções..." onkeyup="filterOptionsList(this)">
         </div>
-        <div class="filter-options" id="options-list-${columnName}">${optionsHtml}</div>
+        <div class="filter-options" id="options-list-${columnName}-${Date.now()}">${optionsHtml}</div>
         <div class="filter-actions">
             <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-link p-0" onclick="toggleAll('${columnName}', true)">Todos</button>
-                <button class="btn btn-sm btn-link p-0" onclick="toggleAll('${columnName}', false)">Nenhum</button>
+                <button class="btn btn-sm btn-link" onclick="toggleAll('${columnName}', true)">Todos</button>
+                <button class="btn btn-sm btn-link" onclick="toggleAll('${columnName}', false)">Nenhum</button>
             </div>
-            <div class="d-flex gap-2 ms-auto">
+            <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-secondary" onclick="clearColumnFilter('${columnName}')">Limpar</button>
                 <button class="btn btn-sm btn-primary" onclick="applySelectFilter('${columnName}')">Aplicar</button>
             </div>
@@ -1506,7 +1765,7 @@ function createSelectFilterHTML(columnName, options, temNull) {
 
 // ===== FUNÇÕES AUXILIARES DOS FILTROS =====
 window.toggleAll = function(columnName, checked) {
-    const container = document.getElementById(`options-list-${columnName}`);
+    const container = document.querySelector(`[id^="options-list-${columnName}"]`);
     if (!container) return;
     
     const checkboxes = container.querySelectorAll('.filter-option:not([style*="display: none"]) input[type="checkbox"]');
@@ -1529,6 +1788,7 @@ window.filterOptionsList = function(input) {
     });
 };
 
+// ===== BUSCA =====
 function setupSearch() {
     const input = document.getElementById('searchInput');
     const btn = document.getElementById('clearSearchBtn');
@@ -1572,6 +1832,7 @@ function setupClearButtons() {
     if(btn) btn.onclick = clearAllFilters;
 }
 
+// ===== APLICAÇÃO DE FILTROS =====
 window.applyNumericFilter = function(columnName) {
     const min = document.getElementById(`${columnName}-min`)?.value;
     const max = document.getElementById(`${columnName}-max`)?.value;
@@ -1593,7 +1854,7 @@ window.applyNumericFilter = function(columnName) {
 };
 
 window.applySelectFilter = function(columnName) {
-    const container = document.getElementById(`options-list-${columnName}`);
+    const container = document.querySelector(`[id^="options-list-${columnName}"]`);
     if (!container) return;
     
     const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
@@ -1658,6 +1919,7 @@ function reloadPage() {
     window.location.search = currentUrlParams.toString();
 }
 
+// ===== UI DE FILTROS ATIVOS =====
 function markActiveHeaders() {
     const keys = Array.from(currentUrlParams.keys());
     document.querySelectorAll('th[data-column]').forEach(th => {
@@ -1692,7 +1954,7 @@ function updateActiveFiltersUI() {
             label = `Busca: "${vals[0]}"`;
         } else {
             const displayVals = vals.map(v => {
-                if (v === '__null__') return '(vazio)';
+                if (v === '__null__') return 'vazio';
                 if (key === 'status_sistemico') {
                     if (v === 'ok') return '🟢 OK';
                     if (v === 'parcial') return '🟡 Parcial';
@@ -1705,7 +1967,7 @@ function updateActiveFiltersUI() {
         
         const badge = document.createElement('span');
         badge.className = 'active-filter-badge' + (vals.includes('__null__') ? ' null-filter' : '');
-        badge.innerHTML = `${label} <i class="fa-solid fa-times" onclick="clearColumnFilter('${key.replace(/min_|max_/, '')}')"></i>`;
+        badge.innerHTML = `${label} <i class="fa-solid fa-times" onclick="clearColumnFilter('${key.replace(/min_|max_/, '')}')" title="Remover filtro"></i>`;
         container.appendChild(badge);
     });
     
@@ -1718,7 +1980,7 @@ let loteIdAtual = null;
 let elementoAtual = null;
 let statusAtual = '';
 
-function abrirModalStatusSistemico(loteId, elemento) {
+function abrirModalStatusSistemico(event, loteId, elemento) {
     event.stopPropagation();
     
     const indicator = elemento.querySelector('.status-sistemico-indicator');
@@ -1735,9 +1997,9 @@ function abrirModalStatusSistemico(loteId, elemento) {
     };
     
     const textos = {
-        'critico': 'Crítico - Sem saldo real',
-        'parcial': 'Parcial - Divergência',
-        'ok': 'OK - Tudo certo'
+        'critico': '🔴 Crítico',
+        'parcial': '🟡 Parcial',
+        'ok': '🟢 OK'
     };
     
     const proximoStatus = statusAtual === 'critico' ? 'parcial' : 
@@ -1759,9 +2021,17 @@ function abrirModalStatusSistemico(loteId, elemento) {
 function confirmarAlteracaoStatus() {
     if (!loteIdAtual || !elementoAtual) return;
     
+    const csrfToken = getCookie('csrftoken');
+    
+    // Validar CSRF antes do fetch
+    if (!csrfToken) {
+        mostrarNotificacao('Erro de segurança: Token CSRF não encontrado. Recarregue a página.', 'danger');
+        return;
+    }
+    
     const btn = document.getElementById('confirmarStatusBtn');
     const textoOriginal = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-pulse me-1"></i>Alterando...';
+    btn.innerHTML = '<span class="loading-spinner me-2"></span>Alterando...';
     btn.disabled = true;
     
     const proximoStatus = statusAtual === 'critico' ? 'parcial' : 
@@ -1771,7 +2041,7 @@ function confirmarAlteracaoStatus() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken')
+            'X-CSRFToken': csrfToken
         },
         body: JSON.stringify({ 
             lote_id: loteIdAtual,
@@ -1792,24 +2062,30 @@ function confirmarAlteracaoStatus() {
                 'ok': '#28a745'
             };
             
+            // Atualizar o indicador visual
             elementoAtual.style.backgroundColor = cores[data.novo_status];
             elementoAtual.dataset.status = data.novo_status;
             
+            // Atualizar o tooltip
             const container = elementoAtual.closest('.status-sistemico-container');
             const tooltip = container.querySelector('.status-tooltip-custom');
             if (tooltip) {
                 const statusText = data.novo_status === 'ok' ? '🟢 OK - Tudo certo' : 
                                   (data.novo_status === 'parcial' ? '🟡 Parcial - Divergência' : '🔴 Crítico - Sem saldo real');
                 
+                const alteradoPor = data.alterado_por || 'Usuário';
+                const alteradoEm = data.alterado_em || new Date().toLocaleString('pt-BR');
+                
                 tooltip.innerHTML = `
                     <strong>${statusText}</strong>
                     <small>
-                        <i class="fa-solid fa-user me-1"></i>${data.alterado_por || 'Usuário'}<br>
-                        <i class="fa-solid fa-clock me-1"></i>${data.alterado_em || new Date().toLocaleString('pt-BR')}
+                        <i class="fa-solid fa-user me-1"></i>${alteradoPor}<br>
+                        <i class="fa-solid fa-clock me-1"></i>${alteradoEm}
                     </small>
                 `;
             }
             
+            // Fechar modal e mostrar sucesso
             bootstrap.Modal.getInstance(document.getElementById('modalStatusSistemico')).hide();
             mostrarNotificacao('Status atualizado com sucesso!', 'success');
         } else {
@@ -1826,7 +2102,9 @@ function confirmarAlteracaoStatus() {
     });
 }
 
+// ===== NOTIFICAÇÕES =====
 function mostrarNotificacao(mensagem, tipo) {
+    // Remover notificações anteriores
     const notificacoesAntigas = document.querySelectorAll('.notificacao-flutuante');
     notificacoesAntigas.forEach(n => n.remove());
     
@@ -1834,12 +2112,23 @@ function mostrarNotificacao(mensagem, tipo) {
     notificacao.className = `notificacao-flutuante alert alert-${tipo} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
     notificacao.setAttribute('role', 'alert');
     notificacao.style.zIndex = '9999';
-    notificacao.style.minWidth = '300px';
-    notificacao.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+    notificacao.style.minWidth = '320px';
+    notificacao.style.padding = '15px 20px';
+    notificacao.style.borderRadius = '12px';
+    notificacao.style.boxShadow = '0 10px 30px rgba(0,0,0,0.2)';
+    notificacao.style.border = 'none';
+    notificacao.style.fontWeight = '500';
+    
+    const icon = tipo === 'success' ? 'fa-circle-check' : 
+                 tipo === 'danger' ? 'fa-circle-exclamation' : 
+                 tipo === 'warning' ? 'fa-triangle-exclamation' : 'fa-circle-info';
     
     notificacao.innerHTML = `
-        ${mensagem}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <div class="d-flex align-items-center gap-3">
+            <i class="fa-solid ${icon} fa-lg"></i>
+            <div class="flex-grow-1">${mensagem}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
     `;
     
     document.body.appendChild(notificacao);
@@ -1848,9 +2137,10 @@ function mostrarNotificacao(mensagem, tipo) {
         if (notificacao.parentNode) {
             notificacao.remove();
         }
-    }, 3000);
+    }, 4000);
 }
 
+// ===== UTILITÁRIOS =====
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -1864,6 +2154,28 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// ===== EVENTOS GLOBAIS =====
+window.addEventListener('popstate', function() {
+    currentUrlParams = new URLSearchParams(window.location.search);
+    updateActiveFiltersUI();
+    markActiveHeaders();
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        const busca = currentUrlParams.get('busca') || '';
+        searchInput.value = busca;
+        document.getElementById('clearSearchBtn').style.display = busca ? 'flex' : 'none';
+    }
+    
+    setTimeout(verificarQtdLotes, 100);
+});
+
+// Inicializar tooltips do Bootstrap se existirem
+if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
 }
 </script>
 {% endblock %}

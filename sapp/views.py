@@ -3562,9 +3562,54 @@ import re
 def ficha_rastreabilidade(request):
     """
     View para exibir a ficha de rastreabilidade
-    Usa os MESMOS FILTROS da página de gestão
+    PRIORIDADE: 
+    1. parâmetro 'item_id' (para pegar a linha específica)
+    2. parâmetro 'lote' (fallback para compatibilidade)
+    3. filtros normais (exatamente 1 resultado)
     """
-    # ========== CAPTURAR TODOS OS FILTROS DA URL ==========
+    
+    import re
+    from django.db.models import Q
+    from .models import Estoque, Produto, ConfiguracaoLogo
+    
+    # ========== CASO 1: TEM ITEM_ID ESPECÍFICO ==========
+    item_id = request.GET.get('item_id', '').strip()
+    
+    if item_id and item_id.isdigit():
+        try:
+            item = Estoque.objects.filter(id=item_id).first()
+            
+            if not item:
+                messages.error(request, f"Item ID '{item_id}' não encontrado.")
+                return redirect('sapp:gestao_estoque')
+            
+            # Processar o item e renderizar a ficha
+            return processar_item_ficha(request, item)
+            
+        except Exception as e:
+            messages.error(request, f"Erro ao buscar item: {str(e)}")
+            return redirect('sapp:gestao_estoque')
+    
+    # ========== CASO 2: TEM LOTE ESPECÍFICO (FALLBACK) ==========
+    lote_especifico = request.GET.get('lote', '').strip()
+    
+    if lote_especifico:
+        try:
+            # Busca o primeiro item com este lote
+            item = Estoque.objects.filter(lote=lote_especifico).first()
+            
+            if not item:
+                messages.error(request, f"Lote '{lote_especifico}' não encontrado.")
+                return redirect('sapp:gestao_estoque')
+            
+            # Processar o item e renderizar a ficha
+            return processar_item_ficha(request, item)
+            
+        except Exception as e:
+            messages.error(request, f"Erro ao buscar lote: {str(e)}")
+            return redirect('sapp:gestao_estoque')
+    
+    # ========== CASO 3: SEM LOTE ESPECÍFICO - USAR FILTROS NORMAIS ==========
     filtros = Q()
     
     # Campos de texto (busca parcial)
@@ -3639,7 +3684,111 @@ def ficha_rastreabilidade(request):
     # PEGAR O ÚNICO ITEM
     item = itens_filtrados.first()
     
-    # ========== PREPARAR DADOS DO ITEM ==========
+    # Processar o item
+    return processar_item_ficha(request, item)
+
+
+def processar_item_ficha(request, item):
+    """
+    Função auxiliar para processar os dados do item e renderizar a ficha
+    """
+    import re
+    from .models import Produto, ConfiguracaoLogo
+    
+    # Extrair código do produto do campo produto
+    codigo_produto = ''
+    descricao_completa = ''
+    produto_obj = None
+    
+    # Tenta encontrar o código do produto
+    if item.produto:
+        # Primeiro tenta encontrar padrão de 10 dígitos
+        match = re.search(r'\b(\d{10})\b', item.produto)
+        if match:
+            codigo_produto = match.group(1)
+            produto_obj = Produto.objects.filter(codigo=codigo_produto).first()
+        
+        # Se não achou com 10 dígitos, usa o próprio produto como código
+        if not produto_obj:
+            codigo_produto = item.produto
+            produto_obj = Produto.objects.filter(codigo=item.produto).first()
+    
+    # Se encontrou o produto, usa a descrição EXATA que está no model
+    if produto_obj and produto_obj.descricao:
+        descricao_completa = produto_obj.descricao
+    
+    # QR Code: código_produto/lote
+    qrcode_texto = item.lote
+    if codigo_produto:
+        qrcode_texto = f"{codigo_produto}/{item.lote}"
+    
+    # Safra padrão 2025/2026
+    safra = "2025/2026"
+    
+    # Extrair AZ do endereço se necessário
+    az = item.az
+    if not az and item.endereco:
+        # Pega as primeiras letras do endereço como AZ
+        az = ''.join([c for c in item.endereco[:2] if c.isalpha()]).upper()
+    
+    # Extrair RUA, LN, PS do endereço (formato: AZ RUA LN PS)
+    rua = ''
+    ln = ''
+    ps = ''
+    
+    if item.endereco:
+        partes = item.endereco.split()
+        if len(partes) >= 4:
+            rua = partes[1] if len(partes) > 1 else ''
+            ln = partes[2] if len(partes) > 2 else ''
+            ps = partes[3] if len(partes) > 3 else ''
+    
+    # Dados completos
+    item_data = {
+        'id': item.id,
+        'lote': item.lote,
+        'safra': safra,
+        'codigo_produto': codigo_produto,
+        'descricao': descricao_completa,
+        'produto': descricao_completa,
+        'az': az or '',
+        'rua': rua,
+        'ln': ln,
+        'ps': ps,
+        'endereco': item.endereco or '',
+        'empresa': item.empresa or 'GRUPO CONCEITO',
+        'peneira': item.peneira.nome if item.peneira else '',
+        'categoria': item.categoria.nome if item.categoria else '',
+        'cultivar': item.cultivar.nome if item.cultivar else '',
+        'peso_unitario': item.peso_unitario,
+        'peso_total': item.peso_total,
+        'embalagem': item.get_embalagem_display() if hasattr(item, 'get_embalagem_display') else item.embalagem,
+        'cliente': item.cliente or '',
+        'status': item.status,
+        'status_sistemico': item.status_sistemico,
+        'saldo': item.saldo,
+        'qrcode_texto': qrcode_texto,
+    }
+    
+    # Buscar configuração da logo
+    config_logo = ConfiguracaoLogo.get_logo()
+    
+    context = {
+        'item': item_data,
+        'config_logo': config_logo,
+        'erro': None,
+        'item_id': item.id,
+        'lote_buscado': item.lote,
+        'filtros_aplicados': request.GET.urlencode(),
+    }
+    
+    return render(request, 'sapp/ficha_rastreabilidade.html', context)
+
+
+def processar_item_ficha(request, item):
+    """
+    Função auxiliar para processar os dados do item e renderizar a ficha
+    """
     # Extrair código do produto do campo produto
     codigo_produto = ''
     descricao_completa = ''
