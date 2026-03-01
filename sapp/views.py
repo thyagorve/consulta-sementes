@@ -257,6 +257,10 @@ def dashboard(request):
     
     return render(request, 'sapp/dashboard.html', context)
 
+# ================================================================
+# LISTA DE ESTOQUE (TABELA PRINCIPAL)
+# ================================================================
+
 @login_required
 def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     """
@@ -268,7 +272,7 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
     ).order_by('-data_ultima_movimentacao', '-id')
     
-    # QuerySet Base para MÉTRICAS - TODOS os lotes
+    # QuerySet Base para MÉTRICAS - TODOS os lotes (para os cards)
     qs_metrics = Estoque.objects.all()
     
     # FILTRO POR STATUS
@@ -292,7 +296,7 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
                 Q(empresa__icontains=termo)
             )
 
-    # Aplicar filtros sequenciais
+    # Aplicar filtros sequenciais - COM SUPORTE A VALORES VAZIOS (__null__)
     filter_map = {
         'az': 'az__in',
         'lote': 'lote__in',
@@ -311,9 +315,24 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
 
     for param, lookup in filter_map.items():
         values = request.GET.getlist(param)
-        values = [v for v in values if v.strip()]
-        if values:
+        # REMOVER VALORES VAZIOS
+        values = [v for v in values if v and v.strip()]
+        
+        # VERIFICAR SE TEM O VALOR ESPECIAL __null__ (VAZIO)
+        tem_null = '__null__' in values
+        if tem_null:
+            values.remove('__null__')
+        
+        if values and tem_null:
+            # CASO: TEM VALORES ESPECÍFICOS E TAMBÉM QUER VAZIOS
+            q = Q(**{lookup: values}) | Q(**{f"{param}__isnull": True}) | Q(**{f"{param}": ''})
+            qs = qs.filter(q)
+        elif values:
+            # CASO: SÓ VALORES ESPECÍFICOS
             qs = qs.filter(**{lookup: values})
+        elif tem_null:
+            # CASO: SÓ VAZIOS
+            qs = qs.filter(Q(**{f"{param}__isnull": True}) | Q(**{f"{param}": ''}))
 
     # Filtros numéricos
     for field in ['saldo', 'peso_unitario', 'peso_total']:
@@ -324,42 +343,51 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         if max_val:
             qs = qs.filter(**{f'{field}__lte': max_val})
 
-    # MÉTRICAS - Usando o queryset NÃO FILTRADO
-    entradas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('entrada'))['s'] or 0
-    entradas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('entrada'))['s'] or 0
-    entradas_total_sc = (entradas_bags * 25) + entradas_sc
+    # MÉTRICAS PARA OS CARDS - Usando o queryset NÃO FILTRADO (qs_metrics)
+    # CARD 1: Lotes Ativos (APENAS saldo > 0)
+    total_itens_ativos = qs_metrics.filter(saldo__gt=0).count()
     
-    saidas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saida'))['s'] or 0
-    saidas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saida'))['s'] or 0
-    saidas_total_sc = (saidas_bags * 25) + saidas_sc
-    
-    saldo_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
-    saldo_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+    # CARD 2: SC Equivalente (somente saldo > 0)
+    saldo_bags = qs_metrics.filter(embalagem='BAG', saldo__gt=0).aggregate(s=Sum('saldo'))['s'] or 0
+    saldo_sc = qs_metrics.filter(embalagem='SC', saldo__gt=0).aggregate(s=Sum('saldo'))['s'] or 0
     saldo_total_sc = (saldo_bags * 25) + saldo_sc
+    
+    # CARD 3: Unidades BAG (somente saldo > 0)
+    saldo_bags_total = qs_metrics.filter(embalagem='BAG', saldo__gt=0).aggregate(s=Sum('saldo'))['s'] or 0
+    
+    # CARD 4: PME Total (KG)
+    pme_total = qs_metrics.filter(saldo__gt=0).aggregate(s=Sum('peso_total'))['s'] or Decimal('0.00')
+    
+    # CARD 5: Clientes Únicos (somente saldo > 0)
+    clientes_unicos = qs_metrics.filter(
+        saldo__gt=0
+    ).exclude(
+        cliente__isnull=True
+    ).exclude(
+        cliente=''
+    ).values('cliente').distinct().count()
 
-    dados_entrada = {'bags': entradas_bags, 'sc': entradas_sc, 'total_sc': entradas_total_sc}
-    dados_saida = {'bags': saidas_bags, 'sc': saidas_sc, 'total_sc': saidas_total_sc}
-    dados_saldo = {'bags': saldo_bags, 'sc': saldo_sc, 'total_sc': saldo_total_sc}
-
-    # Opções de Filtro
-    def get_options_list(field_lookup):
+    # Opções de Filtro (baseadas no queryset filtrado qs, NÃO no qs_metrics)
+    def get_options_list(field_lookup, param_name):
         vals = qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
-        return [str(v) for v in vals if v is not None and str(v).strip() != '']
+        options = [str(v) for v in vals if v is not None and str(v).strip() != '']
+        # Ordenar e retornar
+        return sorted(options)
 
     filter_options = {
-        'az': get_options_list('az'),
-        'lote': get_options_list('lote'),
-        'produto': get_options_list('produto'),
-        'cultivar': get_options_list('cultivar__nome'),
-        'peneira': get_options_list('peneira__nome'),
-        'categoria': get_options_list('categoria__nome'),
-        'endereco': get_options_list('endereco'),
-        'especie': get_options_list('especie__nome'),
-        'tratamento': get_options_list('tratamento__nome'),
-        'embalagem': get_options_list('embalagem'),
-        'cliente': get_options_list('cliente'),
-        'empresa': get_options_list('empresa'),
-        'conferente': get_options_list('conferente__username')
+        'az': get_options_list('az', 'az'),
+        'lote': get_options_list('lote', 'lote'),
+        'produto': get_options_list('produto', 'produto'),
+        'cultivar': get_options_list('cultivar__nome', 'cultivar'),
+        'peneira': get_options_list('peneira__nome', 'peneira'),
+        'categoria': get_options_list('categoria__nome', 'categoria'),
+        'endereco': get_options_list('endereco', 'endereco'),
+        'especie': get_options_list('especie__nome', 'especie'),
+        'tratamento': get_options_list('tratamento__nome', 'tratamento'),
+        'embalagem': get_options_list('embalagem', 'embalagem'),
+        'cliente': get_options_list('cliente', 'cliente'),
+        'empresa': get_options_list('empresa', 'empresa'),
+        'conferente': get_options_list('conferente__username', 'conferente')
     }
 
     # Paginação
@@ -383,22 +411,16 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     if 'page' in query_params:
         del query_params['page']
     
-    total_itens = qs_metrics.count()
-    clientes_unicos = qs_metrics.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
-
     context = {
         'estoque': page_obj,
         'itens': page_obj,
-        'dados_entrada': dados_entrada,
-        'dados_saida': dados_saida,
-        'dados_saldo': dados_saldo,
         'status': status,
         'busca': busca,
-        'total_itens': total_itens,
-        'total_sc': saldo_total_sc,
-        'total_bags': saldo_bags,
-        'total_sc_fisico': saldo_sc,
-        'clientes_unicos': clientes_unicos,
+        'total_itens': total_itens_ativos,  # CARD 1: APENAS saldo > 0
+        'total_sc': saldo_total_sc,          # CARD 2: APENAS saldo > 0
+        'total_bags': saldo_bags_total,      # CARD 3: APENAS saldo > 0
+        'total_pme': pme_total,              # CARD 4: NOVO CARD
+        'clientes_unicos': clientes_unicos,  # CARD 5: APENAS saldo > 0
         'filter_options': filter_options,
         'url_params': query_params.urlencode(),
         'page_sizes': [10, 25, 50, 100, 200],
@@ -419,23 +441,24 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     View para gestão de estoque - MOSTRA APENAS LOTES COM SALDO > 0
     """
     
-    # QuerySet Base - APENAS LOTES COM SALDO > 0
+    # QuerySet Base - APENAS LOTES COM SALDO > 0 - NUNCA mostrar saldo zero
     qs = Estoque.objects.filter(saldo__gt=0).select_related(
         'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
     ).order_by('-data_ultima_movimentacao', '-id')
     
-    # QuerySet Base para MÉTRICAS - TODOS os lotes (para os cards superiores)
-    qs_metrics = Estoque.objects.all()
+    # NÃO existe qs_metrics separado - tudo deve usar o mesmo filtro
     
-    # FILTRO POR STATUS - adaptado para gestão
-    status = request.GET.get('status', 'disponivel')
-    if status == 'disponivel':
-        qs = qs.filter(saldo__gt=0)
-    elif status == 'todos':
-        qs = Estoque.objects.all().select_related(
-            'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
-        ).order_by('-data_ultima_movimentacao', '-id')
-
+    # FILTRO POR STATUS SISTÊMICO
+    status_filter = request.GET.getlist('status_sistemico')
+    if status_filter:
+        if '__null__' in status_filter:
+            qs = qs.filter(
+                Q(status_sistemico__in=[s for s in status_filter if s != '__null__']) | 
+                Q(status_sistemico__isnull=True)
+            )
+        else:
+            qs = qs.filter(status_sistemico__in=status_filter)
+    
     # Busca Global
     busca = request.GET.get('busca', '').strip()
     if busca:
@@ -446,8 +469,7 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
                 Q(cultivar__nome__icontains=termo) | 
                 Q(especie__nome__icontains=termo) |
                 Q(endereco__icontains=termo) | 
-                Q(cliente__icontains=termo) |
-                Q(empresa__icontains=termo)
+                Q(cliente__icontains=termo)
             )
 
     # Aplicar filtros sequenciais
@@ -469,42 +491,58 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
 
     for param, lookup in filter_map.items():
         values = request.GET.getlist(param)
-        values = [v for v in values if v.strip()]
+        values = [v for v in values if v and v.strip()]
+        
         if values:
-            qs = qs.filter(**{lookup: values})
+            if '__null__' in values:
+                specific_values = [v for v in values if v != '__null__']
+                if specific_values:
+                    qs = qs.filter(
+                        Q(**{lookup: specific_values}) | 
+                        Q(**{lookup.replace('__in', '__isnull'): True})
+                    )
+                else:
+                    qs = qs.filter(**{lookup.replace('__in', '__isnull'): True})
+            else:
+                qs = qs.filter(**{lookup: values})
 
     # Filtros numéricos
     for field in ['saldo', 'peso_unitario', 'peso_total']:
         min_val = request.GET.get(f'min_{field}')
         max_val = request.GET.get(f'max_{field}')
         if min_val:
-            qs = qs.filter(**{f'{field}__gte': min_val})
+            try:
+                qs = qs.filter(**{f'{field}__gte': float(min_val)})
+            except ValueError:
+                pass
         if max_val:
-            qs = qs.filter(**{f'{field}__lte': max_val})
+            try:
+                qs = qs.filter(**{f'{field}__lte': float(max_val)})
+            except ValueError:
+                pass
 
-    # MÉTRICAS - Usando o queryset NÃO FILTRADO (qs_metrics) para os cards
-    entradas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('entrada'))['s'] or 0
-    entradas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('entrada'))['s'] or 0
-    entradas_total_sc = (entradas_bags * 25) + entradas_sc
-    
-    saidas_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saida'))['s'] or 0
-    saidas_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saida'))['s'] or 0
-    saidas_total_sc = (saidas_bags * 25) + saidas_sc
-    
-    saldo_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
-    saldo_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+    # MÉTRICAS - usando o mesmo queryset filtrado
+    saldo_bags = qs.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
+    saldo_sc = qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
     saldo_total_sc = (saldo_bags * 25) + saldo_sc
-
-    dados_entrada = {'bags': entradas_bags, 'sc': entradas_sc, 'total_sc': entradas_total_sc}
-    dados_saida = {'bags': saidas_bags, 'sc': saidas_sc, 'total_sc': saidas_total_sc}
-    dados_saldo = {'bags': saldo_bags, 'sc': saldo_sc, 'total_sc': saldo_total_sc}
-
-    # Opções de Filtro (baseadas no queryset filtrado)
+    
+    total_pme = qs.aggregate(s=Sum('peso_total'))['s'] or 0
+    
+    # Opções de Filtro - baseadas no queryset COMPLETO (com saldo > 0)
+    base_options_qs = Estoque.objects.filter(saldo__gt=0)
+    
     def get_options_list(field_lookup):
-        vals = qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
-        return [str(v) for v in vals if v is not None and str(v).strip() != '']
+        vals = base_options_qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
+        options = []
+        for v in vals:
+            if v is not None and str(v).strip() != '':
+                options.append(str(v))
+        return options
 
+    status_options = ['ok', 'parcial', 'critico']
+    
     filter_options = {
+        'status_sistemico': status_options,
         'az': get_options_list('az'),
         'lote': get_options_list('lote'),
         'produto': get_options_list('produto'),
@@ -541,31 +579,23 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     if 'page' in query_params:
         del query_params['page']
     
-    total_itens = qs.count()  # Conta apenas itens com saldo > 0
+    total_itens = qs.count()
     clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
 
     context = {
         'estoque': page_obj,
         'itens': page_obj,
-        'dados_entrada': dados_entrada,
-        'dados_saida': dados_saida,
-        'dados_saldo': dados_saldo,
-        'status': status,
         'busca': busca,
         'total_itens': total_itens,
         'total_sc': saldo_total_sc,
         'total_bags': saldo_bags,
         'total_sc_fisico': saldo_sc,
+        'total_pme': total_pme,
         'clientes_unicos': clientes_unicos,
         'filter_options': filter_options,
         'url_params': query_params.urlencode(),
         'page_sizes': [10, 25, 50, 100, 200],
         'page_size': page_size,
-        'all_cultivares': Cultivar.objects.all(),
-        'all_peneiras': Peneira.objects.all(),
-        'all_categorias': Categoria.objects.all(),
-        'all_tratamentos': Tratamento.objects.all(),
-        'all_especies': Especie.objects.all(),
     }
     
     return render(request, template_name, context)
@@ -1279,100 +1309,235 @@ def relatorio_saidas(request):
     return render(request, 'sapp/relatorio_saidas.html')
 
 
+from django.http import JsonResponse
+from django.db.models import Sum, Q
+from django.contrib.auth.decorators import login_required
+
 @login_required
 def api_estoque_estatisticas(request):
-    """
-    API para retornar estatísticas do estoque baseado nos filtros aplicados
-    """
-    try:
-        # QuerySet Base para MÉTRICAS - COMEÇA COM TODOS OS LOTES
-        qs_metrics = Estoque.objects.all()
-        
-        # APLICAR OS MESMOS FILTROS DA VIEW PRINCIPAL
-        
-        # Busca Global
-        busca = request.GET.get('busca', '').strip()
-        if busca:
-            for termo in busca.split():
-                qs_metrics = qs_metrics.filter(
-                    Q(lote__icontains=termo) | 
-                    Q(produto__icontains=termo) |
-                    Q(cultivar__nome__icontains=termo) | 
-                    Q(especie__nome__icontains=termo) |
-                    Q(endereco__icontains=termo) | 
-                    Q(cliente__icontains=termo) |
-                    Q(empresa__icontains=termo)
-                )
-        
-        # Filtros de seleção múltipla
-        filter_map = {
-            'az': 'az__in',
-            'lote': 'lote__in',
-            'produto': 'produto__in',
-            'cultivar': 'cultivar__nome__in',
-            'peneira': 'peneira__nome__in',
-            'categoria': 'categoria__nome__in',
-            'endereco': 'endereco__in',
-            'especie': 'especie__nome__in',
-            'tratamento': 'tratamento__nome__in',
-            'embalagem': 'embalagem__in',
-            'cliente': 'cliente__in',
-            'empresa': 'empresa__in',
-            'conferente': 'conferente__username__in'
-        }
+    """API para atualizar os cards de estatísticas com base nos filtros atuais"""
+    
+    # Query base - apenas saldo > 0
+    qs = Estoque.objects.filter(saldo__gt=0)
+    
+    # Aplicar os mesmos filtros da view principal
+    # Status sistêmico
+    status_filter = request.GET.getlist('status_sistemico')
+    if status_filter:
+        if '__null__' in status_filter:
+            qs = qs.filter(
+                Q(status_sistemico__in=[s for s in status_filter if s != '__null__']) | 
+                Q(status_sistemico__isnull=True)
+            )
+        else:
+            qs = qs.filter(status_sistemico__in=status_filter)
+    
+    # Busca
+    busca = request.GET.get('busca', '').strip()
+    if busca:
+        for termo in busca.split():
+            qs = qs.filter(
+                Q(lote__icontains=termo) | 
+                Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) | 
+                Q(endereco__icontains=termo) | 
+                Q(cliente__icontains=termo)
+            )
+    
+    # Filtros de seleção
+    filter_map = {
+        'az': 'az__in',
+        'lote': 'lote__in',
+        'produto': 'produto__in',
+        'cultivar': 'cultivar__nome__in',
+        'peneira': 'peneira__nome__in',
+        'categoria': 'categoria__nome__in',
+        'endereco': 'endereco__in',
+        'especie': 'especie__nome__in',
+        'tratamento': 'tratamento__nome__in',
+        'embalagem': 'embalagem__in',
+        'cliente': 'cliente__in',
+        'empresa': 'empresa__in',
+        'conferente': 'conferente__username__in'
+    }
 
-        for param, lookup in filter_map.items():
-            values = request.GET.getlist(param)
-            values = [v for v in values if v.strip()]
-            if values:
-                qs_metrics = qs_metrics.filter(**{lookup: values})
+    for param, lookup in filter_map.items():
+        values = request.GET.getlist(param)
+        values = [v for v in values if v and v.strip()]
+        if values:
+            if '__null__' in values:
+                specific_values = [v for v in values if v != '__null__']
+                if specific_values:
+                    qs = qs.filter(
+                        Q(**{lookup: specific_values}) | 
+                        Q(**{lookup.replace('__in', '__isnull'): True})
+                    )
+                else:
+                    qs = qs.filter(**{lookup.replace('__in', '__isnull'): True})
+            else:
+                qs = qs.filter(**{lookup: values})
+    
+    # Filtros numéricos
+    for field in ['saldo', 'peso_unitario', 'peso_total']:
+        min_val = request.GET.get(f'min_{field}')
+        max_val = request.GET.get(f'max_{field}')
+        if min_val:
+            try:
+                qs = qs.filter(**{f'{field}__gte': float(min_val)})
+            except ValueError:
+                pass
+        if max_val:
+            try:
+                qs = qs.filter(**{f'{field}__lte': float(max_val)})
+            except ValueError:
+                pass
+    
+    # Calcular estatísticas
+    total_itens = qs.count()
+    
+    saldo_bags = qs.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
+    saldo_sc = qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+    total_sc = (saldo_bags * 25) + saldo_sc
+    
+    total_pme = qs.aggregate(s=Sum('peso_total'))['s'] or 0
+    
+    clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
+    
+    return JsonResponse({
+        'success': True,
+        'total_itens': total_itens,
+        'total_sc': total_sc,
+        'total_bags': saldo_bags,
+        'total_pme': total_pme,
+        'clientes_unicos': clientes_unicos
+    })
 
-        # Filtros numéricos
-        for field in ['saldo', 'peso_unitario', 'peso_total']:
-            min_val = request.GET.get(f'min_{field}')
-            max_val = request.GET.get(f'max_{field}')
-            if min_val:
-                qs_metrics = qs_metrics.filter(**{f'{field}__gte': min_val})
-            if max_val:
-                qs_metrics = qs_metrics.filter(**{f'{field}__lte': max_val})
 
-        # FILTRO POR STATUS
-        status = request.GET.get('status', 'todos')
-        if status == 'disponivel':
-            qs_metrics = qs_metrics.filter(saldo__gt=0)
-        elif status == 'esgotado':
-            qs_metrics = qs_metrics.filter(saldo=0)
 
-        # CALCULAR MÉTRICAS
-        saldo_bags = qs_metrics.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
-        saldo_sc = qs_metrics.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
-        saldo_total_sc = (saldo_bags * 25) + saldo_sc
+
+@login_required
+def api_opcoes_filtro(request):
+    """Retorna opções de filtro baseadas nos filtros atuais (encadeamento)"""
+    coluna = request.GET.get('coluna')
+    if not coluna:
+        return JsonResponse({'success': False, 'error': 'Coluna não especificada'})
+    
+    # Query base - APENAS saldo > 0
+    qs = Estoque.objects.filter(saldo__gt=0)
+    
+    # Aplicar TODOS os filtros atuais
+    # Status sistêmico
+    status_filter = request.GET.getlist('status_sistemico')
+    if status_filter and coluna != 'status_sistemico':
+        if '__null__' in status_filter:
+            qs = qs.filter(
+                Q(status_sistemico__in=[s for s in status_filter if s != '__null__']) | 
+                Q(status_sistemico__isnull=True)
+            )
+        else:
+            qs = qs.filter(status_sistemico__in=status_filter)
+    
+    # Busca
+    busca = request.GET.get('busca', '').strip()
+    if busca:
+        for termo in busca.split():
+            qs = qs.filter(
+                Q(lote__icontains=termo) | 
+                Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) | 
+                Q(endereco__icontains=termo) | 
+                Q(cliente__icontains=termo)
+            )
+    
+    # Mapeamento de filtros
+    filter_map = {
+        'az': 'az__in',
+        'lote': 'lote__in',
+        'produto': 'produto__in',
+        'cultivar': 'cultivar__nome__in',
+        'peneira': 'peneira__nome__in',
+        'categoria': 'categoria__nome__in',
+        'endereco': 'endereco__in',
+        'especie': 'especie__nome__in',
+        'tratamento': 'tratamento__nome__in',
+        'embalagem': 'embalagem__in',
+        'cliente': 'cliente__in',
+        'empresa': 'empresa__in',
+        'conferente': 'conferente__username__in'
+    }
+    
+    # Aplicar outros filtros (exceto a coluna atual)
+    for param, lookup in filter_map.items():
+        if param == coluna:
+            continue
+            
+        values = request.GET.getlist(param)
+        values = [v for v in values if v and v.strip()]
+        if values:
+            if '__null__' in values:
+                specific_values = [v for v in values if v != '__null__']
+                if specific_values:
+                    qs = qs.filter(
+                        Q(**{lookup: specific_values}) | 
+                        Q(**{lookup.replace('__in', '__isnull'): True})
+                    )
+                else:
+                    qs = qs.filter(**{lookup.replace('__in', '__isnull'): True})
+            else:
+                qs = qs.filter(**{lookup: values})
+    
+    # Filtros numéricos
+    for field in ['saldo', 'peso_unitario', 'peso_total']:
+        if field == coluna:
+            continue
+            
+        min_val = request.GET.get(f'min_{field}')
+        max_val = request.GET.get(f'max_{field}')
+        if min_val:
+            try:
+                qs = qs.filter(**{f'{field}__gte': float(min_val)})
+            except ValueError:
+                pass
+        if max_val:
+            try:
+                qs = qs.filter(**{f'{field}__lte': float(max_val)})
+            except ValueError:
+                pass
+    
+    # Mapeamento para buscar os valores distintos
+    field_lookup_map = {
+        'az': 'az',
+        'lote': 'lote',
+        'produto': 'produto',
+        'cultivar': 'cultivar__nome',
+        'peneira': 'peneira__nome',
+        'categoria': 'categoria__nome',
+        'endereco': 'endereco',
+        'especie': 'especie__nome',
+        'tratamento': 'tratamento__nome',
+        'embalagem': 'embalagem',
+        'cliente': 'cliente',
+        'empresa': 'empresa',
+        'conferente': 'conferente__username'
+    }
+    
+    if coluna in field_lookup_map:
+        lookup = field_lookup_map[coluna]
         
-        total_itens = qs_metrics.count()
+        # Verificar se existem valores nulos
+        tem_null = qs.filter(**{lookup + '__isnull': True}).exists() or qs.filter(**{lookup: ''}).exists()
         
-        clientes_unicos = qs_metrics.exclude(
-            cliente__isnull=True
-        ).exclude(
-            cliente=''
-        ).values('cliente').distinct().count()
-
-        # Retornar dados em JSON
+        # Buscar valores não nulos
+        valores = qs.exclude(**{lookup: None}).exclude(**{lookup: ''}).values_list(lookup, flat=True).distinct().order_by(lookup)
+        opcoes = [str(v) for v in valores if v is not None and str(v).strip() != '']
+        
         return JsonResponse({
-            'success': True,
-            'total_itens': total_itens,
-            'total_sc': saldo_total_sc,
-            'total_bags': saldo_bags,
-            'total_sc_fisico': saldo_sc,
-            'clientes_unicos': clientes_unicos,
+            'success': True, 
+            'opcoes': opcoes,
+            'tem_null': tem_null
         })
-        
-    except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
-
-
+    
+    return JsonResponse({'success': False, 'error': 'Coluna inválida'})
 
 
 ############################################################################

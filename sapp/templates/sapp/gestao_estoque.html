@@ -1,3 +1,4 @@
+<!-- templates/sapp/lista_estoque.html -->
 {% extends 'sapp/base.html' %}
 {% load humanize %}
 
@@ -25,6 +26,13 @@
     }
     
     /* ===== CARDS DE ESTATÍSTICAS ===== */
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
     .stats-card {
         background: white;
         border-radius: 12px;
@@ -58,6 +66,12 @@
     .stats-card small {
         font-size: 0.8rem;
         display: block;
+    }
+    
+    @media (max-width: 992px) {
+        .stats-row {
+            grid-template-columns: repeat(2, 1fr);
+        }
     }
     
     @media (max-width: 768px) {
@@ -103,17 +117,6 @@
         background: linear-gradient(135deg, #20c997 0%, #28a745 100%);
         transform: translateY(-2px);
         box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
-    }
-    
-    .btn-print {
-        background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-        border: none;
-        color: white;
-    }
-    
-    .btn-print:hover {
-        background: linear-gradient(135deg, #495057 0%, #6c757d 100%);
-        transform: translateY(-2px);
     }
     
     .btn-clear-filters {
@@ -411,6 +414,16 @@
         display: inline-block;
     }
     
+    .badge-null {
+        background: #e9ecef;
+        color: #6c757d;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: normal;
+        font-style: italic;
+    }
+    
     /* ===== FILTROS ATIVOS ===== */
     .active-filters-container {
         background: #f8f9fa;
@@ -444,6 +457,10 @@
         font-size: 0.7rem;
     }
     
+    .active-filter-badge.null-filter {
+        background: #6c757d;
+    }
+    
     /* ===== FILTROS EXCEL ===== */
     .excel-filter-container {
         position: absolute;
@@ -469,6 +486,12 @@
         border-bottom: 1px solid #dee2e6;
         font-weight: 600;
         color: #495057;
+    }
+    
+    .filter-header small {
+        font-weight: normal;
+        color: #6c757d;
+        margin-left: 8px;
     }
     
     .filter-search {
@@ -526,6 +549,16 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+    
+    .filter-option.null-option {
+        border-bottom: 1px dashed #dee2e6;
+        background: #f8f9fa;
+    }
+    
+    .filter-option.null-option label {
+        font-style: italic;
+        color: #6c757d;
     }
     
     .filter-actions {
@@ -707,56 +740,64 @@
 </style>
 
 <div class="container-fluid py-3">
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="stats-card">
-                <div class="d-flex align-items-center">
-                    <div class="bg-success rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-layer-group text-white"></i>
-                    </div>
-                    <div class="overflow-hidden">
-                        <h4 class="mb-0 text-success text-truncate" id="totalItens">{{ total_itens|intcomma }}</h4>
-                        <small class="text-muted text-truncate d-block">Lotes Ativos</small>
-                    </div>
+    <!-- CARDS DE ESTATÍSTICAS - 5 CARDS -->
+    <div class="stats-row">
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="bg-success rounded-circle p-3 me-3">
+                    <i class="fa-solid fa-layer-group text-white"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <h4 class="mb-0 text-success text-truncate" id="totalItens">{{ total_itens|intcomma }}</h4>
+                    <small class="text-muted text-truncate d-block">Lotes Ativos (Saldo > 0)</small>
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="stats-card">
-                <div class="d-flex align-items-center">
-                    <div class="bg-info rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-weight-hanging text-white"></i>
-                    </div>
-                    <div class="overflow-hidden">
-                        <h4 class="mb-0 text-info text-truncate" id="totalSc">{{ total_sc|intcomma }}</h4>
-                        <small class="text-muted text-truncate d-block">Equivalente SC</small>
-                    </div>
+        
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="bg-info rounded-circle p-3 me-3">
+                    <i class="fa-solid fa-weight-hanging text-white"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <h4 class="mb-0 text-info text-truncate" id="totalSc">{{ total_sc|intcomma }}</h4>
+                    <small class="text-muted text-truncate d-block">Equivalente SC</small>
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="stats-card">
-                <div class="d-flex align-items-center">
-                    <div class="bg-warning rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-box text-white"></i>
-                    </div>
-                    <div class="overflow-hidden">
-                        <h4 class="mb-0 text-warning text-truncate" id="totalBags">{{ total_bags|intcomma }}</h4>
-                        <small class="text-muted text-truncate d-block">Unidades BAG</small>
-                    </div>
+        
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="bg-warning rounded-circle p-3 me-3">
+                    <i class="fa-solid fa-box text-white"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <h4 class="mb-0 text-warning text-truncate" id="totalBags">{{ total_bags|intcomma }}</h4>
+                    <small class="text-muted text-truncate d-block">Unidades BAG</small>
                 </div>
             </div>
         </div>
-        <div class="col-6 col-md-3">
-            <div class="stats-card">
-                <div class="d-flex align-items-center">
-                    <div class="bg-primary rounded-circle p-3 me-3">
-                        <i class="fa-solid fa-users text-white"></i>
-                    </div>
-                    <div class="overflow-hidden">
-                        <h4 class="mb-0 text-primary text-truncate" id="clientesUnicos">{{ clientes_unicos|intcomma }}</h4>
-                        <small class="text-muted text-truncate d-block">Clientes Únicos</small>
-                    </div>
+        
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="bg-primary rounded-circle p-3 me-3">
+                    <i class="fa-solid fa-weight-scale text-white"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <h4 class="mb-0 text-primary text-truncate" id="totalPme">{{ total_pme|default:"0"|floatformat:2|intcomma }}</h4>
+                    <small class="text-muted text-truncate d-block">PME Total (KG)</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="bg-secondary rounded-circle p-3 me-3">
+                    <i class="fa-solid fa-users text-white"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <h4 class="mb-0 text-secondary text-truncate" id="clientesUnicos">{{ clientes_unicos|intcomma }}</h4>
+                    <small class="text-muted text-truncate d-block">Clientes Únicos</small>
                 </div>
             </div>
         </div>
@@ -768,25 +809,24 @@
         <div id="activeFilters" class="d-flex flex-wrap"></div>
     </div>
 
+    <div class="action-buttons">
+        <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
+            <i class="fa-solid fa-download"></i><span>Exportar</span>
+        </button>
 
-<div class="action-buttons">
-    <button class="btn btn-export" data-bs-toggle="modal" data-bs-target="#exportModal">
-        <i class="fa-solid fa-download"></i><span>Exportar</span>
-    </button>
-
-    <button class="btn btn-primary" id="btnAbrirFicha" onclick="abrirFichaLoteUnico()" disabled>
-        <i class="fa-solid fa-qrcode"></i><span>Ficha do Lote</span>
-    </button>
-    <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;">
-        <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpar Filtros</span>
-    </button>
-    
-    <div class="search-container">
-        <i class="fa-solid fa-search search-icon"></i>
-        <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar em todas as colunas..." value="{{ busca }}">
-        <button class="clear-search" id="clearSearchBtn"><i class="fa-solid fa-times"></i></button>
+        <button class="btn btn-primary" id="btnAbrirFicha" onclick="abrirFichaLoteUnico()" disabled>
+            <i class="fa-solid fa-qrcode"></i><span>Ficha do Lote</span>
+        </button>
+        <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;">
+            <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpar Filtros</span>
+        </button>
+        
+        <div class="search-container">
+            <i class="fa-solid fa-search search-icon"></i>
+            <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar em todas as colunas..." value="{{ busca }}">
+            <button class="clear-search" id="clearSearchBtn"><i class="fa-solid fa-times"></i></button>
+        </div>
     </div>
-</div>
 
     <!-- TABELA DE ESTOQUE -->
     <div class="table-container">
@@ -893,13 +933,13 @@
                         <td><span class="text-truncate-custom" title="{{ item.produto|default:'' }}">{{ item.produto|default:"-" }}</span></td>
                         
                         <!-- Cultivar -->
-                        <td>{{ item.cultivar.nome }}</td>
+                        <td>{{ item.cultivar.nome|default:"-" }}</td>
                         
                         <!-- Peneira -->
-                        <td>{{ item.peneira.nome }}</td>
+                        <td>{{ item.peneira.nome|default:"-" }}</td>
                         
                         <!-- Categoria -->
-                        <td>{{ item.categoria.nome }}</td>
+                        <td>{{ item.categoria.nome|default:"-" }}</td>
                         
                         <!-- Endereço -->
                         <td>
@@ -946,7 +986,9 @@
                                 <span class="badge badge-cliente" title="{{ item.cliente }}">
                                     <i class="fas fa-user-tag me-1"></i>{{ item.cliente|truncatechars:12 }}
                                 </span>
-                            {% else %}-{% endif %}
+                            {% else %}
+                                <span class="badge-null">(vazio)</span>
+                            {% endif %}
                         </td>
                         
                         <!-- Empresa -->
@@ -955,15 +997,20 @@
                                 <span class="badge badge-empresa" title="{{ item.empresa }}">
                                     {{ item.empresa|truncatechars:15 }}
                                 </span>
-                            {% else %}-{% endif %}
+                            {% else %}
+                                <span class="badge-null">(vazio)</span>
+                            {% endif %}
                         </td>
                         
                         <!-- Conferente -->
                         <td>
-                            <small title="{{ item.conferente.get_full_name|default:item.conferente.username }}">
-                                {{ item.conferente.first_name|default:item.conferente.username|truncatechars:12 }}
-                                
-                            </small>
+                            {% if item.conferente %}
+                                <small title="{{ item.conferente.get_full_name|default:item.conferente.username }}">
+                                    {{ item.conferente.first_name|default:item.conferente.username|truncatechars:12 }}
+                                </small>
+                            {% else %}
+                                <span class="badge-null">(vazio)</span>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}
@@ -1118,9 +1165,11 @@
 
 <!-- SCRIPTS -->
 <script>
-// SCRIPTS COMPLETO - Preserva todo código original e adiciona correções
+// SCRIPTS COMPLETO - COM FILTROS ENCADEADOS, BOTÕES TODOS/NENHUM E VALORES VAZIOS CORRIGIDOS
+// SCRIPTS COMPLETO - CORREÇÃO DO FILTRO VAZIOS E BOTÃO FICHA
 let backendOptions = {};
 let currentUrlParams = new URLSearchParams(window.location.search);
+let verificarLotesTimeout = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     const dataScript = document.getElementById('filter-options-data');
@@ -1147,41 +1196,145 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 100);
     }
     
-    // ===== NOVO: Inicializar verificação de lotes =====
+    // Verificar lotes após carregar
+    setTimeout(verificarQtdLotes, 200);
+    
+    // Observer para quando a tabela for atualizada
     observarMudancasTabela();
 });
 
 function initStatusTooltips() {
     document.querySelectorAll('.status-sistemico-container').forEach(container => {
         const tooltip = container.querySelector('.status-tooltip-custom');
-        const indicator = container.querySelector('.status-sistemico-indicator');
         
-        if (tooltip && indicator) {
+        if (tooltip) {
             container.addEventListener('mouseenter', () => {
                 tooltip.style.display = 'block';
             });
             container.addEventListener('mouseleave', () => {
                 tooltip.style.display = 'none';
             });
-            indicator.addEventListener('mouseenter', () => {
-                indicator.style.transform = 'scale(1.15)';
-            });
-            indicator.addEventListener('mouseleave', () => {
-                indicator.style.transform = 'scale(1)';
-            });
         }
     });
 }
 
-// ===== FILTROS =====
+// ===== FUNÇÕES PARA O BOTÃO DA FICHA - VERSÃO FINAL =====
+function verificarQtdLotes() {
+    if (verificarLotesTimeout) {
+        clearTimeout(verificarLotesTimeout);
+    }
+    
+    verificarLotesTimeout = setTimeout(() => {
+        const btnFicha = document.getElementById('btnAbrirFicha');
+        if (!btnFicha) return;
+        
+        const linhasTabela = document.querySelectorAll('#tableBody tr');
+        
+        // Se não houver linhas
+        if (linhasTabela.length === 0) {
+            desabilitarBotaoFicha(btnFicha, "Nenhum lote encontrado");
+            return;
+        }
+        
+        // Verificar se é a linha de "Nenhum item encontrado"
+        const primeiraLinha = linhasTabela[0];
+        if (linhasTabela.length === 1 && primeiraLinha.querySelector('td[colspan]')) {
+            desabilitarBotaoFicha(btnFicha, "Nenhum lote encontrado");
+            return;
+        }
+        
+        // Se o backend já filtra apenas saldo > 0, TODAS as linhas são válidas
+        // Então contamos todas as linhas que não são a mensagem de vazio
+        let qtdLotesValidos = 0;
+        
+        for (let tr of linhasTabela) {
+            if (tr.querySelector('td[colspan]')) continue;
+            if (tr.cells.length < 3) continue;
+            
+            // Verifica se tem um lote válido (não vazio)
+            const loteCell = tr.cells[2];
+            if (loteCell && loteCell.innerText.trim()) {
+                qtdLotesValidos++;
+            }
+        }
+        
+        console.log(`Total de lotes na tabela: ${linhasTabela.length}, Válidos: ${qtdLotesValidos}`);
+        
+        // Habilita se tiver EXATAMENTE 1 lote
+        if (qtdLotesValidos === 1) {
+            btnFicha.disabled = false;
+            btnFicha.title = "Abrir ficha do lote";
+            btnFicha.classList.remove('btn-secondary');
+            btnFicha.classList.add('btn-primary');
+        } else {
+            desabilitarBotaoFicha(
+                btnFicha, 
+                qtdLotesValidos === 0 
+                    ? "Nenhum lote encontrado" 
+                    : `Selecione exatamente 1 lote (encontrados: ${qtdLotesValidos})`
+            );
+        }
+    }, 50);
+}
+
+function desabilitarBotaoFicha(btnFicha, mensagem) {
+    btnFicha.disabled = true;
+    btnFicha.title = mensagem;
+    btnFicha.classList.remove('btn-primary');
+    btnFicha.classList.add('btn-secondary');
+}
+
+window.abrirFichaLoteUnico = function() {
+    const btnFicha = document.getElementById('btnAbrirFicha');
+    if (btnFicha.disabled) {
+        alert('❌ Nenhum lote único disponível para abrir a ficha.');
+        return;
+    }
+    
+    // Pega o PRIMEIRO lote da tabela (já que só tem 1)
+    const linhas = document.querySelectorAll('#tableBody tr');
+    let loteEncontrado = null;
+    
+    for (let tr of linhas) {
+        if (tr.querySelector('td[colspan]')) continue;
+        
+        const loteCell = tr.cells[2];
+        if (loteCell) {
+            loteEncontrado = loteCell.innerText.trim();
+            break;
+        }
+    }
+    
+    if (loteEncontrado) {
+        window.open(`/ficha-rastreabilidade/?lote=${encodeURIComponent(loteEncontrado)}`, '_blank');
+    }
+};
+
+function observarMudancasTabela() {
+    const tabelaBody = document.getElementById('tableBody');
+    if (!tabelaBody) return;
+    
+    const observer = new MutationObserver(() => {
+        verificarQtdLotes();
+    });
+    
+    observer.observe(tabelaBody, { 
+        childList: true,
+        subtree: false
+    });
+}
+
+// ===== FILTROS COM ENCADEAMENTO =====
 let activeFilterContainer = null;
+let currentFilterColumn = null;
 
 window.showFilter = function(thElement, columnName, columnType) {
-    // Fechar filtro anterior se existir
     if (activeFilterContainer) {
         activeFilterContainer.remove();
         activeFilterContainer = null;
     }
+    
+    currentFilterColumn = columnName;
     
     const rect = thElement.getBoundingClientRect();
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -1202,30 +1355,78 @@ window.showFilter = function(thElement, columnName, columnType) {
         filterContainer.style.left = (rect.left + scrollLeft) + 'px';
     }
     
-    if (columnType === 'number') {
-        filterContainer.innerHTML = createNumericFilterHTML(columnName);
-    } else {
-        filterContainer.innerHTML = createSelectFilterHTML(columnName);
-    }
-    
+    // Mostrar loading
+    filterContainer.innerHTML = '<div class="p-3 text-center"><i class="fa-solid fa-spinner fa-pulse"></i> Carregando...</div>';
     document.body.appendChild(filterContainer);
     
-    // Impedir que o clique no container feche ele
-    filterContainer.addEventListener('click', (e) => {
-        e.stopPropagation();
-    });
-    
-    // Fechar ao clicar fora
-    setTimeout(() => {
-        document.addEventListener('click', function closeOnClickOutside(e) {
-            if (filterContainer && !filterContainer.contains(e.target) && e.target !== thElement) {
-                filterContainer.remove();
-                activeFilterContainer = null;
-                document.removeEventListener('click', closeOnClickOutside);
-            }
+    // Buscar opções atualizadas baseadas nos filtros atuais
+    buscarOpcoesFiltro(columnName).then(({opcoes, temNull}) => {
+        if (columnType === 'number') {
+            filterContainer.innerHTML = createNumericFilterHTML(columnName);
+        } else {
+            filterContainer.innerHTML = createSelectFilterHTML(columnName, opcoes, temNull);
+        }
+        
+        filterContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
-    }, 10);
+        
+        setTimeout(() => {
+            document.addEventListener('click', function closeOnClickOutside(e) {
+                if (filterContainer && !filterContainer.contains(e.target) && e.target !== thElement) {
+                    filterContainer.remove();
+                    activeFilterContainer = null;
+                    currentFilterColumn = null;
+                    document.removeEventListener('click', closeOnClickOutside);
+                }
+            });
+        }, 10);
+    }).catch(error => {
+        console.error('Erro ao carregar opções:', error);
+        filterContainer.innerHTML = '<div class="p-3 text-center text-danger">Erro ao carregar opções</div>';
+    });
 };
+
+async function buscarOpcoesFiltro(columnName) {
+    try {
+        // Se for status_sistemico, retorna opções fixas
+        if (columnName === 'status_sistemico') {
+            return {
+                opcoes: [
+                    {value: 'ok', label: '🟢 OK'},
+                    {value: 'parcial', label: '🟡 Parcial'},
+                    {value: 'critico', label: '🔴 Crítico'}
+                ],
+                temNull: false // Status sistêmico nunca é nulo
+            };
+        }
+        
+        // Construir URL com os filtros atuais (exceto a coluna atual)
+        const params = new URLSearchParams(currentUrlParams);
+        params.delete(columnName);
+        params.delete(`min_${columnName}`);
+        params.delete(`max_${columnName}`);
+        
+        const response = await fetch(`/api/estoque/opcoes-filtro/?coluna=${columnName}&${params.toString()}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return {
+                opcoes: data.opcoes.map(opt => ({value: opt, label: opt})),
+                temNull: data.tem_null || false
+            };
+        }
+    } catch (error) {
+        console.error('Erro ao buscar opções:', error);
+    }
+    
+    // Fallback para opções do backend inicial
+    const rawOptions = backendOptions[columnName] || [];
+    return {
+        opcoes: rawOptions.map(opt => ({value: opt, label: opt})),
+        temNull: false
+    };
+}
 
 function createNumericFilterHTML(columnName) {
     const minVal = currentUrlParams.get(`min_${columnName}`) || '';
@@ -1249,33 +1450,32 @@ function createNumericFilterHTML(columnName) {
     `;
 }
 
-function createSelectFilterHTML(columnName) {
-    let options = [];
-    
-    if (columnName === 'status_sistemico') {
-        options = [
-            {value: 'ok', label: '🟢 OK - Tudo certo'},
-            {value: 'parcial', label: '🟡 Parcial - Divergência'},
-            {value: 'critico', label: '🔴 Crítico - Sem saldo real'}
-        ];
-    } else {
-        const rawOptions = backendOptions[columnName] || [];
-        options = rawOptions.map(opt => ({value: opt, label: opt}));
-    }
-    
+function createSelectFilterHTML(columnName, options, temNull) {
     const selectedValues = currentUrlParams.getAll(columnName);
+    const hasNullSelected = selectedValues.includes('__null__');
+    
     let optionsHtml = '';
     
-    if (options.length === 0) {
-        optionsHtml = '<div class="p-3 text-center text-muted">Sem opções disponíveis</div>';
-    } else {
+    // Só mostra opção de vazio se realmente existirem valores nulos
+    if (temNull) {
+        optionsHtml += `
+            <div class="filter-option null-option">
+                <input type="checkbox" class="filter-checkbox" id="chk-${columnName}-null" value="__null__" ${hasNullSelected ? 'checked' : ''}>
+                <label for="chk-${columnName}-null" style="font-style: italic; color: #6c757d;">
+                    <i class="fa-regular fa-circle-xmark me-1"></i>(vazio)
+                </label>
+            </div>
+        `;
+    }
+    
+    if (options && options.length > 0) {
         options.forEach(opt => {
             const safeValue = String(opt.value);
             const isChecked = selectedValues.includes(safeValue) ? 'checked' : '';
             const id = `chk-${columnName}-${safeValue.replace(/[^a-zA-Z0-9]/g, '_')}`;
             optionsHtml += `
                 <div class="filter-option">
-                    <input type="checkbox" id="${id}" value="${safeValue}" ${isChecked}>
+                    <input type="checkbox" class="filter-checkbox" id="${id}" value="${safeValue}" ${isChecked}>
                     <label for="${id}" class="text-truncate" title="${opt.label}">${opt.label}</label>
                 </div>
             `;
@@ -1283,7 +1483,10 @@ function createSelectFilterHTML(columnName) {
     }
     
     return `
-        <div class="filter-header"><strong>${columnName}</strong></div>
+        <div class="filter-header">
+            <strong>${columnName}</strong>
+            <small>✓ marque as opções</small>
+        </div>
         <div class="filter-search">
             <input type="text" class="form-control form-control-sm" placeholder="Buscar..." onkeyup="filterOptionsList(this)">
         </div>
@@ -1300,6 +1503,31 @@ function createSelectFilterHTML(columnName) {
         </div>
     `;
 }
+
+// ===== FUNÇÕES AUXILIARES DOS FILTROS =====
+window.toggleAll = function(columnName, checked) {
+    const container = document.getElementById(`options-list-${columnName}`);
+    if (!container) return;
+    
+    const checkboxes = container.querySelectorAll('.filter-option:not([style*="display: none"]) input[type="checkbox"]');
+    checkboxes.forEach(cb => {
+        cb.checked = checked;
+    });
+};
+
+window.filterOptionsList = function(input) {
+    const term = input.value.toLowerCase();
+    const container = input.closest('.filter-search').nextElementSibling;
+    const options = container.querySelectorAll('.filter-option');
+    
+    options.forEach(opt => {
+        const label = opt.querySelector('label');
+        if (label) {
+            const text = label.innerText.toLowerCase();
+            opt.style.display = text.includes(term) ? 'flex' : 'none';
+        }
+    });
+};
 
 function setupSearch() {
     const input = document.getElementById('searchInput');
@@ -1318,8 +1546,6 @@ function setupSearch() {
             
             if (this.value.length >= 3 || this.value.length === 0) {
                 searchTimeout = setTimeout(() => {
-                    atualizarCardsComFiltros();
-                    
                     if (this.value.length >= 3) {
                         currentUrlParams.set('busca', this.value);
                     } else {
@@ -1334,7 +1560,6 @@ function setupSearch() {
         btn.addEventListener('click', function() {
             input.value = '';
             btn.style.display = 'none';
-            atualizarCardsComFiltros();
             currentUrlParams.delete('busca');
             currentUrlParams.set('page', '1');
             reloadPage();
@@ -1348,12 +1573,15 @@ function setupClearButtons() {
 }
 
 window.applyNumericFilter = function(columnName) {
-    const min = document.getElementById(`${columnName}-min`).value;
-    const max = document.getElementById(`${columnName}-max`).value;
+    const min = document.getElementById(`${columnName}-min`)?.value;
+    const max = document.getElementById(`${columnName}-max`)?.value;
+    
     currentUrlParams.delete(`min_${columnName}`);
     currentUrlParams.delete(`max_${columnName}`);
-    if (min) currentUrlParams.set(`min_${columnName}`, min);
-    if (max) currentUrlParams.set(`max_${columnName}`, max);
+    
+    if (min && min !== '') currentUrlParams.set(`min_${columnName}`, min);
+    if (max && max !== '') currentUrlParams.set(`max_${columnName}`, max);
+    
     currentUrlParams.set('page', '1');
     
     if (activeFilterContainer) {
@@ -1361,17 +1589,21 @@ window.applyNumericFilter = function(columnName) {
         activeFilterContainer = null;
     }
     
-    atualizarCardsComFiltros();
     reloadPage();
 };
 
 window.applySelectFilter = function(columnName) {
     const container = document.getElementById(`options-list-${columnName}`);
+    if (!container) return;
+    
     const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    
     currentUrlParams.delete(columnName);
-    checkboxes.forEach(cb => { 
-        currentUrlParams.append(columnName, cb.value); 
+    
+    checkboxes.forEach(cb => {
+        currentUrlParams.append(columnName, cb.value);
     });
+    
     currentUrlParams.set('page', '1');
     
     if (activeFilterContainer) {
@@ -1379,12 +1611,10 @@ window.applySelectFilter = function(columnName) {
         activeFilterContainer = null;
     }
     
-    atualizarCardsComFiltros();
     reloadPage();
 };
 
 window.clearColumnFilter = function(columnName) {
-    // Remove todos os parâmetros relacionados à coluna
     const keysToRemove = [];
     for (let key of currentUrlParams.keys()) {
         if (key === columnName || key === `min_${columnName}` || key === `max_${columnName}`) {
@@ -1399,7 +1629,6 @@ window.clearColumnFilter = function(columnName) {
         activeFilterContainer = null;
     }
     
-    atualizarCardsComFiltros();
     reloadPage();
 };
 
@@ -1416,26 +1645,7 @@ window.clearAllFilters = function() {
         activeFilterContainer = null;
     }
     
-    atualizarCardsComFiltros();
     reloadPage();
-};
-
-window.filterOptionsList = function(input) {
-    const term = input.value.toLowerCase();
-    const container = input.closest('.filter-search').nextElementSibling;
-    const options = container.querySelectorAll('.filter-option');
-    options.forEach(opt => {
-        const text = opt.innerText.toLowerCase();
-        opt.style.display = text.includes(term) ? 'flex' : 'none';
-    });
-};
-
-window.toggleAll = function(columnName, checked) {
-    const container = document.getElementById(`options-list-${columnName}`);
-    const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-    checkboxes.forEach(cb => { 
-        if (cb.parentElement.style.display !== 'none') cb.checked = checked; 
-    });
 };
 
 window.updatePageSize = function(size) {
@@ -1478,70 +1688,29 @@ function updateActiveFiltersUI() {
             label = `${key.replace('min_', '')} ≥ ${vals[0]}`;
         } else if (key.startsWith('max_')) {
             label = `${key.replace('max_', '')} ≤ ${vals[0]}`;
+        } else if (key === 'busca') {
+            label = `Busca: "${vals[0]}"`;
         } else {
-            if (key === 'status_sistemico') {
-                const displayVals = vals.map(v => {
+            const displayVals = vals.map(v => {
+                if (v === '__null__') return '(vazio)';
+                if (key === 'status_sistemico') {
                     if (v === 'ok') return '🟢 OK';
                     if (v === 'parcial') return '🟡 Parcial';
                     if (v === 'critico') return '🔴 Crítico';
-                    return v;
-                });
-                label = `${key}: ${displayVals.join(', ')}`;
-            } else if (key === 'busca') {
-                label = `Busca: "${vals[0]}"`;
-            } else {
-                label = `${key}: ${vals.join(', ')}`;
-            }
+                }
+                return v;
+            });
+            label = `${key}: ${displayVals.join(', ')}`;
         }
         
         const badge = document.createElement('span');
-        badge.className = 'active-filter-badge';
+        badge.className = 'active-filter-badge' + (vals.includes('__null__') ? ' null-filter' : '');
         badge.innerHTML = `${label} <i class="fa-solid fa-times" onclick="clearColumnFilter('${key.replace(/min_|max_/, '')}')"></i>`;
         container.appendChild(badge);
     });
     
     document.getElementById('activeFiltersContainer').style.display = count > 0 ? 'block' : 'none';
     document.getElementById('clearFiltersBtn').style.display = count > 0 ? 'inline-flex' : 'none';
-}
-
-function atualizarCardsComFiltros() {
-    document.querySelectorAll('.stats-card h4').forEach(el => {
-        el.style.opacity = '0.5';
-    });
-    
-    document.querySelectorAll('.stats-card .rounded-circle i').forEach(el => {
-        if (!el.classList.contains('fa-spinner')) {
-            el.classList.add('fa-spinner', 'fa-pulse');
-        }
-    });
-    
-    const params = new URLSearchParams(currentUrlParams);
-    
-    fetch(`/api/estoque/estatisticas/?${params.toString()}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById('totalItens').textContent = Number(data.total_itens).toLocaleString('pt-BR');
-                document.getElementById('totalSc').textContent = Number(data.total_sc).toLocaleString('pt-BR');
-                document.getElementById('totalBags').textContent = Number(data.total_bags).toLocaleString('pt-BR');
-                document.getElementById('clientesUnicos').textContent = Number(data.clientes_unicos).toLocaleString('pt-BR');
-            }
-            
-            document.querySelectorAll('.stats-card h4').forEach(el => {
-                el.style.opacity = '1';
-            });
-            
-            document.querySelectorAll('.stats-card .rounded-circle i').forEach(el => {
-                el.classList.remove('fa-spinner', 'fa-pulse');
-            });
-        })
-        .catch(error => {
-            console.error('Erro ao atualizar cards:', error);
-            document.querySelectorAll('.stats-card h4').forEach(el => el.style.opacity = '1');
-            document.querySelectorAll('.stats-card .rounded-circle i').forEach(el => {
-                el.classList.remove('fa-spinner', 'fa-pulse');
-            });
-        });
 }
 
 // ===== STATUS SISTÊMICO =====
@@ -1595,15 +1764,26 @@ function confirmarAlteracaoStatus() {
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-pulse me-1"></i>Alterando...';
     btn.disabled = true;
     
+    const proximoStatus = statusAtual === 'critico' ? 'parcial' : 
+                         (statusAtual === 'parcial' ? 'ok' : 'critico');
+    
     fetch('/api/atualizar-status-sistemico/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCookie('csrftoken')
         },
-        body: JSON.stringify({ lote_id: loteIdAtual })
+        body: JSON.stringify({ 
+            lote_id: loteIdAtual,
+            novo_status: proximoStatus 
+        })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Erro na requisição');
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             const cores = {
@@ -1618,14 +1798,14 @@ function confirmarAlteracaoStatus() {
             const container = elementoAtual.closest('.status-sistemico-container');
             const tooltip = container.querySelector('.status-tooltip-custom');
             if (tooltip) {
+                const statusText = data.novo_status === 'ok' ? '🟢 OK - Tudo certo' : 
+                                  (data.novo_status === 'parcial' ? '🟡 Parcial - Divergência' : '🔴 Crítico - Sem saldo real');
+                
                 tooltip.innerHTML = `
-                    <strong>
-                        ${data.novo_status === 'ok' ? '🟢 OK - Tudo certo' : 
-                          (data.novo_status === 'parcial' ? '🟡 Parcial - Divergência' : '🔴 Crítico - Sem saldo real')}
-                    </strong>
+                    <strong>${statusText}</strong>
                     <small>
-                        <i class="fa-solid fa-user me-1"></i>${data.alterado_por}<br>
-                        <i class="fa-solid fa-clock me-1"></i>${data.alterado_em}
+                        <i class="fa-solid fa-user me-1"></i>${data.alterado_por || 'Usuário'}<br>
+                        <i class="fa-solid fa-clock me-1"></i>${data.alterado_em || new Date().toLocaleString('pt-BR')}
                     </small>
                 `;
             }
@@ -1633,7 +1813,7 @@ function confirmarAlteracaoStatus() {
             bootstrap.Modal.getInstance(document.getElementById('modalStatusSistemico')).hide();
             mostrarNotificacao('Status atualizado com sucesso!', 'success');
         } else {
-            mostrarNotificacao('Erro: ' + data.error, 'danger');
+            mostrarNotificacao('Erro: ' + (data.error || 'Erro desconhecido'), 'danger');
         }
     })
     .catch(error => {
@@ -1647,27 +1827,28 @@ function confirmarAlteracaoStatus() {
 }
 
 function mostrarNotificacao(mensagem, tipo) {
-    const toast = document.createElement('div');
-    toast.className = `toast align-items-center text-white bg-${tipo} border-0 position-fixed top-0 end-0 m-3`;
-    toast.setAttribute('role', 'alert');
-    toast.setAttribute('aria-live', 'assertive');
-    toast.setAttribute('aria-atomic', 'true');
-    toast.style.zIndex = '9999';
+    const notificacoesAntigas = document.querySelectorAll('.notificacao-flutuante');
+    notificacoesAntigas.forEach(n => n.remove());
     
-    toast.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">
-                ${mensagem}
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
+    const notificacao = document.createElement('div');
+    notificacao.className = `notificacao-flutuante alert alert-${tipo} alert-dismissible fade show position-fixed top-0 end-0 m-3`;
+    notificacao.setAttribute('role', 'alert');
+    notificacao.style.zIndex = '9999';
+    notificacao.style.minWidth = '300px';
+    notificacao.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+    
+    notificacao.innerHTML = `
+        ${mensagem}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
     
-    document.body.appendChild(toast);
-    const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
-    bsToast.show();
+    document.body.appendChild(notificacao);
     
-    setTimeout(() => toast.remove(), 3500);
+    setTimeout(() => {
+        if (notificacao.parentNode) {
+            notificacao.remove();
+        }
+    }, 3000);
 }
 
 function getCookie(name) {
@@ -1684,154 +1865,5 @@ function getCookie(name) {
     }
     return cookieValue;
 }
-
-// ===== NOVAS FUNÇÕES PARA O BOTÃO DA FICHA =====
-function verificarQtdLotes() {
-    const linhasTabela = document.querySelectorAll('#tableBody tr');
-    // Filtra linhas que não são a mensagem "Nenhum item encontrado"
-    const linhasValidas = Array.from(linhasTabela).filter(tr => {
-        return !tr.querySelector('td[colspan]') && tr.cells.length > 1;
-    });
-    
-    const qtdLotes = linhasValidas.length;
-    const btnFicha = document.getElementById('btnAbrirFicha');
-    
-    if (!btnFicha) return false;
-    
-    if (qtdLotes === 1) {
-        btnFicha.disabled = false;
-        btnFicha.title = "Abrir ficha do lote filtrado";
-        btnFicha.classList.remove('btn-secondary');
-        btnFicha.classList.add('btn-primary');
-    } else {
-        btnFicha.disabled = true;
-        btnFicha.title = qtdLotes === 0 ? "Nenhum lote encontrado" : "Selecione exatamente 1 lote (use os filtros)";
-        btnFicha.classList.remove('btn-primary');
-        btnFicha.classList.add('btn-secondary');
-    }
-    
-    return qtdLotes === 1;
-}
-
-window.abrirFichaLoteUnico = function() {
-    if (!verificarQtdLotes()) {
-        const linhas = document.querySelectorAll('#tableBody tr');
-        const qtd = Array.from(linhas).filter(tr => !tr.querySelector('td[colspan]')).length;
-        
-        if (qtd === 0) {
-            alert('❌ Nenhum lote encontrado. Aplique filtros para encontrar um lote.');
-        } else {
-            alert(`❌ É necessário ter exatamente 1 lote filtrado. Encontrados: ${qtd} lotes.`);
-        }
-        return;
-    }
-    
-    // Pega a URL atual com todos os parâmetros
-    const params = new URLSearchParams(window.location.search);
-    
-    // Remove parâmetros de paginação que podem atrapalhar
-    params.delete('page');
-    params.delete('page_size');
-    
-    // Constrói a URL da ficha
-    const urlFicha = `/ficha-rastreabilidade/?${params.toString()}`;
-    
-    // Abre em nova aba
-    window.open(urlFicha, '_blank');
-};
-
-function observarMudancasTabela() {
-    // Verifica imediatamente
-    verificarQtdLotes();
-    
-    const tabelaBody = document.getElementById('tableBody');
-    if (tabelaBody) {
-        const observer = new MutationObserver(function() {
-            verificarQtdLotes();
-        });
-        
-        observer.observe(tabelaBody, { 
-            childList: true, 
-            subtree: true,
-            characterData: true,
-            attributes: true
-        });
-    }
-    
-    // Também verifica quando os filtros são aplicados
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            setTimeout(verificarQtdLotes, 600);
-        });
-    }
-}
-
-// ===== SOBRESCREVER FUNÇÕES DE FILTRO PARA VERIFICAR LOTES =====
-// Preservar funções originais
-const originalApplySelectFilter = window.applySelectFilter;
-if (originalApplySelectFilter) {
-    window.applySelectFilter = function(columnName) {
-        originalApplySelectFilter(columnName);
-        setTimeout(verificarQtdLotes, 500);
-    };
-}
-
-const originalApplyNumericFilter = window.applyNumericFilter;
-if (originalApplyNumericFilter) {
-    window.applyNumericFilter = function(columnName) {
-        originalApplyNumericFilter(columnName);
-        setTimeout(verificarQtdLotes, 500);
-    };
-}
-
-const originalClearColumnFilter = window.clearColumnFilter;
-if (originalClearColumnFilter) {
-    window.clearColumnFilter = function(columnName) {
-        originalClearColumnFilter(columnName);
-        setTimeout(verificarQtdLotes, 500);
-    };
-}
-
-const originalClearAllFilters = window.clearAllFilters;
-if (originalClearAllFilters) {
-    window.clearAllFilters = function() {
-        originalClearAllFilters();
-        setTimeout(verificarQtdLotes, 500);
-    };
-}
-
-// Sobrescreve reloadPage se existir
-if (typeof reloadPage === 'function') {
-    const originalReloadPage = reloadPage;
-    window.reloadPage = function() {
-        originalReloadPage();
-        setTimeout(verificarQtdLotes, 800);
-    };
-}
-
-// Atualizar cards ao carregar com filtros
-if (currentUrlParams.toString()) {
-    setTimeout(() => {
-        atualizarCardsComFiltros();
-    }, 100);
-}
-
-// Observar mudanças nos filtros via popstate
-window.addEventListener('popstate', function() {
-    currentUrlParams = new URLSearchParams(window.location.search);
-    updateActiveFiltersUI();
-    markActiveHeaders();
-    
-    const searchInput = document.getElementById('searchInput');
-    if (searchInput) {
-        const busca = currentUrlParams.get('busca') || '';
-        searchInput.value = busca;
-        document.getElementById('clearSearchBtn').style.display = busca ? 'flex' : 'none';
-    }
-    
-    atualizarCardsComFiltros();
-    setTimeout(verificarQtdLotes, 100);
-});
 </script>
 {% endblock %}

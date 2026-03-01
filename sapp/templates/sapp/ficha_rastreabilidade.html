@@ -28,12 +28,12 @@
             padding: 0 !important;
         }
         
-        /* VISUALIZAÇÃO NA TELA - MELHORADA */
+        /* VISUALIZAÇÃO NA TELA */
         html, body {
             width: 100%;
             height: 100%;
             margin: 0;
-            padding: 20px; /* Espaço para visualização na tela */
+            padding: 20px;
             background: #e9ecef;
             display: flex;
             justify-content: center;
@@ -45,43 +45,76 @@
             min-height: 100vh;
         }
         
-        /* ===== CONTAINER PRINCIPAL - VISUALIZAÇÃO NA TELA ===== */
+        /* ===== CONTAINER PRINCIPAL ===== */
         .ficha-a4 {
-            width: 21cm; /* Largura A4 para visualização */
-            min-height: 29.7cm; /* Altura A4 para visualização */
+            width: 21cm;
+            min-height: 29.7cm;
             background: white;
             border: 2px solid #000;
-            padding: 0.5cm 0.5cm 0.3cm 0.5cm;
+            padding: 1.2cm 0.5cm 0.3cm 0.5cm;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             position: relative;
             margin: 0 auto;
             page-break-after: avoid;
             page-break-before: avoid;
+            overflow: hidden; /* Garante que a marca d'água não vaze */
         }
 
         /* ===== ÁREA LIVRE PARA O JACAREZINHO (FURO) ===== */
         .area-livre-furo {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            height: 0.5cm;
-            background: transparent; /* Visualização mais limpa */
+            height: 1cm;
+            background: transparent;
+            z-index: 20;
         }
         
-        /* ===== MARCA D'ÁGUA ===== */
-        .marca-dagua {
+        /* ===== CONTAINER DA TABELA COM POSIÇÃO RELATIVA ===== */
+        .tabela-container {
+            position: relative;
+            width: 100%;
+            z-index: 10;
+            margin-bottom: 8px;
+            page-break-inside: avoid; /* Mantém a tabela em uma única página */
+            break-inside: avoid;
+        }
+        
+        /* ===== MARCA D'ÁGUA DENTRO DA TABELA ===== */
+        .marca-dagua-tabela {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
-            opacity: 0.05;
+            opacity: 0.2;
             pointer-events: none;
-            z-index: 0;
+            z-index: 5;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         
-        .marca-dagua img {
-            max-width: 500px;
-            max-height: 500px;
+        .marca-dagua-tabela img {
+            max-width: 600px;
+            max-height: 600px;
+            width: auto;
+            height: auto;
+            filter: grayscale(100%);
         }
-
+        
+        /* Fallback textual */
+        .marca-dagua-tabela-texto {
+            font-size: 80px;
+            font-weight: bold;
+            color: #999;
+            text-transform: uppercase;
+            white-space: nowrap;
+            opacity: 0.3;
+        }
+        
         /* ===== CABEÇALHO ===== */
         .cabecalho-superior {
             display: grid;
@@ -90,7 +123,7 @@
             margin-bottom: 8px;
             background: #fff;
             position: relative;
-            z-index: 2;
+            z-index: 15;
             height: 80px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
@@ -110,7 +143,7 @@
             justify-content: center;
             overflow: hidden;
             padding: 3px;
-            background: #f8f9fa; /* Fundo suave para visualização */
+            background: #f8f9fa;
         }
 
         .bloco-logo img {
@@ -147,8 +180,10 @@
             color: #fff;
             padding: 6px;
             margin-bottom: 10px;
-            border-radius: 2px; /* Leve arredondado para visualização */
+            border-radius: 2px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 15;
         }
         
         /* ===== ÁREA DE DADOS DO PRODUTO/LOTE ===== */
@@ -156,7 +191,7 @@
             display: flex;
             border: 2px solid #000;
             margin-bottom: 10px;
-            z-index: 2;
+            z-index: 15;
             position: relative;
             background: white;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
@@ -184,7 +219,6 @@
             font-size: 11px !important;
         }
         
-        /* Melhor visualização das células */
         .dados-lote-tabela td strong {
             color: #000;
             font-size: 13px;
@@ -201,6 +235,8 @@
             justify-content: center;
             background: #fff;
             padding: 5px;
+            z-index: 15;
+            position: relative;
         }
 
         .qrcode-label {
@@ -228,12 +264,12 @@
         .tabela-movimentacao {
             width: 100%;
             border-collapse: collapse;
-            z-index: 2;
             position: relative;
             table-layout: fixed;
-            margin-bottom: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             background: white;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         
         .tabela-movimentacao th {
@@ -256,13 +292,9 @@
             background: white;
         }
         
-        /* Efeito zebrado para melhor visualização na tela */
+        /* Efeito zebrado */
         .tabela-movimentacao tbody tr:nth-child(even) td {
             background-color: #f9f9f9;
-        }
-        
-        .tabela-movimentacao tbody tr:hover td {
-            background-color: #f0f7ff; /* Efeito hover para visualização */
         }
         
         /* Larguras das colunas */
@@ -270,6 +302,13 @@
         .col-movs { width: 68px; }
         .col-data { width: 130px; }
         .col-resp { width: auto; }
+
+        /* Ajuste para caber em uma página */
+        .tabela-movimentacao tbody tr {
+            height: 28px;
+        }
+        
+        /* 25 linhas * 28px = 700px, mais cabeçalho ~50px = 750px, cabe em A4 */
 
         /* ===== RODAPÉ ===== */
         .propaganda-app {
@@ -280,7 +319,7 @@
             font-size: 10px;
             font-style: italic;
             color: #666;
-            z-index: 2;
+            z-index: 15;
             position: relative;
             background: white;
         }
@@ -313,15 +352,33 @@
                 width: 100%;
                 height: 100%;
                 margin: 0 !important;
-                padding: 0.4cm 0.4cm 0.2cm 0.4cm;
+                padding: 1cm 0.4cm 0.2cm 0.4cm;
                 border: none !important;
                 box-shadow: none !important;
                 page-break-after: avoid;
                 page-break-before: avoid;
                 background: white;
+                overflow: hidden;
             }
             
-            /* Reset de estilos para impressão */
+            /* Garante que a tabela fique em uma página */
+            .tabela-container {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            .tabela-movimentacao {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            
+            /* MARCA D'ÁGUA NA IMPRESSÃO */
+            .marca-dagua-tabela {
+                opacity: 0.15 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
             .tabela-movimentacao th {
                 background: #FF8C00 !important;
                 -webkit-print-color-adjust: exact !important;
@@ -337,18 +394,17 @@
                 padding: 0 !important;
             }
             
-            .cabecalho-superior {
+            .cabecalho-superior, .titulo-central {
                 box-shadow: none !important;
             }
             
             .titulo-central {
                 background: black !important;
-                box-shadow: none !important;
                 border-radius: 0 !important;
             }
             
             .area-livre-furo {
-                background: transparent !important;
+                height: 1cm !important;
             }
         }
     </style>
@@ -358,13 +414,6 @@
         
         <!-- Espaço para o furo -->
         <div class="area-livre-furo"></div>
-        
-        <!-- MARCA D'ÁGUA -->
-        <div class="marca-dagua">
-            {% if config_logo and config_logo.logo %}
-                <img src="{{ config_logo.logo.url }}">
-            {% endif %}
-        </div>
         
         <!-- CABEÇALHO -->
         <div class="cabecalho-superior">
@@ -431,30 +480,45 @@
             </div>
         </div>
         
-        <!-- TABELA DE MOVIMENTAÇÃO -->
-        <table class="tabela-movimentacao">
-            <thead>
-                <tr>
-                    <th class="col-azrualn">AZ</th>
-                    <th class="col-azrualn">RUA</th>
-                    <th class="col-azrualn">LN</th>
-                    <th class="col-azrualn">PS</th>
-                    <th class="col-movs">ENTRADA</th>
-                    <th class="col-movs">SAÍDA</th>
-                    <th class="col-movs">SALDO</th>
-                    <th class="col-data">DATA</th>
-                    <th class="col-resp">VISTO RESPONSÁVEL</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- 25 LINHAS -->
-                {% for i in "1234567890123456789012345"|make_list %}
-                <tr>
-                    <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- CONTAINER DA TABELA COM MARCA D'ÁGUA DENTRO -->
+        <div class="tabela-container">
+            
+            <!-- MARCA D'ÁGUA DENTRO DA TABELA -->
+            <div class="marca-dagua-tabela">
+                {% if config_logo and config_logo.logo %}
+                    <img src="{{ config_logo.logo.url }}" alt="Marca d'água">
+                {% else %}
+                    <div class="marca-dagua-tabela-texto">
+                        {{ item.empresa|default:"SEMENTES APP" }}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- TABELA DE MOVIMENTAÇÃO -->
+            <table class="tabela-movimentacao">
+                <thead>
+                    <tr>
+                        <th class="col-azrualn">AZ</th>
+                        <th class="col-azrualn">RUA</th>
+                        <th class="col-azrualn">LN</th>
+                        <th class="col-azrualn">PS</th>
+                        <th class="col-movs">ENTRADA</th>
+                        <th class="col-movs">SAÍDA</th>
+                        <th class="col-movs">SALDO</th>
+                        <th class="col-data">DATA</th>
+                        <th class="col-resp">VISTO RESPONSÁVEL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 25 LINHAS - OTIMIZADO PARA UMA PÁGINA -->
+                    {% for i in "1234567890123456789012345"|make_list %}
+                    <tr>
+                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         
         <!-- RODAPÉ -->
         <div class="propaganda-app">
