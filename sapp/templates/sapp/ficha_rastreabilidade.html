@@ -21,11 +21,13 @@
             color-adjust: exact !important;
         }
         
-        /* CONFIGURAÇÃO PARA OCUPAR 100% DA PÁGINA NA IMPRESSÃO */
+        /* CONFIGURAÇÃO PARA OCUPAR 100% DA PÁGINA NA IMPRESSÃO - UMA ÚNICA PÁGINA */
         @page {
             size: A4;
             margin: 0 !important;
             padding: 0 !important;
+            page-break-after: avoid;
+            page-break-before: avoid;
         }
         
         /* VISUALIZAÇÃO NA TELA */
@@ -45,19 +47,24 @@
             min-height: 100vh;
         }
         
-        /* ===== CONTAINER PRINCIPAL ===== */
+        /* ===== CONTAINER PRINCIPAL - FORÇADO A FICAR EM UMA PÁGINA ===== */
         .ficha-a4 {
             width: 21cm;
             min-height: 29.7cm;
+            max-height: 29.7cm;
+            height: 29.7cm;
             background: white;
             border: 2px solid #000;
-            padding: 1.2cm 0.5cm 0.5cm 0.5cm; /* Aumentado padding inferior */
+            padding: 1.2cm 0.5cm 0.8cm 0.5cm;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             position: relative;
             margin: 0 auto;
-            page-break-after: avoid;
-            page-break-before: avoid;
+            page-break-after: avoid !important;
+            page-break-before: avoid !important;
+            page-break-inside: avoid !important;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
         /* ===== ÁREA LIVRE PARA O JACAREZINHO (FURO) ===== */
@@ -71,14 +78,16 @@
             z-index: 20;
         }
         
-        /* ===== CONTAINER DA TABELA COM POSIÇÃO RELATIVA ===== */
+        /* ===== CONTAINER DA TABELA COM ALTURA CONTROLADA ===== */
         .tabela-container {
             position: relative;
             width: 100%;
             z-index: 10;
-            margin-bottom: 15px; /* Aumentado margem inferior */
-            page-break-inside: avoid;
-            break-inside: avoid;
+            margin-bottom: 10px;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            flex: 0 1 auto;
+            max-height: 21cm;
         }
         
         /* ===== MARCA D'ÁGUA QUASE INVISÍVEL ===== */
@@ -93,7 +102,7 @@
             justify-content: center;
             pointer-events: none;
             z-index: 5;
-            opacity: 0.04; /* Bem mais suave, quase invisível */
+            opacity: 0.04;
             mix-blend-mode: soft-light;
         }
         
@@ -106,16 +115,15 @@
         }
         
         .marca-dagua-profissional img {
-            max-width: 80%; /* Reduzido para não competir */
-            max-height: 80%;
+            max-width: 90%;
+            max-height: 90%;
             width: auto;
             height: auto;
             object-fit: contain;
             filter: grayscale(100%) contrast(200%);
-            transform: rotate(-25deg) scale(1.1);
+            transform: rotate(-25deg) scale(1.2);
         }
         
-        /* Fallback textual suave */
         .marca-dagua-texto {
             font-size: 140px;
             font-weight: 900;
@@ -128,7 +136,7 @@
             font-family: 'Arial Black', sans-serif;
         }
         
-        /* ===== CABEÇALHO ===== */
+        /* ===== CABEÇALHO COM LOGO EXPANDIDA ===== */
         .cabecalho-superior {
             display: grid;
             grid-template-columns: 40% 30% 30%;
@@ -137,34 +145,53 @@
             background: #fff;
             position: relative;
             z-index: 15;
-            height: 90px;
+            height: 130px; /* AUMENTADO PARA DAR MAIS ESPAÇO */
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             border-radius: 4px 4px 0 0;
+            flex-shrink: 0;
         }
 
         .cabecalho-bloco {
             display: flex;
             flex-direction: column;
             border-right: 2px solid #000;
+            height: 100%;
         }
         
         .cabecalho-bloco:last-child {
             border-right: none;
         }
 
+        /* BLOCO DA LOGO - CONFIGURAÇÃO PARA EXPANDIR MÁXIMO */
         .bloco-logo {
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            padding: 8px;
+            overflow: visible; /* MUDA PARA VISIBLE - PERMITE QUE A IMAGEM ULTRAPASSE */
+            padding: 0;
             background: #f8f9fa;
+            height: 100%;
+            width: 100%;
+            display: flex;
+            position: relative;
+        }
+
+        /* CONTAINER DA LOGO PARA APLICAR SCALE */
+        .bloco-logo .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            transform: scale(1.8); /* AUMENTA 80% - AJUSTE ESTE VALOR */
         }
 
         .bloco-logo img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            max-height: 70px;
+            width: 30% !important;
+            height: auto !important;
+            max-width: none !important; /* REMOVE LIMITE MÁXIMO */
+            max-height: none !important; /* REMOVE LIMITE MÁXIMO */
+            object-fit: contain !important;
+            display: block;
         }
 
         .bloco-central, .bloco-direita {
@@ -172,6 +199,7 @@
             padding: 8px 12px;
             font-size: 12px;
             background: #f8f9fa;
+            height: 100%;
         }
 
         .bloco-direita { 
@@ -193,25 +221,27 @@
             letter-spacing: 2px;
             background: linear-gradient(145deg, #FF8C00, #5A0F0F);
             color: #fff;
-            padding: 10px;
-            margin-bottom: 15px;
+            padding: 8px;
+            margin-bottom: 12px;
             border-radius: 4px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             position: relative;
             z-index: 15;
             border: 1px solid rgba(255,255,255,0.2);
+            flex-shrink: 0;
         }
         
         /* ===== ÁREA DE DADOS DO PRODUTO/LOTE ===== */
         .dados-lote-container {
             display: flex;
             border: 2px solid #000;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             z-index: 15;
             position: relative;
             background: white;
             box-shadow: 0 6px 10px rgba(0,0,0,0.15);
             border-radius: 4px;
+            flex-shrink: 0;
         }
         
         .dados-lote-tabela {
@@ -222,8 +252,8 @@
         
         .dados-lote-tabela td {
             border: 1px solid #000;
-            padding: 6px 10px;
-            font-size: 13px;
+            padding: 5px 8px;
+            font-size: 12px;
             color: #111;
         }
         
@@ -231,39 +261,39 @@
             background: linear-gradient(145deg, #FF8C00, #e67e22);
             font-weight: 800;
             width: 12%;
-            color: #FFFFFF !important; /* TEXTO BRANCO AGORA */
+            color: #FFFFFF !important;
             text-transform: uppercase;
-            font-size: 12px !important;
+            font-size: 11px !important;
             text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
         }
         
         .dados-lote-tabela td strong {
             color: #000;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
         }
         
         /* ===== QR CODE ===== */
         .qrcode-area {
-            width: 120px;
-            min-width: 120px;
+            width: 115px;
+            min-width: 115px;
             border-left: 2px solid #000;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             background: linear-gradient(145deg, #FF8C00, #e67e22);
-            padding: 8px;
+            padding: 5px;
             z-index: 15;
             position: relative;
             border-radius: 0 4px 4px 0;
         }
 
         .qrcode-label {
-            font-size: 9px;
+            font-size: 8px;
             font-weight: 800;
-            margin-bottom: 6px;
-            color: #FFFFFF; /* BRANCO */
+            margin-bottom: 4px;
+            color: #FFFFFF;
             text-transform: uppercase;
             letter-spacing: 1px;
             text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
@@ -271,19 +301,19 @@
         
         #qrcode {
             background: white;
-            padding: 6px;
+            padding: 4px;
             border: 2px solid #fff;
-            border-radius: 8px;
+            border-radius: 6px;
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
         
         #qrcode canvas, #qrcode img {
-            width: 90px !important;
-            height: 90px !important;
+            width: 80px !important;
+            height: 80px !important;
             display: block;
         }
         
-        /* ===== TABELA DE MOVIMENTAÇÃO ===== */
+        /* ===== TABELA DE MOVIMENTAÇÃO - COMPACTA ===== */
         .tabela-movimentacao {
             width: 100%;
             border-collapse: collapse;
@@ -291,154 +321,161 @@
             table-layout: fixed;
             box-shadow: 0 6px 10px rgba(0,0,0,0.15);
             background: white;
-            page-break-inside: avoid;
-            break-inside: avoid;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
             border: 2px solid #000;
             border-radius: 4px;
             overflow: hidden;
+            font-size: 10px;
         }
         
         .tabela-movimentacao th {
             background: linear-gradient(145deg, #FF8C00, #d35400);
             color: white;
             font-weight: 800;
-            font-size: 11px;
-            padding: 8px 2px;
+            font-size: 10px;
+            padding: 5px 1px;
             text-align: center;
             border: 1px solid #5A0F0F;
-            border-bottom: 3px solid #5A0F0F;
+            border-bottom: 2px solid #5A0F0F;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            text-shadow: 2px 2px 2px rgba(0,0,0,0.3);
+            letter-spacing: 0.3px;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
         }
         
         .tabela-movimentacao td {
             border: 1px solid #ccc;
-            height: 30px;
+            height: 24px;
             background: white;
-            font-size: 11px;
+            font-size: 10px;
             text-align: center;
+            padding: 0 2px;
         }
         
-        /* Efeito zebrado suave */
         .tabela-movimentacao tbody tr:nth-child(even) td {
             background-color: #f5f5f5;
         }
         
-        /* Larguras das colunas otimizadas */
-        .col-azrualn { width: 38px; }
-        .col-movs { width: 65px; }
-        .col-data { width: 125px; }
+        .col-azrualn { width: 35px; }
+        .col-movs { width: 60px; }
+        .col-data { width: 115px; }
         .col-resp { width: auto; }
 
-        /* ===== RODAPÉ SEM CORTE ===== */
+        /* ===== RODAPÉ COMPACTO ===== */
         .propaganda-app {
             text-align: right;
-            border-top: 1px solid #FF8C0;
-            padding: 10px 5px 5px 5px; /* Aumentado padding superior */
-            margin-top: 5px;
+            border-top: 1px solid #FF8C00;
+            padding: 8px 5px 3px 5px;
+            margin-top: 8px;
             font-size: 11px;
             color: #444;
             z-index: 15;
             position: relative;
             background: white;
             font-style: italic;
-            clear: both; /* Garante que fique abaixo */
             width: 100%;
-            bottom: 0;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            clear: both;
+            flex-shrink: 0;
         }
         
         .propaganda-app span {
             font-weight: 800;
             color: #FF8C00;
             font-style: normal;
-            padding: 3px 10px;
+            padding: 2px 10px;
             font-size: 12px;
             letter-spacing: 0.5px;
+            background: #fff3e0;
+            border-radius: 20px;
+            margin-left: 5px;
         }
         
-        /* ===== MEDIA PRINT OTIMIZADO ===== */
+        /* ===== MEDIA PRINT - UMA PÁGINA ===== */
         @media print {
             html, body {
                 padding: 0 !important;
                 margin: 0 !important;
                 background: white !important;
                 display: block;
+                height: 100%;
+                width: 100%;
             }
             
             @page {
                 size: A4;
                 margin: 0 !important;
                 padding: 0 !important;
+                page-break-after: avoid;
+                page-break-before: avoid;
             }
             
             .ficha-a4 {
                 width: 100%;
-                height: 100%;
+                height: 29.7cm !important;
+                max-height: 29.7cm !important;
+                min-height: 29.7cm !important;
                 margin: 0 !important;
-                padding: 1cm 0.5cm 0.5cm 0.5cm !important; /* Padding inferior garantido */
+                padding: 1cm 0.5cm 0.7cm 0.5cm !important;
                 border: none !important;
                 box-shadow: none !important;
-                page-break-after: avoid;
-                page-break-before: avoid;
+                page-break-after: avoid !important;
+                page-break-before: avoid !important;
+                page-break-inside: avoid !important;
                 background: white;
                 overflow: hidden;
+                display: flex;
+                flex-direction: column;
             }
             
             .tabela-container {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
-                margin-bottom: 15px !important;
+                margin-bottom: 8px !important;
+                flex: 1 1 auto;
+                max-height: 20.5cm;
             }
             
             .tabela-movimentacao {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
+                height: auto;
             }
             
-            /* MARCA D'ÁGUA QUASE INVISÍVEL NA IMPRESSÃO */
+            .tabela-movimentacao tbody tr {
+                height: 24px !important;
+                page-break-inside: avoid !important;
+            }
+            
             .marca-dagua-container {
-                opacity: 0.03 !important; /* Ainda mais suave na impressão */
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                mix-blend-mode: soft-light;
+                opacity: 0.03 !important;
             }
             
-            .tabela-movimentacao th {
-                background: #FF8C00 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                border-bottom: 3px solid #5A0F0F !important;
-            }
-            
-            .celula-fundo {
-                background: #FF8C00 !important;
-                color: #FFFFFF !important;
-            }
-            
-            .qrcode-area {
-                background: #FF8C00 !important;
-            }
-            
-            .qrcode-label {
-                color: #FFFFFF !important;
-            }
-            
-            .tabela-movimentacao tbody tr:nth-child(even) td {
-                background-color: #f0f0f0 !important;
+            .bloco-logo .logo-container {
+                transform: scale(1.8) !important; /* MANTÉM O SCALE NA IMPRESSÃO */
             }
             
             .propaganda-app {
+                display: block !important;
+                visibility: visible !important;
                 border-top: 1px solid #FF8C00 !important;
-                padding: 10px 5px 5px 5px !important;
-                margin-top: 5px !important;
-                page-break-after: avoid;
-                position: relative;
-                bottom: auto;
+                padding: 8px 5px 3px 5px !important;
+                margin-top: 8px !important;
+                page-break-after: avoid !important;
+                page-break-before: avoid !important;
+                background: white !important;
+                flex-shrink: 0;
             }
             
-            .area-livre-furo {
-                height: 1cm !important;
+            body::after, body::before {
+                display: none !important;
+                content: none !important;
+            }
+            
+            .cabecalho-superior, .titulo-central, .dados-lote-container {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
         }
     </style>
@@ -449,13 +486,15 @@
         <!-- Espaço para o furo -->
         <div class="area-livre-furo"></div>
         
-        <!-- CABEÇALHO -->
+        <!-- CABEÇALHO COM LOGO EXPANDIDA -->
         <div class="cabecalho-superior">
             <div class="cabecalho-bloco bloco-logo">
                 {% if config_logo and config_logo.logo %}
-                    <img src="{{ config_logo.logo.url }}" alt="Logo">
+                    <div class="logo-container">  <!-- CONTAINER PARA APLICAR SCALE -->
+                        <img src="{{ config_logo.logo.url }}" alt="Logo">
+                    </div>
                 {% else %}
-                    <div style="font-weight: 900; font-size: 22px; color: #FF8C00; text-shadow: 2px 2px 2px rgba(0,0,0,0.1);">GRUPO CONCEITO</div>
+                    <div style="font-weight: 900; font-size: 22px; color: #FF8C00; text-align: center; width: 100%;">GRUPO CONCEITO</div>
                 {% endif %}
             </div>
             
@@ -487,7 +526,7 @@
                 </tr>
                 <tr>
                     <td class="celula-fundo">Lote:</td>
-                    <td style="font-size: 16px;"><strong>{{ item.lote|default:"______________" }}</strong></td>
+                    <td style="font-size: 15px;"><strong>{{ item.lote|default:"______________" }}</strong></td>
                     <td class="celula-fundo">PME (KG):</td>
                     <td><strong>
                         {% if item.peso_unitario %}{{ item.peso_unitario|floatformat:2 }} kg
@@ -509,15 +548,15 @@
             </table>
             
             <div class="qrcode-area">
-                <div class="qrcode-label">QR CODE LOTE</div>
+                <div class="qrcode-label">QR CODE</div>
                 <div id="qrcode"></div>
             </div>
         </div>
         
-        <!-- CONTAINER DA TABELA COM MARCA D'ÁGUA QUASE INVISÍVEL -->
+        <!-- CONTAINER DA TABELA -->
         <div class="tabela-container">
             
-            <!-- MARCA D'ÁGUA BEM SUAVE -->
+            <!-- MARCA D'ÁGUA -->
             <div class="marca-dagua-container">
                 <div class="marca-dagua-profissional">
                     {% if config_logo and config_logo.logo %}
@@ -543,23 +582,43 @@
                         <th class="col-movs">DESTINO</th>
                         <th class="col-movs">SALDO</th>
                         <th class="col-data">DATA</th>
-                        <th class="col-resp">VISTO RESPONSÁVEL</th>
+                        <th class="col-resp">VISTO</th>
                     </tr>
                 </thead>
                 <tbody>
                     <!-- 25 LINHAS -->
-                    {% for i in "1234567890123456789012345"|make_list %}
-                    <tr>
-                        <td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-                    </tr>
-                    {% endfor %}
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
                 </tbody>
             </table>
         </div>
         
-        <!-- RODAPÉ SEM CORTE -->
+        <!-- RODAPÉ -->
         <div class="propaganda-app">
-            Documento eletrônico rastreável gerado via sistema <span>SEMENTES APP</span>
+            Documento eletrônico rastreável via sistema <span>SEMENTES APP</span>
         </div>
 
     </div>
@@ -572,16 +631,16 @@
             if(el) {
                 new QRCode(el, {
                     text: tx,
-                    width: 90,
-                    height: 90,
+                    width: 80,
+                    height: 80,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
                     correctLevel: QRCode.CorrectLevel.H
                 });
             }
             
-            // Delay para impressão
-            setTimeout(() => window.print(), 400);
+            // Impressão direta
+            window.print();
         };
     </script>
 </body>
