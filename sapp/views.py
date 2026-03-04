@@ -1060,8 +1060,11 @@ def nova_entrada(request):
             with transaction.atomic():
                 lote = request.POST.get('lote', '').strip()
                 endereco = request.POST.get('endereco', '').strip().upper()
-                produto = request.POST.get('produto', '').strip()  # 🔥 CAPTURAR PRODUTO
+                produto = request.POST.get('produto', '').strip()
                 qtd = int(request.POST.get('entrada', 0))
+                
+                # 🔥 NOVO: Capturar o checkbox
+                ultimo_lote_linha = request.POST.get('ultimo_lote_linha') == 'on'
                 
                 # Processar peso unitário
                 peso_raw = request.POST.get('peso_unitario', '0')
@@ -1074,72 +1077,55 @@ def nova_entrada(request):
                 except:
                     novo_peso = Decimal('0.00')
                 
-                # CORREÇÃO AQUI: Buscar o Objeto Espécie pelo ID
+                # Buscar objetos relacionados
                 especie_id = request.POST.get('especie')
                 if especie_id:
                     especie_obj = get_object_or_404(Especie, id=especie_id)
                 else:
-                    # Se não escolheu nada, cria/pega uma padrão 'SOJA'
                     especie_obj, _ = Especie.objects.get_or_create(nome='SOJA')
 
-                # Tratamento de Cultivar/Peneira/Categoria (Obrigatórios)
                 cultivar = get_object_or_404(Cultivar, id=request.POST.get('cultivar'))
                 peneira = get_object_or_404(Peneira, id=request.POST.get('peneira'))
                 categoria = get_object_or_404(Categoria, id=request.POST.get('categoria'))
                 
-                # Tratamento (Opcional)
                 trat_id = request.POST.get('tratamento')
                 tratamento = Tratamento.objects.filter(id=trat_id).first() if trat_id else None
 
-                # 🔥 MUDANÇA CRÍTICA: Buscar item existente com MESMO LOTE, ENDEREÇO, PRODUTO, CULTIVAR E PESO
+                # Buscar item existente
                 item = Estoque.objects.filter(
                     lote=lote, 
                     endereco=endereco,
-                    produto=produto,  # 🔥 ADICIONADO PRODUTO!
+                    produto=produto,
                     cultivar=cultivar,
                     peso_unitario=novo_peso
                 ).first()
                 
                 if item:
-                    # SOMA apenas se todos os campos forem iguais (incluindo PRODUTO)
+                    # Soma ao existente
                     item.entrada += qtd
                     item.observacao += f"\n[+ENTRADA {qtd} em {timezone.now().strftime('%d/%m')}]"
                     item.especie = especie_obj
-                    msg = "adicionados ao lote existente (mesmo produto e peso)"
-                    print(f"✅ Somando ao lote existente: {lote} | Produto: {produto} | Peso: {novo_peso} | Qtd: {qtd}")
+                    
+                    # 🔥 IMPORTANTE: Se for marcar como último lote
+                    if ultimo_lote_linha:
+                        # Verificar se já existe outro último na mesma linha
+                        dados_end = extrair_ln_p(endereco)
+                        if dados_end:
+                            outro_ultimo = Estoque.objects.filter(
+                                endereco__startswith=f"{dados_end['rua']} {dados_end['ln']} P",
+                                ultimo_lote_linha=True
+                            ).exclude(id=item.id).first()
+                            
+                            if outro_ultimo:
+                                outro_ultimo.ultimo_lote_linha = False
+                                outro_ultimo.save()
+                        
+                        item.ultimo_lote_linha = True
+                    
+                    msg = "adicionados ao lote existente"
+                    print(f"✅ Somando ao lote existente: {lote}")
                 else:
-                    # 🔥 Verificar se existe lote com mesmo código mas PRODUTO DIFERENTE
-                    item_produto_diferente = Estoque.objects.filter(
-                        lote=lote,
-                        endereco=endereco,
-                        cultivar=cultivar
-                    ).exclude(produto=produto).first()
-                    
-                    if item_produto_diferente:
-                        print(f"⚠️ Lote {lote} já existe com produto DIFERENTE ('{item_produto_diferente.produto}' vs '{produto}')")
-                        messages.warning(
-                            request, 
-                            f"⚠️ Lote {lote} já existe no endereço {endereco} com produto '{item_produto_diferente.produto}'. "
-                            f"Não foi possível somar (produto diferente). Criado como novo registro."
-                        )
-                    
-                    # 🔥 Verificar se existe lote com mesmo código mas PESO DIFERENTE
-                    item_peso_diferente = Estoque.objects.filter(
-                        lote=lote,
-                        endereco=endereco,
-                        produto=produto,
-                        cultivar=cultivar
-                    ).exclude(peso_unitario=novo_peso).first()
-                    
-                    if item_peso_diferente:
-                        print(f"⚠️ Lote {lote} já existe com peso DIFERENTE ({item_peso_diferente.peso_unitario} kg vs {novo_peso} kg)")
-                        messages.warning(
-                            request, 
-                            f"⚠️ Lote {lote} já existe no endereço {endereco} com peso {item_peso_diferente.peso_unitario} kg. "
-                            f"Não foi possível somar (peso diferente). Criado como novo registro."
-                        )
-                    
-                    # CRIAÇÃO DO NOVO LOTE (sempre cria novo quando produto ou peso diferente)
+                    # Criar novo lote
                     item = Estoque(
                         lote=lote, 
                         endereco=endereco, 
@@ -1151,17 +1137,32 @@ def nova_entrada(request):
                         tratamento=tratamento,
                         especie=especie_obj,
                         conferente=request.user,
-                        produto=produto,  # 🔥 USANDO O PRODUTO CAPTURADO
+                        produto=produto,
                         cliente=request.POST.get('cliente', ''),
                         empresa=request.POST.get('empresa', ''),
                         az=request.POST.get('az', ''),
                         origem_destino=request.POST.get('origem_destino', ''),
                         peso_unitario=novo_peso,
                         embalagem=request.POST.get('embalagem', 'BAG'),
-                        observacao=request.POST.get('observacao', '')
+                        observacao=request.POST.get('observacao', ''),
+                        ultimo_lote_linha=ultimo_lote_linha  # 🔥 NOVO
                     )
+                    
+                    # Se for marcar como último, verificar conflitos
+                    if ultimo_lote_linha:
+                        dados_end = extrair_ln_p(endereco)
+                        if dados_end:
+                            outro_ultimo = Estoque.objects.filter(
+                                endereco__startswith=f"{dados_end['rua']} {dados_end['ln']} P",
+                                ultimo_lote_linha=True
+                            ).first()
+                            
+                            if outro_ultimo:
+                                outro_ultimo.ultimo_lote_linha = False
+                                outro_ultimo.save()
+                    
                     msg = "criado com sucesso"
-                    print(f"🆕 Novo lote criado: {lote} | Produto: {produto} | Peso: {novo_peso}")
+                    print(f"🆕 Novo lote criado: {lote}")
                 
                 item.save()
                 
@@ -1171,8 +1172,9 @@ def nova_entrada(request):
                     item.peso_total = item.peso_total.quantize(Decimal('0.01'))
                     item.save()
                 
-                # Histórico e Fotos
-                descricao_historico = f"Entrada de {qtd} unidades. ({msg}) | Produto: {produto} | Peso unitário: {novo_peso} kg"
+                # Histórico
+                status_ultimo = " e marcado como ÚLTIMO DA LINHA" if ultimo_lote_linha else ""
+                descricao_historico = f"Entrada de {qtd} unidades. ({msg}{status_ultimo}) | Produto: {produto} | Peso: {novo_peso} kg"
                 hist = HistoricoMovimentacao.objects.create(
                     estoque=item, 
                     usuario=request.user, 
@@ -1183,7 +1185,7 @@ def nova_entrada(request):
                 for f in request.FILES.getlist('fotos'):
                     FotoMovimentacao.objects.create(historico=hist, arquivo=f)
                 
-                messages.success(request, f"✅ Lote {lote} {msg}! Produto: {produto} | Peso: {novo_peso} kg")
+                messages.success(request, f"✅ Lote {lote} {msg}!{status_ultimo}")
                 
         except Exception as e:
             import traceback
@@ -4037,3 +4039,267 @@ def ficha_rastreabilidade_multipla(request):
         'total_itens': len(itens),
     }
     return render(request, 'ficha_rastreabilidade_multipla.html', context)
+
+
+
+import re
+
+def extrair_ln_p(endereco):
+    """
+    Extrai LN e P de um endereço no formato R-X LN## P##
+    Retorna (rua, ln, posicao) ou None se não seguir o padrão
+    """
+    if not endereco:
+        return None
+    
+    # Padrão: R-X LN## P## (ex: R-A LN10 P03)
+    pattern = r'^(R-[A-Z])\s+(LN\d+)\s+(P\d+)$'
+    match = re.match(pattern, endereco.strip().upper())
+    
+    if match:
+        rua = match.group(1)  # R-A
+        ln = match.group(2)   # LN10
+        p = match.group(3)    # P03
+        posicao = int(re.search(r'\d+', p).group())  # 3
+        return {
+            'rua': rua,
+            'ln': ln,
+            'posicao': posicao,
+            'endereco_completo': endereco
+        }
+    return None
+
+def get_posicoes_linha(rua, ln):
+    """
+    Retorna todas as posições existentes de uma rua+linha
+    """
+    enderecos = Estoque.objects.filter(
+        endereco__startswith=f"{rua} {ln} P"
+    ).values_list('endereco', flat=True).distinct()
+    
+    posicoes = []
+    for end in enderecos:
+        dados = extrair_ln_p(end)
+        if dados:
+            posicoes.append({
+                'endereco': end,
+                'posicao': dados['posicao']
+            })
+    
+    # Ordenar por posição numérica
+    return sorted(posicoes, key=lambda x: x['posicao'])
+
+@login_required
+def marcar_ultimo_lote_linha(request, estoque_id):
+    """
+    Marca/desmarca um lote como último da linha
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método não permitido'})
+    
+    try:
+        lote = Estoque.objects.get(id=estoque_id)
+        
+        # Verificar se o endereço segue o padrão
+        dados_end = extrair_ln_p(lote.endereco)
+        if not dados_end:
+            return JsonResponse({
+                'success': False,
+                'error': 'Endereço não segue padrão LN + P'
+            })
+        
+        # Se já está marcado, desmarcar
+        if lote.ultimo_lote_linha:
+            lote.ultimo_lote_linha = False
+            lote.save()
+            
+            # Limpar marcações da linha
+            posicoes = get_posicoes_linha(dados_end['rua'], dados_end['ln'])
+            for pos in posicoes:
+                if pos['posicao'] >= dados_end['posicao']:
+                    # Aqui você pode limpar alguma flag visual se necessário
+                    pass
+            
+            return JsonResponse({
+                'success': True,
+                'marcado': False,
+                'mensagem': 'Marca removida'
+            })
+        
+        # Verificar se já existe outro último na mesma linha
+        outro_ultimo = Estoque.objects.filter(
+            endereco__startswith=f"{dados_end['rua']} {dados_end['ln']} P",
+            ultimo_lote_linha=True
+        ).exclude(id=estoque_id).first()
+        
+        if outro_ultimo:
+            # Desmarcar o outro
+            outro_ultimo.ultimo_lote_linha = False
+            outro_ultimo.save()
+        
+        # Marcar este como último
+        lote.ultimo_lote_linha = True
+        lote.save()
+        
+        return JsonResponse({
+            'success': True,
+            'marcado': True,
+            'mensagem': 'Marcado como último lote da linha'
+        })
+        
+    except Estoque.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Lote não encontrado'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def get_marcacoes_linha(request, rua, ln):
+    """
+    Retorna as posições afetadas pela marcação
+    """
+    try:
+        # Encontrar o último lote marcado nesta linha
+        ultimo = Estoque.objects.filter(
+            endereco__startswith=f"{rua} {ln} P",
+            ultimo_lote_linha=True
+        ).first()
+        
+        if not ultimo:
+            return JsonResponse({
+                'success': True,
+                'tem_marcacao': False,
+                'posicoes_afetadas': []
+            })
+        
+        dados_ultimo = extrair_ln_p(ultimo.endereco)
+        if not dados_ultimo:
+            return JsonResponse({
+                'success': True,
+                'tem_marcacao': False,
+                'posicoes_afetadas': []
+            })
+        
+        # Todas as posições da linha
+        posicoes = get_posicoes_linha(rua, ln)
+        
+        # Filtrar posições >= a posição marcada
+        posicoes_afetadas = [
+            p['endereco'] for p in posicoes 
+            if p['posicao'] >= dados_ultimo['posicao']
+        ]
+        
+        return JsonResponse({
+            'success': True,
+            'tem_marcacao': True,
+            'lote_marcado': ultimo.lote,
+            'posicao_marcada': dados_ultimo['posicao'],
+            'posicoes_afetadas': posicoes_afetadas
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+    
+
+
+@login_required
+def api_mapa_dados(request, armazem_numero):
+    """API para retornar dados do mapa em formato JSON"""
+    try:
+        armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero)
+        elementos = armazem.elementos.all()
+        
+        # Buscar estoque
+        itens_estoque = Estoque.objects.filter(saldo__gt=0)
+        ocupacao = {}
+        
+        for el in elementos:
+            if el.tipo == 'RETANGULO' and el.identificador:
+                chave = el.identificador.strip().upper()
+                tem_estoque = itens_estoque.filter(endereco__iexact=chave).exists()
+                if tem_estoque:
+                    ocupacao[el.id] = True
+        
+        # Converter elementos para dicionário
+        elementos_list = []
+        for el in elementos:
+            el_dict = {
+                'id': el.id,
+                'tipo': el.tipo,
+                'x': el.pos_x,
+                'y': el.pos_y,
+                'w': el.largura,
+                'h': el.altura,
+                'rot': el.rotacao,
+                'cor': el.cor_preenchimento,
+                'stroke': el.cor_borda,
+                'texto': el.conteudo_texto,
+                'identificador': el.identificador,
+            }
+            elementos_list.append(el_dict)
+        
+        return JsonResponse({
+            'success': True,
+            'armazem': {
+                'id': armazem.id,
+                'numero': armazem.numero,
+                'nome': armazem.nome,
+                'largura_canvas': armazem.largura_canvas,
+                'altura_canvas': armazem.altura_canvas,
+            },
+            'elementos': elementos_list,
+            'ocupacao': ocupacao
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@login_required
+def api_marcacoes_ultimo_lote(request):
+    """
+    Retorna todas as posições que devem receber marcação de X
+    (posições posteriores à posição marcada como último lote)
+    """
+    try:
+        from .models import ArmazemLayout, ElementoMapa
+        
+        # Buscar todos os lotes marcados como último
+        lotes_marcados = Estoque.objects.filter(
+            ultimo_lote_linha=True,
+            saldo__gt=0
+        )
+        
+        marcacoes = {}
+        
+        for lote in lotes_marcados:
+            dados_end = extrair_ln_p(lote.endereco)
+            if not dados_end:
+                continue
+            
+            rua = dados_end['rua']        # R-A
+            ln = dados_end['ln']           # LN01
+            posicao_marcada = dados_end['posicao']  # 4
+            
+            # Buscar no MAPA todos os endereços desta linha
+            padrao = f"{rua} {ln} P"
+            elementos = ElementoMapa.objects.filter(
+                tipo='RETANGULO',
+                identificador__startswith=padrao
+            ).values_list('identificador', flat=True).distinct()
+            
+            # Para cada endereço do mapa, verificar se é posterior
+            for endereco in elementos:
+                dados_pos = extrair_ln_p(endereco)
+                if dados_pos and dados_pos['posicao'] > posicao_marcada:
+                    marcacoes[endereco.strip().upper()] = True
+        
+        return JsonResponse({
+            'success': True,
+            'marcacoes': marcacoes,
+            'total': len(marcacoes)
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })

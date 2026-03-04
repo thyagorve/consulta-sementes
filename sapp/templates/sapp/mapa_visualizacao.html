@@ -2,39 +2,38 @@
 {% load static %}
 
 {% block content %}
-                <div class="main-wrapper d-flex flex-column" style="height: 100vh; height: -webkit-fill-available; background-color: #0f172a; overflow: hidden;">
-                    
-                    <!-- BARRA DE CONTROLE ÚNICA LINHA (ULTRA SLIM) -->
-                    <nav class="navbar navbar-dark bg-glass p-2 px-3 border-bottom border-secondary border-opacity-25 flex-shrink-0">
-                        <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap gap-2">
-                            
-                            <!-- 1. IDENTIFICAÇÃO E STATUS -->
-                            <div class="d-flex align-items-center gap-2 overflow-hidden">
-                            <div class="d-flex align-items-center flex-wrap gap-2">
-                    <!-- Nome do Armazém com Ícone -->
+<div class="main-wrapper d-flex flex-column" style="height: 100vh; height: -webkit-fill-available; background-color: #0f172a; overflow: hidden;">
+    
+    <!-- BARRA DE CONTROLE ÚNICA LINHA -->
+    <nav class="navbar navbar-dark bg-glass p-2 px-3 border-bottom border-secondary border-opacity-25 flex-shrink-0">
+        <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap gap-2">
+            
+            <!-- 1. IDENTIFICAÇÃO E STATUS -->
+            <div class="d-flex align-items-center gap-2 overflow-hidden">
+                <div class="d-flex align-items-center flex-wrap gap-2">
                     <div class="d-flex align-items-center">
                         <i class="fas fa-warehouse text-warning me-1 fs-6"></i>
                         <h6 class="mb-0 fw-bold text-white">{{ armazem.nome }}</h6>
                     </div>
                     
-                    <!-- Badges de Estatísticas na mesma linha -->
                     <div class="d-flex align-items-center gap-1">
-                        <span class="badge bg-dark border border-secondary text-info px-2 py-1 small" id="statsTotal">
+                        <span class="badge bg-dark border border-secondary text-info px-2 py-1 small" id="statsTotal" title="Total de Posições">
                             <i class="fas fa-cubes me-1"></i>0
                         </span>
-                        <span class="badge bg-dark border border-secondary text-success px-2 py-1 small" id="statsOcupados">
+                        <span class="badge bg-dark border border-secondary text-success px-2 py-1 small" id="statsOcupados" title="Posições com Estoque">
                             <i class="fas fa-check-circle me-1"></i>0
+                        </span>
+                        <span class="badge bg-dark border border-warning text-warning px-2 py-1 small" id="statsUltimosLotes" title="Posições Marcadas (Linha Finalizada)">
+                            <i class="fas fa-flag-checkered me-1"></i>0
                         </span>
                     </div>
                 </div>
 
-                <!-- CORREÇÃO: Usando armazens_disponiveis como no original -->
-                <div class="input-group input-group-sm" style="width: 220px;">
-                    <label class="input-group-text" style="background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                <div class="input-group input-group-sm d-none d-md-flex" style="width: 220px;">
+                    <label class="input-group-text bg-transparent border-secondary text-white-50">
                         <i class="fas fa-exchange-alt"></i>
                     </label>
-                    <select class="form-select fw-bold" id="selectAZ" 
-                            style="border-color: rgba(255,255,255,0.3); background: rgba(0,0,0,0.3); color: white;"
+                    <select class="form-select fw-bold bg-dark text-white border-secondary" id="selectAZ" 
                             onchange="location.href='/mapa-armazem/'+this.value+'/'">
                         {% for az in armazens_disponiveis %}
                             <option value="{{ az.numero }}" {% if az.numero == armazem.numero %}selected{% endif %}>
@@ -45,14 +44,14 @@
                 </div>
             </div>
 
-            <!-- 2. BUSCA CENTRAL (EXPANSÍVEL) -->
+            <!-- 2. BUSCA CENTRAL -->
             <div class="flex-grow-1 mx-2 mx-md-4" style="max-width: 600px;">
                 <div class="search-container position-relative">
                     <i class="fas fa-search search-icon"></i>
                     <input type="text" id="campoPesquisaLote" class="search-input" placeholder="Lote, Cliente ou Endereço...">
                     
                     <div id="wrapperContador" class="contador-badge d-none">
-                        <span id="resultadosContador">0</span> <span class="d-none d-sm-inline">items</span>
+                        <span id="resultadosContador">0</span>
                     </div>
                     
                     <button id="btnLimparPesquisa" class="clear-search-btn" style="display: none;">
@@ -61,14 +60,12 @@
                 </div>
             </div>
 
-            <!-- 3. BOTÕES DE AÇÃO E VISUALIZAÇÃO -->
+            <!-- 3. BOTÕES DE AÇÃO -->
             <div class="d-flex align-items-center gap-1 gap-md-2 flex-shrink-0">
-                <!-- Check de Quantidade Customizado -->
+                <a href="{% url 'sapp:lista_armazens' %}" class="btn btn-icon text-info" title="Ver todos os mapas">
+                    <i class="fas fa-th-large"></i>
+                </a>
 
-
-                <div class="vr mx-1 opacity-25 text-white h-20px"></div>
-
-                <!-- Botões de ação iconográficos -->
                 <button onclick="location.reload()" class="btn btn-icon text-white" title="Atualizar">
                     <i class="fas fa-sync-alt"></i>
                 </button>
@@ -83,20 +80,22 @@
     </nav>
 
     <!-- AREA DO MAPA -->
-    <main class="map-viewport position-relative overflow-auto p-2 p-md-4 d-flex align-items-center justify-content-center">
+    <main class="map-viewport position-relative overflow-auto p-2 p-md-4 d-flex align-items-start justify-content-center">
         <!-- Overlay de Rotação Celular -->
         <div id="landscapeSuggestion" class="orientation-overlay">
             <div class="text-center p-4 rounded-4 bg-dark shadow-lg border border-primary">
                 <i class="fas fa-mobile-alt fa-3x mb-3 text-primary rotate-icon"></i>
-                <h5 class="text-white">Gire o celular para o lado</h5>
-                <p class="text-secondary small">Para ver o mapa completo, use o modo paisagem.</p>
-                <button class="btn btn-primary btn-sm" onclick="this.parentElement.parentElement.style.display='none'">Fechar</button>
+                <h5 class="text-white">Gire o celular</h5>
+                <p class="text-secondary small">Para melhor visualização, use o modo paisagem.</p>
+                <button class="btn btn-primary btn-sm" onclick="this.parentElement.parentElement.style.display='none'">Entendi</button>
             </div>
         </div>
 
-        <div id="canvasContainer" class="position-relative shadow-2xl bg-white rounded-3 overflow-hidden">
-            <canvas id="mapaCanvas"></canvas>
-            <div id="tooltipMapa" class="tooltip-premium"></div>
+        <div id="canvasWrapper" class="position-relative">
+            <div id="canvasContainer" class="position-relative shadow-2xl bg-white rounded-3 overflow-hidden">
+                <canvas id="mapaCanvas"></canvas>
+                <div id="tooltipMapa" class="tooltip-premium"></div>
+            </div>
         </div>
     </main>
 </div>
@@ -117,196 +116,88 @@
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
 
-    body {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: #0f172a;
-    }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0f172a; }
 
-    .bg-glass {
-        background: rgba(15, 23, 42, 0.85) !important;
-        backdrop-filter: blur(10px);
-    }
+    .bg-glass { background: rgba(15, 23, 42, 0.85) !important; backdrop-filter: blur(10px); }
 
-    /* Input de busca futurista */
     .search-container {
-        position: relative;
-        height: 40px;
-        background: rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        height: 40px; background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px; transition: all 0.3s;
         border: 1px solid rgba(255,255,255,0.1);
     }
 
     .search-container:focus-within {
         background: rgba(255, 255, 255, 1);
         box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.4);
-        transform: scale(1.01);
     }
 
     .search-icon {
-        position: absolute;
-        left: 14px;
-        top: 50%;
-        transform: translateY(-50%);
-        color: rgba(255, 255, 255, 0.4);
-        pointer-events: none;
-        transition: color 0.3s;
+        position: absolute; left: 14px; top: 50%;
+        transform: translateY(-50%); color: rgba(255, 255, 255, 0.4);
     }
 
     .search-container:focus-within .search-icon { color: #6366f1; }
 
     .search-input {
-        width: 100%;
-        height: 100%;
-        background: transparent;
-        border: none;
-        padding-left: 42px;
-        padding-right: 90px;
-        color: #fff;
-        font-weight: 500;
-        font-size: 0.95rem;
+        width: 100%; height: 100%; background: transparent; border: none;
+        padding-left: 42px; padding-right: 90px; color: #fff; font-weight: 500;
     }
 
     .search-input:focus { outline: none; color: #1e293b; }
-    .search-input:focus::placeholder { color: #cbd5e1; }
 
     .clear-search-btn {
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: transparent;
-        border: none;
-        color: #ef4444;
-        font-size: 1.2rem;
-        z-index: 10;
+        position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+        background: transparent; border: none; color: #ef4444; z-index: 10;
     }
 
     .contador-badge {
-        position: absolute;
-        right: 40px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: #fbbf24;
-        color: #000;
-        padding: 2px 10px;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        font-weight: 800;
-        pointer-events: none;
+        position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
+        background: #fbbf24; color: #000; padding: 2px 8px; border-radius: 6px;
+        font-size: 0.7rem; font-weight: 800;
     }
 
-    /* Overlay para celular */
     .orientation-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.8);
-        z-index: 9999;
-        display: none;
-        align-items: center;
-        justify-content: center;
+        position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+        z-index: 9999; display: none; align-items: center; justify-content: center;
     }
 
-    @media (max-width: 992px) and (orientation: portrait) {
-        .orientation-overlay { display: flex; }
-    }
+    @media (max-width: 992px) and (orientation: portrait) { .orientation-overlay { display: flex; } }
 
-    .rotate-icon {
-        animation: rotateMove 1.5s ease-in-out infinite;
-    }
-    @keyframes rotateMove {
-        0%, 100% { transform: rotate(0deg); }
-        50% { transform: rotate(90deg); }
-    }
+    .map-viewport { background-color: #0f172a; flex-grow: 1; }
 
-    .map-viewport {
-        background-color: #0f172a;
-        flex-grow: 1;
-    }
-
-    #mapaCanvas {
-        display: block;
-        max-width: 100%;
-        cursor: crosshair;
-        background-color: white;
-        border: 1px solid #e2e8f0;
-    }
+    #mapaCanvas { cursor: crosshair; image-rendering: -webkit-optimize-contrast; }
 
     .tooltip-premium {
-        position: fixed;
-        display: none;
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        min-width: 250px;
-        z-index: 1000;
-        overflow: hidden;
-        pointer-events: none;
-        animation: fastPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    }
-
-    @keyframes fastPop {
-        from { transform: scale(0.9); opacity: 0; }
-        to { transform: scale(1); opacity: 1; }
+        position: fixed; display: none; background: white; border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3); min-width: 250px;
+        z-index: 1000; overflow: hidden; pointer-events: none;
     }
 
     .btn-icon {
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-        border: 1px solid rgba(255,255,255,0.05);
+        width: 38px; height: 38px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s; border: 1px solid rgba(255,255,255,0.05);
     }
-    .btn-icon:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); }
+    .btn-icon:hover { background: rgba(255,255,255,0.1); transform: scale(1.05); }
 
-    .line-height-1 { line-height: 1; }
-
-    /* Estilo para checkbox ativo */
-    .btn-check:checked + .btn-outline-light {
-        background-color: rgba(79, 70, 229, 0.2) !important;
-        color: white !important;
-        border-color: #6366f1 !important;
-    }
-
-    /* Estilo para o select de armazém */
-    #selectAZ {
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    
-    #selectAZ:hover {
-        background: rgba(255,255,255,0.1) !important;
-    }
-    
-    #selectAZ option {
-        background-color: #0f172a;
-        color: white;
-        padding: 8px;
-    }
-    
-    #selectAZ:focus {
-        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
-        border-color: #6366f1 !important;
-        outline: none;
+    /* Zoom e Controles */
+    .map-controls {
+        position: fixed; bottom: 20px; right: 20px;
+        z-index: 1000; display: flex; flex-direction: column; gap: 8px;
     }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // CORREÇÃO: Usar as mesmas variáveis do template original
+    // ========== CONFIGURAÇÃO E DADOS ==========
     const LAYOUT_ELEMENTS = {{ elementos_json|safe }};
     const STOCK_DATA = {{ dados_ocupacao_json|safe }};
     
     const canvas = document.getElementById('mapaCanvas');
     const ctx = canvas.getContext('2d');
     const tooltip = document.getElementById('tooltipMapa');
-    const modalEl = document.getElementById('modalMultiplosLotes');
-    const bsModal = new bootstrap.Modal(modalEl);
+    const bsModal = new bootstrap.Modal(document.getElementById('modalMultiplosLotes'));
     
-    // Configura canvas de acordo com o JSON original
     const CANVAS_WIDTH = {{ armazem.largura_canvas|default:1000 }};
     const CANVAS_HEIGHT = {{ armazem.altura_canvas|default:600 }};
     
@@ -315,496 +206,262 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let estado = {
         termo: '',
-        encontrados: new Set()
+        encontrados: new Set(),
+        zoomLevel: 1
     };
 
-    // Cache para buscas rápidas e processamento otimizado
     let cache = {
         posicoesComEndereco: [],
         posicoesSemEndereco: [],
         dadosPorEndereco: {},
         totalPorEndereco: {},
-        indiceBusca: new Map()
+        indiceBusca: new Map(),
+        posicoesComX: {} 
     };
 
-    // Inicializar cache - SEPARAR posições com e sem endereço
+    // ========== INICIALIZAÇÃO DO CACHE ==========
     function inicializarCache() {
         cache.posicoesComEndereco = [];
         cache.posicoesSemEndereco = [];
         cache.dadosPorEndereco = {};
-        cache.totalPorEndereco = {};
-        cache.indiceBusca.clear();
-
-        // Separar posições
-        LAYOUT_ELEMENTS.forEach((el, index) => {
+        
+        LAYOUT_ELEMENTS.forEach(el => {
             if (el.tipo === 'RETANGULO') {
                 const chave = el.id ? el.id.trim().toUpperCase() : '';
-                if (chave && chave !== '') {
-                    cache.posicoesComEndereco.push({
-                        ...el,
-                        chave: chave,
-                        index: index
-                    });
+                if (chave) {
+                    cache.posicoesComEndereco.push({...el, chave});
                 } else {
-                    cache.posicoesSemEndereco.push({
-                        ...el,
-                        index: index
-                    });
+                    cache.posicoesSemEndereco.push(el);
                 }
             }
         });
 
-        // Processar STOCK_DATA apenas para posições com endereço
         for (const [endereco, itens] of Object.entries(STOCK_DATA)) {
-            const enderecoKey = endereco.trim().toUpperCase();
-            if (itens && itens.length > 0) {
-                cache.dadosPorEndereco[enderecoKey] = itens;
-                
-                cache.totalPorEndereco[enderecoKey] = itens.reduce((total, item) => {
-                    return total + (parseInt(item.qtd) || 0);
-                }, 0);
-                
-                const termos = [];
-                itens.forEach(item => {
-                    if (item.lote) termos.push(item.lote.toLowerCase());
-                    if (item.cliente) termos.push(item.cliente.toLowerCase());
-                });
-                termos.push(enderecoKey.toLowerCase());
-                
-                cache.indiceBusca.set(enderecoKey, {
-                    termos: termos.join(' '),
-                    temMultiplos: itens.length > 1
-                });
-            }
+            const key = endereco.trim().toUpperCase();
+            cache.dadosPorEndereco[key] = itens;
+            cache.totalPorEndereco[key] = itens.reduce((acc, i) => acc + (parseInt(i.qtd) || 0), 0);
+            
+            const txtBusca = (itens.map(i => i.lote + ' ' + (i.cliente||'')).join(' ') + ' ' + key).toLowerCase();
+            cache.indiceBusca.set(key, { text: txtBusca, multi: itens.length > 1 });
         }
     }
 
-    inicializarCache();
-
-    // Elementos DOM
-    const campoPesquisa = document.getElementById('campoPesquisaLote');
-    const btnLimpar = document.getElementById('btnLimparPesquisa');
-    const wrapperContador = document.getElementById('wrapperContador');
-    const resContador = document.getElementById('resultadosContador');
-
-    // ===== SISTEMA DE PESQUISA OTIMIZADO =====
-    let searchTimeout = null;
-    
-    campoPesquisa.addEventListener('input', function() {
-        estado.termo = this.value.trim().toLowerCase();
-        
-        // Mostra/esconde botão de limpar
-        if (estado.termo.length > 0) {
-            btnLimpar.style.display = 'block';
-        } else {
-            btnLimpar.style.display = 'none';
-        }
-        
-        // Limpa timeout anterior
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-        
-        // Só busca se tiver 3+ caracteres OU se estiver vazio
-        if (estado.termo.length >= 3 || estado.termo.length === 0) {
-            searchTimeout = setTimeout(() => {
-                if (estado.termo.length >= 3) {
-                    wrapperContador.classList.remove('d-none');
-                    
-                    estado.encontrados.clear();
-                    cache.indiceBusca.forEach((data, endereco) => {
-                        if (data.termos.includes(estado.termo)) {
-                            estado.encontrados.add(endereco);
-                        }
-                    });
-                    resContador.innerText = estado.encontrados.size;
-                } else {
-                    wrapperContador.classList.add('d-none');
-                    estado.encontrados.clear();
-                }
+    function carregarStatusX() {
+        fetch('/api/marcacoes-ultimo-lote/')
+            .then(res => res.json())
+            .then(data => {
+                cache.posicoesComX = data.marcacoes || {};
+                const totalX = Object.keys(cache.posicoesComX).length;
+                document.getElementById('statsUltimosLotes').innerHTML = `<i class="fas fa-flag-checkered me-1"></i>${totalX}`;
                 desenharMapa();
-            }, 300); // Delay de 300ms para não sobrecarregar
-        }
-    });
+            }).catch(e => console.error("Erro marcacoes:", e));
+    }
 
-    btnLimpar.onclick = () => { 
-        campoPesquisa.value = ''; 
-        campoPesquisa.dispatchEvent(new Event('input')); 
-    };
-
+    // ========== RENDERIZAÇÃO PRINCIPAL (CORREÇÃO AQUI) ==========
     function desenharMapa() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        let totalPosicoes = 0;
-        let totalOcupados = 0;
+        let ocupadosCount = 0;
 
-        // 1. PRIMEIRO: Desenhar posições SEM endereço (formas decorativas)
+        // 1. Posições Estáticas (Decoração)
         cache.posicoesSemEndereco.forEach(pos => {
-            ctx.save();
-            
-            if (pos.rot) {
-                const cx = pos.x + pos.w/2;
-                const cy = pos.y + pos.h/2;
-                ctx.translate(cx, cy);
-                ctx.rotate(pos.rot * Math.PI / 180);
-                ctx.translate(-cx, -cy);
-            }
-
             ctx.fillStyle = pos.cor || '#f8fafc';
             ctx.fillRect(pos.x, pos.y, pos.w, pos.h);
-
-            ctx.strokeStyle = pos.stroke || '#e2e8f0';
-            ctx.lineWidth = 0.5;
-            ctx.strokeRect(pos.x, pos.y, pos.w, pos.h);
-
-            ctx.restore();
         });
 
-        // 2. DEPOIS: Desenhar posições COM endereço (funcionais)
+        // 2. Posições de Armazenagem
         cache.posicoesComEndereco.forEach(pos => {
-            totalPosicoes++;
-            
             const chave = pos.chave;
-            const temDados = cache.dadosPorEndereco[chave];
-            if (temDados) totalOcupados++;
+            const itens = cache.dadosPorEndereco[chave];
+            const temEstoque = itens && itens.length > 0;
+            const temX = cache.posicoesComX[chave]; // Aqui está o status da linha finalizada
+            const ehBusca = estado.termo.length >= 3 && estado.encontrados.has(chave);
             
+            if (temEstoque) ocupadosCount++;
+
             ctx.save();
             
-            if (pos.rot) {
-                const cx = pos.x + pos.w/2;
-                const cy = pos.y + pos.h/2;
-                ctx.translate(cx, cy);
-                ctx.rotate(pos.rot * Math.PI / 180);
-                ctx.translate(-cx, -cy);
-            }
-
-            const encontrado = estado.termo.length > 0 && estado.encontrados.has(chave);
-            
-            if (encontrado) {
-                ctx.fillStyle = '#fbbf24';
-            } else if (temDados) {
+            // Desenhar Retângulo
+            if (ehBusca) {
+                ctx.fillStyle = '#fbbf24'; // Destaque Amarelo
+                ctx.strokeStyle = '#d97706';
+            } else if (temEstoque || temX) { 
+                // CORREÇÃO: Fica verde se tiver estoque OU se tiver marcação X
                 ctx.fillStyle = pos.cor_ocupado || '#10b981';
+                ctx.strokeStyle = '#059669';
             } else {
                 ctx.fillStyle = pos.cor || '#f1f5f9';
+                ctx.strokeStyle = '#cbd5e1';
             }
             
+            ctx.lineWidth = 1;
             ctx.fillRect(pos.x, pos.y, pos.w, pos.h);
-
-            ctx.strokeStyle = encontrado ? '#d97706' : (pos.stroke || '#cbd5e1');
-            ctx.lineWidth = encontrado ? 2 : 1;
             ctx.strokeRect(pos.x, pos.y, pos.w, pos.h);
 
-            if (temDados && cache.indiceBusca.get(chave)?.temMultiplos) {
-                const padding = 6;
-                const radius = 4;
-                
-                ctx.beginPath();
-                ctx.arc(pos.x + pos.w - padding, pos.y + padding, radius, 0, Math.PI * 2);
+            // Indicador Multi-Lote
+            if (temEstoque && cache.indiceBusca.get(chave)?.multi) {
                 ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(pos.x + pos.w - 5, pos.y + 5, 3, 0, Math.PI*2);
                 ctx.fill();
-                
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 8px "Plus Jakarta Sans"';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('!', pos.x + pos.w - padding, pos.y + padding);
             }
 
-            // ===== QUANTIDADE SEMPRE VISÍVEL =====
-            if (temDados) {
-                const quantidade = cache.totalPorEndereco[chave];
-                
-                // Escolhe a cor do texto baseado no fundo
-                ctx.fillStyle = encontrado ? '#92400e' : '#ffffff';
-                
-                // Tamanho da fonte proporcional ao retângulo
-                ctx.font = `bold ${Math.min(pos.h * 0.5, 14)}px 'Plus Jakarta Sans'`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // Sombra para melhor legibilidade (só quando não está em destaque)
-                if (!encontrado) {
-                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-                    ctx.shadowBlur = 3;
-                    ctx.shadowOffsetY = 1;
-                }
-                
-                ctx.fillText(quantidade.toString(), pos.x + pos.w/2, pos.y + pos.h/2);
-                
-                // Reset sombra
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetY = 0;
+            // TEXTO CENTRAL (Prioridade para o X)
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const fontSize = Math.min(pos.h * 0.6, 13);
+            ctx.font = `bold ${fontSize}px "Plus Jakarta Sans"`;
+            
+            if (temX) {
+                // DESENHA O X
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 2;
+                ctx.fillText('X', pos.x + pos.w/2, pos.y + pos.h/2);
+            } else if (temEstoque) {
+                // DESENHA QUANTIDADE
+                ctx.fillStyle = ehBusca ? '#92400e' : '#ffffff';
+                ctx.fillText(cache.totalPorEndereco[chave], pos.x + pos.w/2, pos.y + pos.h/2);
             }
 
             ctx.restore();
         });
 
-        // 3. FINALMENTE: Desenhar textos
+        // 3. Labels de Texto do Mapa
         LAYOUT_ELEMENTS.forEach(el => {
             if (el.tipo === 'TEXTO') {
                 ctx.fillStyle = '#64748b';
-                ctx.font = '600 12px "Plus Jakarta Sans"';
-                ctx.fillText(el.texto || '', el.x, el.y + 10);
+                ctx.font = '600 11px "Plus Jakarta Sans"';
+                ctx.fillText(el.texto, el.x, el.y + 10);
             }
         });
 
-        document.getElementById('statsTotal').innerText = totalPosicoes;
-        document.getElementById('statsOcupados').innerText = totalOcupados;
+        document.getElementById('statsTotal').innerText = cache.posicoesComEndereco.length;
+        document.getElementById('statsOcupados').innerText = ocupadosCount;
     }
 
-    // ===== INTERAÇÕES HOVER (TOOLTIP) =====
-    let hoverTimeout;
-    
+    // ========== TOOLTIP DINÂMICO ==========
     canvas.addEventListener('mousemove', function(e) {
-        if (modalEl.classList.contains('show')) return;
-        
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
         
-        // Limpa timeout anterior
-        if (hoverTimeout) clearTimeout(hoverTimeout);
+        let p = cache.posicoesComEndereco.find(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h);
         
-        let elementoEncontrado = null;
-        for (let i = cache.posicoesComEndereco.length - 1; i >= 0; i--) {
-            const pos = cache.posicoesComEndereco[i];
-            if (x >= pos.x && x <= pos.x + pos.w && 
-                y >= pos.y && y <= pos.y + pos.h) {
-                elementoEncontrado = pos;
-                break;
-            }
-        }
-        
-        if (!elementoEncontrado) {
-            for (let i = cache.posicoesSemEndereco.length - 1; i >= 0; i--) {
-                const pos = cache.posicoesSemEndereco[i];
-                if (x >= pos.x && x <= pos.x + pos.w && 
-                    y >= pos.y && y <= pos.y + pos.h) {
-                    tooltip.style.display = 'none';
-                    canvas.style.cursor = 'default';
-                    return;
-                }
-            }
-        }
-        
-        if (elementoEncontrado) {
-            hoverTimeout = setTimeout(() => {
-                const chave = elementoEncontrado.chave;
-                const dados = cache.dadosPorEndereco[chave];
-                
-                let html = `
-                    <div style="padding: 12px 16px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 800; font-size: 14px;">
-                        ${chave || 'Sem endereço'}
-                        <span style="float:right; font-size: 11px; opacity: 0.8;">
-                            <i class="fas fa-mouse-pointer me-1"></i>Clique 2x
-                        </span>
-                    </div>
-                    <div style="padding: 16px;">
-                `;
-                
-                if (dados && dados.length > 0) {
-                    const totalQuantidade = cache.totalPorEndereco[chave] || 0;
-                    
-                    html += `
-                        <div style="margin-bottom: 12px; padding: 8px; background: #f0f9ff; border-radius: 8px;">
-                            <div style="font-size: 11px; color: #0ea5e9; font-weight: 600; margin-bottom: 4px;">
-                                <i class="fas fa-boxes me-1"></i>Resumo
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-size: 12px; color: #475569;">
-                                    ${dados.length} lote${dados.length > 1 ? 's' : ''}
-                                </span>
-                                <span style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; font-weight: 600; font-size: 11px; padding: 4px 8px; border-radius: 10px;">
-                                    ${totalQuantidade} unidades
-                                </span>
-                            </div>
-                        </div>
-                    `;
-                    
-                    dados.forEach((item, index) => {
-                        const isLast = index === dados.length - 1;
-                        html += `
-                            <div style="margin-bottom: ${isLast ? '0' : '8px'}; padding-bottom: ${isLast ? '0' : '8px'}; border-bottom: ${isLast ? 'none' : '1px dashed #e2e8f0'}">
-                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
-                                    <span style="background: #4f46e5; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">
-                                        ${item.lote}
-                                    </span>
-                                    <span style="font-size: 12px; color: #475569; font-weight: 600;">
-                                        ${item.qtd} ${item.embalagem || 'un'}
-                                    </span>
-                                </div>
-                                ${item.cliente ? `
-                                    <div style="font-size: 11px; color: #64748b;">
-                                        <i class="fas fa-user-tag me-1"></i>${item.cliente}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
-                    });
-                } else {
-                    html += `
-                        <div style="text-align: center; padding: 20px 0;">
-                            <div style="width: 40px; height: 40px; background: #f1f5f9; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
-                                <i class="fas fa-box-open" style="color: #94a3b8;"></i>
-                            </div>
-                            <span style="color: #94a3b8; font-size: 13px;">Posição Vazia</span>
-                        </div>
-                    `;
-                }
-                
-                html += `</div>`;
-                
-                tooltip.innerHTML = html;
-                tooltip.style.display = 'block';
-                
-                const ttWidth = 300;
-                const ttHeight = tooltip.offsetHeight;
-                const margin = 15;
-                
-                let leftPos = e.clientX + margin;
-                let topPos = e.clientY + margin;
-                
-                if (leftPos + ttWidth > window.innerWidth) leftPos = e.clientX - ttWidth - margin;
-                if (topPos + ttHeight > window.innerHeight) topPos = e.clientY - ttHeight - margin;
-                
-                tooltip.style.left = leftPos + 'px';
-                tooltip.style.top = topPos + 'px';
-                canvas.style.cursor = 'pointer';
-            }, 200); // Delay de 200ms para o tooltip aparecer
-        } else {
+        if (!p) {
             tooltip.style.display = 'none';
             canvas.style.cursor = 'default';
+            return;
         }
+
+        const chave = p.chave;
+        const itens = cache.dadosPorEndereco[chave] || [];
+        const temX = cache.posicoesComX[chave];
+        
+        let html = `
+            <div style="padding:10px; background:${temX ? '#059669' : '#4f46e5'}; color:white; font-weight:bold; font-size:13px;">
+                ${chave} ${temX ? '<span class="badge bg-warning text-dark ms-2">LINHA CONCLUÍDA</span>' : ''}
+            </div>
+            <div style="padding:10px; font-size:12px; color:#334155;">
+        `;
+
+        if (itens.length > 0) {
+            itens.forEach(it => {
+                html += `
+                    <div class="mb-2 pb-1 border-bottom">
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold text-primary">${it.lote}</span>
+                            <span class="badge bg-light text-dark border">${it.qtd} ${it.embalagem||'un'}</span>
+                        </div>
+                        <div class="small text-muted text-truncate" style="max-width:200px">${it.cliente || 'Sem cliente'}</div>
+                    </div>
+                `;
+            });
+        } else {
+            html += `<div class="text-center py-2 text-muted">Posição Vazia</div>`;
+        }
+
+        html += `</div>`;
+        tooltip.innerHTML = html;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 15) + 'px';
+        tooltip.style.top = (e.clientY + 15) + 'px';
+        canvas.style.cursor = 'pointer';
     });
 
-    // Duplo clique para navegação - APENAS para posições COM endereço
-    canvas.addEventListener('dblclick', function(e) {
-        tooltip.style.display = 'none';
+    // ========== EVENTOS E PESQUISA ==========
+    const campoBusca = document.getElementById('campoPesquisaLote');
+    campoBusca.addEventListener('input', e => {
+        estado.termo = e.target.value.toLowerCase();
+        document.getElementById('btnLimparPesquisa').style.display = estado.termo ? 'block' : 'none';
+        
+        if (estado.termo.length >= 3) {
+            estado.encontrados.clear();
+            cache.indiceBusca.forEach((v, k) => { if(v.text.includes(estado.termo)) estado.encontrados.add(k); });
+            document.getElementById('wrapperContador').classList.remove('d-none');
+            document.getElementById('resultadosContador').innerText = estado.encontrados.size;
+        } else {
+            document.getElementById('wrapperContador').classList.add('d-none');
+        }
+        desenharMapa();
+    });
 
+    document.getElementById('btnLimparPesquisa').onclick = () => {
+        campoBusca.value = '';
+        campoBusca.dispatchEvent(new Event('input'));
+    };
+
+    canvas.addEventListener('dblclick', e => {
         const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        const x = (e.clientX - rect.left) * scaleX;
-        const y = (e.clientY - rect.top) * scaleY;
-
-        for (let i = cache.posicoesComEndereco.length - 1; i >= 0; i--) {
-            const pos = cache.posicoesComEndereco[i];
-            
-            if (x >= pos.x && x <= pos.x + pos.w && 
-                y >= pos.y && y <= pos.y + pos.h) {
-                
-                const chave = pos.chave;
-                const itens = cache.dadosPorEndereco[chave];
-                const baseUrl = "{% url 'sapp:lista_estoque' %}";
-
-                if (!itens || itens.length === 0) {
-                    window.location.href = `${baseUrl}?busca=${encodeURIComponent(chave)}`;
-                } else if (itens.length === 1) {
-                    window.location.href = `${baseUrl}?busca=${encodeURIComponent(itens[0].lote)}`;
-                } else {
-                    abrirModalMultiplos(chave, itens, baseUrl);
-                }
-                return;
-            }
-        }
-
-        for (let i = cache.posicoesSemEndereco.length - 1; i >= 0; i--) {
-            const pos = cache.posicoesSemEndereco[i];
-            if (x >= pos.x && x <= pos.x + pos.w && 
-                y >= pos.y && y <= pos.y + pos.h) {
-                return;
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        const p = cache.posicoesComEndereco.find(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h);
+        
+        if (p) {
+            const url = "{% url 'sapp:lista_estoque' %}";
+            const itens = cache.dadosPorEndereco[p.chave] || [];
+            if (itens.length === 1) {
+                window.location.href = `${url}?busca=${itens[0].lote}`;
+            } else if (itens.length > 1) {
+                document.getElementById('modalEnderecoTitulo').innerText = p.chave;
+                const lista = document.getElementById('listaLotesModal');
+                lista.innerHTML = itens.map(i => `
+                    <a href="${url}?busca=${i.lote}" class="list-group-item list-group-item-action bg-dark text-white border-secondary d-flex justify-content-between">
+                        <span>${i.lote}<br><small class="text-muted">${i.cliente||''}</small></span>
+                        <span class="badge bg-primary align-self-center">${i.qtd}</span>
+                    </a>
+                `).join('');
+                bsModal.show();
+            } else {
+                window.location.href = `${url}?busca=${p.chave}`;
             }
         }
     });
 
-    function abrirModalMultiplos(endereco, itens, baseUrl) {
-        tooltip.style.display = 'none';
-
-        document.getElementById('modalEnderecoTitulo').innerText = endereco;
-        
-        const quantidadeTotal = cache.totalPorEndereco[endereco] || 0;
-        
-        const lista = document.getElementById('listaLotesModal');
-        lista.innerHTML = '';
-
-        itens.forEach(item => {
-            const link = document.createElement('a');
-            link.className = 'list-group-item list-group-item-action bg-dark text-white border-secondary d-flex justify-content-between align-items-center p-3';
-            link.href = `${baseUrl}?busca=${encodeURIComponent(item.lote)}`;
-            link.style.transition = 'all 0.2s ease';
-            
-            link.innerHTML = `
-                <div class="d-flex flex-column">
-                    <strong style="font-size: 14px;">${item.lote}</strong>
-                    <small class="text-muted">${item.cliente || 'Sem cliente'}</small>
-                </div>
-                <span class="badge bg-primary" style="font-size: 12px; padding: 6px 10px;">
-                    ${item.qtd} ${item.embalagem || 'un'}
-                </span>
-            `;
-            
-            link.addEventListener('mouseenter', () => {
-                link.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                link.style.paddingLeft = '20px';
-            });
-            
-            link.addEventListener('mouseleave', () => {
-                link.style.backgroundColor = '';
-                link.style.paddingLeft = '';
-            });
-            
-            lista.appendChild(link);
-        });
-
-        bsModal.show();
+    // ========== CONTROLES DE ZOOM ==========
+    function aplicarZoom() {
+        canvas.style.transform = `scale(${estado.zoomLevel})`;
+        canvas.style.transformOrigin = 'top left';
     }
 
-    // ===== OTIMIZAÇÕES DE RESPONSIVIDADE =====
-    
-    // Redimensionamento responsivo com debounce
-    let resizeTimeout;
-    window.addEventListener('resize', function() {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(() => {
-            desenharMapa();
-            
-            // Ajusta tamanho do canvas proporcionalmente
-            const container = document.getElementById('canvasContainer');
-            const containerWidth = container.clientWidth;
-            const containerHeight = container.clientHeight;
-            
-            // Mantém proporção
-            if (containerWidth < canvas.width) {
-                canvas.style.width = '100%';
-                canvas.style.height = 'auto';
-            }
-        }, 150);
-    });
+    window.zoomIn = () => { estado.zoomLevel = Math.min(estado.zoomLevel + 0.1, 3); aplicarZoom(); };
+    window.zoomOut = () => { estado.zoomLevel = Math.max(estado.zoomLevel - 0.1, 0.5); aplicarZoom(); };
+    window.resetZoom = () => { estado.zoomLevel = 1; aplicarZoom(); };
 
-    // Fecha tooltip ao rolar
-    window.addEventListener('scroll', () => tooltip.style.display = 'none');
+    // Auto-exec
+    inicializarCache();
+    carregarStatusX();
+    setInterval(carregarStatusX, 30000); // Sincroniza a cada 30s
 
-    // ===== AUTOFOCO INTELIGENTE =====
-    // Só foca se já tiver um termo de busca
-    if (campoPesquisa && campoPesquisa.value.trim() !== '') {
-        // Pequeno delay para mobile não abrir teclado sem necessidade
-        setTimeout(() => {
-            campoPesquisa.focus();
-            // Coloca o cursor no final do texto
-            campoPesquisa.setSelectionRange(campoPesquisa.value.length, campoPesquisa.value.length);
-        }, 100);
-    }
-
-    // Inicializar
-    desenharMapa();
-    
-    // Disparar evento de input inicial se houver valor
-    if (campoPesquisa.value.trim() !== '') {
-        campoPesquisa.dispatchEvent(new Event('input'));
-    }
+    // Criar botões de zoom dinamicamente
+    const controls = document.createElement('div');
+    controls.className = 'map-controls d-none d-md-flex';
+    controls.innerHTML = `
+        <button class="btn btn-primary btn-icon shadow" onclick="zoomIn()"><i class="fas fa-search-plus"></i></button>
+        <button class="btn btn-primary btn-icon shadow" onclick="zoomOut()"><i class="fas fa-search-minus"></i></button>
+        <button class="btn btn-light btn-icon shadow" onclick="resetZoom()"><i class="fas fa-expand"></i></button>
+    `;
+    document.querySelector('.map-viewport').appendChild(controls);
 });
 </script>
 {% endblock %}

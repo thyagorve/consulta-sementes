@@ -77,7 +77,10 @@ class Estoque(models.Model):
     data_entrada = models.DateTimeField(auto_now_add=True)
     data_ultima_saida = models.DateTimeField(null=True, blank=True)
     data_ultima_movimentacao = models.DateTimeField(auto_now=True)
-    
+    ultimo_lote_linha = models.BooleanField(
+        default=False,
+        verbose_name="Último Lote da Linha"
+    )
     empresa = models.CharField(max_length=100, blank=True, null=True, default='')
     embalagem = models.CharField(max_length=10, choices=[('SC', 'Saco'), ('BAG', 'Big Bag')], default='BAG')
     peso_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
@@ -112,12 +115,29 @@ class Estoque(models.Model):
     )
 
     def save(self, *args, **kwargs):
+        # Pegar estado original antes de salvar
+        original = None
+        if self.pk:
+            try:
+                original = Estoque.objects.get(pk=self.pk)
+            except Estoque.DoesNotExist:
+                original = None
+
+        # Atualizações automáticas
         self.saldo = self.entrada - self.saida
         self.status = 'ESGOTADO' if self.saldo <= 0 else 'ATIVO'
+
         if self.peso_unitario and self.saldo:
-            try: self.peso_total = Decimal(str(self.saldo)) * Decimal(str(self.peso_unitario))
-            except: self.peso_total = Decimal('0.00')
-        super().save(*args, **kwargs)
+            try:
+                self.peso_total = Decimal(str(self.saldo)) * Decimal(str(self.peso_unitario))
+            except:
+                self.peso_total = Decimal('0.00')
+
+        # 🔥 IMPORTANTE: Se era último lote e mudou de endereço, desmarcar ANTES de salvar
+        if original and original.endereco != self.endereco and original.ultimo_lote_linha:
+            self.ultimo_lote_linha = False  # 👈 Desmarca antes de salvar
+
+        super().save(*args, **kwargs)  # 👈 Agora salva com o valor correto
     
     def __str__(self): return f"{self.lote} - {self.cultivar.nome} ({self.saldo} unidades)"
 

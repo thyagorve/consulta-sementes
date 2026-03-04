@@ -1,0 +1,500 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-3" style="background-color: #0f172a; min-height: 100vh;">
+    <!-- Cabeçalho -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+            <h4 class="text-white fw-bold mb-1">
+                <i class="fas fa-map-marked-alt me-2 text-warning"></i>
+                Mapas dos Armazéns
+            </h4>
+            <p class="text-white-50 small mb-0">
+                <span class="badge bg-info me-2">{{ armazens.count }}</span> armazéns disponíveis
+                <span class="mx-2">•</span>
+                <span class="d-none d-md-inline">Clique duas vezes em um mapa para abrir</span>
+            </p>
+        </div>
+        
+        <!-- Controles de Visualização -->
+        <div class="d-flex gap-2">
+            <div class="btn-group" role="group" id="viewModeToggle">
+                <button type="button" class="btn btn-sm btn-outline-info active" data-mode="grid" onclick="setViewMode('grid')">
+                    <i class="fas fa-th-large me-1"></i> <span class="d-none d-md-inline">Grid</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info" data-mode="list" onclick="setViewMode('list')">
+                    <i class="fas fa-list me-1"></i> <span class="d-none d-md-inline">Lista</span>
+                </button>
+            </div>
+            
+            <button class="btn btn-sm btn-primary" onclick="location.reload()">
+                <i class="fas fa-sync-alt me-1"></i> <span class="d-none d-md-inline">Atualizar</span>
+            </button>
+            
+            {% if is_admin %}
+            <a href="/editor-mapa/1/" class="btn btn-sm btn-warning">
+                <i class="fas fa-edit me-1"></i> <span class="d-none d-md-inline">Editor</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Estatísticas Rápidas -->
+    <div class="row g-2 mb-3">
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body py-2 d-flex align-items-center">
+                    <i class="fas fa-cubes text-info fs-3 me-3"></i>
+                    <div>
+                        <small class="text-white-50">Total de Posições</small>
+                        <h5 class="text-white mb-0" id="totalPosicoesGeral">0</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body py-2 d-flex align-items-center">
+                    <i class="fas fa-check-circle text-success fs-3 me-3"></i>
+                    <div>
+                        <small class="text-white-50">Ocupadas</small>
+                        <h5 class="text-white mb-0" id="totalOcupadosGeral">0</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body py-2 d-flex align-items-center">
+                    <i class="fas fa-percent text-warning fs-3 me-3"></i>
+                    <div>
+                        <small class="text-white-50">Taxa de Ocupação</small>
+                        <h5 class="text-white mb-0" id="taxaOcupacaoGeral">0%</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid de Mapas -->
+    <div id="mapGridContainer" class="row g-3">
+        {% for az in armazens %}
+        <div class="col-12 col-md-6 col-xl-4 mapa-card" data-armazem="{{ az.numero }}" data-nome="{{ az.nome }}">
+            <div class="card bg-dark border-secondary h-100">
+                <div class="card-header bg-dark border-secondary py-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-white fw-bold mb-0">
+                            <i class="fas fa-warehouse me-2 text-warning"></i>
+                            {{ az.nome }} (AZ {{ az.numero }})
+                        </h6>
+                        <small class="text-white-50" id="stats{{ az.numero }}">Carregando...</small>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/mapa-armazem/{{ az.numero }}/">
+                                <i class="fas fa-expand me-2"></i>Abrir Completo
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportarMapa({{ az.numero }})">
+                                <i class="fas fa-download me-2"></i>Exportar
+                            </a></li>
+                            {% if is_admin %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-warning" href="/editor-mapa/{{ az.numero }}/">
+                                <i class="fas fa-edit me-2"></i>Editar
+                            </a></li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+                <div class="card-body p-2 text-center">
+                    <!-- Canvas Preview -->
+                    <div class="map-preview-container position-relative" 
+                         style="height: 250px; overflow: hidden; border-radius: 8px; cursor: pointer;"
+                         ondblclick="abrirMapa({{ az.numero }})">
+                        <canvas id="previewCanvas{{ az.numero }}" 
+                                width="400" height="250" 
+                                style="width: 100%; height: 100%; background: white;"></canvas>
+                        
+                        <!-- Overlay de Clique -->
+                        <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+                             style="background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s;"
+                             onmouseover="this.style.opacity=1" 
+                             onmouseout="this.style.opacity=0"
+                             onclick="abrirMapa({{ az.numero }})">
+                            <button class="btn btn-primary btn-sm">
+                                <i class="fas fa-expand me-2"></i>Abrir Mapa
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Mini Legenda -->
+                    <div class="d-flex justify-content-center gap-3 mt-2 small">
+                        <span class="text-white-50">
+                            <i class="fas fa-square text-success me-1"></i> Ocupado
+                        </span>
+                        <span class="text-white-50">
+                            <i class="fas fa-square text-secondary me-1"></i> Vazio
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle me-2"></i>
+                Nenhum armazém encontrado.
+                {% if is_admin %}
+                <a href="#" onclick="criarArmazensPadrao()" class="alert-link">Criar armazéns padrão</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Modo Lista (Oculto por padrão) -->
+    <div id="listViewContainer" class="d-none">
+        <div class="card bg-dark border-secondary">
+            <div class="card-body p-0">
+                <table class="table table-dark table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Armazém</th>
+                            <th>Nome</th>
+                            <th>Posições</th>
+                            <th>Ocupadas</th>
+                            <th>Taxa</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listViewBody">
+                        <!-- Preenchido via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Visualização Rápida -->
+<div class="modal fade" id="quickViewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark border-secondary">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title text-white">
+                    <i class="fas fa-map me-2 text-warning"></i>
+                    <span id="modalMapTitle">Mapa do Armazém</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3 text-center">
+                <div id="modalCanvasContainer" class="position-relative d-inline-block">
+                    <canvas id="modalCanvas" width="800" height="500" style="max-width: 100%; height: auto; background: white;"></canvas>
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <a href="#" id="modalFullLink" class="btn btn-primary">
+                    <i class="fas fa-expand me-2"></i>Abrir Mapa Completo
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Responsividade */
+    @media (max-width: 768px) {
+        .map-preview-container {
+            height: 180px !important;
+        }
+        #mapGridContainer .col-12 {
+            padding: 0 5px;
+        }
+        .card-header h6 {
+            font-size: 0.9rem;
+        }
+    }
+    
+    /* Hover effects */
+    .map-preview-container {
+        transition: transform 0.2s;
+    }
+    .map-preview-container:hover {
+        transform: scale(1.02);
+    }
+    
+    /* Scroll suave */
+    .mapa-card {
+        transition: all 0.3s;
+    }
+</style>
+
+<script>
+// ========== VARIÁVEIS GLOBAIS ==========
+let viewMode = localStorage.getItem('mapViewMode') || 'grid';
+let canvasPreviews = {};
+let dadosMapas = {};
+
+// ========== INICIALIZAÇÃO ==========
+document.addEventListener('DOMContentLoaded', function() {
+    // Carregar dados de todos os armazéns
+    carregarTodosMapas();
+    
+    // Configurar modo de visualização
+    setViewMode(viewMode);
+    
+    // Responsividade
+    window.addEventListener('resize', redimensionarPreviews);
+});
+
+// ========== CARREGAMENTO DE DADOS ==========
+function carregarTodosMapas() {
+    {% for az in armazens %}
+    carregarMapa({{ az.numero }}, '{{ az.nome|escapejs }}');
+    {% endfor %}
+}
+
+function carregarMapa(numero, nome) {
+    fetch(`/api/mapa-dados/${numero}/`)
+        .then(response => response.json())
+        .then(data => {
+            dadosMapas[numero] = data;
+            desenharPreview(numero, data);
+        })
+        .catch(error => {
+            console.error(`Erro ao carregar mapa ${numero}:`, error);
+        });
+}
+
+// ========== DESENHO DOS PREVIEWS ==========
+function desenharPreview(numero, data) {
+    const canvas = document.getElementById(`previewCanvas${numero}`);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    canvas.width = 400;
+    canvas.height = 250;
+    
+    // Estatísticas
+    let totalPos = 0;
+    let ocupados = 0;
+    
+    // Desenhar elementos
+    data.elementos.forEach(el => {
+        if (el.tipo === 'RETANGULO') {
+            totalPos++;
+            
+            // Escala proporcional
+            const x = el.x * (400 / data.armazem.largura_canvas);
+            const y = el.y * (250 / data.armazem.altura_canvas);
+            const w = el.w * (400 / data.armazem.largura_canvas);
+            const h = el.h * (250 / data.armazem.altura_canvas);
+            
+            // Verificar ocupação
+            const ocupado = data.ocupacao[el.id] || false;
+            if (ocupado) ocupados++;
+            
+            ctx.fillStyle = ocupado ? '#10b981' : '#f1f5f9';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = ocupado ? '#065f46' : '#cbd5e1';
+            ctx.lineWidth = 0.5;
+            ctx.strokeRect(x, y, w, h);
+        }
+    });
+    
+    // Atualizar estatísticas
+    document.getElementById(`stats${numero}`).innerHTML = 
+        `<i class="fas fa-cubes me-1"></i>${ocupados}/${totalPos} ocupados`;
+    
+    // Atualizar totais gerais
+    atualizarTotaisGerais();
+}
+
+function atualizarTotaisGerais() {
+    let totalPos = 0;
+    let totalOcup = 0;
+    
+    {% for az in armazens %}
+    const stats{{ az.numero }} = document.getElementById(`stats{{ az.numero }}`)?.innerHTML || '';
+    const match{{ az.numero }} = stats{{ az.numero }}.match(/(\d+)\/(\d+)/);
+    if (match{{ az.numero }}) {
+        totalOcup += parseInt(match{{ az.numero }}[1]);
+        totalPos += parseInt(match{{ az.numero }}[2]);
+    }
+    {% endfor %}
+    
+    document.getElementById('totalPosicoesGeral').innerText = totalPos;
+    document.getElementById('totalOcupadosGeral').innerText = totalOcup;
+    document.getElementById('taxaOcupacaoGeral').innerHTML = 
+        totalPos ? Math.round((totalOcup/totalPos)*100) + '%' : '0%';
+    
+    // Atualizar modo lista
+    atualizarListView();
+}
+
+// ========== MODO LISTA ==========
+function atualizarListView() {
+    const tbody = document.getElementById('listViewBody');
+    if (!tbody) return;
+    
+    let html = '';
+    {% for az in armazens %}
+    const stats{{ az.numero }} = document.getElementById(`stats{{ az.numero }}`)?.innerHTML || '';
+    const match{{ az.numero }} = stats{{ az.numero }}.match(/(\d+)\/(\d+)/);
+    const ocup{{ az.numero }} = match{{ az.numero }} ? match{{ az.numero }}[1] : '0';
+    const total{{ az.numero }} = match{{ az.numero }} ? match{{ az.numero }}[2] : '0';
+    const taxa{{ az.numero }} = total{{ az.numero }} ? Math.round((ocup{{ az.numero }}/total{{ az.numero }})*100) : 0;
+    
+    html += `<tr>
+        <td><strong>AZ {{ az.numero }}</strong></td>
+        <td>{{ az.nome }}</td>
+        <td>${total{{ az.numero }}}</td>
+        <td>${ocup{{ az.numero }}}</td>
+        <td>
+            <div class="progress" style="height: 20px;">
+                <div class="progress-bar bg-${taxa{{ az.numero }} > 80 ? 'danger' : (taxa{{ az.numero }} > 50 ? 'warning' : 'success')}" 
+                     style="width: ${taxa{{ az.numero }}}%">
+                    ${taxa{{ az.numero }}}%
+                </div>
+            </div>
+        </td>
+        <td>
+            <button class="btn btn-sm btn-primary" onclick="abrirMapa({{ az.numero }})">
+                <i class="fas fa-expand"></i>
+            </button>
+        </td>
+    </tr>`;
+    {% endfor %}
+    
+    tbody.innerHTML = html;
+}
+
+// ========== CONTROLES DE VISUALIZAÇÃO ==========
+function setViewMode(mode) {
+    viewMode = mode;
+    localStorage.setItem('mapViewMode', mode);
+    
+    // Atualizar botões
+    document.querySelectorAll('#viewModeToggle .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`#viewModeToggle .btn[data-mode="${mode}"]`).classList.add('active');
+    
+    // Mostrar/esconder containers
+    if (mode === 'grid') {
+        document.getElementById('mapGridContainer').classList.remove('d-none');
+        document.getElementById('listViewContainer').classList.add('d-none');
+    } else {
+        document.getElementById('mapGridContainer').classList.add('d-none');
+        document.getElementById('listViewContainer').classList.remove('d-none');
+    }
+}
+
+// ========== NAVEGAÇÃO ==========
+function abrirMapa(numero) {
+    // Verificar se é mobile
+    if (window.innerWidth <= 768) {
+        // Mobile: abrir modal
+        abrirModalRapido(numero);
+    } else {
+        // Desktop: verificar preferência
+        if (viewMode === 'grid') {
+            // Se está em grid, perguntar se quer abrir completo ou modal
+            if (confirm('Abrir mapa completo ou visualização rápida?\n\nOK = Completo\nCancelar = Rápida')) {
+                window.location.href = `/mapa-armazem/${numero}/`;
+            } else {
+                abrirModalRapido(numero);
+            }
+        } else {
+            window.location.href = `/mapa-armazem/${numero}/`;
+        }
+    }
+}
+
+function abrirModalRapido(numero) {
+    const modal = new bootstrap.Modal(document.getElementById('quickViewModal'));
+    document.getElementById('modalMapTitle').innerText = `Armazém AZ ${numero}`;
+    document.getElementById('modalFullLink').href = `/mapa-armazem/${numero}/`;
+    
+    // Desenhar no canvas do modal
+    setTimeout(() => {
+        desenharMapaModal(numero);
+    }, 200);
+    
+    modal.show();
+}
+
+function desenharMapaModal(numero) {
+    const canvas = document.getElementById('modalCanvas');
+    if (!canvas || !dadosMapas[numero]) return;
+    
+    const ctx = canvas.getContext('2d');
+    const data = dadosMapas[numero];
+    
+    canvas.width = 800;
+    canvas.height = 500;
+    ctx.clearRect(0, 0, 800, 500);
+    
+    data.elementos.forEach(el => {
+        if (el.tipo === 'RETANGULO') {
+            const x = el.x * (800 / data.armazem.largura_canvas);
+            const y = el.y * (500 / data.armazem.altura_canvas);
+            const w = el.w * (800 / data.armazem.largura_canvas);
+            const h = el.h * (500 / data.armazem.altura_canvas);
+            
+            const ocupado = data.ocupacao[el.id] || false;
+            ctx.fillStyle = ocupado ? '#10b981' : '#f1f5f9';
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = ocupado ? '#065f46' : '#cbd5e1';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, w, h);
+            
+            if (ocupado) {
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('✓', x + w/2, y + h/2);
+            }
+        }
+    });
+}
+
+// ========== UTILITÁRIOS ==========
+function redimensionarPreviews() {
+    {% for az in armazens %}
+    if (dadosMapas[{{ az.numero }}]) {
+        desenharPreview({{ az.numero }}, dadosMapas[{{ az.numero }}]);
+    }
+    {% endfor %}
+}
+
+function exportarMapa(numero) {
+    window.location.href = `/exportar-mapa/${numero}/json/`;
+}
+
+{% if is_admin %}
+function criarArmazensPadrao() {
+    fetch('/criar-armazens-padrao/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    });
+}
+{% endif %}
+</script>
+{% endblock %}

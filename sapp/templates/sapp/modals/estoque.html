@@ -164,7 +164,27 @@
                             </div>
                         </div>
                     </div>
-
+                    <!-- SEÇÃO: Último Lote da Linha (ADICIONAR AQUI) -->
+                    <div class="col-12">
+                        <div class="card border-warning bg-light">
+                            <div class="card-body py-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" 
+                                        id="ultimo_lote_linha_novo"
+                                        name="ultimo_lote_linha"
+                                        style="transform: scale(1.2); cursor: pointer;">
+                                    <label class="form-check-label fw-bold text-warning" for="ultimo_lote_linha_novo">
+                                        <i class="fas fa-flag-checkered me-1"></i> 
+                                        Marcar como Último Lote da Linha
+                                    </label>
+                                    <small class="text-muted d-block mt-1 ms-4">
+                                        Quando marcado, todas as posições seguintes desta linha (mesma rua + LN) 
+                                        receberão marcação visual no mapa.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="modal-footer border-0 p-3 bg-white rounded-bottom-4">
                         <button type="button" class="btn btn-light btn-lg px-4" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary btn-lg px-5 shadow fw-bold" id="btnSubmit">
@@ -1381,7 +1401,31 @@
                             <textarea name="observacao" class="form-control" rows="2">{{ item.observacao|default:'' }}</textarea>
                         </div>
                     </div>
-
+                    <!-- SEÇÃO: Último Lote da Linha -->
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <div class="card border-warning bg-dark">
+                                <div class="card-body py-2">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" 
+                                            id="ultimo_lote_linha_{{ item.id }}"
+                                            name="ultimo_lote_linha"
+                                            {% if item.ultimo_lote_linha %}checked{% endif %}
+                                            style="transform: scale(1.2); cursor: pointer;"
+                                            onchange="marcarUltimoLote(this, {{ item.id }})">
+                                        <label class="form-check-label fw-bold text-warning" for="ultimo_lote_linha_{{ item.id }}">
+                                            <i class="fas fa-flag-checkered me-1"></i> 
+                                            Marcar como Último Lote da Linha
+                                        </label>
+                                        <small class="text-muted d-block mt-1 ms-4">
+                                            Quando marcado, todas as posições seguintes desta linha (mesma rua + LN) 
+                                            receberão marcação visual no mapa.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <!-- AVISO SOBRE SAÍDAS -->
                     <div class="alert alert-warning mt-3 mb-0 py-2 small">
                         <i class="fas fa-info-circle me-1"></i> 
@@ -1399,8 +1443,50 @@
     </div>
 </div>
 
-<!-- SCRIPT PARA CALCULAR PESO TOTAL DINAMICAMENTE -->
 <script>
+function marcarUltimoLote(checkbox, itemId) {
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/marcar-ultimo-lote/${itemId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrftoken,
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Feedback visual
+            if (data.marcado) {
+                showToast('success', data.mensagem);
+            } else {
+                showToast('info', data.mensagem);
+            }
+            
+            // Recarregar o mapa se estiver visível
+            if (typeof atualizarMapa === 'function') {
+                atualizarMapa();
+            }
+        } else {
+            // Se falhou, desmarcar o checkbox
+            checkbox.checked = false;
+            showToast('error', data.error || 'Erro ao processar');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        checkbox.checked = false;
+        showToast('error', 'Erro de conexão');
+    });
+}
+
+// Função auxiliar para toast (se não existir)
+function showToast(tipo, mensagem) {
+    // Adapte conforme seu sistema de notificações
+    alert(mensagem); // Temporário - substitua pelo seu sistema
+}
+
 function atualizarPesoTotal(input) {
     // Encontra o modal correspondente
     var modal = input.closest('.modal');
