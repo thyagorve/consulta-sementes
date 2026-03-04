@@ -2,466 +2,503 @@
 {% load static %}
 
 {% block content %}
-<div class="main-wrapper d-flex flex-column" style="height: 100vh; height: -webkit-fill-available; background-color: #0f172a; overflow: hidden;">
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<div class="app-container">
     
-    <!-- BARRA DE CONTROLE ÚNICA LINHA -->
-    <nav class="navbar navbar-dark bg-glass p-2 px-3 border-bottom border-secondary border-opacity-25 flex-shrink-0">
-        <div class="container-fluid d-flex align-items-center justify-content-between flex-nowrap gap-2">
-            
-            <!-- 1. IDENTIFICAÇÃO E STATUS -->
-            <div class="d-flex align-items-center gap-2 overflow-hidden">
-                <div class="d-flex align-items-center flex-wrap gap-2">
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-warehouse text-warning me-1 fs-6"></i>
-                        <h6 class="mb-0 fw-bold text-white">{{ armazem.nome }}</h6>
-                    </div>
-                    
-                    <div class="d-flex align-items-center gap-1">
-                        <span class="badge bg-dark border border-secondary text-info px-2 py-1 small" id="statsTotal" title="Total de Posições">
-                            <i class="fas fa-cubes me-1"></i>0
-                        </span>
-                        <span class="badge bg-dark border border-secondary text-success px-2 py-1 small" id="statsOcupados" title="Posições com Estoque">
-                            <i class="fas fa-check-circle me-1"></i>0
-                        </span>
-                        <span class="badge bg-dark border border-warning text-warning px-2 py-1 small" id="statsUltimosLotes" title="Posições Marcadas (Linha Finalizada)">
-                            <i class="fas fa-flag-checkered me-1"></i>0
-                        </span>
-                    </div>
-                </div>
-
-                <div class="input-group input-group-sm d-none d-md-flex" style="width: 220px;">
-                    <label class="input-group-text bg-transparent border-secondary text-white-50">
-                        <i class="fas fa-exchange-alt"></i>
-                    </label>
-                    <select class="form-select fw-bold bg-dark text-white border-secondary" id="selectAZ" 
-                            onchange="location.href='/mapa-armazem/'+this.value+'/'">
-                        {% for az in armazens_disponiveis %}
-                            <option value="{{ az.numero }}" {% if az.numero == armazem.numero %}selected{% endif %}>
-                                {{ az.nome }} (AZ {{ az.numero }})
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-
-            <!-- 2. BUSCA CENTRAL -->
-            <div class="flex-grow-1 mx-2 mx-md-4" style="max-width: 600px;">
-                <div class="search-container position-relative">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" id="campoPesquisaLote" class="search-input" placeholder="Lote, Cliente ou Endereço...">
-                    
-                    <div id="wrapperContador" class="contador-badge d-none">
-                        <span id="resultadosContador">0</span>
-                    </div>
-                    
-                    <button id="btnLimparPesquisa" class="clear-search-btn" style="display: none;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- 3. BOTÕES DE AÇÃO -->
-            <div class="d-flex align-items-center gap-1 gap-md-2 flex-shrink-0">
-                <a href="{% url 'sapp:lista_armazens' %}" class="btn btn-icon text-info" title="Ver todos os mapas">
+    <!-- HEADER NAVBAR: ULTRA PREMIUN -->
+    <header class="app-header">
+        <div class="header-left">
+            <button class="map-switcher-btn" data-bs-toggle="offcanvas" data-bs-target="#sidebarArmazens">
+                <div class="icon-box">
                     <i class="fas fa-th-large"></i>
-                </a>
+                </div>
+                <div class="title-group">
+                    <span class="label">MAPA ATUAL</span>
+                    <h1 class="value">{{ armazem.nome }}</h1>
+                </div>
+                <i class="fas fa-chevron-down ms-2 opacity-50"></i>
+            </button>
+        </div>
 
-                <button onclick="location.reload()" class="btn btn-icon text-white" title="Atualizar">
+        <div class="header-center">
+            <div class="global-search">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="campoPesquisaLote" placeholder="Buscar lote, cliente ou endereço específico...">
+                <div id="wrapperContador" class="search-indicator d-none">0</div>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div class="stat-group d-none d-lg-flex">
+                <div class="stat-pill info" id="statsTotal">
+                    <span class="lbl">TOTAL</span>
+                    <span class="val">0</span>
+                </div>
+                <div class="stat-pill success" id="statsOcupados">
+                    <span class="lbl">OCUPADO</span>
+                    <span class="val">0</span>
+                </div>
+                <div class="stat-pill warning" id="statsUltimosLotes">
+                    <span class="lbl">LINHAS X</span>
+                    <span class="val">0</span>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-circle refresh" onclick="location.reload()" title="Sincronizar">
                     <i class="fas fa-sync-alt"></i>
                 </button>
-                
                 {% if is_admin %}
-                <a href="/editor-mapa/{{ armazem.numero }}/" class="btn btn-warning btn-sm fw-bold px-3 d-flex align-items-center gap-1 shadow-sm rounded-3">
-                    <i class="fas fa-edit"></i> <span class="d-none d-md-inline">EDITOR</span>
+                <a href="/editor-mapa/{{ armazem.numero }}/" class="btn-editor">
+                    <i class="fas fa-pencil-alt"></i>
+                    <span>EDITOR</span>
                 </a>
                 {% endif %}
             </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- AREA DO MAPA -->
-    <main class="map-viewport position-relative overflow-auto p-2 p-md-4 d-flex align-items-start justify-content-center">
-        <!-- Overlay de Rotação Celular -->
-        <div id="landscapeSuggestion" class="orientation-overlay">
-            <div class="text-center p-4 rounded-4 bg-dark shadow-lg border border-primary">
-                <i class="fas fa-mobile-alt fa-3x mb-3 text-primary rotate-icon"></i>
-                <h5 class="text-white">Gire o celular</h5>
-                <p class="text-secondary small">Para melhor visualização, use o modo paisagem.</p>
-                <button class="btn btn-primary btn-sm" onclick="this.parentElement.parentElement.style.display='none'">Entendi</button>
-            </div>
-        </div>
-
-        <div id="canvasWrapper" class="position-relative">
-            <div id="canvasContainer" class="position-relative shadow-2xl bg-white rounded-3 overflow-hidden">
-                <canvas id="mapaCanvas"></canvas>
-                <div id="tooltipMapa" class="tooltip-premium"></div>
-            </div>
+    <!-- MAP VIEWPORT -->
+    <main class="viewport">
+        <div id="canvasWrapper" class="map-layer">
+            <canvas id="mapaCanvas"></canvas>
+            <!-- LEGENDA/TOOLTIP (FIXO NO DOM PARA EVITAR BUG DE POSIÇÃO) -->
+            <div id="tooltipMapa" class="modern-tooltip"></div>
         </div>
     </main>
+
+    <!-- FLOATING CONTROLS -->
+    <div class="map-hud">
+        <button class="hud-btn" onclick="changeZoom(0.2)" title="Aumentar">
+            <i class="fas fa-plus"></i>
+        </button>
+        <button class="hud-btn reset" onclick="resetZoom()" title="Resetar Visualização">
+            <i class="fas fa-home"></i>
+        </button>
+        <button class="hud-btn" onclick="changeZoom(-0.2)" title="Diminuir">
+            <i class="fas fa-minus"></i>
+        </button>
+    </div>
+
+</div>
+
+<!-- SIDEBAR DE ARMAZÉNS (NOVO SISTEMA DE TROCA) -->
+<div class="offcanvas offcanvas-start bg-dark text-white border-0 shadow" tabindex="-1" id="sidebarArmazens">
+    <div class="offcanvas-header border-bottom border-secondary">
+        <h5 class="offcanvas-title fw-800 text-warning"><i class="fas fa-warehouse me-2"></i>ARMAZÉNS</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        <div class="list-group list-group-flush list-armazens">
+            {% for az in armazens_disponiveis %}
+            <a href="/mapa-armazem/{{ az.numero }}/" class="list-group-item list-group-item-action bg-transparent text-white border-secondary p-4 {% if az.numero == armazem.numero %}active-map{% endif %}">
+                <div class="d-flex align-items-center">
+                    <div class="az-number">AZ{{ az.numero }}</div>
+                    <div class="az-info">
+                        <div class="az-name">{{ az.nome }}</div>
+                        <div class="az-stats">Capacidade Geral do Mapa</div>
+                    </div>
+                    {% if az.numero == armazem.numero %}<i class="fas fa-check-circle ms-auto text-info"></i>{% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 
 <!-- Modal para Multiplos Lotes -->
 <div class="modal fade" id="modalMultiplosLotes" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow bg-dark text-white rounded-4 overflow-hidden">
-            <div class="modal-header border-bottom border-secondary p-3">
-                <h6 class="modal-title fw-bold" id="modalEnderecoTitulo">Endereço</h6>
+        <div class="modal-content glass-modal border-0 rounded-4 overflow-hidden shadow-lg">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title fw-800 text-white" id="modalEnderecoTitulo">Endereço</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div id="listaLotesModal" class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;"></div>
+            <div id="listaLotesModal" class="modal-body"></div>
         </div>
     </div>
 </div>
 
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
-
-    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0f172a; }
-
-    .bg-glass { background: rgba(15, 23, 42, 0.85) !important; backdrop-filter: blur(10px); }
-
-    .search-container {
-        height: 40px; background: rgba(255, 255, 255, 0.08);
-        border-radius: 12px; transition: all 0.3s;
-        border: 1px solid rgba(255,255,255,0.1);
+    :root {
+        --bg-main: #020617;
+        --bg-panel: rgba(15, 23, 42, 0.95);
+        --primary: #6366f1;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --accent: #0ea5e9;
+        --border: rgba(255, 255, 255, 0.08);
+        --jakarta: 'Plus Jakarta Sans', sans-serif;
     }
 
-    .search-container:focus-within {
-        background: rgba(255, 255, 255, 1);
-        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.4);
+    body {
+        margin: 0; background-color: var(--bg-main); font-family: var(--jakarta);
+        color: #f8fafc; overflow: hidden; height: 100vh;
     }
 
-    .search-icon {
-        position: absolute; left: 14px; top: 50%;
-        transform: translateY(-50%); color: rgba(255, 255, 255, 0.4);
+    /* HEADER */
+    .app-header {
+        height: 70px; display: grid; grid-template-columns: 300px 1fr 300px;
+        align-items: center; padding: 0 25px; background: var(--bg-panel);
+        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border); z-index: 1000; position: relative;
     }
 
-    .search-container:focus-within .search-icon { color: #6366f1; }
+    .map-switcher-btn {
+        background: none; border: none; display: flex; align-items: center; text-align: left;
+        color: white; gap: 12px; cursor: pointer; padding: 5px; border-radius: 8px; transition: 0.2s;
+    }
+    .map-switcher-btn:hover { background: rgba(255,255,255,0.05); }
 
-    .search-input {
-        width: 100%; height: 100%; background: transparent; border: none;
-        padding-left: 42px; padding-right: 90px; color: #fff; font-weight: 500;
+    .icon-box {
+        width: 38px; height: 38px; background: var(--primary);
+        border-radius: 10px; display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
     }
 
-    .search-input:focus { outline: none; color: #1e293b; }
+    .title-group .label { font-size: 0.65rem; color: #64748b; font-weight: 800; display: block; }
+    .title-group h1 { font-size: 0.95rem; margin: 0; font-weight: 800; letter-spacing: -0.2px; }
 
-    .clear-search-btn {
-        position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-        background: transparent; border: none; color: #ef4444; z-index: 10;
+    /* BUSCA */
+    .global-search {
+        position: relative; width: 100%; max-width: 480px; margin: 0 auto;
+    }
+    .global-search .search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: #64748b; }
+    .global-search input {
+        width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border);
+        padding: 12px 18px 12px 50px; border-radius: 12px; color: white;
+        font-weight: 600; font-size: 0.85rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .global-search input:focus {
+        background: #fff; color: #1e293b; box-shadow: 0 10px 40px rgba(0,0,0,0.3); outline: none; border-color: transparent;
+    }
+    .search-indicator {
+        position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+        background: var(--primary); color: white; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 800;
     }
 
-    .contador-badge {
-        position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
-        background: #fbbf24; color: #000; padding: 2px 8px; border-radius: 6px;
-        font-size: 0.7rem; font-weight: 800;
+    /* BADGES */
+    .stat-pill {
+        padding: 4px 12px; border-radius: 8px; background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border); margin-right: 8px; text-align: center;
     }
+    .stat-pill .lbl { font-size: 0.6rem; color: #64748b; font-weight: 800; display: block; }
+    .stat-pill .val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.9rem; }
+    .stat-pill.success .val { color: var(--success); }
+    .stat-pill.warning .val { color: var(--warning); }
+    .stat-pill.info .val { color: var(--accent); }
 
-    .orientation-overlay {
-        position: fixed; inset: 0; background: rgba(0,0,0,0.8);
-        z-index: 9999; display: none; align-items: center; justify-content: center;
+    .header-right .actions { display: flex; align-items: center; gap: 10px; margin-left: 15px; }
+
+    .btn-circle {
+        width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
+        background: rgba(255,255,255,0.05); color: white; display: flex; align-items: center; justify-content: center;
+        transition: 0.2s; cursor: pointer;
     }
+    .btn-circle:hover { background: rgba(255,255,255,0.1); color: var(--accent); }
 
-    @media (max-width: 992px) and (orientation: portrait) { .orientation-overlay { display: flex; } }
-
-    .map-viewport { background-color: #0f172a; flex-grow: 1; }
-
-    #mapaCanvas { cursor: crosshair; image-rendering: -webkit-optimize-contrast; }
-
-    .tooltip-premium {
-        position: fixed; display: none; background: white; border-radius: 12px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3); min-width: 250px;
-        z-index: 1000; overflow: hidden; pointer-events: none;
+    .btn-editor {
+        display: flex; align-items: center; gap: 8px; background: var(--warning);
+        padding: 8px 18px; border-radius: 10px; border: none; font-weight: 800; font-size: 0.8rem; color: #000;
+        transition: 0.2s; text-decoration: none;
     }
+    .btn-editor:hover { transform: translateY(-2px); box-shadow: 0 8px 15px rgba(245, 158, 11, 0.4); }
 
-    .btn-icon {
-        width: 38px; height: 38px; border-radius: 10px;
-        display: flex; align-items: center; justify-content: center;
-        transition: all 0.2s; border: 1px solid rgba(255,255,255,0.05);
+    /* VIEWPORT & CANVAS */
+    .viewport { flex-grow: 1; display: flex; align-items: start; justify-content: center; overflow: auto; padding: 20px; }
+    .map-layer { background: #fff; border-radius: 6px; position: relative; box-shadow: 0 30px 60px rgba(0,0,0,0.5); transform-origin: top left; }
+
+    #mapaCanvas { cursor: crosshair; image-rendering: -webkit-optimize-contrast; display: block; }
+
+    /* HUD */
+    .map-hud { position: fixed; bottom: 30px; right: 30px; display: flex; flex-direction: column; gap: 12px; z-index: 1000; }
+    .hud-btn {
+        width: 50px; height: 50px; background: #2563eb; color: white; border-radius: 14px;
+        border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; transition: 0.2s;
     }
-    .btn-icon:hover { background: rgba(255,255,255,0.1); transform: scale(1.05); }
+    .hud-btn:hover { background: var(--primary); transform: scale(1.05); }
+    .hud-btn.reset { background: var(--bg-panel); color: #fff; }
 
-    /* Zoom e Controles */
-    .map-controls {
-        position: fixed; bottom: 20px; right: 20px;
-        z-index: 1000; display: flex; flex-direction: column; gap: 8px;
+    /* LEGENDA / TOOLTIP PREMIUN */
+    .modern-tooltip {
+        position: fixed; display: none; width: 300px; background: #fff;
+        border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        pointer-events: none; overflow: hidden; border: 1px solid #e2e8f0; z-index: 2000;
+        animation: tooltipEnter 0.18s cubic-bezier(0,0,0.2,1);
+    }
+    @keyframes tooltipEnter { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    /* SIDEBAR ARMAZENS */
+    .list-armazens .list-group-item { border: none; padding: 25px 20px; transition: 0.3s; }
+    .list-armazens .list-group-item:hover { background: rgba(255,255,255,0.05) !important; }
+    .active-map { background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, transparent 100%) !important; border-left: 4px solid var(--primary) !important; }
+    
+    .az-number { 
+        width: 50px; height: 50px; border-radius: 12px; background: rgba(255,255,255,0.05);
+        display: flex; align-items: center; justify-content: center; font-weight: 800; color: #cbd5e1;
+        margin-right: 15px; border: 1px solid var(--border);
+    }
+    .az-name { font-weight: 700; color: #f1f5f9; font-size: 0.95rem; }
+    .az-stats { font-size: 0.75rem; color: #64748b; }
+
+    /* MODAL */
+    .glass-modal { background: #0f172a; border: 1px solid rgba(255,255,255,0.1) !important; }
+
+    @media (max-width: 992px) {
+        .app-header { grid-template-columns: 1fr 1fr; }
+        .header-center { display: none; }
     }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ========== CONFIGURAÇÃO E DADOS ==========
-    const LAYOUT_ELEMENTS = {{ elementos_json|safe }};
-    const STOCK_DATA = {{ dados_ocupacao_json|safe }};
-    
+    // ========== DATA ENGINE ==========
+    const RAW_STOCK = {{ dados_ocupacao_json|safe }};
+    const RAW_LAYOUT = {{ elementos_json|safe }};
     const canvas = document.getElementById('mapaCanvas');
     const ctx = canvas.getContext('2d');
     const tooltip = document.getElementById('tooltipMapa');
     const bsModal = new bootstrap.Modal(document.getElementById('modalMultiplosLotes'));
     
-    const CANVAS_WIDTH = {{ armazem.largura_canvas|default:1000 }};
-    const CANVAS_HEIGHT = {{ armazem.altura_canvas|default:600 }};
-    
-    canvas.width = CANVAS_WIDTH;
-    canvas.height = CANVAS_HEIGHT;
+    canvas.width = {{ armazem.largura_canvas|default:1000 }};
+    canvas.height = {{ armazem.altura_canvas|default:600 }};
 
-    let estado = {
-        termo: '',
-        encontrados: new Set(),
-        zoomLevel: 1
+    let engine = {
+        zoom: 1,
+        search: '',
+        foundSet: new Set(),
+        markX: {},
+        laneStats: {},
+        layouts: [],
+        staticItems: [],
+        stocks: {}
     };
 
-    let cache = {
-        posicoesComEndereco: [],
-        posicoesSemEndereco: [],
-        dadosPorEndereco: {},
-        totalPorEndereco: {},
-        indiceBusca: new Map(),
-        posicoesComX: {} 
-    };
+    function parseAddress(id) {
+        const regex = /^(R-[A-Z]+)\s+(LN\d+)\s+P(\d+)$/i;
+        const match = id.match(regex);
+        return match ? { key: match[1]+" "+match[2], index: parseInt(match[3]) } : null;
+    }
 
-    // ========== INICIALIZAÇÃO DO CACHE ==========
-    function inicializarCache() {
-        cache.posicoesComEndereco = [];
-        cache.posicoesSemEndereco = [];
-        cache.dadosPorEndereco = {};
-        
-        LAYOUT_ELEMENTS.forEach(el => {
+    function init() {
+        // Pre-cache do sistema
+        RAW_LAYOUT.forEach(el => {
             if (el.tipo === 'RETANGULO') {
-                const chave = el.id ? el.id.trim().toUpperCase() : '';
-                if (chave) {
-                    cache.posicoesComEndereco.push({...el, chave});
-                } else {
-                    cache.posicoesSemEndereco.push(el);
-                }
+                const id = el.id?.trim().toUpperCase();
+                if (id) engine.layouts.push({...el, id});
+                else engine.staticItems.push(el);
             }
         });
 
-        for (const [endereco, itens] of Object.entries(STOCK_DATA)) {
-            const key = endereco.trim().toUpperCase();
-            cache.dadosPorEndereco[key] = itens;
-            cache.totalPorEndereco[key] = itens.reduce((acc, i) => acc + (parseInt(i.qtd) || 0), 0);
-            
-            const txtBusca = (itens.map(i => i.lote + ' ' + (i.cliente||'')).join(' ') + ' ' + key).toLowerCase();
-            cache.indiceBusca.set(key, { text: txtBusca, multi: itens.length > 1 });
+        for (const [idEnd, itens] of Object.entries(RAW_STOCK)) {
+            const key = idEnd.toUpperCase();
+            const totalQty = itens.reduce((a, b) => a + (parseInt(b.qtd) || 0), 0);
+            engine.stocks[key] = { lotes: itens, total: totalQty };
+
+            // Soma acumulada da linha
+            const p = parseAddress(key);
+            if(p) {
+                engine.laneStats[p.key] = (engine.laneStats[p.key] || 0) + totalQty;
+            }
         }
+        
+        fetchMarkers();
     }
 
-    function carregarStatusX() {
-        fetch('/api/marcacoes-ultimo-lote/')
-            .then(res => res.json())
-            .then(data => {
-                cache.posicoesComX = data.marcacoes || {};
-                const totalX = Object.keys(cache.posicoesComX).length;
-                document.getElementById('statsUltimosLotes').innerHTML = `<i class="fas fa-flag-checkered me-1"></i>${totalX}`;
-                desenharMapa();
-            }).catch(e => console.error("Erro marcacoes:", e));
+    function fetchMarkers() {
+        fetch('/api/marcacoes-ultimo-lote/').then(r => r.json()).then(d => {
+            engine.markX = d.marcacoes || {};
+            render();
+        }).catch(() => render());
     }
 
-    // ========== RENDERIZAÇÃO PRINCIPAL (CORREÇÃO AQUI) ==========
-    function desenharMapa() {
+    // ========== RENDER ENGINE (ALTA DEFINIÇÃO) ==========
+    function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        let ocupadosCount = 0;
-
-        // 1. Posições Estáticas (Decoração)
-        cache.posicoesSemEndereco.forEach(pos => {
-            ctx.fillStyle = pos.cor || '#f8fafc';
-            ctx.fillRect(pos.x, pos.y, pos.w, pos.h);
+        // Elementos estáticos
+        engine.staticItems.forEach(el => {
+            ctx.fillStyle = el.cor || '#e2e8f0';
+            ctx.fillRect(el.x, el.y, el.w, el.h);
         });
 
-        // 2. Posições de Armazenagem
-        cache.posicoesComEndereco.forEach(pos => {
-            const chave = pos.chave;
-            const itens = cache.dadosPorEndereco[chave];
-            const temEstoque = itens && itens.length > 0;
-            const temX = cache.posicoesComX[chave]; // Aqui está o status da linha finalizada
-            const ehBusca = estado.termo.length >= 3 && estado.encontrados.has(chave);
+        let ocCount = 0; let markCount = 0;
+
+        // Vãos de armazenamento
+        engine.layouts.forEach(pos => {
+            const s = engine.stocks[pos.id];
+            const hasS = !!s;
+            const p = parseAddress(pos.id);
             
-            if (temEstoque) ocupadosCount++;
+            // Logica Propagação X: se o finalizador da linha é anterior ou igual a mim
+            let finalX = !!engine.markX[pos.id];
+            if(!finalX && p) {
+                for (let mxId in engine.markX) {
+                    const m = parseAddress(mxId);
+                    if(m && m.key === p.key && p.index > m.index) { finalX = true; break; }
+                }
+            }
+
+            if(hasS) ocCount++; if(finalX) markCount++;
+            const hit = engine.search.length >= 3 && engine.foundSet.has(pos.id);
 
             ctx.save();
-            
-            // Desenhar Retângulo
-            if (ehBusca) {
-                ctx.fillStyle = '#fbbf24'; // Destaque Amarelo
-                ctx.strokeStyle = '#d97706';
-            } else if (temEstoque || temX) { 
-                // CORREÇÃO: Fica verde se tiver estoque OU se tiver marcação X
-                ctx.fillStyle = pos.cor_ocupado || '#10b981';
-                ctx.strokeStyle = '#059669';
-            } else {
-                ctx.fillStyle = pos.cor || '#f1f5f9';
-                ctx.strokeStyle = '#cbd5e1';
+            if (pos.rot) {
+                ctx.translate(pos.x + pos.w/2, pos.y + pos.h/2);
+                ctx.rotate(pos.rot * Math.PI / 180);
+                ctx.translate(-(pos.x + pos.w/2), -(pos.y + pos.h/2));
             }
-            
-            ctx.lineWidth = 1;
-            ctx.fillRect(pos.x, pos.y, pos.w, pos.h);
-            ctx.strokeRect(pos.x, pos.y, pos.w, pos.h);
 
-            // Indicador Multi-Lote
-            if (temEstoque && cache.indiceBusca.get(chave)?.multi) {
+            // Design das células
+            if (hit) { ctx.fillStyle = '#fde047'; ctx.strokeStyle = '#f59e0b'; }
+            else if (hasS || finalX) { ctx.fillStyle = '#10b981'; ctx.strokeStyle = '#059669'; }
+            else { ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = '#cbd5e1'; }
+
+            ctx.lineWidth = 1.2;
+            ctx.beginPath(); ctx.roundRect(pos.x+0.5, pos.y+0.5, pos.w-1, pos.h-1, 2);
+            ctx.fill(); ctx.stroke();
+
+            // Múltiplos lotes indicator (!) com brilho
+            if(hasS && s.lotes.length > 1) {
+                ctx.shadowBlur = 4; ctx.shadowColor = 'red';
                 ctx.fillStyle = '#ef4444';
-                ctx.beginPath();
-                ctx.arc(pos.x + pos.w - 5, pos.y + 5, 3, 0, Math.PI*2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(pos.x + pos.w - 5.5, pos.y + 5.5, 4.5, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Arial'; ctx.textAlign='center';
+                ctx.fillText('!', pos.x + pos.w - 5.5, pos.y + 8.5);
             }
 
-            // TEXTO CENTRAL (Prioridade para o X)
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const fontSize = Math.min(pos.h * 0.6, 13);
-            ctx.font = `bold ${fontSize}px "Plus Jakarta Sans"`;
-            
-            if (temX) {
-                // DESENHA O X
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowColor = 'rgba(0,0,0,0.3)';
-                ctx.shadowBlur = 2;
-                ctx.fillText('X', pos.x + pos.w/2, pos.y + pos.h/2);
-            } else if (temEstoque) {
-                // DESENHA QUANTIDADE
-                ctx.fillStyle = ehBusca ? '#92400e' : '#ffffff';
-                ctx.fillText(cache.totalPorEndereco[chave], pos.x + pos.w/2, pos.y + pos.h/2);
+            // Identificação de Conteúdo (Centralizado)
+            if (finalX || hasS) {
+                const label = finalX ? 'X' : (s ? s.total : '');
+                const fs = Math.min(pos.h * 0.55, 12);
+                ctx.font = `800 ${fs}px 'JetBrains Mono'`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillStyle = hit ? '#854d0e' : '#ffffff';
+                ctx.fillText(label, pos.x + pos.w/2, pos.y + pos.h/2 + 1);
             }
-
             ctx.restore();
         });
 
-        // 3. Labels de Texto do Mapa
-        LAYOUT_ELEMENTS.forEach(el => {
-            if (el.tipo === 'TEXTO') {
-                ctx.fillStyle = '#64748b';
-                ctx.font = '600 11px "Plus Jakarta Sans"';
+        // Labels flutuantes do editor
+        RAW_LAYOUT.forEach(el => {
+            if(el.tipo === 'TEXTO') {
+                ctx.font = 'bold 11px var(--jakarta)'; ctx.fillStyle = '#94a3b8';
                 ctx.fillText(el.texto, el.x, el.y + 10);
             }
         });
 
-        document.getElementById('statsTotal').innerText = cache.posicoesComEndereco.length;
-        document.getElementById('statsOcupados').innerText = ocupadosCount;
+        // Contadores Reais (Físico vs Virtual)
+        document.querySelector('#statsTotal .val').innerText = engine.layouts.length;
+        document.querySelector('#statsOcupados .val').innerText = ocCount;
+        document.querySelector('#statsUltimosLotes .val').innerText = markCount;
     }
 
-    // ========== TOOLTIP DINÂMICO ==========
-    canvas.addEventListener('mousemove', function(e) {
+    // ========== CONTROLES DE BUSCA ==========
+    document.getElementById('campoPesquisaLote').addEventListener('input', e => {
+        engine.search = e.target.value.toLowerCase().trim();
+        const badge = document.getElementById('wrapperContador');
+        if (engine.search.length >= 3) {
+            engine.foundSet.clear();
+            for (let id in engine.stocks) {
+                const bundle = (id + engine.stocks[id].lotes.map(l => l.lote+l.cliente).join('')).toLowerCase();
+                if (bundle.includes(engine.search)) engine.foundSet.add(id);
+            }
+            badge.innerText = engine.foundSet.size; badge.classList.remove('d-none');
+        } else { badge.classList.add('d-none'); }
+        render();
+    });
+
+    // ========== TOOLTIP & HOVER ==========
+    canvas.addEventListener('mousemove', e => {
+        if(document.body.classList.contains('modal-open')) return;
+        
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        const mx = (e.clientX - rect.left) / engine.zoom;
+        const my = (e.clientY - rect.top) / engine.zoom;
+        const p = engine.layouts.find(pos => mx >= pos.x && mx <= pos.x+pos.w && my >= pos.y && my <= pos.y+pos.h);
         
-        let p = cache.posicoesComEndereco.find(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h);
+        if (!p) { tooltip.style.display = 'none'; canvas.style.cursor = 'default'; return; }
+
+        const st = engine.stocks[p.id];
+        const adr = parseAddress(p.id);
+        const lineTotal = adr ? engine.laneStats[adr.key] || 0 : 0;
         
-        if (!p) {
-            tooltip.style.display = 'none';
-            canvas.style.cursor = 'default';
-            return;
+        let concl = !!engine.markX[p.id];
+        if(!concl && adr) {
+            for(let kid in engine.markX) {
+                let mxId = parseAddress(kid);
+                if(mxId && mxId.key === adr.key && adr.index > mxId.index) { concl = true; break; }
+            }
         }
 
-        const chave = p.chave;
-        const itens = cache.dadosPorEndereco[chave] || [];
-        const temX = cache.posicoesComX[chave];
-        
-        let html = `
-            <div style="padding:10px; background:${temX ? '#059669' : '#4f46e5'}; color:white; font-weight:bold; font-size:13px;">
-                ${chave} ${temX ? '<span class="badge bg-warning text-dark ms-2">LINHA CONCLUÍDA</span>' : ''}
+        tooltip.innerHTML = `
+            <div style="background:${concl?'var(--success)':'var(--primary)'}; padding:14px; color:white">
+                <div style="font-size:14px; font-weight:800">${p.id}</div>
+                ${concl ? '<span style="background:rgba(0,0,0,0.3); font-size:10px; padding:2px 6px; border-radius:4px">LINHA CONCLUÍDA</span>':''}
             </div>
-            <div style="padding:10px; font-size:12px; color:#334155;">
-        `;
-
-        if (itens.length > 0) {
-            itens.forEach(it => {
-                html += `
-                    <div class="mb-2 pb-1 border-bottom">
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-bold text-primary">${it.lote}</span>
-                            <span class="badge bg-light text-dark border">${it.qtd} ${it.embalagem||'un'}</span>
+            <div style="padding:15px">
+                ${st ? st.lotes.map(l=>`
+                    <div style="padding-bottom:10px; border-bottom:1px solid #f1f5f9; margin-bottom:10px">
+                        <div style="display:flex; justify-content:space-between; align-items:center">
+                            <b style="color:var(--primary); font-size:13px">${l.lote}</b>
+                            <span class="badge bg-light text-dark border" style="font-size:11px">${l.qtd} ${l.embalagem||'un'}</span>
                         </div>
-                        <div class="small text-muted text-truncate" style="max-width:200px">${it.cliente || 'Sem cliente'}</div>
+                        <div style="font-size:11px; color:#64748b; margin-top:3px"><i class="fas fa-user-circle"></i> ${l.cliente||'Padrão'}</div>
+                    </div>`).join('') : '<div class="text-center text-muted p-2">Sem registro físico</div>'}
+                
+                ${adr && lineTotal > 0 ? `
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:12px">
+                    <span style="display:block; font-size:10px; font-weight:800; color:#0369a1">TOTAL ACUMULADO NA LINHA</span>
+                    <div style="display:flex; align-items:baseline; gap:6px">
+                        <b style="font-size:20px; color:#0ea5e9">${lineTotal}</b>
+                        <small style="color:#0ea5e9; font-weight:700">UN</small>
                     </div>
-                `;
-            });
-        } else {
-            html += `<div class="text-center py-2 text-muted">Posição Vazia</div>`;
-        }
+                </div>`:''}
+            </div>`;
 
-        html += `</div>`;
-        tooltip.innerHTML = html;
         tooltip.style.display = 'block';
-        tooltip.style.left = (e.clientX + 15) + 'px';
-        tooltip.style.top = (e.clientY + 15) + 'px';
+        tooltip.style.left = Math.min(e.clientX + 15, window.innerWidth - 320) + 'px';
+        tooltip.style.top = Math.min(e.clientY + 15, window.innerHeight - 350) + 'px';
         canvas.style.cursor = 'pointer';
     });
 
-    // ========== EVENTOS E PESQUISA ==========
-    const campoBusca = document.getElementById('campoPesquisaLote');
-    campoBusca.addEventListener('input', e => {
-        estado.termo = e.target.value.toLowerCase();
-        document.getElementById('btnLimparPesquisa').style.display = estado.termo ? 'block' : 'none';
-        
-        if (estado.termo.length >= 3) {
-            estado.encontrados.clear();
-            cache.indiceBusca.forEach((v, k) => { if(v.text.includes(estado.termo)) estado.encontrados.add(k); });
-            document.getElementById('wrapperContador').classList.remove('d-none');
-            document.getElementById('resultadosContador').innerText = estado.encontrados.size;
-        } else {
-            document.getElementById('wrapperContador').classList.add('d-none');
-        }
-        desenharMapa();
-    });
-
-    document.getElementById('btnLimparPesquisa').onclick = () => {
-        campoBusca.value = '';
-        campoBusca.dispatchEvent(new Event('input'));
-    };
-
+    // ========== MODAL DUPLO CLIQUE ==========
     canvas.addEventListener('dblclick', e => {
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-        const p = cache.posicoesComEndereco.find(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h);
+        const mx = (e.clientX - rect.left)/engine.zoom; const my = (e.clientY - rect.top)/engine.zoom;
+        const p = engine.layouts.find(pos => mx>=pos.x && mx<=pos.x+pos.w && my>=pos.y && my<=pos.y+pos.h);
         
         if (p) {
-            const url = "{% url 'sapp:lista_estoque' %}";
-            const itens = cache.dadosPorEndereco[p.chave] || [];
-            if (itens.length === 1) {
-                window.location.href = `${url}?busca=${itens[0].lote}`;
-            } else if (itens.length > 1) {
-                document.getElementById('modalEnderecoTitulo').innerText = p.chave;
-                const lista = document.getElementById('listaLotesModal');
-                lista.innerHTML = itens.map(i => `
-                    <a href="${url}?busca=${i.lote}" class="list-group-item list-group-item-action bg-dark text-white border-secondary d-flex justify-content-between">
-                        <span>${i.lote}<br><small class="text-muted">${i.cliente||''}</small></span>
-                        <span class="badge bg-primary align-self-center">${i.qtd}</span>
-                    </a>
-                `).join('');
+            tooltip.style.display = 'none'; // Importante para UX
+            const s = engine.stocks[p.id];
+            const baseUrl = "{% url 'sapp:lista_estoque' %}";
+            
+            if (s && s.lotes.length > 1) {
+                document.getElementById('modalEnderecoTitulo').innerText = p.id;
+                document.getElementById('listaLotesModal').innerHTML = s.lotes.map(l => `
+                    <div class="list-group list-group-item bg-dark text-white border-secondary mb-2 rounded d-flex justify-content-between flex-row">
+                        <div>
+                            <span class="d-block fw-bold">${l.lote}</span>
+                            <small class="text-secondary">${l.cliente||''}</small>
+                        </div>
+                        <a href="${baseUrl}?busca=${l.lote}" class="btn btn-primary btn-sm align-self-center px-3">ABRIR</a>
+                    </div>`).join('');
                 bsModal.show();
             } else {
-                window.location.href = `${url}?busca=${p.chave}`;
+                window.location.href = baseUrl + "?busca=" + (s ? s.lotes[0].lote : p.id);
             }
         }
     });
 
-    // ========== CONTROLES DE ZOOM ==========
-    function aplicarZoom() {
-        canvas.style.transform = `scale(${estado.zoomLevel})`;
-        canvas.style.transformOrigin = 'top left';
-    }
+    window.changeZoom = d => { engine.zoom = Math.max(0.1, Math.min(4, engine.zoom + d)); applyZ(); };
+    window.resetZoom = () => { engine.zoom = 1; applyZ(); };
+    function applyZ() { document.getElementById('canvasWrapper').style.transform = `scale(${engine.zoom})`; }
 
-    window.zoomIn = () => { estado.zoomLevel = Math.min(estado.zoomLevel + 0.1, 3); aplicarZoom(); };
-    window.zoomOut = () => { estado.zoomLevel = Math.max(estado.zoomLevel - 0.1, 0.5); aplicarZoom(); };
-    window.resetZoom = () => { estado.zoomLevel = 1; aplicarZoom(); };
-
-    // Auto-exec
-    inicializarCache();
-    carregarStatusX();
-    setInterval(carregarStatusX, 30000); // Sincroniza a cada 30s
-
-    // Criar botões de zoom dinamicamente
-    const controls = document.createElement('div');
-    controls.className = 'map-controls d-none d-md-flex';
-    controls.innerHTML = `
-        <button class="btn btn-primary btn-icon shadow" onclick="zoomIn()"><i class="fas fa-search-plus"></i></button>
-        <button class="btn btn-primary btn-icon shadow" onclick="zoomOut()"><i class="fas fa-search-minus"></i></button>
-        <button class="btn btn-light btn-icon shadow" onclick="resetZoom()"><i class="fas fa-expand"></i></button>
-    `;
-    document.querySelector('.map-viewport').appendChild(controls);
+    init(); setInterval(fetchMarkers, 30000);
 });
 </script>
 {% endblock %}
