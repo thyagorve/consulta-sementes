@@ -7,7 +7,7 @@
 
 <div class="app-container">
     
-    <!-- HEADER NAVBAR: ULTRA PREMIUN -->
+    <!-- HEADER NAVBAR -->
     <header class="app-header">
         <div class="header-left">
             <button class="map-switcher-btn" data-bs-toggle="offcanvas" data-bs-target="#sidebarArmazens">
@@ -62,10 +62,12 @@
 
     <!-- MAP VIEWPORT -->
     <main class="viewport">
-        <div id="canvasWrapper" class="map-layer">
-            <canvas id="mapaCanvas"></canvas>
-            <!-- LEGENDA/TOOLTIP (FIXO NO DOM PARA EVITAR BUG DE POSIÇÃO) -->
-            <div id="tooltipMapa" class="modern-tooltip"></div>
+        <div class="map-container">
+            <div id="canvasWrapper" class="map-layer">
+                <canvas id="mapaCanvas"></canvas>
+                <!-- TOOLTIP - SEMPRE JUNTO AO PONTEIRO -->
+                <div id="tooltipMapa" class="modern-tooltip"></div>
+            </div>
         </div>
     </main>
 
@@ -84,7 +86,7 @@
 
 </div>
 
-<!-- SIDEBAR DE ARMAZÉNS (NOVO SISTEMA DE TROCA) -->
+<!-- SIDEBAR DE ARMAZÉNS -->
 <div class="offcanvas offcanvas-start bg-dark text-white border-0 shadow" tabindex="-1" id="sidebarArmazens">
     <div class="offcanvas-header border-bottom border-secondary">
         <h5 class="offcanvas-title fw-800 text-warning"><i class="fas fa-warehouse me-2"></i>ARMAZÉNS</h5>
@@ -110,7 +112,7 @@
 
 <!-- Modal para Multiplos Lotes -->
 <div class="modal fade" id="modalMultiplosLotes" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content glass-modal border-0 rounded-4 overflow-hidden shadow-lg">
             <div class="modal-header border-0 pb-0">
                 <h6 class="modal-title fw-800 text-white" id="modalEnderecoTitulo">Endereço</h6>
@@ -128,128 +130,500 @@
         --primary: #6366f1;
         --success: #10b981;
         --warning: #f59e0b;
-        --accent: #0ea5e9;
+        --danger: #ef4444;
+        --info: #0ea5e9;
         --border: rgba(255, 255, 255, 0.08);
         --jakarta: 'Plus Jakarta Sans', sans-serif;
+        
+        /* CORES DOS RETÂNGULOS - Conforme especificado */
+        --color-empty: #d1d5db;        /* Cinza para vazio/sem estoque */
+        --color-no-address: #6b7280;    /* Cinza mais escuro para sem endereço */
+        --color-occupied: #10b981;      /* Verde para ocupado (com ou sem X, múltiplos ou não) */
+        --color-search: #fde047;         /* Amarelo para busca */
+        --color-stroke: #1e293b;
+        --color-stroke-highlight: #f97316;
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
     }
 
     body {
-        margin: 0; background-color: var(--bg-main); font-family: var(--jakarta);
-        color: #f8fafc; overflow: hidden; height: 100vh;
+        background-color: var(--bg-main);
+        font-family: var(--jakarta);
+        color: #f8fafc;
+        overflow: hidden;
+        height: 100vh;
+        width: 100vw;
     }
 
-    /* HEADER */
+    .app-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+    }
+
+    /* HEADER RESPONSIVO */
     .app-header {
-        height: 70px; display: grid; grid-template-columns: 300px 1fr 300px;
-        align-items: center; padding: 0 25px; background: var(--bg-panel);
-        backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-        border-bottom: 1px solid var(--border); z-index: 1000; position: relative;
+        height: 70px;
+        display: grid;
+        grid-template-columns: minmax(200px, 300px) 1fr minmax(200px, 300px);
+        align-items: center;
+        padding: 0 16px;
+        background: var(--bg-panel);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        z-index: 1000;
+        position: relative;
+        gap: 12px;
     }
 
     .map-switcher-btn {
-        background: none; border: none; display: flex; align-items: center; text-align: left;
-        color: white; gap: 12px; cursor: pointer; padding: 5px; border-radius: 8px; transition: 0.2s;
+        background: none;
+        border: none;
+        display: flex;
+        align-items: center;
+        text-align: left;
+        color: white;
+        gap: 8px;
+        cursor: pointer;
+        padding: 5px 8px;
+        border-radius: 8px;
+        transition: 0.2s;
+        width: 100%;
+        max-width: 260px;
     }
-    .map-switcher-btn:hover { background: rgba(255,255,255,0.05); }
+
+    .map-switcher-btn:hover { 
+        background: rgba(255,255,255,0.05); 
+    }
 
     .icon-box {
-        width: 38px; height: 38px; background: var(--primary);
-        border-radius: 10px; display: flex; align-items: center; justify-content: center;
+        width: 38px;
+        height: 38px;
+        background: var(--primary);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         box-shadow: 0 5px 15px rgba(99, 102, 241, 0.4);
+        flex-shrink: 0;
     }
 
-    .title-group .label { font-size: 0.65rem; color: #64748b; font-weight: 800; display: block; }
-    .title-group h1 { font-size: 0.95rem; margin: 0; font-weight: 800; letter-spacing: -0.2px; }
+    .title-group {
+        min-width: 0;
+        flex: 1;
+    }
 
-    /* BUSCA */
+    .title-group .label { 
+        font-size: 0.65rem; 
+        color: #64748b; 
+        font-weight: 800; 
+        display: block; 
+        white-space: nowrap;
+    }
+
+    .title-group h1 { 
+        font-size: 0.95rem; 
+        margin: 0; 
+        font-weight: 800; 
+        letter-spacing: -0.2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* BUSCA RESPONSIVA */
     .global-search {
-        position: relative; width: 100%; max-width: 480px; margin: 0 auto;
-    }
-    .global-search .search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: #64748b; }
-    .global-search input {
-        width: 100%; background: rgba(0,0,0,0.2); border: 1px solid var(--border);
-        padding: 12px 18px 12px 50px; border-radius: 12px; color: white;
-        font-weight: 600; font-size: 0.85rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .global-search input:focus {
-        background: #fff; color: #1e293b; box-shadow: 0 10px 40px rgba(0,0,0,0.3); outline: none; border-color: transparent;
-    }
-    .search-indicator {
-        position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-        background: var(--primary); color: white; padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: 800;
+        position: relative;
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
     }
 
-    /* BADGES */
-    .stat-pill {
-        padding: 4px 12px; border-radius: 8px; background: rgba(255,255,255,0.03);
-        border: 1px solid var(--border); margin-right: 8px; text-align: center;
+    .global-search .search-icon { 
+        position: absolute; 
+        left: 14px; 
+        top: 50%; 
+        transform: translateY(-50%); 
+        color: #64748b;
+        font-size: 0.9rem;
+        z-index: 1;
     }
-    .stat-pill .lbl { font-size: 0.6rem; color: #64748b; font-weight: 800; display: block; }
-    .stat-pill .val { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.9rem; }
+
+    .global-search input {
+        width: 100%;
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--border);
+        padding: 10px 14px 10px 42px;
+        border-radius: 12px;
+        color: white;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .global-search input:focus {
+        background: #fff;
+        color: #1e293b;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        outline: none;
+        border-color: transparent;
+    }
+
+    .search-indicator {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--primary);
+        color: white;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        z-index: 1;
+    }
+
+    /* STATS PILLS */
+    .header-right {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+
+    .stat-group {
+        display: flex;
+        gap: 6px;
+    }
+
+    .stat-pill {
+        padding: 4px 10px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.03);
+        border: 1px solid var(--border);
+        text-align: center;
+        min-width: 65px;
+    }
+
+    .stat-pill .lbl { 
+        font-size: 0.6rem; 
+        color: #64748b; 
+        font-weight: 800; 
+        display: block; 
+        white-space: nowrap;
+    }
+
+    .stat-pill .val { 
+        font-family: 'JetBrains Mono', monospace; 
+        font-weight: 700; 
+        font-size: 0.9rem; 
+        line-height: 1.2;
+    }
+
     .stat-pill.success .val { color: var(--success); }
     .stat-pill.warning .val { color: var(--warning); }
-    .stat-pill.info .val { color: var(--accent); }
+    .stat-pill.info .val { color: var(--info); }
 
-    .header-right .actions { display: flex; align-items: center; gap: 10px; margin-left: 15px; }
+    .actions { 
+        display: flex; 
+        align-items: center; 
+        gap: 8px; 
+    }
 
     .btn-circle {
-        width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
-        background: rgba(255,255,255,0.05); color: white; display: flex; align-items: center; justify-content: center;
-        transition: 0.2s; cursor: pointer;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.05);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: 0.2s;
+        cursor: pointer;
+        flex-shrink: 0;
     }
-    .btn-circle:hover { background: rgba(255,255,255,0.1); color: var(--accent); }
+
+    .btn-circle:hover { 
+        background: rgba(255,255,255,0.1); 
+        color: var(--accent); 
+    }
 
     .btn-editor {
-        display: flex; align-items: center; gap: 8px; background: var(--warning);
-        padding: 8px 18px; border-radius: 10px; border: none; font-weight: 800; font-size: 0.8rem; color: #000;
-        transition: 0.2s; text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--warning);
+        padding: 6px 14px;
+        border-radius: 10px;
+        border: none;
+        font-weight: 800;
+        font-size: 0.8rem;
+        color: #000;
+        transition: 0.2s;
+        text-decoration: none;
+        white-space: nowrap;
     }
-    .btn-editor:hover { transform: translateY(-2px); box-shadow: 0 8px 15px rgba(245, 158, 11, 0.4); }
 
-    /* VIEWPORT & CANVAS */
-    .viewport { flex-grow: 1; display: flex; align-items: start; justify-content: center; overflow: auto; padding: 20px; }
-    .map-layer { background: #fff; border-radius: 6px; position: relative; box-shadow: 0 30px 60px rgba(0,0,0,0.5); transform-origin: top left; }
+    .btn-editor:hover { 
+        transform: translateY(-2px); 
+        box-shadow: 0 8px 15px rgba(245, 158, 11, 0.4); 
+    }
 
-    #mapaCanvas { cursor: crosshair; image-rendering: -webkit-optimize-contrast; display: block; }
+    /* VIEWPORT RESPONSIVO */
+    .viewport {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        padding: 16px;
+        position: relative;
+        width: 100%;
+        height: calc(100vh - 70px);
+    }
 
-    /* HUD */
-    .map-hud { position: fixed; bottom: 30px; right: 30px; display: flex; flex-direction: column; gap: 12px; z-index: 1000; }
+    .map-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto;
+        position: relative;
+    }
+
+    .map-layer {
+        background: #ffffff;
+        border-radius: 6px;
+        position: relative;
+        box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+        transform-origin: center;
+        transition: transform 0.1s ease;
+        display: inline-block;
+        max-width: none;
+    }
+
+    #mapaCanvas {
+        display: block;
+        cursor: crosshair;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: crisp-edges;
+    }
+
+    /* HUD RESPONSIVO */
+    .map-hud {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        z-index: 1000;
+    }
+
     .hud-btn {
-        width: 50px; height: 50px; background: #2563eb; color: white; border-radius: 14px;
-        border: 2px solid rgba(255,255,255,0.2); box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-        display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; transition: 0.2s;
+        width: 48px;
+        height: 48px;
+        background: #2563eb;
+        color: white;
+        border-radius: 14px;
+        border: 2px solid rgba(255,255,255,0.2);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        cursor: pointer;
+        transition: 0.2s;
     }
-    .hud-btn:hover { background: var(--primary); transform: scale(1.05); }
-    .hud-btn.reset { background: var(--bg-panel); color: #fff; }
 
-    /* LEGENDA / TOOLTIP PREMIUN */
-    .modern-tooltip {
-        position: fixed; display: none; width: 300px; background: #fff;
-        border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-        pointer-events: none; overflow: hidden; border: 1px solid #e2e8f0; z-index: 2000;
-        animation: tooltipEnter 0.18s cubic-bezier(0,0,0.2,1);
+    .hud-btn:hover { 
+        background: var(--primary); 
+        transform: scale(1.05); 
     }
-    @keyframes tooltipEnter { from { opacity: 0; transform: translateY(10px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+    .hud-btn.reset { 
+        background: var(--bg-panel); 
+        color: #fff; 
+    }
+
+    /* TOOLTIP - SEMPRE JUNTO AO PONTEIRO */
+    .modern-tooltip {
+        position: fixed;
+        display: none;
+        width: min(320px, 90vw);
+        max-height: min(400px, 70vh);
+        overflow-y: auto;
+        background: #fff;
+        border-radius: 16px;
+        box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        pointer-events: none;
+        border: 1px solid #e2e8f0;
+        z-index: 2000;
+        animation: tooltipFade 0.15s ease;
+    }
+
+    @keyframes tooltipFade { 
+        from { opacity: 0; } 
+        to { opacity: 1; } 
+    }
 
     /* SIDEBAR ARMAZENS */
-    .list-armazens .list-group-item { border: none; padding: 25px 20px; transition: 0.3s; }
-    .list-armazens .list-group-item:hover { background: rgba(255,255,255,0.05) !important; }
-    .active-map { background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, transparent 100%) !important; border-left: 4px solid var(--primary) !important; }
+    .list-armazens .list-group-item { 
+        border: none; 
+        padding: 20px 16px; 
+        transition: 0.3s; 
+    }
+
+    .list-armazens .list-group-item:hover { 
+        background: rgba(255,255,255,0.05) !important; 
+    }
+
+    .active-map { 
+        background: linear-gradient(90deg, rgba(99, 102, 241, 0.2) 0%, transparent 100%) !important; 
+        border-left: 4px solid var(--primary) !important; 
+    }
     
     .az-number { 
-        width: 50px; height: 50px; border-radius: 12px; background: rgba(255,255,255,0.05);
-        display: flex; align-items: center; justify-content: center; font-weight: 800; color: #cbd5e1;
-        margin-right: 15px; border: 1px solid var(--border);
+        width: 48px; 
+        height: 48px; 
+        border-radius: 12px; 
+        background: rgba(255,255,255,0.05);
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        font-weight: 800; 
+        color: #cbd5e1;
+        margin-right: 12px; 
+        border: 1px solid var(--border);
+        flex-shrink: 0;
     }
-    .az-name { font-weight: 700; color: #f1f5f9; font-size: 0.95rem; }
-    .az-stats { font-size: 0.75rem; color: #64748b; }
 
-    /* MODAL */
-    .glass-modal { background: #0f172a; border: 1px solid rgba(255,255,255,0.1) !important; }
+    .az-info {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .az-name { 
+        font-weight: 700; 
+        color: #f1f5f9; 
+        font-size: 0.95rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .az-stats { 
+        font-size: 0.75rem; 
+        color: #64748b; 
+    }
+
+    /* MODAL RESPONSIVO */
+    .glass-modal { 
+        background: #0f172a; 
+        border: 1px solid rgba(255,255,255,0.1) !important; 
+    }
+
+    .modal-dialog {
+        margin: 16px;
+        max-width: 500px;
+    }
+
+    .modal-body {
+        max-height: min(400px, 60vh);
+        overflow-y: auto;
+    }
+
+    /* BREAKPOINTS RESPONSIVOS */
+    @media (max-width: 1200px) {
+        .app-header {
+            grid-template-columns: 200px 1fr 200px;
+            padding: 0 12px;
+        }
+    }
 
     @media (max-width: 992px) {
-        .app-header { grid-template-columns: 1fr 1fr; }
-        .header-center { display: none; }
+        .app-header {
+            grid-template-columns: 1fr auto;
+            height: auto;
+            min-height: 70px;
+            padding: 8px 12px;
+        }
+        
+        .header-center {
+            display: none;
+        }
+        
+        .global-search {
+            display: none;
+        }
+        
+        .stat-group {
+            display: none !important;
+        }
+        
+        .header-right {
+            gap: 8px;
+        }
+        
+        .btn-editor span {
+            display: none;
+        }
+        
+        .btn-editor {
+            padding: 8px 12px;
+        }
+        
+        .btn-editor i {
+            margin: 0;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .viewport {
+            padding: 8px;
+        }
+        
+        .map-hud {
+            bottom: 16px;
+            right: 16px;
+            gap: 8px;
+        }
+        
+        .hud-btn {
+            width: 44px;
+            height: 44px;
+            font-size: 1rem;
+        }
+        
+        .title-group .label {
+            font-size: 0.55rem;
+        }
+        
+        .title-group h1 {
+            font-size: 0.85rem;
+        }
+        
+        .icon-box {
+            width: 34px;
+            height: 34px;
+        }
+        
+        .btn-circle {
+            width: 36px;
+            height: 36px;
+        }
     }
 </style>
 
@@ -263,8 +637,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const tooltip = document.getElementById('tooltipMapa');
     const bsModal = new bootstrap.Modal(document.getElementById('modalMultiplosLotes'));
     
-    canvas.width = {{ armazem.largura_canvas|default:1000 }};
-    canvas.height = {{ armazem.altura_canvas|default:600 }};
+    // Configurar canvas com proporções originais
+    const baseWidth = {{ armazem.largura_canvas|default:1000 }};
+    const baseHeight = {{ armazem.altura_canvas|default:600 }};
+    
+    canvas.width = baseWidth;
+    canvas.height = baseHeight;
+    canvas.style.width = 'auto';
+    canvas.style.height = 'auto';
+    canvas.style.maxWidth = '100%';
+    canvas.style.maxHeight = '100%';
 
     let engine = {
         zoom: 1,
@@ -274,13 +656,21 @@ document.addEventListener('DOMContentLoaded', function() {
         laneStats: {},
         layouts: [],
         staticItems: [],
-        stocks: {}
+        stocks: {},
+        colorSystem: {
+            empty: '#d1d5db',        // Cinza para vazio
+            noAddress: '#6b7280',     // Cinza mais escuro para sem endereço
+            occupied: '#10b981',       // Verde para ocupado (com ou sem X)
+            search: '#fde047',          // Amarelo para busca
+            stroke: '#1e293b',
+            strokeHighlight: '#f97316'
+        }
     };
 
     function parseAddress(id) {
         const regex = /^(R-[A-Z]+)\s+(LN\d+)\s+P(\d+)$/i;
         const match = id.match(regex);
-        return match ? { key: match[1]+" "+match[2], index: parseInt(match[3]) } : null;
+        return match ? { key: match[1] + " " + match[2], index: parseInt(match[3]) } : null;
     }
 
     function init() {
@@ -288,8 +678,14 @@ document.addEventListener('DOMContentLoaded', function() {
         RAW_LAYOUT.forEach(el => {
             if (el.tipo === 'RETANGULO') {
                 const id = el.id?.trim().toUpperCase();
-                if (id) engine.layouts.push({...el, id});
-                else engine.staticItems.push(el);
+                if (id) {
+                    engine.layouts.push({...el, id});
+                } else {
+                    // Retângulos sem ID (sem endereço) - cinza mais escuro
+                    engine.staticItems.push({...el, noAddress: true});
+                }
+            } else if (el.tipo === 'TEXTO') {
+                engine.staticItems.push(el);
             }
         });
 
@@ -306,187 +702,349 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         fetchMarkers();
+        adjustCanvasToContainer();
     }
 
     function fetchMarkers() {
-        fetch('/api/marcacoes-ultimo-lote/').then(r => r.json()).then(d => {
-            engine.markX = d.marcacoes || {};
-            render();
-        }).catch(() => render());
+        fetch('/api/marcacoes-ultimo-lote/')
+            .then(r => r.json())
+            .then(d => {
+                engine.markX = d.marcacoes || {};
+                render();
+            })
+            .catch(() => render());
     }
 
-    // ========== RENDER ENGINE (ALTA DEFINIÇÃO) ==========
+    // Função para ajustar canvas ao container
+    function adjustCanvasToContainer() {
+        const container = document.querySelector('.map-container');
+        const wrapper = document.getElementById('canvasWrapper');
+        
+        if (container && wrapper) {
+            const containerRatio = container.clientWidth / container.clientHeight;
+            const canvasRatio = baseWidth / baseHeight;
+            
+            let scale;
+            if (containerRatio > canvasRatio) {
+                scale = container.clientHeight / baseHeight;
+            } else {
+                scale = container.clientWidth / baseWidth;
+            }
+            
+            wrapper.style.transform = `scale(${scale * engine.zoom})`;
+        }
+    }
+
+    // ========== RENDER ENGINE ==========
     function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Elementos estáticos
+        // Elementos estáticos (inclui retângulos sem ID)
         engine.staticItems.forEach(el => {
-            ctx.fillStyle = el.cor || '#e2e8f0';
+            if (el.tipo === 'RETANGULO') {
+                // Retângulos sem endereço - cinza mais escuro
+                ctx.fillStyle = el.noAddress ? engine.colorSystem.noAddress : (el.cor || '#e2e8f0');
+            } else {
+                ctx.fillStyle = el.cor || '#e2e8f0';
+            }
             ctx.fillRect(el.x, el.y, el.w, el.h);
         });
 
-        let ocCount = 0; let markCount = 0;
+        let ocCount = 0; 
+        let markCount = 0;
 
-        // Vãos de armazenamento
+        // Vãos de armazenamento (com ID)
         engine.layouts.forEach(pos => {
             const s = engine.stocks[pos.id];
-            const hasS = !!s;
+            const hasStock = !!s;
             const p = parseAddress(pos.id);
             
-            // Logica Propagação X: se o finalizador da linha é anterior ou igual a mim
-            let finalX = !!engine.markX[pos.id];
-            if(!finalX && p) {
+            // Verifica se linha está concluída (X)
+            let isLineCompleted = !!engine.markX[pos.id];
+            if(!isLineCompleted && p) {
                 for (let mxId in engine.markX) {
                     const m = parseAddress(mxId);
-                    if(m && m.key === p.key && p.index > m.index) { finalX = true; break; }
+                    if(m && m.key === p.key && p.index > m.index) { 
+                        isLineCompleted = true; 
+                        break; 
+                    }
                 }
             }
 
-            if(hasS) ocCount++; if(finalX) markCount++;
-            const hit = engine.search.length >= 3 && engine.foundSet.has(pos.id);
+            if(hasStock || isLineCompleted) ocCount++; 
+            if(isLineCompleted) markCount++;
+            
+            const isSearchMatch = engine.search.length >= 3 && engine.foundSet.has(pos.id);
+            const hasMultipleLotes = hasStock && s.lotes.length > 1;
 
             ctx.save();
+            
             if (pos.rot) {
                 ctx.translate(pos.x + pos.w/2, pos.y + pos.h/2);
                 ctx.rotate(pos.rot * Math.PI / 180);
                 ctx.translate(-(pos.x + pos.w/2), -(pos.y + pos.h/2));
             }
 
-            // Design das células
-            if (hit) { ctx.fillStyle = '#fde047'; ctx.strokeStyle = '#f59e0b'; }
-            else if (hasS || finalX) { ctx.fillStyle = '#10b981'; ctx.strokeStyle = '#059669'; }
-            else { ctx.fillStyle = '#f8fafc'; ctx.strokeStyle = '#cbd5e1'; }
+            // SISTEMA DE CORES - Conforme especificado
+            if (isSearchMatch) {
+                // Cor de busca (amarelo)
+                ctx.fillStyle = engine.colorSystem.search;
+                ctx.strokeStyle = engine.colorSystem.strokeHighlight;
+                ctx.lineWidth = 2;
+            } 
+            else if (hasStock || isLineCompleted) {
+                // VERDE para qualquer situação com estoque OU com X
+                ctx.fillStyle = engine.colorSystem.occupied;
+                ctx.strokeStyle = '#059669';
+                ctx.lineWidth = 1.5;
+            } 
+            else {
+                // Cinza para vazio (sem estoque e sem X)
+                ctx.fillStyle = engine.colorSystem.empty;
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 1;
+            }
 
-            ctx.lineWidth = 1.2;
-            ctx.beginPath(); ctx.roundRect(pos.x+0.5, pos.y+0.5, pos.w-1, pos.h-1, 2);
-            ctx.fill(); ctx.stroke();
+            // Desenha retângulo
+            ctx.beginPath();
+            ctx.roundRect(pos.x + 0.5, pos.y + 0.5, pos.w - 1, pos.h - 1, 2);
+            ctx.fill();
+            ctx.stroke();
 
-            // Múltiplos lotes indicator (!) com brilho
-            if(hasS && s.lotes.length > 1) {
-                ctx.shadowBlur = 4; ctx.shadowColor = 'red';
+            // Ícone vermelho APENAS para múltiplos lotes (independente da cor de fundo)
+            if(hasMultipleLotes) {
+                ctx.shadowBlur = 4; 
+                ctx.shadowColor = '#ef4444';
                 ctx.fillStyle = '#ef4444';
-                ctx.beginPath(); ctx.arc(pos.x + pos.w - 5.5, pos.y + 5.5, 4.5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); 
+                ctx.arc(pos.x + pos.w - 8, pos.y + 8, 5, 0, Math.PI * 2); 
+                ctx.fill();
                 ctx.shadowBlur = 0;
-                ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Arial'; ctx.textAlign='center';
-                ctx.fillText('!', pos.x + pos.w - 5.5, pos.y + 8.5);
+                
+                ctx.fillStyle = '#ffffff'; 
+                ctx.font = 'bold 9px "JetBrains Mono"';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('!', pos.x + pos.w - 8, pos.y + 8);
             }
 
-            // Identificação de Conteúdo (Centralizado)
-            if (finalX || hasS) {
-                const label = finalX ? 'X' : (s ? s.total : '');
-                const fs = Math.min(pos.h * 0.55, 12);
-                ctx.font = `800 ${fs}px 'JetBrains Mono'`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillStyle = hit ? '#854d0e' : '#ffffff';
-                ctx.fillText(label, pos.x + pos.w/2, pos.y + pos.h/2 + 1);
+            // Texto central (quantidade ou X)
+            if (hasStock || isLineCompleted) {
+                const label = isLineCompleted ? 'X' : (s ? s.total : '');
+                const fontSize = Math.min(pos.h * 0.5, 14);
+                
+                ctx.font = `800 ${fontSize}px 'JetBrains Mono'`;
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                ctx.shadowBlur = 2;
+                
+                ctx.fillText(String(label), pos.x + pos.w/2, pos.y + pos.h/2);
+                ctx.shadowBlur = 0;
             }
+
             ctx.restore();
         });
 
-        // Labels flutuantes do editor
-        RAW_LAYOUT.forEach(el => {
+        // Textos flutuantes
+        engine.staticItems.forEach(el => {
             if(el.tipo === 'TEXTO') {
-                ctx.font = 'bold 11px var(--jakarta)'; ctx.fillStyle = '#94a3b8';
+                ctx.font = 'bold 11px var(--jakarta)';
+                ctx.fillStyle = '#94a3b8';
                 ctx.fillText(el.texto, el.x, el.y + 10);
             }
         });
 
-        // Contadores Reais (Físico vs Virtual)
+        // Atualiza contadores
         document.querySelector('#statsTotal .val').innerText = engine.layouts.length;
         document.querySelector('#statsOcupados .val').innerText = ocCount;
         document.querySelector('#statsUltimosLotes .val').innerText = markCount;
     }
 
+    // Helper para roundRect
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        if (w < 2 * r) r = w / 2;
+        if (h < 2 * r) r = h / 2;
+        this.moveTo(x + r, y);
+        this.lineTo(x + w - r, y);
+        this.quadraticCurveTo(x + w, y, x + w, y + r);
+        this.lineTo(x + w, y + h - r);
+        this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        this.lineTo(x + r, y + h);
+        this.quadraticCurveTo(x, y + h, x, y + h - r);
+        this.lineTo(x, y + r);
+        this.quadraticCurveTo(x, y, x + r, y);
+        return this;
+    };
+
     // ========== CONTROLES DE BUSCA ==========
     document.getElementById('campoPesquisaLote').addEventListener('input', e => {
         engine.search = e.target.value.toLowerCase().trim();
         const badge = document.getElementById('wrapperContador');
+        
         if (engine.search.length >= 3) {
             engine.foundSet.clear();
             for (let id in engine.stocks) {
-                const bundle = (id + engine.stocks[id].lotes.map(l => l.lote+l.cliente).join('')).toLowerCase();
-                if (bundle.includes(engine.search)) engine.foundSet.add(id);
+                const loteInfo = engine.stocks[id].lotes.map(l => l.lote + l.cliente).join('');
+                const bundle = (id + loteInfo).toLowerCase();
+                if (bundle.includes(engine.search)) {
+                    engine.foundSet.add(id);
+                }
             }
-            badge.innerText = engine.foundSet.size; badge.classList.remove('d-none');
-        } else { badge.classList.add('d-none'); }
+            badge.innerText = engine.foundSet.size;
+            badge.classList.remove('d-none');
+        } else { 
+            badge.classList.add('d-none'); 
+        }
         render();
     });
 
-    // ========== TOOLTIP & HOVER ==========
+    // ========== TOOLTIP - SEMPRE JUNTO AO PONTEIRO ==========
+    let tooltipTimeout;
+    
     canvas.addEventListener('mousemove', e => {
         if(document.body.classList.contains('modal-open')) return;
         
-        const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) / engine.zoom;
-        const my = (e.clientY - rect.top) / engine.zoom;
-        const p = engine.layouts.find(pos => mx >= pos.x && mx <= pos.x+pos.w && my >= pos.y && my <= pos.y+pos.h);
+        // Limpa timeout anterior se existir
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+        }
         
-        if (!p) { tooltip.style.display = 'none'; canvas.style.cursor = 'default'; return; }
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+        
+        const p = engine.layouts.find(pos => 
+            mx >= pos.x && mx <= pos.x + pos.w && 
+            my >= pos.y && my <= pos.y + pos.h
+        );
+        
+        if (!p) { 
+            // Esconde tooltip após sair do retângulo
+            tooltip.style.display = 'none'; 
+            canvas.style.cursor = 'default'; 
+            return; 
+        }
 
         const st = engine.stocks[p.id];
         const adr = parseAddress(p.id);
         const lineTotal = adr ? engine.laneStats[adr.key] || 0 : 0;
         
-        let concl = !!engine.markX[p.id];
-        if(!concl && adr) {
+        let isLineCompleted = !!engine.markX[p.id];
+        if(!isLineCompleted && adr) {
             for(let kid in engine.markX) {
                 let mxId = parseAddress(kid);
-                if(mxId && mxId.key === adr.key && adr.index > mxId.index) { concl = true; break; }
+                if(mxId && mxId.key === adr.key && adr.index > mxId.index) { 
+                    isLineCompleted = true; 
+                    break; 
+                }
             }
         }
 
+        const hasMultipleLotes = st && st.lotes.length > 1;
+        
         tooltip.innerHTML = `
-            <div style="background:${concl?'var(--success)':'var(--primary)'}; padding:14px; color:white">
+            <div style="background:${isLineCompleted ? '#10b981' : '#6366f1'}; padding:14px; color:white">
                 <div style="font-size:14px; font-weight:800">${p.id}</div>
-                ${concl ? '<span style="background:rgba(0,0,0,0.3); font-size:10px; padding:2px 6px; border-radius:4px">LINHA CONCLUÍDA</span>':''}
+                ${isLineCompleted ? '<span style="background:rgba(0,0,0,0.3); font-size:10px; padding:2px 6px; border-radius:4px">LINHA CONCLUÍDA</span>' : ''}
+                ${hasMultipleLotes ? '<span style="background:rgba(0,0,0,0.3); font-size:10px; padding:2px 6px; border-radius:4px">MÚLTIPLOS LOTES</span>' : ''}
             </div>
-            <div style="padding:15px">
-                ${st ? st.lotes.map(l=>`
+            <div style="padding:15px; max-height:300px; overflow-y:auto">
+                ${st ? st.lotes.map(l => `
                     <div style="padding-bottom:10px; border-bottom:1px solid #f1f5f9; margin-bottom:10px">
                         <div style="display:flex; justify-content:space-between; align-items:center">
-                            <b style="color:var(--primary); font-size:13px">${l.lote}</b>
-                            <span class="badge bg-light text-dark border" style="font-size:11px">${l.qtd} ${l.embalagem||'un'}</span>
+                            <b style="color:#6366f1; font-size:13px">${l.lote}</b>
+                            <span class="badge bg-light text-dark border" style="font-size:11px">${l.qtd} ${l.embalagem || 'un'}</span>
                         </div>
-                        <div style="font-size:11px; color:#64748b; margin-top:3px"><i class="fas fa-user-circle"></i> ${l.cliente||'Padrão'}</div>
-                    </div>`).join('') : '<div class="text-center text-muted p-2">Sem registro físico</div>'}
+                        <div style="font-size:11px; color:#64748b; margin-top:3px">
+                            <i class="fas fa-user-circle"></i> ${l.cliente || 'Padrão'}
+                        </div>
+                    </div>
+                `).join('') : '<div class="text-center text-muted p-2">Sem registro físico</div>'}
                 
                 ${adr && lineTotal > 0 ? `
-                <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:12px">
+                <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:12px; margin-top:10px">
                     <span style="display:block; font-size:10px; font-weight:800; color:#0369a1">TOTAL ACUMULADO NA LINHA</span>
                     <div style="display:flex; align-items:baseline; gap:6px">
                         <b style="font-size:20px; color:#0ea5e9">${lineTotal}</b>
                         <small style="color:#0ea5e9; font-weight:700">UN</small>
                     </div>
-                </div>`:''}
-            </div>`;
+                </div>` : ''}
+            </div>
+        `;
 
         tooltip.style.display = 'block';
-        tooltip.style.left = Math.min(e.clientX + 15, window.innerWidth - 320) + 'px';
-        tooltip.style.top = Math.min(e.clientY + 15, window.innerHeight - 350) + 'px';
+        
+        // Posicionamento JUNTO AO PONTEIRO
+        let left = e.clientX + 20;
+        let top = e.clientY - 20;
+        
+        // Ajustes para não sair da tela
+        const tooltipWidth = 320;
+        const tooltipHeight = 400;
+        
+        if (left + tooltipWidth > window.innerWidth - 10) {
+            left = e.clientX - tooltipWidth - 20;
+        }
+        
+        if (top + tooltipHeight > window.innerHeight - 10) {
+            top = e.clientY - tooltipHeight - 20;
+        }
+        
+        if (top < 10) {
+            top = e.clientY + 20;
+        }
+        
+        tooltip.style.left = Math.max(5, Math.min(left, window.innerWidth - tooltipWidth - 5)) + 'px';
+        tooltip.style.top = Math.max(5, Math.min(top, window.innerHeight - tooltipHeight - 5)) + 'px';
+        
         canvas.style.cursor = 'pointer';
+    });
+
+    // Esconde tooltip quando sai do canvas
+    canvas.addEventListener('mouseleave', () => {
+        tooltip.style.display = 'none';
+        canvas.style.cursor = 'default';
     });
 
     // ========== MODAL DUPLO CLIQUE ==========
     canvas.addEventListener('dblclick', e => {
         const rect = canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left)/engine.zoom; const my = (e.clientY - rect.top)/engine.zoom;
-        const p = engine.layouts.find(pos => mx>=pos.x && mx<=pos.x+pos.w && my>=pos.y && my<=pos.y+pos.h);
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const mx = (e.clientX - rect.left) * scaleX;
+        const my = (e.clientY - rect.top) * scaleY;
+        
+        const p = engine.layouts.find(pos => 
+            mx >= pos.x && mx <= pos.x + pos.w && 
+            my >= pos.y && my <= pos.y + pos.h
+        );
         
         if (p) {
-            tooltip.style.display = 'none'; // Importante para UX
+            tooltip.style.display = 'none';
             const s = engine.stocks[p.id];
             const baseUrl = "{% url 'sapp:lista_estoque' %}";
             
             if (s && s.lotes.length > 1) {
                 document.getElementById('modalEnderecoTitulo').innerText = p.id;
                 document.getElementById('listaLotesModal').innerHTML = s.lotes.map(l => `
-                    <div class="list-group list-group-item bg-dark text-white border-secondary mb-2 rounded d-flex justify-content-between flex-row">
-                        <div>
-                            <span class="d-block fw-bold">${l.lote}</span>
-                            <small class="text-secondary">${l.cliente||''}</small>
+                    <div class="list-group-item bg-dark text-white border-secondary mb-2 rounded-3 p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="d-block fw-bold fs-6">${l.lote}</span>
+                                <small class="text-secondary">${l.cliente || 'Cliente padrão'}</small>
+                                <span class="d-block mt-1"><strong>${l.qtd}</strong> ${l.embalagem || 'un'}</span>
+                            </div>
+                            <a href="${baseUrl}?busca=${l.lote}" class="btn btn-sm btn-primary px-4 py-2">ABRIR</a>
                         </div>
-                        <a href="${baseUrl}?busca=${l.lote}" class="btn btn-primary btn-sm align-self-center px-3">ABRIR</a>
-                    </div>`).join('');
+                    </div>
+                `).join('');
                 bsModal.show();
             } else {
                 window.location.href = baseUrl + "?busca=" + (s ? s.lotes[0].lote : p.id);
@@ -494,11 +1052,41 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    window.changeZoom = d => { engine.zoom = Math.max(0.1, Math.min(4, engine.zoom + d)); applyZ(); };
-    window.resetZoom = () => { engine.zoom = 1; applyZ(); };
-    function applyZ() { document.getElementById('canvasWrapper').style.transform = `scale(${engine.zoom})`; }
+    // ========== CONTROLES DE ZOOM ==========
+    window.changeZoom = d => { 
+        engine.zoom = Math.max(0.2, Math.min(3, engine.zoom + d)); 
+        applyZoom(); 
+    };
+    
+    window.resetZoom = () => { 
+        engine.zoom = 1; 
+        applyZoom(); 
+    };
+    
+    function applyZoom() { 
+        adjustCanvasToContainer();
+    }
 
-    init(); setInterval(fetchMarkers, 30000);
+    // ========== RESPONSIVIDADE ==========
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            adjustCanvasToContainer();
+            render();
+        }, 100);
+    });
+
+    // Inicialização
+    init();
+    
+    // Atualiza a cada 30 segundos
+    setInterval(fetchMarkers, 30000);
+    
+    // Garantir que o modal feche corretamente
+    document.getElementById('modalMultiplosLotes').addEventListener('hidden.bs.modal', function () {
+        tooltip.style.display = 'none';
+    });
 });
 </script>
 {% endblock %}
