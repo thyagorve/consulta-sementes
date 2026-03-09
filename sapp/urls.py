@@ -99,7 +99,8 @@ urlpatterns = [
     
     # Ficha múltipla (vários lotes)
     path('ficha-rastreabilidade/multipla/', views.ficha_rastreabilidade_multipla, name='ficha_rastreabilidade_multipla'),
-
+    path('api/validar-endereco/', views.validar_endereco, name='validar_endereco'),
+    path('api/buscar-origens/', views.buscar_origens, name='buscar_origens'),
 
     path('marcar-ultimo-lote/<int:estoque_id>/', views.marcar_ultimo_lote_linha, name='marcar_ultimo_lote'),
     path('get-marcacoes-linha/<str:rua>/<str:ln>/', views.get_marcacoes_linha, name='get_marcacoes_linha'),   

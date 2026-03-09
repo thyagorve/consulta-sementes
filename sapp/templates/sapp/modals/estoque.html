@@ -49,7 +49,10 @@
                     <div class="modal-body p-4 bg-light">
                         <div class="row g-3">
                             <!-- SEÇÃO 1: IDENTIFICAÇÃO -->
-                            <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-2">Identificação Principal</h6><hr class="mt-1"></div>
+                            <div class="col-12">
+                                <h6 class="text-primary fw-bold mb-0 mt-2">Identificação Principal</h6>
+                                <hr class="mt-1">
+                            </div>
                             
                             <div class="col-md-8 position-relative">
                                 <label class="form-label small fw-bold">Número do Lote *</label>
@@ -68,28 +71,53 @@
                                 <input type="number" name="entrada" id="inputQtd" class="form-control form-control-lg text-center fw-bold" required min="1" placeholder="0">
                             </div>
 
-                            <!-- SEÇÃO 2: LOCALIZAÇÃO -->
-                            <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-3">Localização e Origem</h6><hr class="mt-1"></div>
+                            <!-- SEÇÃO 2: LOCALIZAÇÃO E ORIGEM -->
+                            <div class="col-12">
+                                <h6 class="text-primary fw-bold mb-0 mt-3">Localização e Origem</h6>
+                                <hr class="mt-1">
+                            </div>
+                            
+                            <div class="col-md-6 col-lg-3 position-relative">
+                                <label class="form-label small fw-bold">Origem / Destino *</label>
+                                <select name="origem_destino" id="inputOrigem" class="form-select" required>
+                                    <option value="">Selecione...</option>
+
+                                    {% for o in origens %}
+                                        <option value="{{ o.nome }}">{{ o.nome }}</option>
+                                    {% endfor %}
+
+                                </select>
+                                <div id="origemAutocompleteList" class="dropdown-menu shadow-lg w-100" style="max-height: 200px; overflow-y: auto; display: none;"></div>
+                            </div>
                             
                             <div class="col-md-6 col-lg-3">
-                                <label class="form-label small fw-bold">Origem / Destino *</label>
-                                <input type="text" name="origem_destino" id="inputOrigem" class="form-control" required placeholder="Ex: Produção Interna">
-                            </div>
-                            <div class="col-md-6 col-lg-3">
                                 <label class="form-label small fw-bold">Endereço *</label>
-                                <input type="text" name="endereco" id="inputEndereco" class="form-control text-uppercase" required placeholder="P01-A01">
+                                <input type="text"
+                                    name="endereco"
+                                    id="inputEndereco"
+                                    class="form-control text-uppercase"
+                                    required
+                                    placeholder="Ex: R-C LN01 P03">
+                                <div id="enderecoFeedback" class="mt-1 small" style="min-height: 24px;"></div>
+                                
                             </div>
+                            
                             <div class="col-md-6 col-lg-3">
                                 <label class="form-label small fw-bold">Armazém (AZ) *</label>
-                                <input type="text" name="az" id="inputAz" class="form-control text-uppercase" required placeholder="AZ-01">
+                                <input type="text" name="az" id="inputAz" class="form-control text-uppercase bg-light" 
+                                       required readonly placeholder="Preenchido automaticamente">
                             </div>
+                            
                             <div class="col-md-6 col-lg-3">
                                 <label class="form-label small fw-bold">Cliente</label>
                                 <input type="text" name="cliente" id="inputCliente" class="form-control">
                             </div>
 
                             <!-- SEÇÃO 3: PRODUTO E DADOS TÉCNICOS -->
-                            <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-3">Dados do Produto e SKU</h6><hr class="mt-1"></div>
+                            <div class="col-12">
+                                <h6 class="text-primary fw-bold mb-0 mt-3">Dados do Produto e SKU</h6>
+                                <hr class="mt-1">
+                            </div>
                             
                             <div class="col-md-12 col-lg-4">
                                 <label class="form-label small fw-bold">Código do Produto (SKU)</label>
@@ -104,45 +132,63 @@
                                 <label class="form-label small fw-bold">Espécie *</label>
                                 <select name="especie" id="selEspecie" class="form-select" required>
                                     <option value="">Selecione...</option>
-                                    {% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}
+                                    {% for e in all_especies %}
+                                        <option value="{{ e.id }}">{{ e.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
+                            
                             <div class="col-md-6 col-lg-4">
                                 <label class="form-label small fw-bold">Cultivar *</label>
                                 <select name="cultivar" id="selCultivar" class="form-select" required>
                                     <option value="">Selecione...</option>
-                                    {% for c in all_cultivares %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+                                    {% for c in all_cultivares %}
+                                        <option value="{{ c.id }}">{{ c.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
+                            
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Peneira *</label>
                                 <select name="peneira" id="selPeneira" class="form-select" required>
                                     <option value="">Selecione...</option>
-                                    {% for p in all_peneiras %}<option value="{{ p.id }}">{{ p.nome }}</option>{% endfor %}
+                                    {% for p in all_peneiras %}
+                                        <option value="{{ p.id }}">{{ p.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
+                            
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Categoria *</label>
                                 <select name="categoria" id="selCategoria" class="form-select" required>
                                     <option value="">Selecione...</option>
-                                    {% for c in all_categorias %}<option value="{{ c.id }}">{{ c.nome }}</option>{% endfor %}
+                                    {% for c in all_categorias %}
+                                        <option value="{{ c.id }}">{{ c.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
+                            
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Tratamento</label>
                                 <select name="tratamento" id="selTratamento" class="form-select">
                                     <option value="">Nenhum tratamento</option>
-                                    {% for t in all_tratamentos %}<option value="{{ t.id }}">{{ t.nome }}</option>{% endfor %}
+                                    {% for t in all_tratamentos %}
+                                        <option value="{{ t.id }}">{{ t.nome }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
 
                             <!-- SEÇÃO 4: COMPLEMENTO -->
-                            <div class="col-12"><h6 class="text-primary fw-bold mb-0 mt-3">Complementares</h6><hr class="mt-1"></div>
+                            <div class="col-12">
+                                <h6 class="text-primary fw-bold mb-0 mt-3">Complementares</h6>
+                                <hr class="mt-1">
+                            </div>
 
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Empresa</label>
                                 <input type="text" name="empresa" id="inputEmpresa" class="form-control">
                             </div>
+                            
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Embalagem</label>
                                 <select name="embalagem" id="selEmbalagem" class="form-select">
@@ -150,22 +196,26 @@
                                     <option value="SC">SACO (SC)</option>
                                 </select>
                             </div>
+                            
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Peso Unit. (Kg)</label>
                                 <input type="number" step="0.01" name="peso_unitario" id="inputPeso" class="form-control" placeholder="0.00">
                             </div>
+                            
                             <div class="col-12">
                                 <label class="form-label small fw-bold">Fotos / Arquivos</label>
                                 <input type="file" name="fotos" class="form-control" multiple accept="image/*">
                             </div>
+                            
                             <div class="col-12">
                                 <label class="form-label small fw-bold">Observações Adicionais</label>
                                 <textarea name="observacao" id="inputObs" class="form-control" rows="2" placeholder="Notas, histórico ou avisos..."></textarea>
                             </div>
                         </div>
                     </div>
-                    <!-- SEÇÃO: Último Lote da Linha (ADICIONAR AQUI) -->
-                    <div class="col-12">
+                    
+                    <!-- SEÇÃO: Último Lote da Linha -->
+                    <div class="px-4 pb-3">
                         <div class="card border-warning bg-light">
                             <div class="card-body py-2">
                                 <div class="form-check form-switch">
@@ -185,6 +235,7 @@
                             </div>
                         </div>
                     </div>
+                    
                     <div class="modal-footer border-0 p-3 bg-white rounded-bottom-4">
                         <button type="button" class="btn btn-light btn-lg px-4" data-bs-dismiss="modal">Cancelar</button>
                         <button type="submit" class="btn btn-primary btn-lg px-5 shadow fw-bold" id="btnSubmit">
@@ -198,8 +249,9 @@
     </div>
 </div>
 
-<!-- ESTILO -->
+<!-- ESTILO ADICIONAL -->
 <style>
+    /* Estilos existentes mantidos */
     #autoCompleteList { 
         max-height: 300px; 
         overflow-y: auto; 
@@ -209,6 +261,7 @@
         position: absolute;
         z-index: 1000;
         background: white;
+        border: 1px solid #dee2e6;
     }
     
     .autocomplete-item { 
@@ -317,12 +370,231 @@
         cursor: not-allowed;
         opacity: 0.65;
     }
+
+    /* NOVOS ESTILOS PARA VALIDAÇÃO DE ENDEREÇO */
+    #inputEndereco.is-valid {
+        border-color: #198754 !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
+    #inputEndereco.is-invalid {
+        border-color: #dc3545 !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
+    #origemAutocompleteList {
+        max-height: 200px;
+        overflow-y: auto;
+        display: none;
+        margin-top: 2px;
+        border-radius: 8px;
+        position: absolute;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #dee2e6;
+    }
+
+    .bg-light[readonly] {
+        background-color: #e9ecef !important;
+        cursor: default;
+    }
+
+    #enderecoFeedback {
+        transition: all 0.2s;
+    }
+
+    .text-muted small {
+        font-size: 0.75rem;
+    }
 </style>
 
 <!-- SCRIPTS -->
 <script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
 <script>
+    // ==================== VALIDADOR DE ENDEREÇO CORRIGIDO ====================
+    const EnderecoValidator = {
+        timeout: null,
+        
+        init() {
+            const inputEndereco = document.getElementById('inputEndereco');
+            const inputAz = document.getElementById('inputAz');
+            
+            if (inputEndereco && inputAz) {
+                // Desabilita o campo AZ (não deve ser editado manualmente)
+                inputAz.readOnly = true;
+                inputAz.classList.add('bg-light');
+                
+                // Eventos de validação
+                inputEndereco.addEventListener('input', () => this.validarComDebounce());
+                inputEndereco.addEventListener('blur', () => this.validar());
+                inputEndereco.addEventListener('change', () => this.validar());
+                
+                // Força uppercase enquanto digita
+                inputEndereco.addEventListener('keyup', () => {
+                    inputEndereco.value = inputEndereco.value.toUpperCase();
+                });
+            }
+            
+            // Autocomplete para Origem/Destino
+            this.setupOrigemAutocomplete();
+        },
+        
+        validarComDebounce() {
+            clearTimeout(this.timeout);
+            this.timeout = setTimeout(() => this.validar(), 500);
+        },
+        
+        async validar() {
+            const inputEndereco = document.getElementById('inputEndereco');
+            const inputAz = document.getElementById('inputAz');
+            const feedback = document.getElementById('enderecoFeedback');
+            
+            if (!inputEndereco || !inputAz || !feedback) return;
+            
+            const endereco = inputEndereco.value.trim().toUpperCase();
+            
+            // Se campo vazio, limpa validação
+            if (!endereco) {
+                inputEndereco.classList.remove('is-valid', 'is-invalid');
+                inputAz.value = '';
+                feedback.innerHTML = '';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/validar-endereco/?endereco=${encodeURIComponent(endereco)}`);
+                const data = await response.json();
+                
+                if (data.valido) {
+                    // Endereço válido
+                    inputEndereco.classList.remove('is-invalid');
+                    inputEndereco.classList.add('is-valid');
+                    
+                    // Preenche o AZ automaticamente
+                    inputAz.value = data.dados.armazem;
+                    
+                    // Feedback visual
+                    feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> ${data.mensagem}</span>`;
+                    
+                    // Dispara evento com dados completos
+                    const event = new CustomEvent('enderecoValido', { 
+                        detail: {
+                            ...data.dados,
+                            endereco: endereco
+                        }
+                    });
+                    inputEndereco.dispatchEvent(event);
+                    
+                } else {
+                    // Endereço inválido
+                    inputEndereco.classList.remove('is-valid');
+                    inputEndereco.classList.add('is-invalid');
+                    inputAz.value = ''; // Limpa AZ
+                    
+                    feedback.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${data.erro}</span>`;
+                }
+            } catch (error) {
+                console.error('Erro na validação:', error);
+                feedback.innerHTML = `<span class="text-danger">Erro ao validar endereço</span>`;
+            }
+        },
+        
+        setupOrigemAutocomplete() {
+            const inputOrigem = document.getElementById('inputOrigem');
+            const container = document.getElementById('origemAutocompleteList');
+            
+            if (!inputOrigem || !container) return;
+            
+            let timeout;
+            
+            inputOrigem.addEventListener('input', () => {
+                clearTimeout(timeout);
+                const termo = inputOrigem.value.trim();
+                
+                if (termo.length < 2) {
+                    container.style.display = 'none';
+                    return;
+                }
+                
+                timeout = setTimeout(async () => {
+                    try {
+                        const response = await fetch(`/api/buscar-origens/?term=${encodeURIComponent(termo)}`);
+                        const data = await response.json();
+                        
+                        container.innerHTML = '';
+                        
+                        if (data.length > 0) {
+                            container.style.display = 'block';
+                            data.forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'autocomplete-item';
+                                div.innerHTML = `<i class="bi bi-geo-alt-fill me-2 text-primary"></i> ${item.nome}`;
+                                div.addEventListener('mousedown', (evt) => {
+
+                                    evt.preventDefault();
+
+                                    const loteSelecionado = d.lote;
+
+                                    fetch(`/api/buscar-lote-completo/?lote=${encodeURIComponent(loteSelecionado)}`)
+                                        .then(r => r.json())
+                                        .then(data => {
+
+                                            if (data.encontrado) {
+
+                                                const dados = {
+                                                    lote: data.lote,
+                                                    produto: data.produto,
+                                                    origem_destino: data.origem_destino,
+                                                    az: data.az,
+                                                    especie_id: data.especie_id,
+                                                    cultivar_id: data.cultivar_id,
+                                                    peneira_id: data.peneira_id,
+                                                    categoria_id: data.categoria_id,
+                                                    tratamento_id: data.tratamento_id,
+                                                    empresa: data.empresa,
+                                                    peso_unitario: data.peso_unitario,
+                                                    embalagem: data.embalagem
+                                                };
+
+                                                self.fillFromData(dados);
+
+                                            }
+
+                                        });
+
+                                });
+                                container.appendChild(div);
+                            });
+                        } else {
+                            container.style.display = 'none';
+                        }
+                    } catch (error) {
+                        console.error('Erro ao buscar origens:', error);
+                    }
+                }, 300);
+            });
+            
+            inputOrigem.addEventListener('blur', () => {
+                setTimeout(() => container.style.display = 'none', 200);
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (!inputOrigem.contains(e.target) && !container.contains(e.target)) {
+                    container.style.display = 'none';
+                }
+            });
+        }
+    };
+
+    // ==================== STOCK APP MODIFICADO ====================
     const StockApp = {
         isSubmitting: false,
         debounce: null,
@@ -335,6 +607,9 @@
             this.setupClean();
             this.preventDoubleSubmit();
             this.setupEnterKey();
+            
+            // Inicializa o validador de endereço
+            EnderecoValidator.init();
         },
 
         preventDoubleSubmit() {
@@ -343,25 +618,31 @@
             const spinner = document.getElementById('submitSpinner');
             const submitText = document.getElementById('submitText');
             
-            // Referência ao objeto StockApp
             const self = this;
 
             form.addEventListener('submit', function(e) {
+                // VERIFICAÇÃO DE ENDEREÇO (NOVO)
+                const inputEndereco = document.getElementById('inputEndereco');
+                if (inputEndereco && !inputEndereco.classList.contains('is-valid')) {
+                    e.preventDefault();
+                    alert('❌ Endereço inválido! O endereço deve estar no formato R-A LN01 P03 e existir no sistema.');
+                    inputEndereco.focus();
+                    return false;
+                }
+
                 // VERIFICAÇÃO DE DUPLO ENVIO
                 if (self.isSubmitting) {
                     e.preventDefault();
                     e.stopPropagation();
                     console.log('⛔ Envio bloqueado - já em processamento');
                     
-                    // Feedback visual para o usuário
                     if (submitBtn.disabled) {
                         alert('Registro em andamento. Aguarde...');
                     }
                     return false;
                 }
 
-                // VALIDAÇÕES
-                // Quantidade
+                // VALIDAÇÕES DOS CAMPOS OBRIGATÓRIOS
                 const quantidade = document.getElementById('inputQtd');
                 if (!quantidade || !quantidade.value) {
                     e.preventDefault();
@@ -382,7 +663,6 @@
                     return false;
                 }
 
-                // Campos obrigatórios
                 const camposObrigatorios = [
                     { id: 'inputLote', nome: 'Lote' },
                     { id: 'inputOrigem', nome: 'Origem/Destino' },
@@ -419,13 +699,12 @@
                 spinner.classList.remove('d-none');
                 submitText.textContent = 'Registrando...';
                 
-                // Feedback visual
                 submitBtn.classList.add('btn-secondary');
                 submitBtn.classList.remove('btn-primary');
                 
                 console.log('✅ Enviando formulário...');
                 
-                // Timeout de segurança (caso algo dê errado)
+                // Timeout de segurança
                 setTimeout(() => {
                     if (self.isSubmitting) {
                         console.warn('⚠️ Timeout de segurança - liberando formulário');
@@ -436,65 +715,121 @@
                         submitBtn.classList.remove('btn-secondary');
                         submitBtn.classList.add('btn-primary');
                     }
-                }, 10000); // 10 segundos
+                }, 10000);
                 
-                return true; // Envia o formulário
+                return true;
             });
         },
 
         setupAutocomplete() {
-            const input = document.getElementById('inputLote');
-            const list = document.getElementById('autoCompleteList');
-            const self = this;
+    const input = document.getElementById('inputLote');
+    const list = document.getElementById('autoCompleteList');
+    const self = this;
 
-            if (!input || !list) return;
+    if (!input || !list) return;
 
-            input.addEventListener('input', (e) => {
-                clearTimeout(self.debounce);
-                const term = e.target.value;
-                if (term.length < 3) { 
-                    list.style.display = 'none'; 
-                    return; 
-                }
+    input.addEventListener('input', (e) => {
 
-                self.debounce = setTimeout(() => {
-                    fetch(`/api/autocomplete-lotes/?term=${encodeURIComponent(term)}`)
-                        .then(r => r.json())
-                        .then(data => {
-                            list.innerHTML = '';
-                            if (data.length > 0) {
-                                list.style.display = 'block';
-                                data.forEach(item => {
-                                    const d = item.dados;
-                                    const div = document.createElement('div');
-                                    div.className = 'autocomplete-item';
-                                    div.innerHTML = `<strong>${d.lote}</strong><small>Prod: ${d.produto || 'N/A'} | End: ${d.endereco || '?'}</small>`;
-                                    div.addEventListener('mousedown', (evt) => {
-                                        evt.preventDefault();
-                                        self.fillFromData(d);
-                                    });
-                                    list.appendChild(div);
-                                });
-                            } else { 
-                                list.style.display = 'none'; 
-                            }
-                        })
-                        .catch(() => {
-                            list.style.display = 'none';
-                        });
-                }, 400);
-            });
+        clearTimeout(self.debounce);
 
-            input.addEventListener('blur', () => {
-                setTimeout(() => list.style.display = 'none', 200);
-            });
-            
-            document.addEventListener('click', (e) => {
-                if (!input.contains(e.target) && !list.contains(e.target)) {
+        const term = e.target.value.trim();
+
+        if (term.length < 2) {
+            list.style.display = 'none';
+            list.innerHTML = '';
+            return;
+        }
+
+        self.debounce = setTimeout(() => {
+
+            fetch(`/api/buscar-lotes/?q=${encodeURIComponent(term)}`)
+            .then(response => response.json())
+            .then(data => {
+
+                list.innerHTML = '';
+
+                if (data.results && data.results.length > 0) {
+
+                    list.style.display = 'block';
+
+                    data.results.forEach(d => {
+
+                        const div = document.createElement('div');
+                        div.className = 'autocomplete-item';
+
+                        div.innerHTML = `
+                            <strong>${d.lote}</strong>
+                            <small>
+                                🌱 ${d.cultivar || '-'}
+                                | 📍 ${d.endereco || '-'}
+                                | 📦 Saldo: ${d.saldo || 0}
+                            </small>
+                        `;
+
+                        div.addEventListener('mousedown', (evt) => {
+
+    evt.preventDefault();
+
+    fetch(`/api/buscar-lote-completo/?lote=${encodeURIComponent(d.lote)}`)
+        .then(r => r.json())
+        .then(data => {
+
+            if (data.encontrado) {
+
+                self.fillFromData({
+                    lote: data.lote,
+                    produto: data.produto,
+                    origem_destino: data.origem_destino,
+                    az: data.az,
+                    especie_id: data.especie_id,
+                    cultivar_id: data.cultivar_id,
+                    peneira_id: data.peneira_id,
+                    categoria_id: data.categoria_id,
+                    tratamento_id: data.tratamento_id,
+                    empresa: data.empresa,
+                    cliente: data.cliente,
+                    peso_unitario: data.peso_unitario,
+                    embalagem: data.embalagem
+                });
+
+            }
+
+        });
+
+});
+
+                        list.appendChild(div);
+
+                    });
+
+                } else {
+
                     list.style.display = 'none';
+
                 }
+
+            })
+            .catch(error => {
+                console.error("Erro no autocomplete:", error);
+                list.style.display = 'none';
             });
-        },
+
+        }, 350);
+
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(() => {
+            list.style.display = 'none';
+        }, 200);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !list.contains(e.target)) {
+            list.style.display = 'none';
+        }
+    });
+},
 
         setupSKUSearch() {
             const input = document.getElementById('inputSKU');
@@ -528,42 +863,53 @@
             });
         },
 
-        fillFromData(d) {
-            const campos = {
-                'inputLote': d.lote || '',
-                'inputSKU': d.produto || '',
-                'inputOrigem': d.origem_destino || '',
-                'inputEndereco': d.endereco || '',
-                'inputAz': d.az || '',
-                'selEspecie': d.especie_id || d.especie__id,
-                'selCultivar': d.cultivar_id || d.cultivar__id,
-                'selPeneira': d.peneira_id || d.peneira__id,
-                'selCategoria': d.categoria_id || d.categoria__id,
-                'selTratamento': d.tratamento_id || d.tratamento__id,
-                'inputEmpresa': d.empresa || '',
-                'inputCliente': d.cliente || '',
-                'inputPeso': d.peso_unitario || '',
-                'selEmbalagem': d.embalagem || 'BAG'
-            };
+fillFromData(d) {
 
-            for (let [id, valor] of Object.entries(campos)) {
-                const el = document.getElementById(id);
-                if (el && valor) {
-                    if (el.tagName === 'SELECT') {
-                        // Para selects, tenta selecionar a opção
-                        const option = Array.from(el.options).find(opt => opt.value == valor);
-                        if (option) {
-                            el.value = valor;
-                        }
-                    } else {
-                        el.value = valor;
-                    }
-                }
+    const campos = {
+        'inputLote': d.lote,
+        'inputSKU': d.produto,
+        'inputOrigem': d.origem_destino,
+        'inputEndereco': d.endereco,
+        'inputAz': d.az,
+        'selEspecie': d.especie_id,
+        'selCultivar': d.cultivar_id,
+        'selPeneira': d.peneira_id,
+        'selCategoria': d.categoria_id,
+        'selTratamento': d.tratamento_id,
+        'inputEmpresa': d.empresa,
+        'inputCliente': d.cliente,
+        'inputPeso': d.peso_unitario,
+        'selEmbalagem': d.embalagem
+    };
+
+    for (let [id, valor] of Object.entries(campos)) {
+
+        const el = document.getElementById(id);
+
+        if (!el) continue;
+
+        if (el.tagName === 'SELECT') {
+
+            const option = Array.from(el.options).find(opt => opt.value == valor);
+
+            if (option) {
+                el.value = valor;
             }
 
-            document.getElementById('autoCompleteList').style.display = 'none';
-            document.getElementById('inputQtd').focus();
-        },
+        } else {
+
+            el.value = valor || '';
+
+        }
+
+    }
+
+    document.getElementById('autoCompleteList').style.display = 'none';
+
+    document.getElementById('inputQtd').focus();
+
+    setTimeout(() => EnderecoValidator.validar(), 100);
+},
 
         fillFields(d) {
             const campos = {
@@ -614,7 +960,6 @@
                     }
                 });
                 
-                // Para selects
                 if (input.tagName === 'SELECT') {
                     input.addEventListener('change', () => {
                         if (input.value) {
@@ -634,21 +979,24 @@
             const self = this;
 
             modal.addEventListener('hidden.bs.modal', function() {
-                // Reset do formulário
                 const form = document.getElementById('formNovaEntrada');
                 if (form) {
                     form.reset();
                 }
                 
-                // Remove classes de erro
-                document.querySelectorAll('.is-invalid').forEach(el => {
-                    el.classList.remove('is-invalid');
+                // Remove classes de validação
+                document.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
+                    el.classList.remove('is-invalid', 'is-valid');
                 });
                 
-                // Reset do estado de submissão
+                // Limpa feedback do endereço
+                const feedback = document.getElementById('enderecoFeedback');
+                if (feedback) feedback.innerHTML = '';
+                
+                // Reseta estado
                 self.isSubmitting = false;
                 
-                // Reset do botão
+                // Reseta botão
                 const submitBtn = document.getElementById('btnSubmit');
                 const spinner = document.getElementById('submitSpinner');
                 const submitText = document.getElementById('submitText');
@@ -682,18 +1030,14 @@
                 if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
                     e.preventDefault();
                     
-                    // Se não for textarea, previne o enter de submeter automaticamente
                     const submitBtn = document.getElementById('btnSubmit');
                     if (submitBtn && !submitBtn.disabled) {
-                        // Foca no próximo campo ou no botão de submit após o último campo
                         const inputs = Array.from(form.querySelectorAll('input:not([type="file"]):not([type="hidden"]), select, textarea'));
                         const index = inputs.indexOf(e.target);
                         
                         if (index < inputs.length - 1) {
-                            // Foca no próximo campo
                             inputs[index + 1].focus();
                         } else {
-                            // Se for o último, submete o formulário
                             if (!this.isSubmitting) {
                                 submitBtn.click();
                             }
@@ -704,6 +1048,7 @@
         }
     };
 
+    // ==================== SCANNER APP (MANTIDO IGUAL) ====================
     const ScannerApp = {
         html5QrCode: null,
         isScanning: false,
@@ -736,7 +1081,6 @@
             
             if (!scannerDiv || !formContent) return;
             
-            // Esconder formulário e mostrar scanner fullscreen
             formContent.style.display = 'none';
             scannerDiv.classList.remove('d-none');
             
@@ -766,7 +1110,6 @@
                                 document.getElementById('inputSKU').value = partes[0];
                                 document.getElementById('inputLote').value = partes[1];
                                 
-                                // Disparar busca do SKU
                                 document.getElementById('inputSKU').dispatchEvent(new Event('input'));
                                 
                                 setTimeout(() => {
@@ -786,8 +1129,6 @@
                 );
                 
                 this.isScanning = true;
-                
-                // Verificar flash
                 this.checkFlashSupport();
                 
             } catch (err) {
@@ -843,7 +1184,6 @@
             const formContent = document.getElementById('formContent');
             
             if (scannerDiv && formContent) {
-                // Mostrar formulário e esconder scanner
                 formContent.style.display = 'block';
                 scannerDiv.classList.add('d-none');
             }
@@ -888,12 +1228,11 @@
         }
     };
 
-    // Inicialização quando o DOM estiver pronto
+    // Inicialização
     document.addEventListener('DOMContentLoaded', () => {
         StockApp.init();
     });
 
-    // Para garantir que o scanner pare quando o modal fechar
     document.addEventListener('hidden.bs.modal', (event) => {
         if (event.target.id === 'modalNovaEntrada') {
             ScannerApp.stop();
@@ -904,9 +1243,18 @@
 
 
 
+
+
+
+
+
+
+
+
+
 <!-- === MODAL TRANSFERÊNCIA === -->
 <div class="modal fade" id="modalTransferencia" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-fullscreen-sm-down">
         <div class="modal-content">
             <div class="modal-header bg-warning text-white">
                 <h5 class="modal-title"><i class="fas fa-exchange-alt me-2"></i>Transferir e Ajustar</h5>
@@ -957,18 +1305,42 @@
                                 <i class="fas fa-arrow-right me-2"></i>Destino da Transferência
                             </h6>
                         </div>
-                        <div class="col-6 mb-2">
-                            <label class="fw-bold" id="endereco_label">Novo Endereço *</label>
-                            <input type="text" name="novo_endereco" id="transf_novo_endereco" class="form-control" required>
-                        </div>
-                        <div class="col-3 mb-2">
+                                                <div class="col-md-3 mb-2">
                             <label class="fw-bold">Quantidade *</label>
-                            <input type="number" name="quantidade" id="transf_quantidade" class="form-control fw-bold" required min="1">
+                            <input type="number" 
+                                   name="quantidade" 
+                                   id="transf_quantidade" 
+                                   class="form-control fw-bold" 
+                                   required 
+                                   min="1"
+                                   placeholder="0">
                         </div>
-                        <div class="col-3 mb-2">
-                            <label>AZ</label>
-                            <input type="text" name="az" id="transf_az" class="form-control">
+                        <!-- Endereço com validação -->
+                        <div class="col-md-6 mb-2 position-relative">
+                            <label class="fw-bold" id="endereco_label">Novo Endereço *</label>
+                            <input type="text" 
+                                   name="novo_endereco" 
+                                   id="transf_novo_endereco" 
+                                   class="form-control text-uppercase" 
+                                   required 
+                                   placeholder="Ex: R-C LN01 P03">
+                            <div id="transfEnderecoFeedback" class="mt-1 small" style="min-height: 24px;"></div>
+                       
                         </div>
+
+                        <div class="col-md-3 mb-2">
+                            <label>Armazém (AZ)</label>
+                            <input type="text" 
+                                   name="az" 
+                                   id="transf_az" 
+                                   class="form-control text-uppercase bg-light" 
+                                   readonly 
+                                   placeholder="Automático">
+                        </div>
+                        
+
+                        
+                        
                     </div>
 
                     <div class="row g-2">
@@ -979,39 +1351,61 @@
                             </h6>
                         </div>
                         
-                        <!-- Linha 1 -->
-                        <div class="col-3"><label>Lote</label><input type="text" class="form-control bg-light" id="transf_lote_display" readonly></div>
-                        <div class="col-9"><label>Produto</label><input type="text" name="produto" id="transf_produto" class="form-control"></div>
+                        <!-- Linha 1 - Responsiva -->
+                        <div class="col-sm-3">
+                            <label>Lote</label>
+                            <input type="text" class="form-control bg-light" id="transf_lote_display" readonly>
+                        </div>
+                        <div class="col-sm-9">
+                            <label>Produto</label>
+                            <input type="text" name="produto" id="transf_produto" class="form-control">
+                        </div>
                         
-                        <!-- Linha 2 -->
-                        <div class="col-4">
+                        <!-- Linha 2 - Responsiva -->
+                        <div class="col-md-4">
                             <label>Espécie</label>
                             <select name="especie" id="transf_especie" class="form-select">
                                 <option value="">Selecione...</option>
                                 {% for e in all_especies %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endfor %}
                             </select>
                         </div>
-                        <div class="col-4"><label>Cliente</label><input type="text" name="cliente" id="transf_cliente" class="form-control"></div>
-                        <div class="col-4"><label>Empresa</label><input type="text" name="empresa" id="transf_empresa" class="form-control"></div>
+                        <div class="col-md-4">
+                            <label>Cliente</label>
+                            <input type="text" name="cliente" id="transf_cliente" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label>Empresa</label>
+                            <input type="text" name="empresa" id="transf_empresa" class="form-control">
+                        </div>
                         
-                        <!-- Linha 3 -->
-                        <div class="col-3"><label>Peso Unitário</label><input type="text" name="peso_unitario" id="transf_peso" class="form-control"></div>
-                        <div class="col-3"><label>Embalagem</label>
+                        <!-- Linha 3 - Responsiva -->
+                        <div class="col-sm-3">
+                            <label>Peso Unit.</label>
+                            <input type="text" name="peso_unitario" id="transf_peso" class="form-control" placeholder="0.00">
+                        </div>
+                        <div class="col-sm-3">
+                            <label>Embalagem</label>
                             <select name="embalagem" id="transf_embalagem" class="form-select">
                                 <option value="BAG">BAG</option>
                                 <option value="SC">Saco</option>
                             </select>
                         </div>
-                        <div class="col-3"><label>Saldo</label><input type="text" id="transf_saldo" class="form-control bg-light" readonly></div>
-                        <div class="col-3"><label>Entrada</label><input type="text" id="transf_entrada" class="form-control bg-light" readonly></div>
+                        <div class="col-sm-3">
+                            <label>Saldo Atual</label>
+                            <input type="text" id="transf_saldo" class="form-control bg-light" readonly>
+                        </div>
+                        <div class="col-sm-3">
+                            <label>Entrada</label>
+                            <input type="text" id="transf_entrada" class="form-control bg-light" readonly>
+                        </div>
                         
                         <div class="col-12 mt-2">
-                            <a class="text-primary text-decoration-none small fw-bold" data-bs-toggle="collapse" href="#advancedFields">
+                            <a class="text-primary text-decoration-none small fw-bold" data-bs-toggle="collapse" href="#transfAdvancedFields">
                                 <i class="fas fa-cog me-1"></i> Dados Técnicos (Cultivar, Peneira...)
                             </a>
-                            <div class="collapse show mt-2" id="advancedFields">
+                            <div class="collapse show mt-2" id="transfAdvancedFields">
                                 <div class="row g-2 bg-light p-3 rounded border">
-                                    <div class="col-6">
+                                    <div class="col-md-6">
                                         <label>Cultivar</label>
                                         <select name="cultivar" id="transf_cultivar" class="form-select">
                                             <option value="">Selecione...</option>
@@ -1020,7 +1414,7 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-md-6">
                                         <label>Peneira</label>
                                         <select name="peneira" id="transf_peneira" class="form-select">
                                             <option value="">Selecione...</option>
@@ -1029,7 +1423,7 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-md-6">
                                         <label>Categoria</label>
                                         <select name="categoria" id="transf_categoria" class="form-select">
                                             <option value="">Selecione...</option>
@@ -1038,7 +1432,7 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="col-6">
+                                    <div class="col-md-6">
                                         <label>Tratamento</label>
                                         <select name="tratamento" id="transf_tratamento" class="form-select">
                                             <option value="">Nenhum</option>
@@ -1075,7 +1469,7 @@
     </div>
 </div>
 
-<!-- JavaScript para controle dinâmico do modal + prevenção de duplo envio -->
+<!-- JavaScript para controle dinâmico do modal + validação de endereço + prevenção de duplo envio -->
 <script>
 (function() {
     // Aguarda o DOM carregar completamente
@@ -1086,6 +1480,92 @@
     }
 
     function initTransferModal() {
+        // ==================== VALIDADOR DE ENDEREÇO PARA TRANSFERÊNCIA ====================
+        const EnderecoValidatorTransf = {
+            timeout: null,
+            
+            init() {
+                const inputEndereco = document.getElementById('transf_novo_endereco');
+                const inputAz = document.getElementById('transf_az');
+                
+                if (inputEndereco && inputAz) {
+                    // Desabilita o campo AZ (não deve ser editado manualmente)
+                    inputAz.readOnly = true;
+                    inputAz.classList.add('bg-light');
+                    
+                    // Eventos de validação
+                    inputEndereco.addEventListener('input', () => this.validarComDebounce());
+                    inputEndereco.addEventListener('blur', () => this.validar());
+                    inputEndereco.addEventListener('change', () => this.validar());
+                    
+                    // Força uppercase enquanto digita
+                    inputEndereco.addEventListener('keyup', () => {
+                        inputEndereco.value = inputEndereco.value.toUpperCase();
+                    });
+                }
+            },
+            
+            validarComDebounce() {
+                clearTimeout(this.timeout);
+                this.timeout = setTimeout(() => this.validar(), 500);
+            },
+            
+            async validar() {
+                const inputEndereco = document.getElementById('transf_novo_endereco');
+                const inputAz = document.getElementById('transf_az');
+                const feedback = document.getElementById('transfEnderecoFeedback');
+                
+                if (!inputEndereco || !inputAz || !feedback) return;
+                
+                const endereco = inputEndereco.value.trim().toUpperCase();
+                const tipoNormal = document.getElementById('tipo_normal');
+                
+                // Se for beneficiamento, não valida endereço
+                if (!tipoNormal || !tipoNormal.checked) {
+                    inputEndereco.classList.remove('is-valid', 'is-invalid');
+                    inputAz.value = '';
+                    feedback.innerHTML = '';
+                    return;
+                }
+                
+                // Se campo vazio, limpa validação
+                if (!endereco) {
+                    inputEndereco.classList.remove('is-valid', 'is-invalid');
+                    inputAz.value = '';
+                    feedback.innerHTML = '';
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`/api/validar-endereco/?endereco=${encodeURIComponent(endereco)}`);
+                    const data = await response.json();
+                    
+                    if (data.valido) {
+                        // Endereço válido
+                        inputEndereco.classList.remove('is-invalid');
+                        inputEndereco.classList.add('is-valid');
+                        
+                        // Preenche o AZ automaticamente
+                        inputAz.value = data.dados.armazem;
+                        
+                        // Feedback visual
+                        feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> ${data.mensagem}</span>`;
+                        
+                    } else {
+                        // Endereço inválido
+                        inputEndereco.classList.remove('is-valid');
+                        inputEndereco.classList.add('is-invalid');
+                        inputAz.value = ''; // Limpa AZ
+                        
+                        feedback.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${data.erro}</span>`;
+                    }
+                } catch (error) {
+                    console.error('Erro na validação:', error);
+                    feedback.innerHTML = `<span class="text-danger">Erro ao validar endereço</span>`;
+                }
+            }
+        };
+
         // Elementos principais
         const tipoNormal = document.getElementById('tipo_normal');
         const tipoBeneficiamento = document.getElementById('tipo_beneficiamento');
@@ -1105,6 +1585,9 @@
             return;
         }
 
+        // Inicializa o validador de endereço
+        EnderecoValidatorTransf.init();
+
         // Variável de controle para prevenir duplo envio
         let isSubmitting = false;
 
@@ -1118,6 +1601,11 @@
                 enderecoLabel.innerHTML = 'Destino na UBS (apenas referência)';
                 enderecoInput.required = false;
                 enderecoInput.placeholder = 'Ex: UBS - Linha 1 (opcional)';
+                
+                // Remove validação de endereço
+                enderecoInput.classList.remove('is-valid', 'is-invalid');
+                document.getElementById('transfEnderecoFeedback').innerHTML = '';
+                
                 btnText.innerHTML = '<i class="fas fa-industry me-1"></i>Confirmar Envio para Beneficiamento';
                 btnConfirmar.classList.add('btn-success');
                 btnConfirmar.classList.remove('btn-warning');
@@ -1128,10 +1616,15 @@
                 destinoTitle.innerHTML = '<i class="fas fa-arrow-right me-2"></i>Destino da Transferência';
                 enderecoLabel.innerHTML = 'Novo Endereço *';
                 enderecoInput.required = true;
-                enderecoInput.placeholder = '';
+                enderecoInput.placeholder = 'Ex: R-C LN01 P03';
                 btnText.innerHTML = '<i class="fas fa-exchange-alt me-1"></i>Confirmar Transferência';
                 btnConfirmar.classList.add('btn-warning');
                 btnConfirmar.classList.remove('btn-success');
+                
+                // Revalida se houver valor
+                if (enderecoInput.value.trim()) {
+                    EnderecoValidatorTransf.validar();
+                }
             }
         }
 
@@ -1151,6 +1644,7 @@
                 e.preventDefault();
                 alert('A quantidade deve ser maior que zero');
                 quantidade.focus();
+                quantidade.classList.add('is-invalid');
                 return false;
             }
             
@@ -1158,15 +1652,28 @@
                 e.preventDefault();
                 alert(`Quantidade não pode ser maior que o saldo atual (${saldoAtual})`);
                 quantidade.focus();
+                quantidade.classList.add('is-invalid');
                 return false;
+            } else {
+                quantidade.classList.remove('is-invalid');
             }
             
             // Validar endereço no modo normal
-            if (tipoNormal.checked && !enderecoInput.value.trim()) {
-                e.preventDefault();
-                alert('Endereço de destino é obrigatório');
-                enderecoInput.focus();
-                return false;
+            if (tipoNormal.checked) {
+                if (!enderecoInput.value.trim()) {
+                    e.preventDefault();
+                    alert('Endereço de destino é obrigatório');
+                    enderecoInput.focus();
+                    enderecoInput.classList.add('is-invalid');
+                    return false;
+                }
+                
+                if (!enderecoInput.classList.contains('is-valid')) {
+                    e.preventDefault();
+                    alert('Endereço inválido! O endereço deve estar no formato R-C LN01 P03 e existir no sistema.');
+                    enderecoInput.focus();
+                    return false;
+                }
             }
 
             // Se passou pelas validações, bloquear duplo envio
@@ -1186,6 +1693,10 @@
             
             // Reset visual da quantidade se necessário
             document.getElementById('transf_quantidade').classList.remove('is-invalid');
+            
+            // Limpa validação de endereço
+            enderecoInput.classList.remove('is-valid', 'is-invalid');
+            document.getElementById('transfEnderecoFeedback').innerHTML = '';
             
             // Voltar para modo normal
             tipoNormal.checked = true;
@@ -1215,8 +1726,27 @@
 })();
 </script>
 
-<!-- Estilo adicional para feedback visual -->
+<!-- Estilo adicional para feedback visual e responsividade -->
 <style>
+    /* Estilos para validação de endereço */
+    #transf_novo_endereco.is-valid {
+        border-color: #198754 !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
+    #transf_novo_endereco.is-invalid {
+        border-color: #dc3545 !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right calc(0.375em + 0.1875rem) center;
+        background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+        padding-right: calc(1.5em + 0.75rem);
+    }
+
     #transf_quantidade.is-invalid {
         border-color: #dc3545;
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
@@ -1229,7 +1759,66 @@
         border-color: #dc3545;
         box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
     }
+
+    /* Melhorias de responsividade */
+    @media (max-width: 767.98px) {
+        .modal-fullscreen-sm-down {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+        .modal-fullscreen-sm-down .modal-content {
+            height: 100%;
+            border-radius: 0 !important;
+            overflow-y: auto;
+        }
+        .modal-fullscreen-sm-down .modal-body {
+            padding: 1rem !important;
+        }
+        
+        /* Ajustes para campos em mobile */
+        .row.g-2 > [class*="col-"] {
+            margin-bottom: 0.5rem;
+        }
+        
+        /* Fonte menor em labels para mobile */
+        label {
+            font-size: 0.85rem;
+        }
+        
+        /* Ajuste no padding do footer */
+        .modal-footer {
+            padding: 0.75rem !important;
+        }
+        
+        /* Botões ocupam largura total em mobile */
+        .modal-footer .btn {
+            width: 100%;
+            margin: 0.25rem 0;
+        }
+    }
+
+    /* Melhorias visuais gerais */
+    .bg-light[readonly] {
+        background-color: #e9ecef !important;
+        cursor: default;
+    }
+
+    #transfEnderecoFeedback {
+        transition: all 0.2s;
+        font-size: 0.8rem;
+    }
+
+    /* Destaque para seções */
+    .border-warning {
+        border-width: 2px !important;
+    }
+
+    .bg-opacity-10 {
+        --bs-bg-opacity: 0.1;
+    }
 </style>
+
 
 
 

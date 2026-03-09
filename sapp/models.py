@@ -573,3 +573,33 @@ class ConfiguracaoLogo(models.Model):
             primeira = cls.objects.filter(ativo=True).first()
             cls.objects.filter(ativo=True).exclude(pk=primeira.pk).update(ativo=False)
             return primeira
+
+
+# Adicione ao models.py junto com Cultivar, Peneira, etc.
+
+class Armazem(models.Model):
+    nome = models.CharField(max_length=20, unique=True)
+    def __str__(self): return self.nome
+
+class Rua(models.Model):
+    nome = models.CharField(max_length=20)  # Ex: R-A
+    armazem = models.ForeignKey(Armazem, on_delete=models.CASCADE, related_name='ruas')
+    
+    class Meta:
+        unique_together = ('nome', 'armazem') # Permite 'R-A' no AZ-01 e no AZ-02
+    def __str__(self): return f"{self.nome} ({self.armazem.nome})"
+
+class Linha(models.Model):
+    nome = models.CharField(max_length=20)
+    # Adicione null=True e blank=True
+    rua = models.ForeignKey(Rua, on_delete=models.CASCADE, related_name='linhas', null=True, blank=True)
+    
+    class Meta:
+        unique_together = ('nome', 'rua')
+
+    def __str__(self):
+        return f"{self.nome} de {self.rua}"
+
+class OrigemDestino(models.Model):
+    nome = models.CharField(max_length=100, unique=True) # Ex: Produção Interna
+    def __str__(self): return self.nome

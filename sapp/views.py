@@ -11,6 +11,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth import update_session_auth_hash
 from django.core.serializers.json import DjangoJSONEncoder 
 from .models import HistoricoMovimentacao
+from .models import OrigemDestino
 
 # Adicione no topo com os outros imports
 import datetime
@@ -35,7 +36,7 @@ import json
 # App imports
 from .models import (
     Estoque, HistoricoMovimentacao, Configuracao, Cultivar, 
-    Peneira, Categoria, Tratamento, PerfilUsuario, Especie
+    Peneira, Categoria, Tratamento, PerfilUsuario, Especie, OrigemDestino,Linha,Rua,Armazem
 )
 from .forms import (
     NovaEntradaForm, ConfiguracaoForm, CultivarForm, PeneiraForm, 
@@ -275,6 +276,7 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     # QuerySet Base para MÉTRICAS - TODOS os lotes (para os cards)
     qs_metrics = Estoque.objects.all()
     
+    
     # FILTRO POR STATUS
     status = request.GET.get('status', 'todos')
     if status == 'disponivel':
@@ -351,7 +353,7 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     saldo_bags = qs_metrics.filter(embalagem='BAG', saldo__gt=0).aggregate(s=Sum('saldo'))['s'] or 0
     saldo_sc = qs_metrics.filter(embalagem='SC', saldo__gt=0).aggregate(s=Sum('saldo'))['s'] or 0
     saldo_total_sc = (saldo_bags * 25) + saldo_sc
-    
+    origens = OrigemDestino.objects.all().order_by('nome')
     # CARD 3: Unidades BAG (somente saldo > 0)
     saldo_bags_total = qs_metrics.filter(embalagem='BAG', saldo__gt=0).aggregate(s=Sum('saldo'))['s'] or 0
     
@@ -430,6 +432,7 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         'all_categorias': Categoria.objects.all(),
         'all_tratamentos': Tratamento.objects.all(),
         'all_especies': Especie.objects.all(),
+        'origens': origens,
     }
     
     return render(request, template_name, context)
@@ -1771,8 +1774,10 @@ def logout_view(request):
 @login_required
 def configuracoes(request):
     config = Configuracao.get_solo()
-    usuarios_conferentes = User.objects.filter(is_superuser=False)
+    # Pega usuários que não são admin para gerir conferentes
+    usuarios_conferentes = User.objects.filter(is_superuser=False).order_by('username')
     
+    # Querysets básicos
     produtos = Produto.objects.select_related(
         'cultivar', 'peneira', 'especie', 'categoria', 'tratamento'
     ).all().order_by('-data_cadastro')
@@ -1783,6 +1788,12 @@ def configuracoes(request):
     categorias = Categoria.objects.all().order_by('nome')
     tratamentos = Tratamento.objects.all().order_by('nome')
 
+    # Novas entidades de Endereçamento
+    armazens_lista = Armazem.objects.all().order_by('nome')
+    ruas_lista = Rua.objects.select_related('armazem').all().order_by('nome')
+    linhas_lista = Linha.objects.select_related('rua').all().order_by('nome')
+    origens_lista = OrigemDestino.objects.all().order_by('nome')
+
     if request.method == 'POST':
         acao = request.POST.get('acao')
         
@@ -1792,11 +1803,9 @@ def configuracoes(request):
                 cultivar_id = request.POST.get('cultivar')
                 codigo = request.POST.get('codigo', '').strip().upper()
                 descricao = request.POST.get('descricao', '').strip()
-                tipo = request.POST.get('tipo', '').strip()
-                empresa = request.POST.get('empresa', '').strip()
                 
-                if not cultivar_id or not codigo or not descricao:
-                    messages.error(request, "❌ Cultivar, Código e Descrição são obrigatórios!")
+                if not cultivar_id or not codigo:
+                    messages.error(request, "❌ Cultivar e Código são obrigatórios!")
                 elif Produto.objects.filter(codigo=codigo).exists():
                     messages.error(request, f"❌ Código '{codigo}' já existe!")
                 else:
@@ -1804,72 +1813,41 @@ def configuracoes(request):
                         cultivar_id=cultivar_id,
                         codigo=codigo,
                         descricao=descricao,
-                        tipo=tipo if tipo else None,
-                        empresa=empresa if empresa else None,
+                        tipo=request.POST.get('tipo', '').strip(),
+                        empresa=request.POST.get('empresa', '').strip(),
                         ativo=request.POST.get('ativo') == 'on'
                     )
-                    
-                    if request.POST.get('peneira'):
-                        produto.peneira_id = request.POST.get('peneira')
-                    if request.POST.get('especie'):
-                        produto.especie_id = request.POST.get('especie')
-                    if request.POST.get('categoria'):
-                        produto.categoria_id = request.POST.get('categoria')
-                    if request.POST.get('tratamento'):
-                        produto.tratamento_id = request.POST.get('tratamento')
-                    
+                    produto.peneira_id = request.POST.get('peneira') or None
+                    produto.especie_id = request.POST.get('especie') or None
+                    produto.categoria_id = request.POST.get('categoria') or None
+                    produto.tratamento_id = request.POST.get('tratamento') or None
                     produto.save()
-                    messages.success(request, f"✅ Produto '{produto.codigo}' cadastrado com sucesso!")
-                    
+                    messages.success(request, f"✅ Produto '{codigo}' cadastrado!")
             except Exception as e:
-                messages.error(request, f"❌ Erro ao cadastrar produto: {str(e)}")
+                messages.error(request, f"❌ Erro: {str(e)}")
         
         elif acao == 'delete_produto':
             try:
-                produto_id = request.POST.get('id_item')
-                produto = Produto.objects.get(id=produto_id)
-                produto_codigo = produto.codigo
-                produto.delete()
-                messages.success(request, f"✅ Produto '{produto_codigo}' excluído!")
-            except Produto.DoesNotExist:
-                messages.error(request, "❌ Produto não encontrado!")
+                item_id = request.POST.get('id_item')
+                Produto.objects.filter(id=item_id).delete()
+                messages.success(request, "✅ Produto excluído!")
             except Exception as e:
                 messages.error(request, f"❌ Erro ao excluir: {str(e)}")
         
         # ===== USUÁRIOS =====
         elif acao == 'add_conferente_user':
-            if not request.user.is_superuser:
-                messages.error(request, "❌ Apenas Administradores podem criar usuários.")
-            else:
-                username = request.POST.get('username', '').strip()
-                first_name = request.POST.get('first_name', '').strip()
-                
-                if not username or not first_name:
-                    messages.error(request, "❌ Usuário e nome são obrigatórios!")
-                elif User.objects.filter(username=username).exists():
-                    messages.error(request, f"❌ Usuário '{username}' já existe!")
-                else:
-                    try:
-                        u = User.objects.create_user(
-                            username=username,
-                            password='conceito',
-                            first_name=first_name
-                        )
-                        messages.success(request, f"✅ Usuário '{u.username}' criado! Senha: conceito")
-                    except Exception as e:
-                        messages.error(request, f"❌ Erro ao criar usuário: {e}")
-
-        elif acao == 'delete_conferente_user':
             if request.user.is_superuser:
-                try:
-                    uid = request.POST.get('id_item')
-                    u = User.objects.get(id=uid)
-                    if not u.is_superuser: 
-                        u.delete()
-                        messages.success(request, "✅ Usuário removido.")
-                except:
-                    messages.error(request, "❌ Erro ao remover usuário.")
-        
+                username = request.POST.get('username', '').strip()
+                if username and not User.objects.filter(username=username).exists():
+                    User.objects.create_user(
+                        username=username, 
+                        password='conceito', 
+                        first_name=request.POST.get('first_name', '').strip()
+                    )
+                    messages.success(request, f"✅ Usuário {username} criado! Senha padrão: conceito")
+                else:
+                    messages.error(request, "❌ Usuário já existe ou nome inválido.")
+
         # ===== CONFIGURAÇÃO GERAL =====
         elif acao == 'config_geral':
             form = ConfiguracaoForm(request.POST, instance=config)
@@ -1877,98 +1855,82 @@ def configuracoes(request):
                 form.save()
                 messages.success(request, "✅ Configurações salvas!")
         
-        # ===== CADASTROS AUXILIARES =====
-        elif acao == 'add_cultivar':
+        # ===== CADASTROS SIMPLES (NOME) =====
+        elif acao in ['add_cultivar', 'add_peneira', 'add_especie', 'add_categoria', 'add_tratamento']:
+            model_map = {
+                'add_cultivar': Cultivar, 'add_peneira': Peneira, 
+                'add_especie': Especie, 'add_categoria': Categoria, 'add_tratamento': Tratamento
+            }
+            model = model_map[acao]
             nome = request.POST.get('nome', '').strip()
             if nome:
-                if not Cultivar.objects.filter(nome__iexact=nome).exists():
-                    Cultivar.objects.create(nome=nome)
-                    messages.success(request, f"✅ Cultivar '{nome}' adicionado!")
-                else:
-                    messages.warning(request, f"⚠️ Cultivar '{nome}' já existe!")
-            else:
-                messages.error(request, "❌ Nome do cultivar é obrigatório.")
-        
-        elif acao == 'add_especie':
+                obj, created = model.objects.get_or_create(nome=nome)
+                if created: messages.success(request, f"✅ '{nome}' adicionado!")
+                else: messages.warning(request, "⚠️ Registro já existe.")
+
+        # ===== INFRAESTRUTURA (ARMAZÉM > RUA > LINHA) =====
+        elif acao == 'add_armazem':
             nome = request.POST.get('nome', '').strip().upper()
             if nome:
-                if not Especie.objects.filter(nome__iexact=nome).exists():
-                    Especie.objects.create(nome=nome)
-                    messages.success(request, f"✅ Espécie '{nome}' adicionada!")
+                obj, created = Armazem.objects.get_or_create(nome=nome)
+                if created: messages.success(request, f"✅ Armazém {nome} criado!")
+                else: messages.warning(request, "⚠️ Armazém já existe.")
+
+        elif acao == 'add_rua':
+            nome = request.POST.get('nome', '').strip().upper()
+            az_id = request.POST.get('armazem_id')
+            if nome and az_id:
+                if Rua.objects.filter(nome=nome, armazem_id=az_id).exists():
+                    messages.warning(request, f"⚠️ A Rua {nome} já existe neste armazém.")
                 else:
-                    messages.warning(request, f"⚠️ Espécie '{nome}' já existe!")
-            else:
-                messages.error(request, "❌ Nome da espécie é obrigatório.")
-        
-        elif acao == 'add_peneira':
+                    Rua.objects.create(nome=nome, armazem_id=az_id)
+                    messages.success(request, f"✅ Rua {nome} adicionada!")
+
+        elif acao == 'add_linha':
+            nome = request.POST.get('nome', '').strip().upper()
+            rua_id = request.POST.get('rua_id')
+            if not rua_id:
+                messages.error(request, "❌ Selecione uma Rua para esta linha!")
+            elif nome:
+                if Linha.objects.filter(nome=nome, rua_id=rua_id).exists():
+                    messages.warning(request, f"⚠️ A linha {nome} já existe nesta rua.")
+                else:
+                    Linha.objects.create(nome=nome, rua_id=rua_id)
+                    messages.success(request, f"✅ Linha {nome} cadastrada com sucesso!")
+
+        elif acao == 'add_origem':
             nome = request.POST.get('nome', '').strip()
             if nome:
-                if not Peneira.objects.filter(nome__iexact=nome).exists():
-                    Peneira.objects.create(nome=nome)
-                    messages.success(request, f"✅ Peneira '{nome}' adicionada!")
-                else:
-                    messages.warning(request, f"⚠️ Peneira '{nome}' já existe!")
-            else:
-                messages.error(request, "❌ Nome da peneira é obrigatório.")
-        
-        elif acao == 'add_categoria':
-            nome = request.POST.get('nome', '').strip()
-            if nome:
-                if not Categoria.objects.filter(nome__iexact=nome).exists():
-                    Categoria.objects.create(nome=nome)
-                    messages.success(request, f"✅ Categoria '{nome}' adicionada!")
-                else:
-                    messages.warning(request, f"⚠️ Categoria '{nome}' já existe!")
-            else:
-                messages.error(request, "❌ Nome da categoria é obrigatório.")
-        
-        elif acao == 'add_tratamento':
-            nome = request.POST.get('nome', '').strip()
-            if nome:
-                if not Tratamento.objects.filter(nome__iexact=nome).exists():
-                    Tratamento.objects.create(nome=nome)
-                    messages.success(request, f"✅ Tratamento '{nome}' adicionado!")
-                else:
-                    messages.warning(request, f"⚠️ Tratamento '{nome}' já existe!")
-            else:
-                messages.error(request, "❌ Nome do tratamento é obrigatório.")
-        
-        # ===== EXCLUSÃO DE ITENS =====
+                obj, created = OrigemDestino.objects.get_or_create(nome=nome)
+                if created: messages.success(request, f"✅ Origem '{nome}' adicionada!")
+
+        # ===== EXCLUSÃO CENTRALIZADA =====
         elif acao == 'delete_item':
             tipo = request.POST.get('tipo_item')
             item_id = request.POST.get('id_item')
             
-            try:
-                if tipo == 'cultivar':
-                    item = Cultivar.objects.get(id=item_id)
-                    nome = item.nome
-                    item.delete()
-                    messages.success(request, f"✅ Cultivar '{nome}' removido!")
-                elif tipo == 'especie':
-                    item = Especie.objects.get(id=item_id)
-                    nome = item.nome
-                    item.delete()
-                    messages.success(request, f"✅ Espécie '{nome}' removida!")
-                elif tipo == 'peneira':
-                    item = Peneira.objects.get(id=item_id)
-                    nome = item.nome
-                    item.delete()
-                    messages.success(request, f"✅ Peneira '{nome}' removida!")
-                elif tipo == 'categoria':
-                    item = Categoria.objects.get(id=item_id)
-                    nome = item.nome
-                    item.delete()
-                    messages.success(request, f"✅ Categoria '{nome}' removida!")
-                elif tipo == 'tratamento':
-                    item = Tratamento.objects.get(id=item_id)
-                    nome = item.nome
-                    item.delete()
-                    messages.success(request, f"✅ Tratamento '{nome}' removido!")
-                else:
-                    messages.error(request, "❌ Tipo de item inválido!")
+            model_map = {
+                'cultivar': Cultivar, 'especie': Especie, 'peneira': Peneira, 
+                'categoria': Categoria, 'tratamento': Tratamento, 'armazem': Armazem, 
+                'rua': Rua, 'linha': Linha, 'origem': OrigemDestino,
+                'conferente': User
+            }
+            
+            if tipo in model_map:
+                try:
+                    item = model_map[tipo].objects.get(id=item_id)
+                    nome_excluido = str(item)
                     
-            except Exception as e:
-                messages.error(request, f"❌ Erro ao remover item: {str(e)}")
+                    # Proteção para usuários
+                    if tipo == 'conferente' and item.is_superuser:
+                        messages.error(request, "❌ Não é possível excluir um Administrador por aqui.")
+                    else:
+                        item.delete()
+                        messages.success(request, f"✅ Registro '{nome_excluido}' removido!")
+                except Exception as e:
+                    messages.error(request, f"❌ Erro ao remover: Item possui vínculos no sistema.")
+            else:
+                messages.error(request, "❌ Tipo de item inválido!")
 
         return redirect('sapp:configuracoes')
 
@@ -1982,6 +1944,12 @@ def configuracoes(request):
         'usuarios_conferentes': usuarios_conferentes,
         'form_conf_user': NovoConferenteUserForm(),
         'produtos': produtos,
+        
+        # Novas variáveis enviadas para o template
+        'armazens': armazens_lista,
+        'ruas': ruas_lista,
+        'linhas': linhas_lista,
+        'origens': origens_lista,
     }
     
     return render(request, 'sapp/configuracoes.html', context)
@@ -2249,29 +2217,49 @@ def api_saldo_lote(request, id):
 
 @login_required
 def api_buscar_lotes(request):
-    """API para busca de lotes com autocomplete"""
+
     query = request.GET.get('q', '')
-    
+
     if not query:
         return JsonResponse({'results': []})
-    
-    lotes = Estoque.objects.filter(
-        Q(lote__icontains=query) |
-        Q(cultivar__nome__icontains=query) |
-        Q(produto__icontains=query)
-    ).filter(saldo__gt=0).values('id', 'lote', 'cultivar__nome', 'saldo', 'endereco')[:10]
-    
+
+    lotes = (
+        Estoque.objects
+        .filter(Q(lote__icontains=query))
+        .select_related(
+            'cultivar',
+            'peneira',
+            'categoria',
+            'tratamento',
+            'especie'
+        )
+        .order_by('-data_ultima_movimentacao')[:10]
+    )
+
     results = []
-    for lote in lotes:
+
+    for item in lotes:
         results.append({
-            'id': lote['id'],
-            'lote': lote['lote'],
-            'cultivar': lote['cultivar__nome'],
-            'saldo': lote['saldo'],
-            'endereco': lote['endereco']
+            "id": item.id,
+            "lote": item.lote,
+            "produto": item.produto,
+            "cultivar": item.cultivar.nome if item.cultivar else "",
+            "cultivar_id": item.cultivar.id if item.cultivar else None,
+            "especie_id": item.especie.id if item.especie else None,
+            "peneira_id": item.peneira.id if item.peneira else None,
+            "categoria_id": item.categoria.id if item.categoria else None,
+            "tratamento_id": item.tratamento.id if item.tratamento else None,
+            "empresa": item.empresa,
+            "cliente": item.cliente,
+            "peso_unitario": float(item.peso_unitario) if item.peso_unitario else "",
+            "embalagem": item.embalagem,
+            "az": item.az,
+            "endereco": item.endereco,
+            "saldo": float(item.saldo)
         })
-    
-    return JsonResponse({'results': results})
+
+    return JsonResponse({"results": results})
+
 
 @login_required
 def api_buscar_lote_completo(request):
@@ -2293,7 +2281,7 @@ def api_buscar_lote_completo(request):
             'tratamento_id': item.tratamento.id if item.tratamento else None,
             'empresa': item.empresa or '',
             'origem_destino': item.origem_destino or '',
-            'especie': item.especie or 'SOJA',
+            'especie_id': item.especie.id if item.especie else None,
             'peso_unitario': str(item.peso_unitario),
             'embalagem': item.embalagem or 'BAG',
             'az': item.az or '',
@@ -2687,6 +2675,38 @@ def api_autocomplete_nova_entrada(request):
     """
     Busca lotes pelo termo digitado e retorna TODOS os dados para preenchimento.
     """
+    # No views.py, dentro de nova_entrada ou editar:
+
+    endereco_raw = request.POST.get('endereco', '').strip().upper() # R-A LN01 P01
+    # Regex para separar: (Rua) (Linha) (Posição)
+    import re
+    match = re.match(r'^(R-[A-Z]+)\s+(LN\d+)\s+(P\d+)$', endereco_raw)
+
+    if not match:
+        messages.error(request, "Formato de endereço inválido! Use: R-A LN01 P01")
+        return redirect('sapp:lista_estoque')
+
+    rua_nome, linha_nome, posicao_str = match.groups()
+
+    # 1. Validar Posição (01 a 06)
+    posicao_num = int(re.search(r'\d+', posicao_str).group())
+    if posicao_num < 1 or posicao_num > 6:
+        messages.error(request, f"Posição {posicao_str} inválida! Use de 01 a 06.")
+        return redirect('sapp:lista_estoque')
+
+    # 2. Verificar se Rua e Linha existem no cadastro
+    rua_obj = Rua.objects.filter(nome=rua_nome).first()
+    if not rua_obj:
+        messages.error(request, f"Rua {rua_nome} não cadastrada!")
+        return redirect('sapp:lista_estoque')
+
+    if not Linha.objects.filter(nome=linha_nome).exists():
+        messages.error(request, f"Linha {linha_nome} não cadastrada!")
+        return redirect('sapp:lista_estoque')
+
+    # 3. SETAR ARMAZÉM AUTOMÁTICO (Puxa da Rua)
+    item.az = rua_obj.armazem.nome
+    item.endereco = endereco_raw
     termo = request.GET.get('term', '').strip()
     
     if len(termo) < 2:
@@ -4303,3 +4323,102 @@ def api_marcacoes_ultimo_lote(request):
             'success': False,
             'error': str(e)
         })
+    
+
+def api_get_armazem_by_rua(request):
+    rua_nome = request.GET.get('rua', '').strip().upper()
+    rua = Rua.objects.select_related('armazem').get(nome=rua_nome)
+    armazem = rua.armazem
+    if rua:
+        return JsonResponse({'sucesso': True, 'az': rua.armazem.nome})
+    return JsonResponse({'sucesso': False, 'msg': 'Rua não cadastrada'}, status=404)
+
+
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from .models import Armazem, Rua, Linha
+import re
+
+@login_required
+def validar_endereco(request):
+
+    endereco = request.GET.get('endereco', '').strip().upper()
+
+    if not endereco:
+        return JsonResponse({
+            'valido': False,
+            'erro': 'Endereço não informado'
+        })
+
+    try:
+
+        padrao = r'^(R-[A-Z])\s+LN(\d{2})\s+P(\d{2})$'
+        match = re.match(padrao, endereco)
+
+        if not match:
+            return JsonResponse({
+                'valido': False,
+                'erro': 'Formato inválido. Use: R-C LN01 P03'
+            })
+
+        rua_nome = match.group(1)
+        linha_num = match.group(2)
+        posicao_num = match.group(3)
+
+        linha_nome = f'LN{linha_num}'
+        posicao_valor = int(posicao_num)
+
+        if posicao_valor < 1 or posicao_valor > 6:
+            return JsonResponse({
+                'valido': False,
+                'erro': f'Posição P{posicao_num} inválida. Use P01 até P06'
+            })
+
+        rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
+
+        if not rua:
+            return JsonResponse({
+                'valido': False,
+                'erro': f'Rua {rua_nome} não encontrada'
+            })
+
+        linha = Linha.objects.filter(nome=linha_nome, rua=rua).first()
+
+        if not linha:
+            return JsonResponse({
+                'valido': False,
+                'erro': f'Linha {linha_nome} não existe na rua {rua_nome}'
+            })
+
+        return JsonResponse({
+            'valido': True,
+            'mensagem': 'Endereço válido!',
+            'dados': {
+                'armazem': rua.armazem.nome,
+                'rua': rua.nome,
+                'linha': linha.nome,
+                'posicao': posicao_valor,
+                'linha_id': linha.id
+                
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'valido': False,
+            'erro': str(e)
+        })
+
+@login_required
+def buscar_origens(request):
+    """
+    Busca origens/destinos para autocomplete
+    """
+    termo = request.GET.get('term', '').strip()
+    if len(termo) < 2:
+        return JsonResponse([], safe=False)
+    
+    origens = OrigemDestino.objects.filter(nome__icontains=termo)[:10]
+    resultados = [{'id': o.id, 'nome': o.nome} for o in origens]
+    
+    return JsonResponse(resultados, safe=False)
