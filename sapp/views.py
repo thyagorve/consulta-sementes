@@ -4333,6 +4333,9 @@ def api_get_armazem_by_rua(request):
         return JsonResponse({'sucesso': True, 'az': rua.armazem.nome})
     return JsonResponse({'sucesso': False, 'msg': 'Rua não cadastrada'}, status=404)
 
+import re
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 
 @login_required
 def validar_endereco(request):
@@ -4400,7 +4403,40 @@ def validar_endereco(request):
 
 
         # =============================
-        # 2️⃣ ENDEREÇO SIMPLES
+        # 2️⃣ RUA GERAL
+        # Ex: R-A GERAL
+        # =============================
+
+        padrao_geral = r'^(R-[A-Z])\s+GERAL$'
+        match_geral = re.match(padrao_geral, endereco)
+
+        if match_geral:
+
+            rua_nome = match_geral.group(1)
+
+            rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
+
+            if not rua:
+                return JsonResponse({
+                    'valido': False,
+                    'erro': f'Rua {rua_nome} não encontrada'
+                })
+
+            return JsonResponse({
+                'valido': True,
+                'mensagem': 'Endereço geral válido!',
+                'dados': {
+                    'armazem': rua.armazem.nome,
+                    'rua': rua.nome,
+                    'linha': 'GERAL',
+                    'posicao': None,
+                    'linha_id': None
+                }
+            })
+
+
+        # =============================
+        # 3️⃣ ENDEREÇO SIMPLES
         # Ex: UBS 21
         # =============================
 
@@ -4438,7 +4474,7 @@ def validar_endereco(request):
 
         return JsonResponse({
             'valido': False,
-            'erro': 'Formato inválido. Use: R-C LN01 P03 ou UBS 21'
+            'erro': 'Formato inválido. Use: R-C LN01 P03, R-A GERAL ou UBS 21'
         })
 
     except Exception as e:
@@ -4446,7 +4482,6 @@ def validar_endereco(request):
             'valido': False,
             'erro': str(e)
         })
-
 @login_required
 def buscar_origens(request):
     """
