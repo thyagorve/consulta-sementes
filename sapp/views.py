@@ -4334,11 +4334,6 @@ def api_get_armazem_by_rua(request):
     return JsonResponse({'sucesso': False, 'msg': 'Rua não cadastrada'}, status=404)
 
 
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-from .models import Armazem, Rua, Linha
-import re
-
 @login_required
 def validar_endereco(request):
 
@@ -4352,55 +4347,98 @@ def validar_endereco(request):
 
     try:
 
-        padrao = r'^(R-[A-Z])\s+LN(\d{2})\s+P(\d{2})$'
-        match = re.match(padrao, endereco)
+        # =============================
+        # 1️⃣ ENDEREÇO COMPLETO
+        # Ex: R-C LN01 P03
+        # =============================
 
-        if not match:
+        padrao_completo = r'^(R-[A-Z])\s+LN(\d{2})\s+P(\d{2})$'
+        match = re.match(padrao_completo, endereco)
+
+        if match:
+
+            rua_nome = match.group(1)
+            linha_num = match.group(2)
+            posicao_num = match.group(3)
+
+            linha_nome = f'LN{linha_num}'
+            posicao_valor = int(posicao_num)
+
+            if posicao_valor < 1 or posicao_valor > 6:
+                return JsonResponse({
+                    'valido': False,
+                    'erro': f'Posição P{posicao_num} inválida. Use P01 até P06'
+                })
+
+            rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
+
+            if not rua:
+                return JsonResponse({
+                    'valido': False,
+                    'erro': f'Rua {rua_nome} não encontrada'
+                })
+
+            linha = Linha.objects.filter(nome=linha_nome, rua=rua).first()
+
+            if not linha:
+                return JsonResponse({
+                    'valido': False,
+                    'erro': f'Linha {linha_nome} não existe na rua {rua_nome}'
+                })
+
             return JsonResponse({
-                'valido': False,
-                'erro': 'Formato inválido. Use: R-C LN01 P03'
+                'valido': True,
+                'mensagem': 'Endereço válido!',
+                'dados': {
+                    'armazem': rua.armazem.nome,
+                    'rua': rua.nome,
+                    'linha': linha.nome,
+                    'posicao': posicao_valor,
+                    'linha_id': linha.id
+                }
             })
 
-        rua_nome = match.group(1)
-        linha_num = match.group(2)
-        posicao_num = match.group(3)
 
-        linha_nome = f'LN{linha_num}'
-        posicao_valor = int(posicao_num)
+        # =============================
+        # 2️⃣ ENDEREÇO SIMPLES
+        # Ex: UBS 21
+        # =============================
 
-        if posicao_valor < 1 or posicao_valor > 6:
+        padrao_simples = r'^([A-Z]+)\s*(\d+)$'
+        match_simples = re.match(padrao_simples, endereco)
+
+        if match_simples:
+
+            rua_nome = f"{match_simples.group(1)} {match_simples.group(2)}"
+
+            rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
+
+            if not rua:
+                return JsonResponse({
+                    'valido': False,
+                    'erro': f'Local {rua_nome} não encontrado'
+                })
+
             return JsonResponse({
-                'valido': False,
-                'erro': f'Posição P{posicao_num} inválida. Use P01 até P06'
+                'valido': True,
+                'mensagem': 'Local válido!',
+                'dados': {
+                    'armazem': rua.armazem.nome,
+                    'rua': rua.nome,
+                    'linha': None,
+                    'posicao': None,
+                    'linha_id': None
+                }
             })
 
-        rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
 
-        if not rua:
-            return JsonResponse({
-                'valido': False,
-                'erro': f'Rua {rua_nome} não encontrada'
-            })
-
-        linha = Linha.objects.filter(nome=linha_nome, rua=rua).first()
-
-        if not linha:
-            return JsonResponse({
-                'valido': False,
-                'erro': f'Linha {linha_nome} não existe na rua {rua_nome}'
-            })
+        # =============================
+        # FORMATO INVÁLIDO
+        # =============================
 
         return JsonResponse({
-            'valido': True,
-            'mensagem': 'Endereço válido!',
-            'dados': {
-                'armazem': rua.armazem.nome,
-                'rua': rua.nome,
-                'linha': linha.nome,
-                'posicao': posicao_valor,
-                'linha_id': linha.id
-                
-            }
+            'valido': False,
+            'erro': 'Formato inválido. Use: R-C LN01 P03 ou UBS 21'
         })
 
     except Exception as e:
