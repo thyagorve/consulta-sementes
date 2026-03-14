@@ -1771,44 +1771,75 @@ def logout_view(request):
     logout(request)
     return redirect('sapp:login')
 
+import re
+from django.shortcuts import render, redirect
+from django.http import JsonResponse
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+
 @login_required
 def configuracoes(request):
+
     config = Configuracao.get_solo()
-    # Pega usuários que não são admin para gerir conferentes
-    usuarios_conferentes = User.objects.filter(is_superuser=False).order_by('username')
-    
-    # Querysets básicos
+
+    usuarios_conferentes = User.objects.filter(
+        is_superuser=False
+    ).order_by('username')
+
+    # =============================
+    # QUERYSETS
+    # =============================
+
     produtos = Produto.objects.select_related(
-        'cultivar', 'peneira', 'especie', 'categoria', 'tratamento'
+        'cultivar',
+        'peneira',
+        'especie',
+        'categoria',
+        'tratamento'
     ).all().order_by('-data_cadastro')
-    
+
     cultivares = Cultivar.objects.all().order_by('nome')
     peneiras = Peneira.objects.all().order_by('nome')
     especies = Especie.objects.all().order_by('nome')
     categorias = Categoria.objects.all().order_by('nome')
     tratamentos = Tratamento.objects.all().order_by('nome')
 
-    # Novas entidades de Endereçamento
     armazens_lista = Armazem.objects.all().order_by('nome')
     ruas_lista = Rua.objects.select_related('armazem').all().order_by('nome')
     linhas_lista = Linha.objects.select_related('rua').all().order_by('nome')
     origens_lista = OrigemDestino.objects.all().order_by('nome')
 
+    # =============================
+    # POST
+    # =============================
+
     if request.method == 'POST':
+
         acao = request.POST.get('acao')
-        
-        # ===== PRODUTOS =====
+
+        # ====================================
+        # PRODUTOS
+        # ====================================
+
         if acao == 'add_produto':
+
             try:
+
                 cultivar_id = request.POST.get('cultivar')
                 codigo = request.POST.get('codigo', '').strip().upper()
                 descricao = request.POST.get('descricao', '').strip()
-                
+
                 if not cultivar_id or not codigo:
+
                     messages.error(request, "❌ Cultivar e Código são obrigatórios!")
+
                 elif Produto.objects.filter(codigo=codigo).exists():
+
                     messages.error(request, f"❌ Código '{codigo}' já existe!")
+
                 else:
+
                     produto = Produto.objects.create(
                         cultivar_id=cultivar_id,
                         codigo=codigo,
@@ -1817,142 +1848,322 @@ def configuracoes(request):
                         empresa=request.POST.get('empresa', '').strip(),
                         ativo=request.POST.get('ativo') == 'on'
                     )
+
                     produto.peneira_id = request.POST.get('peneira') or None
                     produto.especie_id = request.POST.get('especie') or None
                     produto.categoria_id = request.POST.get('categoria') or None
                     produto.tratamento_id = request.POST.get('tratamento') or None
+
                     produto.save()
+
                     messages.success(request, f"✅ Produto '{codigo}' cadastrado!")
+
             except Exception as e:
+
                 messages.error(request, f"❌ Erro: {str(e)}")
-        
+
         elif acao == 'delete_produto':
+
             try:
+
                 item_id = request.POST.get('id_item')
-                Produto.objects.filter(id=item_id).delete()
-                messages.success(request, "✅ Produto excluído!")
+
+                if not item_id:
+                    messages.error(request, "❌ Produto não identificado!")
+
+                else:
+
+                    Produto.objects.filter(id=item_id).delete()
+
+                    messages.success(request, "✅ Produto excluído!")
+
             except Exception as e:
+
                 messages.error(request, f"❌ Erro ao excluir: {str(e)}")
-        
-        # ===== USUÁRIOS =====
+
+        # ====================================
+        # USUÁRIOS
+        # ====================================
+
         elif acao == 'add_conferente_user':
+
             if request.user.is_superuser:
+
                 username = request.POST.get('username', '').strip()
+
                 if username and not User.objects.filter(username=username).exists():
+
                     User.objects.create_user(
-                        username=username, 
-                        password='conceito', 
+                        username=username,
+                        password='conceito',
                         first_name=request.POST.get('first_name', '').strip()
                     )
-                    messages.success(request, f"✅ Usuário {username} criado! Senha padrão: conceito")
+
+                    messages.success(
+                        request,
+                        f"✅ Usuário {username} criado! Senha padrão: conceito"
+                    )
+
                 else:
+
                     messages.error(request, "❌ Usuário já existe ou nome inválido.")
 
-        # ===== CONFIGURAÇÃO GERAL =====
-        elif acao == 'config_geral':
-            form = ConfiguracaoForm(request.POST, instance=config)
-            if form.is_valid(): 
-                form.save()
-                messages.success(request, "✅ Configurações salvas!")
-        
-        # ===== CADASTROS SIMPLES (NOME) =====
-        elif acao in ['add_cultivar', 'add_peneira', 'add_especie', 'add_categoria', 'add_tratamento']:
-            model_map = {
-                'add_cultivar': Cultivar, 'add_peneira': Peneira, 
-                'add_especie': Especie, 'add_categoria': Categoria, 'add_tratamento': Tratamento
-            }
-            model = model_map[acao]
-            nome = request.POST.get('nome', '').strip()
-            if nome:
-                obj, created = model.objects.get_or_create(nome=nome)
-                if created: messages.success(request, f"✅ '{nome}' adicionado!")
-                else: messages.warning(request, "⚠️ Registro já existe.")
+        # ====================================
+        # CONFIGURAÇÃO GERAL
+        # ====================================
 
-        # ===== INFRAESTRUTURA (ARMAZÉM > RUA > LINHA) =====
-        elif acao == 'add_armazem':
-            nome = request.POST.get('nome', '').strip().upper()
+        elif acao == 'config_geral':
+
+            form = ConfiguracaoForm(request.POST, instance=config)
+
+            if form.is_valid():
+
+                form.save()
+
+                messages.success(request, "✅ Configurações salvas!")
+
+        # ====================================
+        # CADASTROS SIMPLES
+        # ====================================
+
+        elif acao in [
+            'add_cultivar',
+            'add_peneira',
+            'add_especie',
+            'add_categoria',
+            'add_tratamento'
+        ]:
+
+            model_map = {
+                'add_cultivar': Cultivar,
+                'add_peneira': Peneira,
+                'add_especie': Especie,
+                'add_categoria': Categoria,
+                'add_tratamento': Tratamento
+            }
+
+            model = model_map[acao]
+
+            nome = request.POST.get('nome', '').strip()
+
             if nome:
+
+                obj, created = model.objects.get_or_create(nome=nome)
+
+                if created:
+
+                    messages.success(request, f"✅ '{nome}' adicionado!")
+
+                else:
+
+                    messages.warning(request, "⚠️ Registro já existe.")
+
+        # ====================================
+        # ARMAZÉM
+        # ====================================
+
+        elif acao == 'add_armazem':
+
+            nome = request.POST.get('nome', '').strip().upper()
+
+            if nome:
+
                 obj, created = Armazem.objects.get_or_create(nome=nome)
-                if created: messages.success(request, f"✅ Armazém {nome} criado!")
-                else: messages.warning(request, "⚠️ Armazém já existe.")
+
+                if created:
+
+                    messages.success(request, f"✅ Armazém {nome} criado!")
+
+                else:
+
+                    messages.warning(request, "⚠️ Armazém já existe.")
+
+        # ====================================
+        # RUA
+        # ====================================
 
         elif acao == 'add_rua':
+
             nome = request.POST.get('nome', '').strip().upper()
-            az_id = request.POST.get('armazem_id')
-            if nome and az_id:
-                if Rua.objects.filter(nome=nome, armazem_id=az_id).exists():
-                    messages.warning(request, f"⚠️ A Rua {nome} já existe neste armazém.")
+
+            armazem_id = request.POST.get('armazem_id')
+
+            if nome and armazem_id:
+
+                if Rua.objects.filter(nome=nome, armazem_id=armazem_id).exists():
+
+                    messages.warning(
+                        request,
+                        f"⚠️ A Rua {nome} já existe neste armazém."
+                    )
+
                 else:
-                    Rua.objects.create(nome=nome, armazem_id=az_id)
+
+                    Rua.objects.create(
+                        nome=nome,
+                        armazem_id=armazem_id
+                    )
+
                     messages.success(request, f"✅ Rua {nome} adicionada!")
 
+        # ====================================
+        # LINHA
+        # ====================================
+
         elif acao == 'add_linha':
+
             nome = request.POST.get('nome', '').strip().upper()
+
             rua_id = request.POST.get('rua_id')
+
             if not rua_id:
-                messages.error(request, "❌ Selecione uma Rua para esta linha!")
+
+                messages.error(request, "❌ Selecione uma Rua!")
+
             elif nome:
+
                 if Linha.objects.filter(nome=nome, rua_id=rua_id).exists():
-                    messages.warning(request, f"⚠️ A linha {nome} já existe nesta rua.")
+
+                    messages.warning(
+                        request,
+                        f"⚠️ A linha {nome} já existe nesta rua."
+                    )
+
                 else:
-                    Linha.objects.create(nome=nome, rua_id=rua_id)
-                    messages.success(request, f"✅ Linha {nome} cadastrada com sucesso!")
+
+                    Linha.objects.create(
+                        nome=nome,
+                        rua_id=rua_id
+                    )
+
+                    messages.success(request, f"✅ Linha {nome} cadastrada!")
+
+        # ====================================
+        # ORIGEM
+        # ====================================
 
         elif acao == 'add_origem':
-            nome = request.POST.get('nome', '').strip()
-            if nome:
-                obj, created = OrigemDestino.objects.get_or_create(nome=nome)
-                if created: messages.success(request, f"✅ Origem '{nome}' adicionada!")
 
-        # ===== EXCLUSÃO CENTRALIZADA =====
+            nome = request.POST.get('nome', '').strip()
+
+            if nome:
+
+                obj, created = OrigemDestino.objects.get_or_create(nome=nome)
+
+                if created:
+
+                    messages.success(
+                        request,
+                        f"✅ Origem '{nome}' adicionada!"
+                    )
+
+        # ====================================
+        # EXCLUSÃO
+        # ====================================
+
         elif acao == 'delete_item':
+
             tipo = request.POST.get('tipo_item')
+
             item_id = request.POST.get('id_item')
-            
-            model_map = {
-                'cultivar': Cultivar, 'especie': Especie, 'peneira': Peneira, 
-                'categoria': Categoria, 'tratamento': Tratamento, 'armazem': Armazem, 
-                'rua': Rua, 'linha': Linha, 'origem': OrigemDestino,
-                'conferente': User
-            }
-            
-            if tipo in model_map:
-                try:
-                    item = model_map[tipo].objects.get(id=item_id)
-                    nome_excluido = str(item)
-                    
-                    # Proteção para usuários
-                    if tipo == 'conferente' and item.is_superuser:
-                        messages.error(request, "❌ Não é possível excluir um Administrador por aqui.")
-                    else:
-                        item.delete()
-                        messages.success(request, f"✅ Registro '{nome_excluido}' removido!")
-                except Exception as e:
-                    messages.error(request, f"❌ Erro ao remover: Item possui vínculos no sistema.")
+
+            if not item_id:
+
+                messages.error(request, "❌ Item não identificado!")
+
             else:
-                messages.error(request, "❌ Tipo de item inválido!")
+
+                model_map = {
+                    'cultivar': Cultivar,
+                    'especie': Especie,
+                    'peneira': Peneira,
+                    'categoria': Categoria,
+                    'tratamento': Tratamento,
+                    'armazem': Armazem,
+                    'rua': Rua,
+                    'linha': Linha,
+                    'origem': OrigemDestino,
+                    'conferente': User
+                }
+
+                if tipo in model_map:
+
+                    try:
+
+                        item = model_map[tipo].objects.get(id=item_id)
+
+                        nome_excluido = str(item)
+
+                        if tipo == 'conferente' and item.is_superuser:
+
+                            messages.error(
+                                request,
+                                "❌ Não é possível excluir um Administrador."
+                            )
+
+                        else:
+
+                            item.delete()
+
+                            messages.success(
+                                request,
+                                f"✅ Registro '{nome_excluido}' removido!"
+                            )
+
+                    except model_map[tipo].DoesNotExist:
+
+                        messages.error(
+                            request,
+                            "❌ Registro não encontrado."
+                        )
+
+                    except Exception as e:
+
+                        messages.error(
+                            request,
+                            f"❌ Erro ao remover: {str(e)}"
+                        )
+
+                else:
+
+                    messages.error(
+                        request,
+                        "❌ Tipo de item inválido!"
+                    )
 
         return redirect('sapp:configuracoes')
 
+    # ====================================
+    # CONTEXT
+    # ====================================
+
     context = {
+
         'form_config': ConfiguracaoForm(instance=config),
+
         'cultivares': cultivares,
         'especies': especies,
         'peneiras': peneiras,
         'categorias': categorias,
         'tratamentos': tratamentos,
+
         'usuarios_conferentes': usuarios_conferentes,
+
         'form_conf_user': NovoConferenteUserForm(),
+
         'produtos': produtos,
-        
-        # Novas variáveis enviadas para o template
+
         'armazens': armazens_lista,
         'ruas': ruas_lista,
         'linhas': linhas_lista,
         'origens': origens_lista,
     }
-    
-    return render(request, 'sapp/configuracoes.html', context)
+
+    return render(
+        request,
+        'sapp/configuracoes.html',
+        context
+    )
 
 @login_required
 def historico_geral(request):
