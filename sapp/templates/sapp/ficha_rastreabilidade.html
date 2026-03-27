@@ -1,256 +1,143 @@
-<!-- templates/sapp/ficha_rastreabilidade.html -->
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ficha de Controle - {{ item.lote }}</title>
+    <title>Ficha de Controle - {{ item.lote|default:"Sistema" }}</title>
     
-    <!-- QR Code Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <style>
-        /* ===== CONFIGURAÇÕES DE PÁGINA E IMPRESSÃO ===== */
+        /* ===== CONFIGURAÇÕES DE IMPRESSÃO ===== */
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+            margin: 0; padding: 0; box-sizing: border-box;
             font-family: 'Segoe UI', Arial, sans-serif;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
         
-        @page {
-            size: A4;
-            margin: 0 !important;
-        }
+        @page { size: A4; margin: 0 !important; }
         
-        body {
-            background: #e9ecef;
-            display: flex;
-            justify-content: center;
-            padding: 20px 0;
-        }
+        body { background: #e9ecef; display: flex; justify-content: center; padding: 20px 0; }
 
         .ficha-a4 {
-            width: 21cm;
-            height: 29.7cm;
-            background: white;
-            border: 2px solid #000;
-            padding: 1.2cm 0.7cm 0.7cm 0.7cm;
-            position: relative;
-            margin: 0 auto;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            width: 21cm; height: 29.7cm; background: white;
+            border: 2px solid #000; padding: 1.2cm 0.7cm;
+            position: relative; display: flex; flex-direction: column;
         }
 
-        /* ===== MARCAÇÃO TÉCNICA DO FURO (ESTILO PERFURAÇÃO) ===== */
-        .marcador-furo-tecnico {
-            position: absolute;
-            top: 0.5cm; /* Altura padrão para presilha/jacarezinho */
-            left: 50%;
-            transform: translateX(-50%);
-            width: 35px;
-            height: 12px;
-            border: 1px solid #999;
-            border-radius: 20px;
-            background: #f1f1f1;
-            box-shadow: inset 1px 1px 3px rgba(0,0,0,0.2);
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .marcador-furo-tecnico::before {
-            content: 'FURO';
-            font-size: 6px;
-            color: #bbb;
-            font-weight: bold;
-        }
-
-        /* ===== CABEÇALHO ===== */
+        /* ===== CABEÇALHO (FIXO NO LAYOUT) ===== */
         .cabecalho-superior {
-            display: grid;
-            grid-template-columns: 40% 30% 30%;
-            border: 2px solid #000;
-            margin-bottom: 8px;
-            height: 130px;
+            display: grid; grid-template-columns: 40% 30% 30%;
+            border: 2px solid #000; margin-bottom: 8px; height: 130px;
         }
 
         .cabecalho-bloco {
-            display: flex;
-            flex-direction: column;
-            border-right: 2px solid #000;
-            justify-content: center; /* Centraliza conteúdo verticalmente */
-            align-items: center;    /* Centraliza conteúdo horizontalmente */
-            text-align: center;
-            background: #fff;
+            display: flex; flex-direction: column; border-right: 2px solid #000;
+            justify-content: center; align-items: center; text-align: center;
         }
-        
         .cabecalho-bloco:last-child { border-right: none; }
-
-        .bloco-logo .logo-container {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transform: scale(1.8);
-        }
-
-        .bloco-logo img {
-            width: 35%;
-            height: auto;
-            object-fit: contain;
-        }
-
-        .bloco-info-txt p {
-            margin: 4px 0;
-            font-size: 13px;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        /* ===== TÍTULO CENTRAL ===== */
-        .titulo-central {
-            width: 100%;
-            text-align: center;
-            font-size: 20px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            background: linear-gradient(145deg, #FF8C00, #5A0F0F);
-            color: #fff;
-            padding: 10px;
-            margin-bottom: 12px;
-            border-radius: 4px;
-            border: 1px solid #000;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
         
-        /* ===== DADOS DO PRODUTO ===== */
+        .valor-estatico { font-weight: bold; color: #000; } /* Conteúdo fixo (Ex: FOR.017) */
+
+        .titulo-central {
+            width: 100%; text-align: center; font-size: 20px; font-weight: 900;
+            background: linear-gradient(145deg, #FF8C00, #5A0F0F) !important;
+            color: #fff !important; padding: 10px; margin-bottom: 12px; border: 1px solid #000;
+        }
+
+        /* ===== CONTAINER DE DADOS ===== */
         .dados-lote-container {
-            display: flex;
-            border: 2px solid #000;
-            margin-bottom: 12px;
-            border-radius: 4px;
+            display: flex; border: 2px solid #000; margin-bottom: 12px; height: 165px;
         }
 
-        .dados-lote-tabela {
-            flex: 1;
-            border-collapse: collapse;
-        }
-
-        .dados-lote-tabela td {
-            border: 1px solid #000;
-            padding: 6px 10px;
-            font-size: 12px;
-        }
+        .dados-lote-tabela { flex: 1; border-collapse: collapse; }
+        .dados-lote-tabela td { border: 1px solid #000; padding: 6px 10px; font-size: 12px; height: 33px; }
 
         .celula-fundo {
-            background: linear-gradient(145deg, #FF8C00, #e67e22);
-            color: white !important;
-            font-weight: 800;
-            text-transform: uppercase;
-            font-size: 11px;
-            width: 15%;
+            background: linear-gradient(145deg, #FF8C00, #e67e22) !important;
+            color: white !important; font-weight: 800; text-transform: uppercase;
         }
 
-        .valor-bold { font-weight: 700; color: #000; }
+        /* DADOS VARIÁVEIS (O que vem do banco de dados) */
+        .valor-variavel { font-weight: 700; color: #000; font-size: 13px; }
 
-       .qrcode-area {
-            width: 115px;
-            min-width: 115px;
-            border-left: 2px solid #000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(145deg, #FF8C00, #e67e22);
-            padding: 5px;
-            z-index: 15;
-            position: relative;
-            border-radius: 0 4px 4px 0;
+        .qrcode-area {
+            width: 115px; border-left: 2px solid #000;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            background: linear-gradient(145deg, #FF8C00, #e67e22) !important;
         }
 
-        .qrcode-label {
-            font-size: 8px;
-            font-weight: 800;
-            margin-bottom: 4px;
-            color: #FFFFFF;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.3);
-        }
-        
-        #qrcode {
-            background: white;
-            padding: 4px;
-            border: 2px solid #fff;
-            border-radius: 6px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
-        
-        #qrcode canvas, #qrcode img {
-            width: 80px !important;
-            height: 80px !important;
-            display: block;
+        #qrcode { 
+            background: white !important; padding: 4px; border-radius: 4px;
+            width: 85px; height: 85px; display: flex; align-items: center; justify-content: center;
         }
 
-        /* ===== MARCA D'ÁGUA (LOGO) ===== */
-        .marca-dagua-container {
-            position: absolute;
-            top: 60%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100%;
-            opacity: 0.05;
-            z-index: 1;
-            pointer-events: none;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .marca-dagua-container img {
-            width: 100%;
-            filter: grayscale(1);
-            transform: rotate(-25deg);
-        }
-
-        /* ===== TABELA DE MOVIMENTAÇÃO ===== */
-        .tabela-container {
-            position: relative;
-            z-index: 10;
-            flex-grow: 1;
-        }
-
-        .tabela-movimentacao {
-            width: 100%;
-            border-collapse: collapse;
-            border: 2px solid #000;
-            background: transparent;
-        }
-
+        .tabela-movimentacao { width: 100%; border-collapse: collapse; border: 2px solid #000; flex-grow: 1; }
         .tabela-movimentacao th {
-            background: linear-gradient(145deg, #FF8C00, #d35400);
-            color: white;
-            font-size: 10px;
-            padding: 6px 2px;
-            text-transform: uppercase;
-            border: 1px solid #5A0F0F;
+            background: linear-gradient(145deg, #FF8C00, #d35400) !important;
+            color: white !important; font-size: 10px; padding: 6px; border: 1px solid #5A0F0F;
+        }
+        .tabela-movimentacao td { border: 1px solid #888; height: 26px; }
+
+        /* ===== LÓGICA DE IMPRESSÃO REVISADA ===== */
+
+        @media print {
+            body { background: white; padding: 0; }
+
+            /* MODO 1: LAYOUT (Colorida) */
+            body.print-layout-mode .valor-variavel,
+            body.print-layout-mode #qrcode img,
+            body.print-layout-mode #qrcode canvas {
+                visibility: hidden !important; /* Esconde os dados do banco */
+            }
+            /* O cabeçalho, logo, código FOR.017 e quadrado branco do QR aparecem aqui */
+
+            /* MODO 2: DADOS (Preto e Branco) */
+            body.print-data-mode .ficha-a4,
+            body.print-data-mode .cabecalho-superior,
+            body.print-data-mode .dados-lote-container,
+            body.print-data-mode .tabela-movimentacao {
+                border-color: transparent !important; background: none !important;
+            }
+            body.print-data-mode img:not(.qr-pixels), /* Esconde logo */
+            body.print-data-mode .cabecalho-bloco,
+            body.print-data-mode .titulo-central,
+            body.print-data-mode .celula-fundo,
+            body.print-data-mode .qrcode-label,
+            body.print-data-mode th,
+            body.print-data-mode td {
+                border-color: transparent !important; background: none !important;
+            }
+            body.print-data-mode span:not(.valor-variavel), /* Esconde "Código:", "Revisão:", etc */
+            body.print-data-mode p,
+            body.print-data-mode div:not(#qrcode):not(.valor-variavel):not(.ficha-a4):not(.dados-lote-container) {
+                visibility: hidden !important;
+            }
+            body.print-data-mode .valor-variavel,
+            body.print-data-mode #qrcode img,
+            body.print-data-mode #qrcode canvas {
+                visibility: visible !important; /* Mostra apenas os dados variáveis */
+                color: #000 !important;
+            }
+            body.print-data-mode #qrcode { background: transparent !important; }
         }
 
-        .tabela-movimentacao td {
-            border: 1px solid #888;
-            height: 25px;
-            text-align: center;
-            font-size: 10px;
+        /* Estilos do Modal */
+        #printModal {
+            position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center;
         }
-        .tabela-movimentacao tr:nth-child(even) td { background: rgba(240,240,240,0.5); }
+        .modal-card { background: white; padding: 30px; border-radius: 12px; width: 400px; text-align: center; }
+        .btn-print {
+            width: 100%; padding: 12px; margin: 10px 0; border: 2px solid #FF8C00;
+            background: white; border-radius: 6px; cursor: pointer; font-weight: bold;
+        }
+        .btn-print.active { background: #FF8C00; color: white; }
 
-        /* ===== RODAPÉ ===== */
-        .propaganda-app {
+                .propaganda-app {
             text-align: right;
             border-top: 1px solid #FF8C00;
             padding-top: 8px;
@@ -267,98 +154,71 @@
             font-style: normal;
         }
 
-        @media print {
-            body { background: white; padding: 0; }
-            .ficha-a4 { box-shadow: none; width: 100%; height: 29.7cm; }
-        }
+
+
+
+        
     </style>
 </head>
-<body>
+<body class="print-full-mode">
 
     <div class="ficha-a4">
-        
-        <!-- Furo do crachá altura padrão -->
-        <div class="marcador-furo-tecnico"></div>
-
-        <!-- Marca d'água usando a LOGO configurada -->
-        <div class="marca-dagua-container">
-            {% if config_logo and config_logo.logo %}
-                <img src="{{ config_logo.logo.url }}" alt="Watermark">
-            {% endif %}
-        </div>
-
-        <!-- Cabeçalho Centralizado nos blocos -->
+        <!-- Cabeçalho Truncado como LAYOUT (Impresso na colorida) -->
         <header class="cabecalho-superior">
-            <div class="cabecalho-bloco bloco-logo">
-                <div class="logo-container">
-                    {% if config_logo and config_logo.logo %}
-                        <img src="{{ config_logo.logo.url }}" alt="Logo">
-                    {% else %}
-                        <div style="font-weight: 900; color: #FF8C00;">GRUPO CONCEITO</div>
-                    {% endif %}
-                </div>
+            <div class="cabecalho-bloco">
+                {% if config_logo and config_logo.logo %}
+                    <img src="{{ config_logo.logo.url }}" style="max-height: 100px;">
+                {% else %}
+                    <span style="font-weight:900; color:#FF8C00;">GRUPO CONCEITO</span>
+                {% endif %}
             </div>
-            
-            <div class="cabecalho-bloco bloco-info-txt">
-                <p>CÓDIGO: <span style="color: #FF8C00;">FOR.017</span></p>
-                <p>REVISÃO: <span style="color: #FF8C00;">01</span></p>
+            <div class="cabecalho-bloco">
+                <p>CÓDIGO: <span class="valor-estatico">FOR.017</span></p>
+                <p>REVISÃO: <span class="valor-estatico">01</span></p>
             </div>
-            
-            <div class="cabecalho-bloco bloco-info-txt">
-                <p>EMISSÃO: <span style="color: #FF8C00;">{% now "d/m/Y" %}</span></p>
-                <p>APROVAÇÃO: <span style="color: #FF8C00;">______________</span></p>
+            <div class="cabecalho-bloco">
+                <p>EMISSÃO: <span class="valor-estatico">{% now "d/m/Y" %}</span></p>
+                <p>APROVAÇÃO: <span class="valor-estatico">________</span></p>
             </div>
         </header>
 
-        <!-- Título Principal Centralizado -->
         <div class="titulo-central">FICHA DE CONTROLE DE ESTOQUE FÍSICO</div>
 
-        <!-- Todos os seus dados mantidos intactos -->
         <div class="dados-lote-container">
             <table class="dados-lote-tabela">
                 <tr>
-                    <td class="celula-fundo">Código:</td>
-                    <td class="valor-bold">{{ item.codigo_produto|default:"______________" }}</td>
-                    <td class="celula-fundo" style="width: 10%;">Safra:</td>
-                    <td class="valor-bold">{{ item.safra|default:"2025/2026" }}</td>
+                    <td class="celula-fundo" style="width: 15%;">Código:</td>
+                    <td style="width: 35%;"><span class="valor-variavel">{{ item.codigo_produto|default:"" }}</span></td>
+                    <td class="celula-fundo" style="width: 15%;">Safra:</td>
+                    <td style="width: 35%;"><span class="valor-variavel">{{ item.safra|default:"2025/2026" }}</span></td>
                 </tr>
                 <tr>
                     <td class="celula-fundo">Descrição:</td>
-                    <td colspan="3" class="valor-bold">{{ item.descricao|default:"______________" }}</td>
+                    <td colspan="3"><span class="valor-variavel">{{ item.descricao|default:"" }}</span></td>
                 </tr>
                 <tr>
                     <td class="celula-fundo">Lote:</td>
-                    <td class="valor-bold" style="font-size: 15px; color: #5A0F0F;">{{ item.lote|default:"______________" }}</td>
+                    <td colspan="1"><span class="valor-variavel" style="font-size: 16px;">{{ item.lote|default:"" }}</span></td>
                     <td class="celula-fundo">PME (KG):</td>
-                    <td class="valor-bold">
-                        {% if item.peso_unitario %}{{ item.peso_unitario|floatformat:2 }} kg{% else %}_____{% endif %}
-                    </td>
+                    <td><span class="valor-variavel">{% if item.peso_unitario %}{{ item.peso_unitario|floatformat:2 }}{% endif %}</span></td>
                 </tr>
                 <tr>
                     <td class="celula-fundo">Armazém:</td>
-                    <td class="valor-bold">{{ item.az|default:item.endereco|default:"______________" }}</td>
+                    <td><span class="valor-variavel">{{ item.az|default:item.endereco|default:"" }}</span></td>
                     <td class="celula-fundo">Produtor:</td>
-                    <td class="valor-bold">{{ item.empresa|default:"______________" }}</td>
-                </tr>
-                <tr>
-                    <td class="celula-fundo">Peneira:</td>
-                    <td class="valor-bold">{{ item.peneira|default:"______________" }}</td>
-                    <td class="celula-fundo">CAT:</td>
-                    <td class="valor-bold">{{ item.categoria|default:"______________" }}</td>
+                    <td><span class="valor-variavel">{{ item.empresa|default:"" }}</span></td>
                 </tr>
             </table>
             
             <div class="qrcode-area">
-                <div class="qrcode-label">QR CODE</div>
+                <div class="qrcode-label" style="font-size: 8px; color:white; margin-bottom:4px; font-weight:bold;">QR CODE</div>
                 <div id="qrcode"></div>
             </div>
         </div>
 
-        <!-- Tabela de Movimentação completa -->
-        <div class="tabela-container">
-            <table class="tabela-movimentacao">
-                <thead>
-                    <tr>
+        <table class="tabela-movimentacao">
+            <thead>
+                 <tr>
                         <th style="width: 60px;">AZ</th>
                         <th style="width: 60px;">RUA</th>
                         <th style="width: 60px;">LN</th>
@@ -370,37 +230,53 @@
                         <th style="width: 115px;">DATA</th>
                         <th>VISTO</th>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for i in "1234567890123456789012345" %}
-                    <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="propaganda-app">
+            </thead>
+            <tbody>
+                {% for i in "12345678901234567890" %}
+                <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+             <div class="propaganda-app">
             Rastreável eletronicamente via sistema <span>SEMENTES APP</span>
-        </div>
-
+        </div>  
     </div>
+
+
+    <!-- Modal -->
+    <div id="printModal">
+        <div class="modal-card">
+            <h3>Impressão de Ficha</h3>
+            <button class="btn-print" onclick="imprimir('layout')">1. Imprimir LAYOUT (Folha Colorida)</button>
+            <button class="btn-print" onclick="imprimir('data')">2. Imprimir DADOS (Sobrepor P&B)</button>
+            <button class="btn-print" onclick="imprimir('full')">Imprimir COMPLETO</button>
+            <button onclick="$('#printModal').hide()" style="border:none; color:red; cursor:pointer; background:none; margin-top:15px;">Cancelar</button>
+        </div>
+    </div>
+
     
+
     <script>
-        window.onload = function() {
+        function imprimir(modo) {
+            $('body').removeClass('print-layout-mode print-data-mode print-full-mode')
+                     .addClass('print-' + modo + '-mode');
+            $('#printModal').hide();
+            setTimeout(function() {
+                window.print();
+                $('#printModal').show();
+            }, 500);
+        }
+
+        $(document).ready(function() {
             var el = document.getElementById("qrcode");
-            var tx = '{{ item.lote|escapejs }}';
-            if(el) {
-                new QRCode(el, {
-                    text: tx,
-                    width: 85,
-                    height: 85,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.H
-                });
-            }
-            window.print();
-        };
+            new QRCode(el, {
+                text: '{{ item.lote|escapejs }}',
+                width: 80, height: 80,
+                colorDark: "#000000", colorLight: "#ffffff"
+            });
+            // Adiciona uma classe nas imagens do QR para facilitar a seleção
+            $('#qrcode img, #qrcode canvas').addClass('qr-pixels');
+        });
     </script>
 </body>
 </html>
