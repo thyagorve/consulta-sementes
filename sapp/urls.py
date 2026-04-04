@@ -7,63 +7,31 @@ from django.conf.urls.static import static
 app_name = 'sapp'
 
 urlpatterns = [
-    # ============================================================================
-    # AUTENTICAÇÃO
-    # ============================================================================
     path('login/', auth_views.LoginView.as_view(template_name='sapp/registration/login.html', redirect_authenticated_user=True), name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('mudar-senha/', views.mudar_senha, name='mudar_senha'),
-
-    # ============================================================================
-    # DASHBOARD E PÁGINAS PRINCIPAIS
-    # ============================================================================
     path('', views.dashboard, name='dashboard'),  # Mantém o dashboard original
     path('dashboard/', views.dashboard_view, name='dashboard_novo'),  # Renomeado para não conflitar
-    
     path('estoque/', views.lista_estoque, name='lista_estoque'),
     path('estoque/gestao/', views.gestao_estoque, name='gestao_estoque'),
     path('mapa-armazem/', views.lista_armazens, name='lista_armazens'),
     path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
-
-    # ============================================================================
-    # OPERAÇÕES CRUD - ESTOQUE
-    # ============================================================================
     path('estoque/nova-entrada/', views.nova_entrada, name='nova_entrada'),
     path('estoque/transferir/<int:id>/', views.transferir, name='transferir'),
     path('estoque/editar/<int:id>/', views.editar, name='editar'),
     path('estoque/excluir/<int:id>/', views.excluir_lote, name='excluir_lote'),
-    
-    # ============================================================================
-    # SAÍDAS E RELATÓRIOS
-    # ============================================================================
     path('estoque/registrar-saida/<int:id>/', views.registrar_saida, name='registrar_saida'),
     path('estoque/nova-saida/', views.nova_saida, name='nova_saida'),
     path('relatorio-saidas/', views.relatorio_saidas, name='relatorio_saidas'),
     path('api/estoque/estatisticas/', views.api_estoque_estatisticas, name='api_estoque_estatisticas'),
     path('api/estoque/opcoes-filtro/', views.api_opcoes_filtro, name='api_opcoes_filtro'),
-    
-    # ============================================================================
-    # CONFIGURAÇÕES, HISTÓRICO E EMPENHO
-    # ============================================================================
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     path('historico-geral/', views.historico_geral, name='historico_geral'),
     path('empenho/', views.pagina_rascunho, name='pagina_rascunho'),
     path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
-    
-    # ============================================================================
-    # IMPORT/EXPORT
-    # ============================================================================
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
-    
-    # ============================================================================
-    # CONFIGURAÇÃO DO DASHBOARD
-    # ============================================================================
     path('salvar-config-dashboard/', views.salvar_config_dashboard, name='salvar_config_dashboard'),  # APENAS UMA VEZ
-
-    # ============================================================================
-    # DEBUG E MANUTENÇÃO
-    # ============================================================================
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
     path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
     path('api/autocomplete-entrada/', views.api_autocomplete_nova_entrada, name='api_autocomplete_entrada'),
@@ -88,24 +56,21 @@ urlpatterns = [
     path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
     path('editor-mapa/<int:armazem_numero>/', views.editor_avancado, name='editor_avancado'),
     path('armazem/editar-config/<int:armazem_id>/', views.editar_config_armazem, name='editar_config_armazem'),
-
-
-
-
     path('ficha-rastreabilidade/', views.ficha_rastreabilidade, name='ficha_rastreabilidade'),
-    
-    # Ficha de rastreabilidade por ID (URL amigável)
     path('ficha-rastreabilidade/<int:estoque_id>/', views.ficha_rastreabilidade_por_id, name='ficha_rastreabilidade_id'),
-    
-    # Ficha múltipla (vários lotes)
     path('ficha-rastreabilidade/multipla/', views.ficha_rastreabilidade_multipla, name='ficha_rastreabilidade_multipla'),
     path('api/validar-endereco/', views.validar_endereco, name='validar_endereco'),
     path('api/buscar-origens/', views.buscar_origens, name='buscar_origens'),
-
     path('marcar-ultimo-lote/<int:estoque_id>/', views.marcar_ultimo_lote_linha, name='marcar_ultimo_lote'),
     path('get-marcacoes-linha/<str:rua>/<str:ln>/', views.get_marcacoes_linha, name='get_marcacoes_linha'),   
     path('api/mapa-dados/<int:armazem_numero>/', views.api_mapa_dados, name='api_mapa_dados'),
     path('api/marcacoes-ultimo-lote/', views.api_marcacoes_ultimo_lote, name='api_marcacoes_ultimo_lote'),
+
+
+        # No urlpatterns do sapp/urls.py
+    path('api/buscar-origens/', views.buscar_origens, name='buscar_origens'),  # já existente
+    path('api/buscar-enderecos/', views.api_buscar_enderecos, name='api_buscar_enderecos'),  # NOVA
+    path('api/listar-enderecos/', views.api_listar_enderecos, name='api_listar_enderecos'),  # NOVA
 ]
 
 # ============================================================================

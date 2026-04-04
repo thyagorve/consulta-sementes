@@ -36,11 +36,11 @@ import json
 # App imports
 from .models import (
     Estoque, HistoricoMovimentacao, Configuracao, Cultivar, 
-    Peneira, Categoria, Tratamento, PerfilUsuario, Especie, OrigemDestino,Linha,Rua,Armazem
+    Peneira, Categoria, Tratamento, PerfilUsuario, Especie, OrigemDestino,Armazem, Endereco  
 )
 from .forms import (
     NovaEntradaForm, ConfiguracaoForm, CultivarForm, PeneiraForm, 
-    CategoriaForm, TratamentoForm, NovoConferenteUserForm, MudarSenhaForm
+    CategoriaForm, TratamentoForm, NovoConferenteUserForm, MudarSenhaForm  
 )
 
 # Pandas e outros imports
@@ -1771,26 +1771,24 @@ def logout_view(request):
     logout(request)
     return redirect('sapp:login')
 
-import re
-from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import User
+
+
+
+
 
 @login_required
 def configuracoes(request):
-
+    
     config = Configuracao.get_solo()
-
+    
     usuarios_conferentes = User.objects.filter(
         is_superuser=False
     ).order_by('username')
-
+    
     # =============================
     # QUERYSETS
     # =============================
-
+    
     produtos = Produto.objects.select_related(
         'cultivar',
         'peneira',
@@ -1798,48 +1796,44 @@ def configuracoes(request):
         'categoria',
         'tratamento'
     ).all().order_by('-data_cadastro')
-
+    
     cultivares = Cultivar.objects.all().order_by('nome')
     peneiras = Peneira.objects.all().order_by('nome')
     especies = Especie.objects.all().order_by('nome')
     categorias = Categoria.objects.all().order_by('nome')
     tratamentos = Tratamento.objects.all().order_by('nome')
-
+    
+    # ARMAZÉNS (de volta!)
     armazens_lista = Armazem.objects.all().order_by('nome')
-    ruas_lista = Rua.objects.select_related('armazem').all().order_by('nome')
-    linhas_lista = Linha.objects.select_related('rua').all().order_by('nome')
+    
+    # ENDEREÇOS (com armazém)
+    enderecos_lista = Endereco.objects.select_related('armazem').all().order_by('codigo')
+    
     origens_lista = OrigemDestino.objects.all().order_by('nome')
-
+    
     # =============================
     # POST
     # =============================
-
+    
     if request.method == 'POST':
-
+        
         acao = request.POST.get('acao')
-
+        
         # ====================================
         # PRODUTOS
         # ====================================
-
+        
         if acao == 'add_produto':
-
             try:
-
                 cultivar_id = request.POST.get('cultivar')
                 codigo = request.POST.get('codigo', '').strip().upper()
                 descricao = request.POST.get('descricao', '').strip()
-
+                
                 if not cultivar_id or not codigo:
-
                     messages.error(request, "❌ Cultivar e Código são obrigatórios!")
-
                 elif Produto.objects.filter(codigo=codigo).exists():
-
                     messages.error(request, f"❌ Código '{codigo}' já existe!")
-
                 else:
-
                     produto = Produto.objects.create(
                         cultivar_id=cultivar_id,
                         codigo=codigo,
@@ -1848,231 +1842,130 @@ def configuracoes(request):
                         empresa=request.POST.get('empresa', '').strip(),
                         ativo=request.POST.get('ativo') == 'on'
                     )
-
                     produto.peneira_id = request.POST.get('peneira') or None
                     produto.especie_id = request.POST.get('especie') or None
                     produto.categoria_id = request.POST.get('categoria') or None
                     produto.tratamento_id = request.POST.get('tratamento') or None
-
                     produto.save()
-
                     messages.success(request, f"✅ Produto '{codigo}' cadastrado!")
-
             except Exception as e:
-
                 messages.error(request, f"❌ Erro: {str(e)}")
-
+        
         elif acao == 'delete_produto':
-
             try:
-
                 item_id = request.POST.get('id_item')
-
                 if not item_id:
                     messages.error(request, "❌ Produto não identificado!")
-
                 else:
-
                     Produto.objects.filter(id=item_id).delete()
-
                     messages.success(request, "✅ Produto excluído!")
-
             except Exception as e:
-
                 messages.error(request, f"❌ Erro ao excluir: {str(e)}")
-
+        
         # ====================================
         # USUÁRIOS
         # ====================================
-
+        
         elif acao == 'add_conferente_user':
-
             if request.user.is_superuser:
-
                 username = request.POST.get('username', '').strip()
-
                 if username and not User.objects.filter(username=username).exists():
-
                     User.objects.create_user(
                         username=username,
                         password='conceito',
                         first_name=request.POST.get('first_name', '').strip()
                     )
-
-                    messages.success(
-                        request,
-                        f"✅ Usuário {username} criado! Senha padrão: conceito"
-                    )
-
+                    messages.success(request, f"✅ Usuário {username} criado! Senha padrão: conceito")
                 else:
-
                     messages.error(request, "❌ Usuário já existe ou nome inválido.")
-
+        
         # ====================================
         # CONFIGURAÇÃO GERAL
         # ====================================
-
+        
         elif acao == 'config_geral':
-
             form = ConfiguracaoForm(request.POST, instance=config)
-
             if form.is_valid():
-
                 form.save()
-
                 messages.success(request, "✅ Configurações salvas!")
-
+        
+        # ====================================
+        # ARMAZÉM (de volta!)
+        # ====================================
+        
+        elif acao == 'add_armazem':
+            nome = request.POST.get('nome', '').strip().upper()
+            if nome:
+                obj, created = Armazem.objects.get_or_create(nome=nome)
+                if created:
+                    messages.success(request, f"✅ Armazém {nome} criado!")
+                else:
+                    messages.warning(request, "⚠️ Armazém já existe.")
+        
+        # ====================================
+        # ENDEREÇO (com armazém)
+        # ====================================
+        
+        elif acao == 'add_endereco':
+            endereco_codigo = request.POST.get('endereco_codigo', '').strip().upper()
+            armazem_id = request.POST.get('armazem_id')
+            
+            if not endereco_codigo:
+                messages.error(request, "❌ Endereço não informado!")
+            elif not armazem_id:
+                messages.error(request, "❌ Selecione um armazém!")
+            else:
+                try:
+                    armazem = Armazem.objects.get(id=armazem_id)
+                    
+                    if Endereco.objects.filter(codigo=endereco_codigo).exists():
+                        messages.warning(request, f"⚠️ Endereço '{endereco_codigo}' já cadastrado!")
+                    else:
+                        Endereco.objects.create(
+                            codigo=endereco_codigo,
+                            armazem=armazem
+                        )
+                        messages.success(request, f"✅ Endereço '{endereco_codigo}' cadastrado no armazém {armazem.nome}!")
+                        
+                except Armazem.DoesNotExist:
+                    messages.error(request, "❌ Armazém não encontrado!")
+                except Exception as e:
+                    messages.error(request, f"❌ Erro ao cadastrar endereço: {str(e)}")
+        
         # ====================================
         # CADASTROS SIMPLES
         # ====================================
-
-        elif acao in [
-            'add_cultivar',
-            'add_peneira',
-            'add_especie',
-            'add_categoria',
-            'add_tratamento'
-        ]:
-
+        
+        elif acao in ['add_cultivar', 'add_peneira', 'add_especie', 'add_categoria', 'add_tratamento', 'add_origem']:
             model_map = {
                 'add_cultivar': Cultivar,
                 'add_peneira': Peneira,
                 'add_especie': Especie,
                 'add_categoria': Categoria,
-                'add_tratamento': Tratamento
+                'add_tratamento': Tratamento,
+                'add_origem': OrigemDestino
             }
-
-            model = model_map[acao]
-
-            nome = request.POST.get('nome', '').strip()
-
-            if nome:
-
-                obj, created = model.objects.get_or_create(nome=nome)
-
-                if created:
-
-                    messages.success(request, f"✅ '{nome}' adicionado!")
-
-                else:
-
-                    messages.warning(request, "⚠️ Registro já existe.")
-
-        # ====================================
-        # ARMAZÉM
-        # ====================================
-
-        elif acao == 'add_armazem':
-
-            nome = request.POST.get('nome', '').strip().upper()
-
-            if nome:
-
-                obj, created = Armazem.objects.get_or_create(nome=nome)
-
-                if created:
-
-                    messages.success(request, f"✅ Armazém {nome} criado!")
-
-                else:
-
-                    messages.warning(request, "⚠️ Armazém já existe.")
-
-        # ====================================
-        # RUA
-        # ====================================
-
-        elif acao == 'add_rua':
-
-            nome = request.POST.get('nome', '').strip().upper()
-
-            armazem_id = request.POST.get('armazem_id')
-
-            if nome and armazem_id:
-
-                if Rua.objects.filter(nome=nome, armazem_id=armazem_id).exists():
-
-                    messages.warning(
-                        request,
-                        f"⚠️ A Rua {nome} já existe neste armazém."
-                    )
-
-                else:
-
-                    Rua.objects.create(
-                        nome=nome,
-                        armazem_id=armazem_id
-                    )
-
-                    messages.success(request, f"✅ Rua {nome} adicionada!")
-
-        # ====================================
-        # LINHA
-        # ====================================
-
-        elif acao == 'add_linha':
-
-            nome = request.POST.get('nome', '').strip().upper()
-
-            rua_id = request.POST.get('rua_id')
-
-            if not rua_id:
-
-                messages.error(request, "❌ Selecione uma Rua!")
-
-            elif nome:
-
-                if Linha.objects.filter(nome=nome, rua_id=rua_id).exists():
-
-                    messages.warning(
-                        request,
-                        f"⚠️ A linha {nome} já existe nesta rua."
-                    )
-
-                else:
-
-                    Linha.objects.create(
-                        nome=nome,
-                        rua_id=rua_id
-                    )
-
-                    messages.success(request, f"✅ Linha {nome} cadastrada!")
-
-        # ====================================
-        # ORIGEM
-        # ====================================
-
-        elif acao == 'add_origem':
-
-            nome = request.POST.get('nome', '').strip()
-
-            if nome:
-
-                obj, created = OrigemDestino.objects.get_or_create(nome=nome)
-
-                if created:
-
-                    messages.success(
-                        request,
-                        f"✅ Origem '{nome}' adicionada!"
-                    )
-
+            model = model_map.get(acao)
+            if model:
+                nome = request.POST.get('nome', '').strip()
+                if nome:
+                    obj, created = model.objects.get_or_create(nome=nome)
+                    if created:
+                        messages.success(request, f"✅ '{nome}' adicionado!")
+                    else:
+                        messages.warning(request, "⚠️ Registro já existe.")
+        
         # ====================================
         # EXCLUSÃO
         # ====================================
-
+        
         elif acao == 'delete_item':
-
             tipo = request.POST.get('tipo_item')
-
             item_id = request.POST.get('id_item')
-
+            
             if not item_id:
-
                 messages.error(request, "❌ Item não identificado!")
-
             else:
-
                 model_map = {
                     'cultivar': Cultivar,
                     'especie': Especie,
@@ -2080,90 +1973,91 @@ def configuracoes(request):
                     'categoria': Categoria,
                     'tratamento': Tratamento,
                     'armazem': Armazem,
-                    'rua': Rua,
-                    'linha': Linha,
+                    'endereco': Endereco,
                     'origem': OrigemDestino,
-                    'conferente': User
+                    'conferente': User,
+                    'produto': Produto,
                 }
-
+                
                 if tipo in model_map:
-
                     try:
-
                         item = model_map[tipo].objects.get(id=item_id)
-
                         nome_excluido = str(item)
-
+                        
                         if tipo == 'conferente' and item.is_superuser:
-
-                            messages.error(
-                                request,
-                                "❌ Não é possível excluir um Administrador."
-                            )
-
+                            messages.error(request, "❌ Não é possível excluir um Administrador.")
                         else:
-
-                            item.delete()
-
-                            messages.success(
-                                request,
-                                f"✅ Registro '{nome_excluido}' removido!"
-                            )
-
+                            # Verifica se o endereço está sendo usado
+                            if tipo == 'endereco' and Estoque.objects.filter(endereco=item.codigo).exists():
+                                messages.error(request, f"❌ Endereço '{nome_excluido}' está sendo usado em lotes de estoque.")
+                            elif tipo == 'armazem' and Endereco.objects.filter(armazem=item).exists():
+                                messages.error(request, f"❌ Armazém '{nome_excluido}' possui endereços vinculados.")
+                            else:
+                                item.delete()
+                                messages.success(request, f"✅ Registro '{nome_excluido}' removido!")
+                                
                     except model_map[tipo].DoesNotExist:
-
-                        messages.error(
-                            request,
-                            "❌ Registro não encontrado."
-                        )
-
+                        messages.error(request, "❌ Registro não encontrado.")
                     except Exception as e:
-
-                        messages.error(
-                            request,
-                            f"❌ Erro ao remover: {str(e)}"
-                        )
-
+                        messages.error(request, f"❌ Erro ao remover: {str(e)}")
                 else:
-
-                    messages.error(
-                        request,
-                        "❌ Tipo de item inválido!"
-                    )
-
+                    messages.error(request, "❌ Tipo de item inválido!")
+        
         return redirect('sapp:configuracoes')
-
-    # ====================================
+    
+    # =============================
     # CONTEXT
-    # ====================================
-
+    # =============================
+    
     context = {
-
         'form_config': ConfiguracaoForm(instance=config),
-
+        
         'cultivares': cultivares,
         'especies': especies,
         'peneiras': peneiras,
         'categorias': categorias,
         'tratamentos': tratamentos,
-
+        
         'usuarios_conferentes': usuarios_conferentes,
-
+        
         'form_conf_user': NovoConferenteUserForm(),
-
+        
         'produtos': produtos,
-
-        'armazens': armazens_lista,
-        'ruas': ruas_lista,
-        'linhas': linhas_lista,
+        
+        'armazens': armazens_lista,  # De volta!
+        'enderecos': enderecos_lista,
         'origens': origens_lista,
     }
+    
+    return render(request, 'sapp/configuracoes.html', context)
+    
+    # =============================
+    # CONTEXT (ATUALIZADO - sem ruas/linhas)
+    # =============================
+    
+    context = {
+        'form_config': ConfiguracaoForm(instance=config),
+        
+        'cultivares': cultivares,
+        'especies': especies,
+        'peneiras': peneiras,
+        'categorias': categorias,
+        'tratamentos': tratamentos,
+        
+        'usuarios_conferentes': usuarios_conferentes,
+        
+        'form_conf_user': NovoConferenteUserForm(),
+        
+        'produtos': produtos,
+        
+        'armazens': armazens_lista,
+        'enderecos': enderecos_lista,  # Lista de endereços unificada
+        'origens': origens_lista,
+    }
+    
+    return render(request, 'sapp/configuracoes.html', context)
 
-    return render(
-        request,
-        'sapp/configuracoes.html',
-        context
-    )
+
 
 @login_required
 def historico_geral(request):
@@ -4502,13 +4396,18 @@ def api_marcacoes_ultimo_lote(request):
         marcacoes = {}
         
         for lote in lotes_marcados:
-            dados_end = extrair_ln_p(lote.endereco)
+            # Extrair informações do endereço usando regex
+            dados_end = extrair_info_endereco(lote.endereco)
             if not dados_end:
                 continue
             
-            rua = dados_end['rua']        # R-A
-            ln = dados_end['ln']           # LN01
-            posicao_marcada = dados_end['posicao']  # 4
+            rua = dados_end.get('rua')        # R-A
+            ln = dados_end.get('linha')       # LN01
+            posicao_marcada = dados_end.get('posicao')  # 4
+            
+            # Se não tiver posição, pula
+            if not posicao_marcada:
+                continue
             
             # Buscar no MAPA todos os endereços desta linha
             padrao = f"{rua} {ln} P"
@@ -4519,8 +4418,8 @@ def api_marcacoes_ultimo_lote(request):
             
             # Para cada endereço do mapa, verificar se é posterior
             for endereco in elementos:
-                dados_pos = extrair_ln_p(endereco)
-                if dados_pos and dados_pos['posicao'] > posicao_marcada:
+                dados_pos = extrair_info_endereco(endereco)
+                if dados_pos and dados_pos.get('posicao', 0) > posicao_marcada:
                     marcacoes[endereco.strip().upper()] = True
         
         return JsonResponse({
@@ -4534,169 +4433,167 @@ def api_marcacoes_ultimo_lote(request):
             'success': False,
             'error': str(e)
         })
-    
 
+
+@login_required
 def api_get_armazem_by_rua(request):
-    rua_nome = request.GET.get('rua', '').strip().upper()
-    rua = Rua.objects.select_related('armazem').get(nome=rua_nome)
-    armazem = rua.armazem
-    if rua:
-        return JsonResponse({'sucesso': True, 'az': rua.armazem.nome})
-    return JsonResponse({'sucesso': False, 'msg': 'Rua não cadastrada'}, status=404)
+    """
+    Obtém o armazém a partir de um endereço
+    """
+    endereco_codigo = request.GET.get('endereco', '').strip().upper()
+    
+    if not endereco_codigo:
+        return JsonResponse({'sucesso': False, 'msg': 'Endereço não informado'}, status=400)
+    
+    try:
+        # Busca o endereço pelo código exato ou contém
+        endereco = Endereco.objects.select_related('armazem').filter(
+            codigo__icontains=endereco_codigo
+        ).first()
+        
+        if endereco:
+            # Extrai informações adicionais do endereço (se possível)
+            dados = extrair_info_endereco(endereco.codigo)
+            
+            return JsonResponse({
+                'sucesso': True, 
+                'az': endereco.armazem.nome,
+                'endereco': endereco.codigo,
+                'rua': dados.get('rua') if dados else None,
+                'linha': dados.get('linha') if dados else None,
+                'posicao': dados.get('posicao') if dados else None
+            })
+        
+        return JsonResponse({'sucesso': False, 'msg': 'Endereço não cadastrado'}, status=404)
+        
+    except Exception as e:
+        return JsonResponse({'sucesso': False, 'msg': str(e)}, status=500)
 
-import re
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
+
+def extrair_info_endereco(endereco_str):
+    """
+    Função auxiliar para extrair rua, linha e posição de um endereço
+    Usa regex para extrair informações mesmo sem campos no banco
+    
+    Exemplos:
+    - "R-A LN10 P02" -> {'rua': 'R-A', 'linha': 'LN10', 'posicao': 2}
+    - "R-A LN10" -> {'rua': 'R-A', 'linha': 'LN10', 'posicao': None}
+    - "R-A GERAL" -> {'rua': 'R-A', 'linha': 'GERAL', 'posicao': None}
+    - "R-A" -> {'rua': 'R-A', 'linha': None, 'posicao': None}
+    """
+    import re
+    
+    if not endereco_str:
+        return None
+    
+    endereco_str = endereco_str.strip().upper()
+    
+    # Padrão completo: R-A LN10 P02
+    match_completo = re.match(r'^(R-[A-Z])\s+LN(\d{2})\s+P(\d{2})$', endereco_str)
+    if match_completo:
+        return {
+            'rua': match_completo.group(1),
+            'linha': f"LN{match_completo.group(2)}",
+            'posicao': int(match_completo.group(3))
+        }
+    
+    # Padrão sem posição: R-A LN10
+    match_linha = re.match(r'^(R-[A-Z])\s+LN(\d{2})$', endereco_str)
+    if match_linha:
+        return {
+            'rua': match_linha.group(1),
+            'linha': f"LN{match_linha.group(2)}",
+            'posicao': None
+        }
+    
+    # Padrão geral: R-A GERAL
+    match_geral = re.match(r'^(R-[A-Z])\s+GERAL$', endereco_str)
+    if match_geral:
+        return {
+            'rua': match_geral.group(1),
+            'linha': 'GERAL',
+            'posicao': None
+        }
+    
+    # Apenas a rua: R-A
+    match_rua = re.match(r'^(R-[A-Z])$', endereco_str)
+    if match_rua:
+        return {
+            'rua': match_rua.group(1),
+            'linha': None,
+            'posicao': None
+        }
+    
+    # Formato livre: tenta extrair o primeiro como rua
+    partes = endereco_str.split()
+    return {
+        'rua': partes[0] if partes else endereco_str,
+        'linha': None,
+        'posicao': None
+    }
+
 
 @login_required
 def validar_endereco(request):
-
-    endereco = request.GET.get('endereco', '').strip().upper()
-
-    if not endereco:
+    """
+    Valida endereço - busca nos endereços cadastrados e sugere cadastro se não existir
+    """
+    
+    endereco_raw = request.GET.get('endereco', '').strip().upper()
+    
+    if not endereco_raw:
         return JsonResponse({
             'valido': False,
             'erro': 'Endereço não informado'
         })
-
+    
     try:
-
-        # =============================
-        # 1️⃣ ENDEREÇO COMPLETO
-        # Ex: R-C LN01 P03
-        # =============================
-
-        padrao_completo = r'^(R-[A-Z])\s+LN(\d{2})\s+P(\d{2})$'
-        match = re.match(padrao_completo, endereco)
-
-        if match:
-
-            rua_nome = match.group(1)
-            linha_num = match.group(2)
-            posicao_num = match.group(3)
-
-            linha_nome = f'LN{linha_num}'
-            posicao_valor = int(posicao_num)
-
-            if posicao_valor < 1 or posicao_valor > 6:
-                return JsonResponse({
-                    'valido': False,
-                    'erro': f'Posição P{posicao_num} inválida. Use P01 até P06'
-                })
-
-            rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
-
-            if not rua:
-                return JsonResponse({
-                    'valido': False,
-                    'erro': f'Rua {rua_nome} não encontrada'
-                })
-
-            linha = Linha.objects.filter(nome=linha_nome, rua=rua).first()
-
-            if not linha:
-                return JsonResponse({
-                    'valido': False,
-                    'erro': f'Linha {linha_nome} não existe na rua {rua_nome}'
-                })
-
+        # Busca exata primeiro
+        endereco_obj = Endereco.objects.filter(codigo=endereco_raw).select_related('armazem').first()
+        
+        if endereco_obj:
             return JsonResponse({
                 'valido': True,
-                'mensagem': 'Endereço válido!',
+                'mensagem': f'✅ Endereço válido! Localizado no armazém {endereco_obj.armazem.nome}',
+                'endereco_formatado': endereco_obj.codigo,
                 'dados': {
-                    'armazem': rua.armazem.nome,
-                    'rua': rua.nome,
-                    'linha': linha.nome,
-                    'posicao': posicao_valor,
-                    'linha_id': linha.id
+                    'codigo': endereco_obj.codigo,
+                    'id': endereco_obj.id,
+                    'armazem': endereco_obj.armazem.nome,
+                    'armazem_id': endereco_obj.armazem.id
                 }
             })
-
-
-        # =============================
-        # 2️⃣ RUA GERAL
-        # Ex: R-A GERAL
-        # =============================
-
-        padrao_geral = r'^(R-[A-Z])\s+GERAL$'
-        match_geral = re.match(padrao_geral, endereco)
-
-        if match_geral:
-
-            rua_nome = match_geral.group(1)
-
-            rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
-
-            if not rua:
-                return JsonResponse({
-                    'valido': False,
-                    'erro': f'Rua {rua_nome} não encontrada'
-                })
-
+        
+        # Busca parcial (se digitar só parte do endereço)
+        enderecos_similares = Endereco.objects.filter(
+            codigo__icontains=endereco_raw
+        ).select_related('armazem')[:5]
+        
+        if enderecos_similares.exists():
+            sugestoes = [f"{e.codigo} ({e.armazem.nome})" for e in enderecos_similares]
             return JsonResponse({
-                'valido': True,
-                'mensagem': 'Endereço geral válido!',
-                'dados': {
-                    'armazem': rua.armazem.nome,
-                    'rua': rua.nome,
-                    'linha': 'GERAL',
-                    'posicao': None,
-                    'linha_id': None
-                }
+                'valido': False,
+                'erro': f'Endereço não encontrado. Você quis dizer: {", ".join(sugestoes)}?',
+                'sugestoes': sugestoes
             })
-
-
-        # =============================
-        # 3️⃣ ENDEREÇO SIMPLES
-        # Ex: UBS 21
-        # =============================
-
-        padrao_simples = r'^([A-Z]+)\s*(\d+)$'
-        match_simples = re.match(padrao_simples, endereco)
-
-        if match_simples:
-
-            rua_nome = f"{match_simples.group(1)} {match_simples.group(2)}"
-
-            rua = Rua.objects.select_related('armazem').filter(nome=rua_nome).first()
-
-            if not rua:
-                return JsonResponse({
-                    'valido': False,
-                    'erro': f'Local {rua_nome} não encontrado'
-                })
-
-            return JsonResponse({
-                'valido': True,
-                'mensagem': 'Local válido!',
-                'dados': {
-                    'armazem': rua.armazem.nome,
-                    'rua': rua.nome,
-                    'linha': None,
-                    'posicao': None,
-                    'linha_id': None
-                }
-            })
-
-
-        # =============================
-        # FORMATO INVÁLIDO
-        # =============================
-
+        
+        # Não encontrou nenhum
         return JsonResponse({
             'valido': False,
-            'erro': 'Formato inválido. Use: R-C LN01 P03, R-A GERAL ou UBS 21'
+            'erro': f'❌ Endereço "{endereco_raw}" não cadastrado. Por favor, cadastre-o nas configurações primeiro.'
         })
-
+        
     except Exception as e:
         return JsonResponse({
             'valido': False,
-            'erro': str(e)
+            'erro': f'Erro na validação: {str(e)}'
         })
+    
+
 @login_required
 def buscar_origens(request):
     """
-    Busca origens/destinos para autocomplete
+    Busca origens/destinos para autocomplete (mantida igual)
     """
     termo = request.GET.get('term', '').strip()
     if len(termo) < 2:
@@ -4706,3 +4603,49 @@ def buscar_origens(request):
     resultados = [{'id': o.id, 'nome': o.nome} for o in origens]
     
     return JsonResponse(resultados, safe=False)
+
+
+@login_required
+def api_buscar_enderecos(request):
+    """
+    Busca ENDEREÇOS para autocomplete (NOVA)
+    """
+    termo = request.GET.get('termo', '').strip().upper()
+    
+    if not termo or len(termo) < 2:
+        return JsonResponse([], safe=False)
+    
+    enderecos = Endereco.objects.filter(
+        codigo__icontains=termo
+    ).select_related('armazem')[:10]
+    
+    resultados = []
+    for end in enderecos:
+        resultados.append({
+            'id': end.id,
+            'codigo': end.codigo,
+            'armazem': end.armazem.nome,
+            'label': f"{end.codigo} ({end.armazem.nome})",
+            'value': end.codigo
+        })
+    
+    return JsonResponse(resultados, safe=False)
+
+
+@login_required
+def api_listar_enderecos(request):
+    """
+    Lista TODOS os endereços para o frontend (NOVA)
+    """
+    enderecos = Endereco.objects.select_related('armazem').all().order_by('codigo')
+    
+    dados = []
+    for end in enderecos:
+        dados.append({
+            'id': end.id,
+            'codigo': end.codigo,
+            'armazem': end.armazem.nome,
+            'armazem_id': end.armazem.id
+        })
+    
+    return JsonResponse(dados, safe=False)

@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal, InvalidOperation
+import json  # <-- ADICIONE ESTA LINHA
 
 # ============================================================================
 # TABELAS AUXILIARES (Cadastros Básicos)
@@ -29,9 +30,39 @@ class Especie(models.Model):
     nome = models.CharField(max_length=50, unique=True)
     def __str__(self): return self.nome
 
+class OrigemDestino(models.Model):
+    nome = models.CharField(max_length=100, unique=True)
+    def __str__(self): return self.nome
+
 # ============================================================================
-# PERFIL E CONFIGURAÇÃO
+# ARMAZÉM E ENDEREÇOS (SIMPLIFICADO)
 # ============================================================================
+
+# models.py - Adicione/atualize
+
+class Armazem(models.Model):
+    nome = models.CharField(max_length=20, unique=True)
+    def __str__(self): return self.nome
+
+class Endereco(models.Model):
+    """Model unificado de endereços - simples e funcional"""
+    
+    codigo = models.CharField(max_length=100, unique=True, verbose_name="Endereço completo")
+    armazem = models.ForeignKey(Armazem, on_delete=models.CASCADE, related_name='enderecos', null=True, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Endereço"
+        verbose_name_plural = "Endereços"
+        ordering = ['armazem__nome', 'codigo']
+    
+    def __str__(self):
+        if self.armazem:
+            return f"{self.codigo} ({self.armazem.nome})"
+        return self.codigo
+    
+
+    
 
 class PerfilUsuario(models.Model):
     usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
@@ -66,9 +97,12 @@ class Estoque(models.Model):
     peneira = models.ForeignKey(Peneira, on_delete=models.PROTECT)
     categoria = models.ForeignKey(Categoria, on_delete=models.PROTECT)
     tratamento = models.ForeignKey(Tratamento, on_delete=models.SET_NULL, null=True, blank=True)
-    especie = models.ForeignKey(Especie, on_delete=models.PROTECT, null=True, blank=True) 
+    especie = models.ForeignKey(Especie, on_delete=models.PROTECT, null=True, blank=True)
     
-    endereco = models.CharField(max_length=20)
+    endereco = models.CharField(max_length=50, verbose_name="Endereço")  # Texto simples ou FK
+    # Se quiser usar FK (recomendado):
+    # endereco = models.ForeignKey(Endereco, on_delete=models.PROTECT, related_name='estoques')
+    
     entrada = models.IntegerField(default=0)
     saida = models.IntegerField(default=0)
     saldo = models.IntegerField(default=0)
@@ -77,10 +111,7 @@ class Estoque(models.Model):
     data_entrada = models.DateTimeField(auto_now_add=True)
     data_ultima_saida = models.DateTimeField(null=True, blank=True)
     data_ultima_movimentacao = models.DateTimeField(auto_now=True)
-    ultimo_lote_linha = models.BooleanField(
-        default=False,
-        verbose_name="Último Lote da Linha"
-    )
+    ultimo_lote_linha = models.BooleanField(default=False, verbose_name="Último Lote da Linha")
     empresa = models.CharField(max_length=100, blank=True, null=True, default='')
     embalagem = models.CharField(max_length=10, choices=[('SC', 'Saco'), ('BAG', 'Big Bag')], default='BAG')
     peso_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
@@ -99,7 +130,7 @@ class Estoque(models.Model):
     status_sistemico = models.CharField(
         max_length=20,
         choices=STATUS_SISTEMICO_CHOICES,
-        default='critico',  # Começa como vermelho
+        default='critico',
         verbose_name='Status Sistêmico'
     )
     status_sistemico_alterado_por = models.ForeignKey(
@@ -109,13 +140,9 @@ class Estoque(models.Model):
         blank=True,
         related_name='status_sistemico_alteracoes'
     )
-    status_sistemico_alterado_em = models.DateTimeField(
-        null=True,
-        blank=True
-    )
+    status_sistemico_alterado_em = models.DateTimeField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        # Pegar estado original antes de salvar
         original = None
         if self.pk:
             try:
@@ -123,7 +150,6 @@ class Estoque(models.Model):
             except Estoque.DoesNotExist:
                 original = None
 
-        # Atualizações automáticas
         self.saldo = self.entrada - self.saida
         self.status = 'ESGOTADO' if self.saldo <= 0 else 'ATIVO'
 
@@ -133,11 +159,10 @@ class Estoque(models.Model):
             except:
                 self.peso_total = Decimal('0.00')
 
-        # 🔥 IMPORTANTE: Se era último lote e mudou de endereço, desmarcar ANTES de salvar
         if original and original.endereco != self.endereco and original.ultimo_lote_linha:
-            self.ultimo_lote_linha = False  # 👈 Desmarca antes de salvar
+            self.ultimo_lote_linha = False
 
-        super().save(*args, **kwargs)  # 👈 Agora salva com o valor correto
+        super().save(*args, **kwargs)
     
     def __str__(self): return f"{self.lote} - {self.cultivar.nome} ({self.saldo} unidades)"
 
@@ -154,7 +179,9 @@ class HistoricoMovimentacao(models.Model):
     placa = models.CharField(max_length=20, blank=True, null=True)
     cliente = models.CharField(max_length=255, blank=True, null=True)
     ordem_entrega = models.CharField(max_length=50, blank=True, null=True)
+    
     class Meta: ordering = ['-data_hora']
+    
     def save(self, *args, **kwargs):
         if self.estoque: self.lote_ref = f"{self.estoque.lote}"
         super().save(*args, **kwargs)
@@ -166,7 +193,7 @@ class FotoMovimentacao(models.Model):
     def __str__(self): return f"Foto de {self.historico}"
 
 # ============================================================================
-# MAPA E LAYOUT (NOVO SISTEMA)
+# MAPA E LAYOUT
 # ============================================================================
 
 class ArmazemLayout(models.Model):
@@ -176,9 +203,11 @@ class ArmazemLayout(models.Model):
     largura_canvas = models.IntegerField(default=1000)
     altura_canvas = models.IntegerField(default=600)
     ativo = models.BooleanField(default=True)
+    
     class Meta:
         verbose_name = "Layout do Armazém"
         verbose_name_plural = "Layouts dos Armazéns"
+    
     def __str__(self): return f"Armazém {self.numero} - {self.nome}"
 
 class ElementoMapa(models.Model):
@@ -187,19 +216,16 @@ class ElementoMapa(models.Model):
     armazem = models.ForeignKey(ArmazemLayout, on_delete=models.CASCADE, related_name='elementos')
     tipo = models.CharField(max_length=20, choices=TIPO_ELEMENTO_CHOICES)
     
-    # Geometria
     pos_x = models.IntegerField(default=0)
     pos_y = models.IntegerField(default=0)
     largura = models.IntegerField(default=100)
     altura = models.IntegerField(default=60)
-    rotacao = models.IntegerField(default=0) # CAMPO ADICIONADO AQUI
+    rotacao = models.IntegerField(default=0)
     
-    # Estilo
     cor_preenchimento = models.CharField(max_length=20, default='#CCCCCC')
     cor_borda = models.CharField(max_length=20, default='#000000')
     espessura_borda = models.IntegerField(default=2)
     
-    # Texto
     conteudo_texto = models.TextField(blank=True, null=True)
     fonte_nome = models.CharField(max_length=100, default='Arial')
     fonte_tamanho = models.IntegerField(default=14)
@@ -207,7 +233,6 @@ class ElementoMapa(models.Model):
     texto_italico = models.BooleanField(default=False)
     texto_direcao = models.CharField(max_length=20, default='horizontal', choices=[('horizontal', 'Horizontal'), ('vertical', 'Vertical')])
     
-    # Outros
     linha_tipo = models.CharField(max_length=20, default='solida', choices=[('solida', 'Sólida'), ('tracejada', 'Tracejada'), ('pontilhada', 'Pontilhada')])
     identificador = models.CharField(max_length=50, blank=True, null=True)
     ordem_z = models.IntegerField(default=1)
@@ -216,10 +241,11 @@ class ElementoMapa(models.Model):
         verbose_name = "Elemento do Mapa"
         verbose_name_plural = "Elementos do Mapa"
         ordering = ['armazem', 'ordem_z']
+    
     def __str__(self): return f"{self.get_tipo_display()} - {self.identificador or 'Sem ID'}"
 
 # ============================================================================
-# SISTEMA DE EMPENHO (Mantido)
+# SISTEMA DE EMPENHO
 # ============================================================================
 
 class EmpenhoStatus(models.Model):
@@ -239,10 +265,14 @@ class Empenho(models.Model):
     placa = models.CharField(max_length=20, blank=True, null=True)
     cliente = models.CharField(max_length=255, blank=True, null=True)
     ordem_entrega = models.CharField(max_length=50, blank=True, null=True)
+    
     class Meta: ordering = ['-data_criacao']
+    
     def __str__(self): return f"Empenho #{self.id} - {self.usuario.username}"
+    
     @property
     def total_itens(self): return self.itens.count()
+    
     @property
     def saldo_afetado(self): return sum(item.quantidade for item in self.itens.all())
 
@@ -259,9 +289,13 @@ class ItemEmpenho(models.Model):
     categoria = models.CharField(max_length=50)
     saldo_anterior = models.IntegerField(default=0)
     data_criacao = models.DateTimeField(auto_now_add=True)
-    class Meta: ordering = ['-data_criacao']; unique_together = ['empenho', 'estoque']
+    
+    class Meta: 
+        ordering = ['-data_criacao']
+        unique_together = ['empenho', 'estoque']
 
     def __str__(self): return f"{self.lote} - {self.quantidade} unidades"
+    
     def save(self, *args, **kwargs):
         if self.estoque and not self.lote:
             self.lote = self.estoque.lote
@@ -271,14 +305,13 @@ class ItemEmpenho(models.Model):
             self.saldo_anterior = self.estoque.saldo
             self.endereco_origem = self.estoque.endereco
         super().save(*args, **kwargs)
+    
     @property
     def saldo_disponivel(self): return self.estoque.saldo - self.quantidade
 
-
-
-
-
-
+# ============================================================================
+# PRODUTO
+# ============================================================================
 
 class Produto(models.Model):
     cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT, verbose_name="Cultivar")
@@ -312,17 +345,11 @@ class Produto(models.Model):
         if self.tratamento: info.append(f"Tratamento: {self.tratamento.nome}")
         return " | ".join(info)
 
-
-
-
-
-from django.db import models
-from django.contrib.auth.models import User
-import json
+# ============================================================================
+# DASHBOARD
+# ============================================================================
 
 class DashboardConfig(models.Model):
-    """Configurações dos gráficos do dashboard"""
-    
     TIPO_GRAFICO_CHOICES = [
         ('doughnut', 'Rosca (Doughnut)'),
         ('pie', 'Pizza (Pie)'),
@@ -346,19 +373,16 @@ class DashboardConfig(models.Model):
         (90, 'Últimos 90 dias'),
     ]
     
-    # Gráfico de Cultivares
     cultivar_tipo = models.CharField(max_length=20, choices=TIPO_GRAFICO_CHOICES, default='doughnut')
     cultivar_qtd = models.IntegerField(default=10)
     cultivar_ordem = models.CharField(max_length=20, choices=ORDEM_CHOICES, default='valor_desc')
     cultivar_zerados = models.BooleanField(default=False)
     cultivar_agrupar_outros = models.BooleanField(default=True)
     
-    # Gráfico de Peneiras
     peneira_tipo = models.CharField(max_length=20, choices=TIPO_GRAFICO_CHOICES, default='pie')
     peneira_qtd = models.IntegerField(default=8)
     peneira_ordem = models.CharField(max_length=20, choices=ORDEM_CHOICES, default='valor_desc')
     
-    # Gráfico de Armazéns
     armazem_tipo = models.CharField(max_length=20, choices=TIPO_GRAFICO_CHOICES, default='bar')
     armazem_ordem = models.CharField(max_length=20, choices=ORDEM_CHOICES, default='nome_asc')
     armazem_metrica = models.CharField(max_length=20, choices=[
@@ -367,7 +391,6 @@ class DashboardConfig(models.Model):
         ('peso', 'Peso Total (kg)'),
     ], default='volume')
     
-    # Gráfico de Tendência
     tendencia_periodo = models.IntegerField(choices=PERIODO_CHOICES, default=7)
     tendencia_saidas = models.BooleanField(default=True)
     tendencia_transferencias = models.BooleanField(default=False)
@@ -377,8 +400,7 @@ class DashboardConfig(models.Model):
         ('month', 'Por Mês'),
     ], default='day')
     
-    # Configurações Gerais
-    auto_refresh = models.IntegerField(default=0, help_text="Tempo em segundos (0 = desativado)")
+    auto_refresh = models.IntegerField(default=0)
     unidade_padrao = models.CharField(max_length=10, choices=[
         ('sc', 'Sacas (SC)'),
         ('bags', 'Bags'),
@@ -395,16 +417,13 @@ class DashboardConfig(models.Model):
     mostrar_legendas = models.BooleanField(default=True)
     mostrar_percentuais = models.BooleanField(default=True)
     
-    # Filtros Rápidos
     filtro_cultivar = models.BooleanField(default=True)
     filtro_peneira = models.BooleanField(default=True)
     filtro_armazem = models.BooleanField(default=True)
     filtro_periodo = models.BooleanField(default=True)
     
-    # Layout dos gráficos (posições e tamanhos)
-    layout_config = models.TextField(default='{}', help_text="Configuração de layout em JSON")
+    layout_config = models.TextField(default='{}')
     
-    # Metadados
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
     criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='dashboard_configs')
@@ -412,8 +431,8 @@ class DashboardConfig(models.Model):
     class Meta:
         verbose_name = "Configuração do Dashboard"
         verbose_name_plural = "Configurações do Dashboard"
-        unique_together = ['criado_por']  # Garante apenas uma config por usuário
-
+        unique_together = ['criado_por']
+    
     def __str__(self):
         return f"Dashboard Config - {self.criado_em.strftime('%d/%m/%Y %H:%M')}"
     
@@ -426,13 +445,10 @@ class DashboardConfig(models.Model):
     def set_layout_config(self, config_dict):
         self.layout_config = json.dumps(config_dict)
 
-
 class DashboardFiltroSalvo(models.Model):
-    """Filtros salvos pelos usuários"""
-    
     nome = models.CharField(max_length=100)
     descricao = models.TextField(blank=True, null=True)
-    filtros = models.TextField(help_text="Filtros em JSON")
+    filtros = models.TextField()
     usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name='filtros_salvos')
     compartilhado = models.BooleanField(default=False)
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -451,10 +467,7 @@ class DashboardFiltroSalvo(models.Model):
         except:
             return {}
 
-
 class DashboardWidget(models.Model):
-    """Widgets personalizados para o dashboard"""
-    
     TIPO_WIDGET_CHOICES = [
         ('grafico', 'Gráfico'),
         ('tabela', 'Tabela'),
@@ -477,28 +490,22 @@ class DashboardWidget(models.Model):
     tipo = models.CharField(max_length=20, choices=TIPO_WIDGET_CHOICES)
     origem_dados = models.CharField(max_length=30, choices=ORIGEM_DADOS_CHOICES)
     
-    # Configurações
     titulo = models.CharField(max_length=200, blank=True)
     subtitulo = models.CharField(max_length=200, blank=True)
     
-    # Posição e tamanho
     pos_x = models.IntegerField(default=0)
     pos_y = models.IntegerField(default=0)
     largura = models.IntegerField(default=6)
     altura = models.IntegerField(default=4)
     
-    # Configurações específicas
-    config = models.TextField(default='{}', help_text="Configurações específicas do widget em JSON")
+    config = models.TextField(default='{}')
     
-    # Visibilidade
     ativo = models.BooleanField(default=True)
     visivel_para_todos = models.BooleanField(default=False)
     usuarios_permitidos = models.ManyToManyField(User, blank=True, related_name='widgets_permitidos')
     
-    # Ordem
     ordem = models.IntegerField(default=0)
     
-    # Metadados
     criado_em = models.DateTimeField(auto_now_add=True)
     criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='widgets_criados')
     
@@ -515,91 +522,34 @@ class DashboardWidget(models.Model):
             return json.loads(self.config)
         except:
             return {}
-        
 
-
-
-
-from django.db import models
-from django.contrib.auth.models import User
+# ============================================================================
+# CONFIGURAÇÃO DE LOGO
+# ============================================================================
 
 class ConfiguracaoLogo(models.Model):
-    """Configuração da logo da empresa - gerenciada via Django Admin"""
-    logo = models.ImageField(
-        upload_to='logos/',
-        null=True,
-        blank=True,
-        verbose_name="Logo da Empresa",
-        help_text="Tamanho recomendado: 200x100px. Faça upload pelo Django Admin."
-    )
-    nome_empresa = models.CharField(
-        max_length=100,
-        default='GRUPO CONCEITO',
-        verbose_name="Nome da Empresa"
-    )
-    ativo = models.BooleanField(
-        default=True,
-        verbose_name="Ativo",
-        help_text="Apenas uma configuração deve estar ativa"
-    )
+    logo = models.ImageField(upload_to='logos/', null=True, blank=True, verbose_name="Logo da Empresa")
+    nome_empresa = models.CharField(max_length=100, default='GRUPO CONCEITO', verbose_name="Nome da Empresa")
+    ativo = models.BooleanField(default=True, verbose_name="Ativo")
     atualizado_em = models.DateTimeField(auto_now=True)
-    atualizado_por = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="Atualizado por"
-    )
+    atualizado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Atualizado por")
     
     class Meta:
         verbose_name = "Configuração da Logo"
         verbose_name_plural = "Configurações da Logo"
     
     def save(self, *args, **kwargs):
-        # Garante que apenas um registro está ativo
         if self.ativo:
             ConfiguracaoLogo.objects.filter(ativo=True).exclude(pk=self.pk).update(ativo=False)
         super().save(*args, **kwargs)
     
     @classmethod
     def get_logo(cls):
-        """Retorna a logo ativa ou None"""
         try:
             return cls.objects.get(ativo=True)
         except cls.DoesNotExist:
             return None
         except cls.MultipleObjectsReturned:
-            # Se houver múltiplos, pega o primeiro e desativa os outros
             primeira = cls.objects.filter(ativo=True).first()
             cls.objects.filter(ativo=True).exclude(pk=primeira.pk).update(ativo=False)
             return primeira
-
-
-# Adicione ao models.py junto com Cultivar, Peneira, etc.
-
-class Armazem(models.Model):
-    nome = models.CharField(max_length=20, unique=True)
-    def __str__(self): return self.nome
-
-class Rua(models.Model):
-    nome = models.CharField(max_length=20)  # Ex: R-A
-    armazem = models.ForeignKey(Armazem, on_delete=models.CASCADE, related_name='ruas')
-    
-    class Meta:
-        unique_together = ('nome', 'armazem') # Permite 'R-A' no AZ-01 e no AZ-02
-    def __str__(self): return f"{self.nome} ({self.armazem.nome})"
-
-class Linha(models.Model):
-    nome = models.CharField(max_length=20)
-    # Adicione null=True e blank=True
-    rua = models.ForeignKey(Rua, on_delete=models.CASCADE, related_name='linhas', null=True, blank=True)
-    
-    class Meta:
-        unique_together = ('nome', 'rua')
-
-    def __str__(self):
-        return f"{self.nome} de {self.rua}"
-
-class OrigemDestino(models.Model):
-    nome = models.CharField(max_length=100, unique=True) # Ex: Produção Interna
-    def __str__(self): return self.nome
