@@ -71,6 +71,7 @@ urlpatterns = [
     path('api/buscar-origens/', views.buscar_origens, name='buscar_origens'),  # já existente
     path('api/buscar-enderecos/', views.api_buscar_enderecos, name='api_buscar_enderecos'),  # NOVA
     path('api/listar-enderecos/', views.api_listar_enderecos, name='api_listar_enderecos'),  # NOVA
+    path('dashboard-data/', views.dashboard_data, name='dashboard_data'),
 ]
 
 # ============================================================================

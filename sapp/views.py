@@ -186,78 +186,269 @@ def processar_decimal(valor, default=Decimal('0.00')):
         return Decimal(str(valor)).quantize(Decimal('0.01'))
     except (InvalidOperation, ValueError, TypeError):
         return default
-# ================================================================
-# FUNÇÕES AUXILIARES
-# ================================================================
+
+
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.db.models import Sum, Count, Q, F, OuterRef, Subquery
+from django.db.models.functions import TruncDate, Coalesce
+from django.utils import timezone
+from django.http import JsonResponse
+from datetime import datetime, timedelta
+from .models import Estoque, HistoricoMovimentacao, Especie, Cultivar, Peneira
 
 @login_required
 def dashboard(request):
-    """Dashboard com métricas reais"""
-    total_itens = Estoque.objects.count()
-    itens_ativos = Estoque.objects.filter(saldo__gt=0).count()
-    itens_esgotados = total_itens - itens_ativos
+    """Dashboard inicial com preenchimento de filtros e estado base"""
+    try:
+        context = {
+            'tipos_semente': Especie.objects.values_list('nome', flat=True).distinct().order_by('nome'),
+            'cultivares_lista': Cultivar.objects.all().order_by('nome'),
+            'armazens_lista': Estoque.objects.exclude(az__isnull=True).exclude(az='')
+                              .values_list('az', flat=True).distinct().order_by('az'),
+            'peneiras_lista': Peneira.objects.all().order_by('nome'),
+        }
+        return render(request, 'sapp/dashboard.html', context)
+    except Exception as e:
+        print(f"[ERROR] Dashboard: {str(e)}")
+        context = {
+            'tipos_semente': [],
+            'cultivares_lista': [],
+            'armazens_lista': [],
+            'peneiras_lista': [],
+        }
+        return render(request, 'sapp/dashboard.html', context)
+
+
+@login_required
+def dashboard_data(request):
+    """Endpoint AJAX para carregar dados do dashboard com filtros"""
+    try:
+        # Pegar filtros
+        tipo_semente = request.GET.get('tipo_semente', '').strip()
+        cultivar_id = request.GET.get('cultivar', '').strip()
+        peneira_id = request.GET.get('peneira', '').strip()
+        unidade = request.GET.get('unidade', '').strip()
+        armazem = request.GET.get('armazem', '').strip()
+        data_inicio = request.GET.get('data_inicio', '').strip()
+        data_fim = request.GET.get('data_fim', '').strip()
+        tipo_mov = request.GET.get('tipo_mov', '').strip()
+        search = request.GET.get('search', '').strip()
+        
+        # Base queries
+        est_qs = Estoque.objects.filter(saldo__gt=0)
+        mov_qs = HistoricoMovimentacao.objects.select_related('estoque', 'usuario')
+        
+        # Aplicar filtros de estoque
+        if tipo_semente:
+            est_qs = est_qs.filter(especie__nome__icontains=tipo_semente)
+        
+        if cultivar_id and cultivar_id.isdigit():
+            est_qs = est_qs.filter(cultivar_id=int(cultivar_id))
+        
+        if peneira_id and peneira_id.isdigit():
+            est_qs = est_qs.filter(peneira_id=int(peneira_id))
+        
+        if unidade:
+            est_qs = est_qs.filter(embalagem=unidade)
+        
+        if armazem:
+            est_qs = est_qs.filter(az=armazem)
+        
+        if search:
+            est_qs = est_qs.filter(
+                Q(lote__icontains=search) | 
+                Q(cultivar__nome__icontains=search) |
+                Q(especie__nome__icontains=search)
+            )
+        
+        # Aplicar filtros de movimentação
+        mov_qs = mov_qs.filter(estoque__in=est_qs)
+        
+        if data_inicio:
+            try:
+                mov_qs = mov_qs.filter(data_hora__date__gte=data_inicio)
+            except:
+                pass
+        
+        if data_fim:
+            try:
+                mov_qs = mov_qs.filter(data_hora__date__lte=data_fim)
+            except:
+                pass
+        
+        if tipo_mov:
+            mov_qs = mov_qs.filter(tipo__iexact=tipo_mov)
+        
+        # Calcular KPIs
+        kpis = calcular_kpis(est_qs)
+        
+        # Dados dos gráficos com cores variadas
+        cores = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1']
+        
+        graficos = {
+            'cultivar': obter_dados_cultivares(est_qs, cores),
+            'peneira': obter_dados_peneiras(est_qs, cores),
+            'armazem': obter_dados_armazens(est_qs, cores),
+            'tendencia': obter_dados_tendencia(mov_qs)
+        }
+        
+        # Opções de cultivares para encadeamento
+        opcoes_cultivares = []
+        if tipo_semente:
+            opcoes_cultivares = list(
+                est_qs.filter(cultivar__isnull=False)
+                .values('cultivar_id', 'cultivar__nome')
+                .distinct()
+                .order_by('cultivar__nome')
+            )
+        
+        # Movimentações recentes
+        movimentacoes_recentes = obter_movimentacoes_recentes(mov_qs)
+        
+        return JsonResponse({
+            'success': True,
+            'kpis': kpis,
+            'graficos': graficos,
+            'recentes': movimentacoes_recentes,
+            'opcoes_cultivares': opcoes_cultivares
+        })
+        
+    except Exception as e:
+        print(f"[ERROR] Dashboard data: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+def calcular_kpis(est_qs):
+    """Calcula KPIs"""
+    totais = est_qs.values('embalagem').annotate(total=Sum('saldo'))
     
-    total_bag = Estoque.objects.filter(embalagem='BAG', saldo__gt=0).aggregate(
-        total=Sum('saldo'))['total'] or 0
-    total_sc = Estoque.objects.filter(embalagem='SC', saldo__gt=0).aggregate(
-        total=Sum('saldo'))['total'] or 0
-    total_sc_convertido = (total_bag * 25) + total_sc
+    bags = 0
+    scs = 0
+    for item in totais:
+        if item['embalagem'] == 'BAG':
+            bags = item['total'] or 0
+        elif item['embalagem'] == 'SC':
+            scs = item['total'] or 0
     
-    peso_total = Estoque.objects.filter(saldo__gt=0).aggregate(
-        total=Sum('peso_total'))['total'] or Decimal('0.00')
+    total_sc = (bags * 25) + scs
+    peso_total = float(est_qs.aggregate(s=Sum('peso_total'))['s'] or 0)
+    lotes_ativos = est_qs.count()
     
-    hoje = timezone.now()
-    inicio_mes = hoje.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    
-    movimentacao_mes = HistoricoMovimentacao.objects.filter(
-        data_hora__gte=inicio_mes
+    # Estoque parado
+    limite_parado = timezone.now() - timedelta(days=30)
+    estoque_parado = est_qs.filter(
+        Q(data_ultima_movimentacao__lt=limite_parado) |
+        Q(data_ultima_movimentacao__isnull=True, data_entrada__lt=limite_parado)
     ).count()
     
-    top_cultivares = list(Estoque.objects.filter(saldo__gt=0).values(
-        'cultivar__nome'
-    ).annotate(
-        total_saldo=Sum('saldo')
-    ).order_by('-total_saldo')[:10])
-    
-    categorias_distribuicao = list(Estoque.objects.filter(saldo__gt=0).values(
-        'peneira__nome'  # Alterado de categoria__nome para peneira__nome
-    ).annotate(
-        total=Sum('saldo')
-    ).order_by('-total')[:10])
-    
-    capacidade_armazem = list(Estoque.objects.filter(
-        saldo__gt=0,
-        az__isnull=False  # Filtra apenas itens com AZ definido
-    ).exclude(
-        az=''  # Remove valores vazios
-    ).values(
-        'az'  # ✅ CORRETO: agora usa o campo AZ
-    ).annotate(
-        total_sc=Sum('saldo'),
-        total_lotes=Count('id'),
-        peso_total=Sum('peso_total')
-    ).order_by('az'))  # Ordena por AZ
-    
-    movimentacao_recente = list(HistoricoMovimentacao.objects.select_related(
-        'estoque', 'usuario'
-    ).order_by('-data_hora')[:10])
-    
-    context = {
-        'total_sc_convertido': total_sc_convertido,
-        'total_bag': total_bag,
-        'total_sc': total_sc,
-        'peso_total': peso_total,
-        'itens_ativos': itens_ativos,
-        'itens_esgotados': itens_esgotados,
-        'movimentacao_mes': movimentacao_mes,
-        'top_cultivares': top_cultivares,
-        'categorias_distribuicao': categorias_distribuicao,
-        'capacidade_armazem': capacidade_armazem,
-        'movimentacao_recente': movimentacao_recente,
+    return {
+        'total_sc': int(total_sc),
+        'bags': int(bags),
+        'scs': int(scs),
+        'peso': round(peso_total, 2),
+        'ativos': lotes_ativos,
+        'parados': estoque_parado,
     }
-    
-    return render(request, 'sapp/dashboard.html', context)
 
+
+def obter_dados_cultivares(est_qs, cores):
+    """Obtém dados do gráfico de cultivares com cores"""
+    dados = list(
+        est_qs.filter(cultivar__isnull=False, cultivar__nome__isnull=False)
+        .values('cultivar__nome')
+        .annotate(volume=Sum('saldo'))
+        .filter(volume__gt=0)
+        .order_by('-volume')[:10]
+    )
+    
+    return {
+        'labels': [item['cultivar__nome'] for item in dados],
+        'values': [int(item['volume']) for item in dados],
+        'colors': cores[:len(dados)]
+    }
+
+
+def obter_dados_peneiras(est_qs, cores):
+    """Obtém dados do gráfico de peneiras com cores"""
+    dados = list(
+        est_qs.filter(peneira__isnull=False, peneira__nome__isnull=False)
+        .values('peneira__nome')
+        .annotate(volume=Sum('saldo'))
+        .filter(volume__gt=0)
+        .order_by('-volume')
+    )
+    
+    return {
+        'labels': [item['peneira__nome'] for item in dados],
+        'values': [int(item['volume']) for item in dados],
+        'colors': cores[:len(dados)]
+    }
+
+
+def obter_dados_armazens(est_qs, cores):
+    """Obtém dados do gráfico de armazéns com cores"""
+    dados = list(
+        est_qs.exclude(az__isnull=True).exclude(az='')
+        .values('az')
+        .annotate(volume=Sum('saldo'))
+        .filter(volume__gt=0)
+        .order_by('az')
+    )
+    
+    return {
+        'labels': [f"AZ {item['az']}" for item in dados],
+        'values': [int(item['volume']) for item in dados],
+        'colors': cores[:len(dados)]
+    }
+
+
+def obter_dados_tendencia(mov_qs):
+    """Obtém dados do gráfico de tendência"""
+    data_limite = (timezone.now() - timedelta(days=15)).date()
+    
+    dados = list(
+        mov_qs.filter(data_hora__date__gte=data_limite)
+        .annotate(dia=TruncDate('data_hora'))
+        .values('dia')
+        .annotate(
+            entradas=Count('id', filter=Q(tipo__iexact='Entrada')),
+            saidas=Count('id', filter=Q(tipo__iexact='Saída'))
+        )
+        .order_by('dia')
+    )
+    
+    return {
+        'labels': [item['dia'].strftime('%d/%m') for item in dados],
+        'entradas': [item['entradas'] for item in dados],
+        'saidas': [item['saidas'] for item in dados]
+    }
+
+
+def obter_movimentacoes_recentes(mov_qs):
+    """Obtém lista de movimentações recentes"""
+    movimentacoes = []
+    
+    for mov in mov_qs.select_related('usuario', 'estoque').order_by('-data_hora')[:10]:
+        embalagem = mov.estoque.embalagem if mov.estoque else '--'
+        quantidade = getattr(mov, 'quantidade', 0)
+        lote = mov.lote_ref or (mov.estoque.lote if mov.estoque else '--')
+        
+        movimentacoes.append({
+            'dt': mov.data_hora.strftime('%d/%m/%Y %H:%M') if mov.data_hora else '--',
+            'tp': mov.tipo or '--',
+            'lt': lote,
+            'unidade': embalagem,
+            'qtd': quantidade,
+            'us': mov.usuario.username if mov.usuario else 'Sistema'
+        })
+    
+    return movimentacoes
 # ================================================================
 # LISTA DE ESTOQUE (TABELA PRINCIPAL)
 # ================================================================
