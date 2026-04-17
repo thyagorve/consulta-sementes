@@ -66,8 +66,6 @@ urlpatterns = [
     path('api/mapa-dados/<int:armazem_numero>/', views.api_mapa_dados, name='api_mapa_dados'),
     path('api/marcacoes-ultimo-lote/', views.api_marcacoes_ultimo_lote, name='api_marcacoes_ultimo_lote'),
 
-
-        # No urlpatterns do sapp/urls.py
     path('api/buscar-origens/', views.buscar_origens, name='buscar_origens'),  # já existente
     path('api/buscar-enderecos/', views.api_buscar_enderecos, name='api_buscar_enderecos'),  # NOVA
     path('api/listar-enderecos/', views.api_listar_enderecos, name='api_listar_enderecos'),  # NOVA
