@@ -1,102 +1,79 @@
-<!-- 
-INSTRUÇÕES:
-1. CORRIGIR TODOS OS PROBLEMAS LISTADOS ACIMA
-2. MELHORAR A ESTILIZAÇÃO DO MODAL (HEADER COM GRADIENTE, CARDS COM SHADOWS, ÍCONES NOS INPUTS, CORES MODERNAS)
-3. MANTER TODAS AS FUNCIONALIDADES EXISTENTES
-4. NÃO REMOVER NENHUM CAMPO DO FORMULÁRIO
-5. O SCANNER DEVE FUNCIONAR COMO A CÂMERA NATIVA (LER À DISTÂNCIA, SEM PRECISAR APROXIMAR)
-6. A CÂMERA DEVE PARAR COMPLETAMENTE AO FECHAR O MODAL
-7. ENTREGAR O CÓDIGO HTML + CSS + JAVASCRIPT COMPLETO
--->
-
-<!-- ESTRUTURA DO MODAL -->
+<!-- ============================================ -->
+<!-- MODAL COMPLETO 100% FUNCIONAL - SCROLL CORRIGIDO -->
+<!-- ============================================ -->
 <div class="modal fade" id="modalNovaEntrada" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-fullscreen-sm-down modal-xl modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden">
+        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden" style="max-height: 90vh;">
             
-            <!-- ============================================ -->
-            <!-- HEADER MELHORADO COM GRADIENTE -->
-            <!-- ============================================ -->
-            <div class="modal-header bg-gradient-primary text-white border-0 py-3 px-4" style="background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);">
+            <!-- HEADER FIXO -->
+            <div class="modal-header bg-gradient-primary text-white border-0 py-3 px-4 flex-shrink-0" style="background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);">
                 <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
                     <div class="icon-circle bg-white bg-opacity-25 p-2 rounded-circle">
                         <i class="bi bi-box-seam fs-5"></i>
                     </div>
                     Nova Entrada de Estoque
                 </h5>
-                <button type="button" class="btn-close btn-close-white opacity-75 hover-opacity-100" data-bs-dismiss="modal" aria-label="Close" id="btnCloseModal"></button>
+                <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close" id="btnCloseModal"></button>
             </div>
 
-            <form id="formNovaEntrada" method="POST" action="{% url 'sapp:nova_entrada' %}" enctype="multipart/form-data">
-                {% csrf_token %}
+            <!-- BODY COM SCROLL -->
+            <div class="modal-body p-0" style="overflow-y: auto; max-height: calc(90vh - 140px); -webkit-overflow-scrolling: touch;">
                 
-                <!-- ============================================ -->
-                <!-- SCANNER FULLSCREEN (CORRIGIDO) -->
-                <!-- ============================================ -->
-                <div id="scannerFullscreen" class="d-none position-fixed top-0 start-0 w-100 h-100" style="z-index: 99999; background: rgba(0,0,0,0.95);">
-                    <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4">
-                        
-                        <!-- Indicador de câmera ativa -->
-                        <div id="cameraActiveIndicator" class="camera-indicator"></div>
-                        
-                        <div class="text-center mb-4">
-                            <h4 class="text-white fw-bold mb-2">
-                                <i class="bi bi-qr-code-scan me-2"></i>Escanear QR Code
-                            </h4>
-                            <p class="text-white-50">Aponte para o código - não precisa aproximar</p>
-                        </div>
-                        
-                        <!-- Container do Scanner (MELHORADO) -->
-                        <div id="scannerContainer" class="scanner-container-enhanced">
-                            <div id="scannerReader" class="scanner-reader-enhanced"></div>
+                <form id="formNovaEntrada" method="POST" action="{% url 'sapp:nova_entrada' %}" enctype="multipart/form-data" class="d-flex flex-column h-100">
+                    {% csrf_token %}
+                    
+                    <!-- SCANNER FULLSCREEN -->
+                    <div id="scannerFullscreen" class="d-none position-fixed top-0 start-0 w-100 h-100" style="z-index: 99999; background: rgba(0,0,0,0.95);">
+                        <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4">
+                            <div id="cameraActiveIndicator" class="camera-indicator" style="display:none;"></div>
                             
-                            <!-- Moldura do scanner (MELHORADA) -->
-                            <div class="scanner-frame-enhanced">
-                                <div class="scanner-corner top-left"></div>
-                                <div class="scanner-corner top-right"></div>
-                                <div class="scanner-corner bottom-left"></div>
-                                <div class="scanner-corner bottom-right"></div>
-                                <div class="scanner-line-enhanced"></div>
+                            <div class="text-center mb-4">
+                                <h4 class="text-white fw-bold mb-2">
+                                    <i class="bi bi-qr-code-scan me-2"></i>Escanear QR Code
+                                </h4>
+                                <p class="text-white-50">Aponte para o código - não precisa aproximar</p>
+                            </div>
+                            
+                            <div id="scannerContainer" style="width: 90%; max-width: 450px; aspect-ratio: 1/1; position: relative; margin: 0 auto;">
+                                <div id="scannerReader" style="width: 100%; height: 100%; border-radius: 20px; overflow: hidden; border: 3px solid rgba(59, 130, 246, 0.6);"></div>
+                                
+                                <div class="scanner-frame-enhanced" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+                                    <div class="scanner-line-animated" style="position: absolute; left: 5%; width: 90%; height: 2px; background: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.8); animation: scanLine 2s ease-in-out infinite;"></div>
+                                </div>
+                            </div>
+                            
+                            <div id="scannerStatus" class="text-white mt-4 fw-bold text-center" style="min-height: 30px;"></div>
+                            
+                            <div class="d-flex gap-3 mt-5">
+                                <button type="button" class="btn btn-outline-light btn-lg px-4 rounded-pill" onclick="ScannerApp.toggleFlash()" id="btnFlash" disabled>
+                                    <i class="bi bi-lightning-charge"></i> Flash
+                                </button>
+                                <button type="button" class="btn btn-danger btn-lg px-5 fw-bold rounded-pill shadow-lg" onclick="ScannerApp.stop()">
+                                    <i class="bi bi-x-circle"></i> Fechar Scanner
+                                </button>
                             </div>
                         </div>
-                        
-                        <div id="scannerStatus" class="text-white mt-4 fw-bold text-center" style="min-height: 30px;"></div>
-                        
-                        <div class="d-flex gap-3 mt-5">
-                            <button type="button" class="btn btn-outline-light btn-lg px-4 rounded-pill" onclick="ScannerApp.toggleFlash()" id="btnFlash" disabled>
-                                <i class="bi bi-lightning-charge"></i> Flash
-                            </button>
-                            <button type="button" class="btn btn-danger btn-lg px-5 fw-bold rounded-pill shadow-lg" onclick="ScannerApp.stop()">
-                                <i class="bi bi-x-circle"></i> Fechar Scanner
-                            </button>
-                        </div>
                     </div>
-                </div>
 
-                <!-- ============================================ -->
-                <!-- CONTEÚDO DO FORMULÁRIO (MELHORADO) -->
-                <!-- ============================================ -->
-                <div id="formContent">
-                    <div class="modal-body p-4" style="background: #f8fafc;">
+                    <!-- CONTEÚDO DO FORMULÁRIO -->
+                    <div id="formContent" class="p-4" style="background: #f8fafc;">
                         <div class="row g-3">
                             
                             <!-- SEÇÃO 1: IDENTIFICAÇÃO -->
                             <div class="col-12">
-                                <div class="section-header">
-                                    <div class="section-icon">
+                                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom">
+                                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
                                         <i class="bi bi-tag-fill"></i>
                                     </div>
-                                    <h6 class="section-title">Identificação Principal</h6>
+                                    <h6 class="fw-bold text-dark m-0">Identificação Principal</h6>
                                 </div>
                             </div>
                             
                             <div class="col-md-8 position-relative">
                                 <label class="form-label small fw-bold text-secondary">Número do Lote *</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-hash text-primary"></i>
-                                    </span>
-                                    <input type="text" name="lote" id="inputLote" class="form-control form-control-lg fw-bold border-start-0" required autocomplete="off" placeholder="Digite o lote ou escaneie">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-hash text-primary"></i></span>
+                                    <input type="text" name="lote" id="inputLote" class="form-control form-control-lg fw-bold" required autocomplete="off" placeholder="Digite o lote ou escaneie">
                                     <button type="button" class="btn btn-primary px-3" onclick="ScannerApp.start()" title="Escanear QR Code" id="btnScan">
                                         <i class="bi bi-qr-code-scan fs-5"></i>
                                     </button>
@@ -106,87 +83,63 @@ INSTRUÇÕES:
 
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold text-secondary">Quantidade *</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-123 text-primary"></i>
-                                    </span>
-                                    <input type="number" name="entrada" id="inputQtd" class="form-control form-control-lg text-center fw-bold border-start-0" required min="1" placeholder="0">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-123 text-primary"></i></span>
+                                    <input type="number" name="entrada" id="inputQtd" class="form-control form-control-lg text-center fw-bold" required min="1" placeholder="0">
                                 </div>
                             </div>
 
                             <!-- SEÇÃO 2: LOCALIZAÇÃO E ORIGEM -->
                             <div class="col-12 mt-3">
-                                <div class="section-header">
-                                    <div class="section-icon">
+                                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom">
+                                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
                                         <i class="bi bi-geo-alt-fill"></i>
                                     </div>
-                                    <h6 class="section-title">Localização e Origem</h6>
+                                    <h6 class="fw-bold text-dark m-0">Localização e Origem</h6>
                                 </div>
                             </div>
                             
                             <div class="col-md-6 col-lg-3">
                                 <label class="form-label small fw-bold text-secondary">Origem / Destino *</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-building text-primary"></i>
-                                    </span>
-                                    <select name="origem_destino" id="inputOrigem" class="form-select border-start-0" required>
-                                        <option value="">Selecione...</option>
-                                        {% for o in origens %}
-                                            <option value="{{ o.nome }}">{{ o.nome }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
+                                <select name="origem_destino" id="inputOrigem" class="form-select" required>
+                                    <option value="">Selecione...</option>
+                                    {% for o in origens %}
+                                        <option value="{{ o.nome }}">{{ o.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             
                             <div class="col-md-6 col-lg-3">
                                 <label class="form-label small fw-bold text-secondary">Endereço *</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-pin-map-fill text-primary"></i>
-                                    </span>
-                                    <input type="text" name="endereco" id="inputEndereco" class="form-control text-uppercase border-start-0" required placeholder="Ex: R-C LN01 P03">
-                                </div>
+                                <input type="text" name="endereco" id="inputEndereco" class="form-control text-uppercase" required placeholder="Ex: R-C LN01 P03">
                                 <div id="enderecoFeedback" class="mt-1 small" style="min-height: 24px;"></div>
                             </div>
                             
                             <div class="col-md-6 col-lg-3">
                                 <label class="form-label small fw-bold text-secondary">Armazém (AZ) *</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-boxes text-primary"></i>
-                                    </span>
-                                    <input type="text" name="az" id="inputAz" class="form-control text-uppercase bg-light border-start-0" required readonly placeholder="Automático">
-                                </div>
+                                <input type="text" name="az" id="inputAz" class="form-control text-uppercase bg-light" required readonly placeholder="Automático">
                             </div>
                             
                             <div class="col-md-6 col-lg-3">
                                 <label class="form-label small fw-bold text-secondary">Cliente</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-person-fill text-primary"></i>
-                                    </span>
-                                    <input type="text" name="cliente" id="inputCliente" class="form-control border-start-0">
-                                </div>
+                                <input type="text" name="cliente" id="inputCliente" class="form-control">
                             </div>
 
                             <!-- SEÇÃO 3: PRODUTO E DADOS TÉCNICOS -->
                             <div class="col-12 mt-3">
-                                <div class="section-header">
-                                    <div class="section-icon">
+                                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom">
+                                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
                                         <i class="bi bi-box-seam-fill"></i>
                                     </div>
-                                    <h6 class="section-title">Dados do Produto e SKU</h6>
+                                    <h6 class="fw-bold text-dark m-0">Dados do Produto e SKU</h6>
                                 </div>
                             </div>
                             
                             <div class="col-md-12 col-lg-4">
                                 <label class="form-label small fw-bold text-secondary">Código do Produto (SKU)</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-upc-scan text-primary"></i>
-                                    </span>
-                                    <input type="text" name="produto" id="inputSKU" class="form-control fw-bold border-start-0" placeholder="Digite SKU para buscar dados">
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-upc-scan text-primary"></i></span>
+                                    <input type="text" name="produto" id="inputSKU" class="form-control fw-bold" placeholder="Digite SKU para buscar dados">
                                 </div>
                                 <small id="skuLoading" class="text-primary d-none mt-1">
                                     <span class="spinner-border spinner-border-sm me-1"></span>Buscando dados...
@@ -195,32 +148,22 @@ INSTRUÇÕES:
 
                             <div class="col-md-6 col-lg-4">
                                 <label class="form-label small fw-bold text-secondary">Espécie *</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-flower1 text-primary"></i>
-                                    </span>
-                                    <select name="especie" id="selEspecie" class="form-select border-start-0" required>
-                                        <option value="">Selecione...</option>
-                                        {% for e in all_especies %}
-                                            <option value="{{ e.id }}">{{ e.nome }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
+                                <select name="especie" id="selEspecie" class="form-select" required>
+                                    <option value="">Selecione...</option>
+                                    {% for e in all_especies %}
+                                        <option value="{{ e.id }}">{{ e.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             
                             <div class="col-md-6 col-lg-4">
                                 <label class="form-label small fw-bold text-secondary">Cultivar *</label>
-                                <div class="input-group input-group-enhanced">
-                                    <span class="input-group-text bg-white border-end-0">
-                                        <i class="bi bi-tree-fill text-primary"></i>
-                                    </span>
-                                    <select name="cultivar" id="selCultivar" class="form-select border-start-0" required>
-                                        <option value="">Selecione...</option>
-                                        {% for c in all_cultivares %}
-                                            <option value="{{ c.id }}">{{ c.nome }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
+                                <select name="cultivar" id="selCultivar" class="form-select" required>
+                                    <option value="">Selecione...</option>
+                                    {% for c in all_cultivares %}
+                                        <option value="{{ c.id }}">{{ c.nome }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                             
                             <div class="col-md-4">
@@ -255,11 +198,11 @@ INSTRUÇÕES:
 
                             <!-- SEÇÃO 4: COMPLEMENTO -->
                             <div class="col-12 mt-3">
-                                <div class="section-header">
-                                    <div class="section-icon">
+                                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom">
+                                    <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
                                         <i class="bi bi-journal-text"></i>
                                     </div>
-                                    <h6 class="section-title">Informações Complementares</h6>
+                                    <h6 class="fw-bold text-dark m-0">Informações Complementares</h6>
                                 </div>
                             </div>
 
@@ -291,116 +234,110 @@ INSTRUÇÕES:
                                 <textarea name="observacao" id="inputObs" class="form-control" rows="2" placeholder="Notas, histórico ou avisos..."></textarea>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- SEÇÃO: Último Lote da Linha -->
-                    <div class="px-4 pb-3" style="background: #f8fafc;">
-                        <div class="card border-warning bg-warning bg-opacity-10 shadow-sm">
+
+                        <!-- CARD ÚLTIMO LOTE DA LINHA (AGORA DENTRO DO BODY COM SCROLL) -->
+                        <div class="card border-warning bg-warning bg-opacity-10 shadow-sm mt-4 mb-3" id="cardUltimoLote">
                             <div class="card-body py-3">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" id="ultimo_lote_linha_novo" name="ultimo_lote_linha" style="transform: scale(1.3); cursor: pointer;">
-                                    <label class="form-check-label fw-bold text-warning ms-2" for="ultimo_lote_linha_novo">
-                                        <i class="fas fa-flag-checkered me-1"></i> 
-                                        Marcar como Último Lote da Linha
-                                    </label>
-                                    <small class="text-muted d-block mt-1 ms-5">
-                                        Quando marcado, todas as posições seguintes desta linha receberão marcação visual no mapa.
-                                    </small>
+                                <div class="form-check form-switch d-flex align-items-center ps-0">
+                                    <input class="form-check-input ms-0 me-3" type="checkbox" 
+                                        id="ultimo_lote_linha_novo"
+                                        name="ultimo_lote_linha"
+                                        style="width: 3rem; height: 1.5rem; cursor: pointer; flex-shrink: 0; margin-top: 0;">
+                                    <div>
+                                        <label class="form-check-label fw-bold text-warning" for="ultimo_lote_linha_novo" style="cursor: pointer; font-size: 0.95rem;">
+                                            <i class="fas fa-flag-checkered me-1"></i> 
+                                            Marcar como Último Lote da Linha
+                                        </label>
+                                        <small class="text-muted d-block mt-1" style="font-size: 0.8rem;">
+                                            Quando marcado, todas as posições seguintes desta linha (mesma rua + LN) receberão marcação visual no mapa.
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
                     </div>
-                    
-                    <!-- FOOTER MELHORADO -->
-                    <div class="modal-footer border-0 p-4" style="background: #ffffff;">
-                        <button type="button" class="btn btn-outline-secondary btn-lg px-4 rounded-pill" data-bs-dismiss="modal" id="btnCancelarModal">
-                            <i class="bi bi-x-lg me-1"></i> Cancelar
-                        </button>
-                        <button type="submit" class="btn btn-primary btn-lg px-5 shadow fw-bold rounded-pill" id="btnSubmit" style="background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);">
-                            <span class="spinner-border spinner-border-sm d-none" role="status" id="submitSpinner"></span>
-                            <span id="submitText"><i class="bi bi-check2-circle me-1"></i> Confirmar Registro</span>
-                        </button>
-                    </div>
-                </div>
-            </form>
+                </form>
+            </div>
+
+            <!-- FOOTER FIXO -->
+            <div class="modal-footer border-0 p-4 flex-shrink-0" style="background: #ffffff; border-top: 1px solid #e2e8f0;">
+                <button type="button" class="btn btn-outline-secondary btn-lg px-4 rounded-pill" data-bs-dismiss="modal" id="btnCancelarModal">
+                    <i class="bi bi-x-lg me-1"></i> Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary btn-lg px-5 shadow fw-bold rounded-pill" id="btnSubmit" form="formNovaEntrada" style="background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);">
+                    <span class="spinner-border spinner-border-sm d-none" role="status" id="submitSpinner"></span>
+                    <span id="submitText"><i class="bi bi-check2-circle me-1"></i> Confirmar Registro</span>
+                </button>
+            </div>
+
         </div>
     </div>
 </div>
 
-<!-- ============================================ -->
-<!-- ESTILOS CSS COMPLETOS (MELHORADOS) -->
-<!-- ============================================ -->
 <style>
-    /* ========== ESTILOS GERAIS ========== */
+    /* ========== SCROLL DO MODAL ========== */
+    .modal-dialog-centered {
+        display: flex;
+        align-items: center;
+        min-height: calc(100vh - 1rem);
+    }
+    
     .modal-content {
-        border: none;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    }
-    
-    /* ========== SEÇÕES DO FORMULÁRIO ========== */
-    .section-header {
+        max-height: 90vh;
         display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 5px;
-        padding-bottom: 8px;
-        border-bottom: 2px solid #e2e8f0;
+        flex-direction: column;
     }
     
-    .section-icon {
-        width: 32px;
-        height: 32px;
-        background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 14px;
+    .modal-body {
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
+        flex: 1 1 auto !important;
     }
     
-    .section-title {
-        margin: 0;
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: #1e293b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    .modal-header {
+        flex-shrink: 0 !important;
     }
     
-    /* ========== INPUTS MELHORADOS ========== */
-    .input-group-enhanced .form-control,
-    .input-group-enhanced .form-select {
-        border-left: none;
-        transition: all 0.2s ease;
+    .modal-footer {
+        flex-shrink: 0 !important;
     }
-    
-    .input-group-enhanced .form-control:focus,
-    .input-group-enhanced .form-select:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+
+    /* Mobile */
+    @media (max-width: 575.98px) {
+        .modal-fullscreen-sm-down {
+            height: 100% !important;
+        }
+        
+        .modal-fullscreen-sm-down .modal-content {
+            max-height: 100vh !important;
+            border-radius: 0 !important;
+        }
+        
+        .modal-fullscreen-sm-down .modal-body {
+            max-height: calc(100vh - 160px) !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+        
+        .modal-fullscreen-sm-down .modal-footer {
+            position: sticky !important;
+            bottom: 0 !important;
+            z-index: 10 !important;
+            background: white !important;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.1) !important;
+        }
     }
-    
-    .input-group-enhanced .input-group-text {
-        transition: all 0.2s ease;
+
+    /* iOS Safari */
+    @supports (-webkit-touch-callout: none) {
+        .modal-body {
+            -webkit-overflow-scrolling: touch !important;
+        }
     }
-    
-    .input-group-enhanced:focus-within .input-group-text {
-        border-color: #3b82f6;
-    }
-    
-    .form-control, .form-select {
-        border-radius: 8px;
-        border-color: #e2e8f0;
-        transition: all 0.2s ease;
-    }
-    
-    .form-control:focus, .form-select:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-    
-    /* ========== AUTOCOMPLETE ========== */
+
+    /* ========== ESTILOS GERAIS ========== */
     #autoCompleteList { 
         max-height: 300px; 
         overflow-y: auto; 
@@ -443,44 +380,7 @@ INSTRUÇÕES:
         margin-top: 3px; 
     }
 
-    /* ========== RESPONSIVIDADE ========== */
-    @media (max-width: 575.98px) {
-        .modal-fullscreen-sm-down { 
-            width: 100vw; 
-            height: 100%; 
-            margin: 0; 
-        }
-        .modal-fullscreen-sm-down .modal-content { 
-            height: 100%; 
-            border-radius: 0 !important; 
-        }
-        .modal-fullscreen-sm-down .modal-body { 
-            overflow-y: auto; 
-            padding: 16px !important; 
-        }
-        .modal-footer { 
-            padding: 12px !important; 
-            flex-direction: column-reverse;
-            gap: 8px;
-        }
-        .modal-footer .btn { 
-            width: 100%; 
-            margin: 0;
-        }
-    }
-    
-    /* ========== VALIDAÇÃO ========== */
-    .is-invalid { 
-        border-color: #dc3545 !important;
-        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
-    }
-    
-    .is-valid {
-        border-color: #198754 !important;
-        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1) !important;
-    }
-    
-    /* ========== SCANNER FULLSCREEN (CORRIGIDO) ========== */
+    /* Scanner */
     #scannerFullscreen {
         position: fixed !important;
         top: 0 !important;
@@ -488,117 +388,21 @@ INSTRUÇÕES:
         width: 100vw !important;
         height: 100vh !important;
         z-index: 99999 !important;
-        background: rgba(0, 0, 0, 0.97) !important;
     }
     
-    /* Container do scanner melhorado */
-    .scanner-container-enhanced {
-        width: 90%;
-        max-width: 450px;
-        aspect-ratio: 1/1;
-        position: relative;
-        margin: 0 auto;
-    }
-    
-    .scanner-reader-enhanced {
-        width: 100%;
-        height: 100%;
-        border-radius: 20px;
-        overflow: hidden;
-        border: 3px solid rgba(59, 130, 246, 0.6);
-        box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
-    }
-    
-    .scanner-reader-enhanced video { 
+    #scannerReader video { 
         width: 100% !important;
         height: 100% !important;
         object-fit: cover !important;
     }
     
-    /* Moldura do scanner melhorada */
-    .scanner-frame-enhanced {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
+    @keyframes scanLine {
+        0% { top: 8%; opacity: 0.3; }
+        15% { opacity: 1; }
+        85% { opacity: 1; }
+        100% { top: 92%; opacity: 0.3; }
     }
     
-    /* Cantos animados */
-    .scanner-corner {
-        position: absolute;
-        width: 30px;
-        height: 30px;
-        border-color: #3b82f6;
-        border-style: solid;
-        transition: all 0.3s ease;
-    }
-    
-    .scanner-corner.top-left {
-        top: -2px;
-        left: -2px;
-        border-width: 4px 0 0 4px;
-        border-radius: 6px 0 0 0;
-    }
-    
-    .scanner-corner.top-right {
-        top: -2px;
-        right: -2px;
-        border-width: 4px 4px 0 0;
-        border-radius: 0 6px 0 0;
-    }
-    
-    .scanner-corner.bottom-left {
-        bottom: -2px;
-        left: -2px;
-        border-width: 0 0 4px 4px;
-        border-radius: 0 0 0 6px;
-    }
-    
-    .scanner-corner.bottom-right {
-        bottom: -2px;
-        right: -2px;
-        border-width: 0 4px 4px 0;
-        border-radius: 0 0 6px 0;
-    }
-    
-    /* Linha do scanner melhorada */
-    .scanner-line-enhanced {
-        position: absolute;
-        left: 5%;
-        width: 90%;
-        height: 2px;
-        background: linear-gradient(90deg, 
-            transparent 0%, 
-            rgba(59, 130, 246, 0.3) 15%, 
-            #3b82f6 50%, 
-            rgba(59, 130, 246, 0.3) 85%, 
-            transparent 100%
-        );
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.4);
-        animation: scanLineEnhanced 2s ease-in-out infinite;
-        border-radius: 2px;
-    }
-    
-    @keyframes scanLineEnhanced {
-        0% { 
-            top: 8%; 
-            opacity: 0.3;
-        }
-        15% {
-            opacity: 1;
-        }
-        85% {
-            opacity: 1;
-        }
-        100% { 
-            top: 92%; 
-            opacity: 0.3;
-        }
-    }
-    
-    /* Indicador de câmera ativa */
     .camera-indicator {
         position: fixed;
         top: 20px;
@@ -617,34 +421,18 @@ INSTRUÇÕES:
         70% { box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
         100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
-    
-    /* ========== BOTÕES MELHORADOS ========== */
-    .btn {
-        transition: all 0.2s ease;
+
+    /* Validação */
+    .is-invalid { 
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
     }
     
-    .btn-primary {
-        background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
-        border: none;
+    .is-valid {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1) !important;
     }
     
-    .btn-primary:hover {
-        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
-    }
-    
-    .btn-outline-secondary:hover {
-        transform: translateY(-1px);
-    }
-    
-    .btn:disabled {
-        cursor: not-allowed;
-        opacity: 0.65;
-        transform: none !important;
-    }
-    
-    /* ========== VALIDAÇÃO DE ENDEREÇO ========== */
     #inputEndereco.is-valid {
         border-color: #198754 !important;
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
@@ -667,12 +455,11 @@ INSTRUÇÕES:
         max-height: 200px;
         overflow-y: auto;
         display: none;
-        margin-top: 2px;
-        border-radius: 8px;
         position: absolute;
         z-index: 1000;
         background: white;
         border: 1px solid #dee2e6;
+        border-radius: 8px;
     }
 
     .bg-light[readonly] {
@@ -684,107 +471,36 @@ INSTRUÇÕES:
         transition: all 0.2s;
     }
 
-    .text-muted small {
-        font-size: 0.75rem;
-    }
-    
-    /* ========== ANIMAÇÕES DE TRANSIÇÃO ========== */
-    .modal.fade .modal-dialog {
-        transition: transform 0.3s ease-out;
-    }
-    
-    /* ========== CARD DE ÚLTIMO LOTE ========== */
-    .card.border-warning {
+    /* Card último lote */
+    #cardUltimoLote {
         border-radius: 12px;
         transition: all 0.2s ease;
     }
     
-    .card.border-warning:hover {
-        box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
-    }
-    
-    /* ========== HOVER OPACITY ========== */
-    .hover-opacity-100:hover {
-        opacity: 1 !important;
+    #cardUltimoLote:hover {
+        box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2) !important;
     }
 
-
-    /* ========== SCROLL NO MODAL PARA MOBILE ========== */
-
-/* Corrige o scroll no corpo do modal */
-.modal-body {
-    overflow-y: auto !important;
-    max-height: 70vh !important; /* Altura máxima no celular */
-    -webkit-overflow-scrolling: touch !important; /* Scroll suave no iOS */
-    overscroll-behavior: contain !important; /* Evita scroll da página atrás */
-}
-
-/* Para telas pequenas (mobile) */
-@media (max-width: 575.98px) {
-    .modal-body {
-        max-height: calc(100vh - 160px) !important; /* Desconta header e footer */
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-        padding: 16px !important;
+    /* Botões */
+    .btn {
+        transition: all 0.2s ease;
     }
     
-    /* Garante que o modal inteiro tenha scroll se necessário */
-    .modal-fullscreen-sm-down .modal-content {
-        max-height: 100vh !important;
-        display: flex !important;
-        flex-direction: column !important;
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
     }
     
-    /* Header fixo no topo */
-    .modal-fullscreen-sm-down .modal-header {
-        flex-shrink: 0 !important;
-        position: sticky !important;
-        top: 0 !important;
-        z-index: 10 !important;
+    .btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.65;
+        transform: none !important;
     }
-    
-    /* Footer fixo embaixo */
-    .modal-fullscreen-sm-down .modal-footer {
-        flex-shrink: 0 !important;
-        position: sticky !important;
-        bottom: 0 !important;
-        z-index: 10 !important;
-        background: white !important;
-    }
-    
-    /* Body com scroll */
-    .modal-fullscreen-sm-down .modal-body {
-        flex: 1 1 auto !important;
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-}
-
-/* Ajuste para o container do formulário dentro do modal */
-#formContent {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Garante scroll no iOS */
-@supports (-webkit-touch-callout: none) {
-    .modal-body {
-        -webkit-overflow-scrolling: touch !important;
-    }
-    
-    .modal-fullscreen-sm-down .modal-body {
-        -webkit-overflow-scrolling: touch !important;
-    }
-}
 </style>
 
-<!-- ============================================ -->
-<!-- SCRIPTS COMPLETOS (CORRIGIDOS) -->
-<!-- ============================================ -->
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-    // ==================== VALIDADOR DE ENDEREÇO (MANTIDO) ====================
+    // ==================== VALIDADOR DE ENDEREÇO ====================
     const EnderecoValidator = {
         timeout: null,
         
@@ -804,8 +520,6 @@ INSTRUÇÕES:
                     inputEndereco.value = inputEndereco.value.toUpperCase();
                 });
             }
-            
-            this.setupOrigemAutocomplete();
         },
         
         validarComDebounce() {
@@ -840,10 +554,7 @@ INSTRUÇÕES:
                     feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> ${data.mensagem}</span>`;
                     
                     const event = new CustomEvent('enderecoValido', { 
-                        detail: {
-                            ...data.dados,
-                            endereco: endereco
-                        }
+                        detail: { ...data.dados, endereco: endereco }
                     });
                     inputEndereco.dispatchEvent(event);
                 } else {
@@ -856,67 +567,10 @@ INSTRUÇÕES:
                 console.error('Erro na validação:', error);
                 feedback.innerHTML = `<span class="text-danger">Erro ao validar endereço</span>`;
             }
-        },
-        
-        setupOrigemAutocomplete() {
-            const inputOrigem = document.getElementById('inputOrigem');
-            const container = document.getElementById('origemAutocompleteList');
-            
-            if (!inputOrigem || !container) return;
-            
-            let timeout;
-            
-            inputOrigem.addEventListener('input', () => {
-                clearTimeout(timeout);
-                const termo = inputOrigem.value.trim();
-                
-                if (termo.length < 2) {
-                    container.style.display = 'none';
-                    return;
-                }
-                
-                timeout = setTimeout(async () => {
-                    try {
-                        const response = await fetch(`/api/buscar-origens/?term=${encodeURIComponent(termo)}`);
-                        const data = await response.json();
-                        
-                        container.innerHTML = '';
-                        
-                        if (data.length > 0) {
-                            container.style.display = 'block';
-                            data.forEach(item => {
-                                const div = document.createElement('div');
-                                div.className = 'autocomplete-item';
-                                div.innerHTML = `<i class="bi bi-geo-alt-fill me-2 text-primary"></i> ${item.nome}`;
-                                div.addEventListener('mousedown', (evt) => {
-                                    evt.preventDefault();
-                                    inputOrigem.value = item.nome;
-                                    container.style.display = 'none';
-                                });
-                                container.appendChild(div);
-                            });
-                        } else {
-                            container.style.display = 'none';
-                        }
-                    } catch (error) {
-                        console.error('Erro ao buscar origens:', error);
-                    }
-                }, 300);
-            });
-            
-            inputOrigem.addEventListener('blur', () => {
-                setTimeout(() => container.style.display = 'none', 200);
-            });
-            
-            document.addEventListener('click', (e) => {
-                if (!inputOrigem.contains(e.target) && !container.contains(e.target)) {
-                    container.style.display = 'none';
-                }
-            });
         }
     };
 
-    // ==================== STOCK APP (MANTIDO COM MELHORIAS) ====================
+    // ==================== STOCK APP ====================
     const StockApp = {
         isSubmitting: false,
         debounce: null,
@@ -929,56 +583,8 @@ INSTRUÇÕES:
             this.setupClean();
             this.preventDoubleSubmit();
             this.setupEnterKey();
-            this.setupModalCleanup(); // NOVO: Limpeza do modal
             
             EnderecoValidator.init();
-        },
-
-        // NOVO: Configura limpeza completa do modal
-        setupModalCleanup() {
-            const modal = document.getElementById('modalNovaEntrada');
-            if (!modal) return;
-            
-            // Botão Cancelar do footer
-            const cancelBtn = document.getElementById('btnCancelarModal');
-            cancelBtn?.addEventListener('click', () => {
-                ScannerApp.stop();
-            });
-            
-            // Botão X do header
-            const closeBtn = document.getElementById('btnCloseModal');
-            closeBtn?.addEventListener('click', () => {
-                ScannerApp.stop();
-            });
-            
-            // Quando modal for fechado (qualquer método)
-            modal.addEventListener('hidden.bs.modal', () => {
-                ScannerApp.stop();
-            });
-            
-            // Quando modal for aberto, garante scanner parado
-            modal.addEventListener('show.bs.modal', () => {
-                ScannerApp.stop();
-            });
-            
-            // Tecla ESC
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && ScannerApp.isScanning) {
-                    ScannerApp.stop();
-                }
-            });
-            
-            // Sair da página
-            window.addEventListener('beforeunload', () => {
-                ScannerApp.stop();
-            });
-            
-            // Mudança de visibilidade da página
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden && ScannerApp.isScanning) {
-                    ScannerApp.stop();
-                }
-            });
         },
 
         preventDoubleSubmit() {
@@ -993,7 +599,7 @@ INSTRUÇÕES:
                 const inputEndereco = document.getElementById('inputEndereco');
                 if (inputEndereco && !inputEndereco.classList.contains('is-valid')) {
                     e.preventDefault();
-                    alert('❌ Endereço inválido! O endereço deve estar no formato R-A LN01 P03 e existir no sistema.');
+                    alert('Endereço inválido! O endereço deve estar no formato R-A LN01 P03 e existir no sistema.');
                     inputEndereco.focus();
                     return false;
                 }
@@ -1001,7 +607,6 @@ INSTRUÇÕES:
                 if (self.isSubmitting) {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('⛔ Envio bloqueado - já em processamento');
                     return false;
                 }
 
@@ -1060,7 +665,6 @@ INSTRUÇÕES:
                 
                 setTimeout(() => {
                     if (self.isSubmitting) {
-                        console.warn('⚠️ Timeout de segurança - liberando formulário');
                         self.isSubmitting = false;
                         submitBtn.disabled = false;
                         spinner.classList.add('d-none');
@@ -1101,11 +705,7 @@ INSTRUÇÕES:
                                 div.className = 'autocomplete-item';
                                 div.innerHTML = `
                                     <strong>${d.lote}</strong>
-                                    <small>
-                                        🌱 ${d.cultivar || '-'}
-                                        | 📍 ${d.endereco || '-'}
-                                        | 📦 Saldo: ${d.saldo || 0}
-                                    </small>
+                                    <small>🌱 ${d.cultivar || '-'} | 📍 ${d.endereco || '-'} | 📦 Saldo: ${d.saldo || 0}</small>
                                 `;
                                 div.addEventListener('mousedown', (evt) => {
                                     evt.preventDefault();
@@ -1146,9 +746,7 @@ INSTRUÇÕES:
             });
 
             input.addEventListener('blur', () => {
-                setTimeout(() => {
-                    list.style.display = 'none';
-                }, 200);
+                setTimeout(() => { list.style.display = 'none'; }, 200);
             });
 
             document.addEventListener('click', (e) => {
@@ -1183,9 +781,7 @@ INSTRUÇÕES:
                                 self.fillFields(data.dados);
                             }
                         })
-                        .catch(() => {
-                            loading.classList.add('d-none');
-                        });
+                        .catch(() => { loading.classList.add('d-none'); });
                 }, 500);
             });
         },
@@ -1213,9 +809,7 @@ INSTRUÇÕES:
                 if (!el) continue;
                 if (el.tagName === 'SELECT') {
                     const option = Array.from(el.options).find(opt => opt.value == valor);
-                    if (option) {
-                        el.value = valor;
-                    }
+                    if (option) el.value = valor;
                 } else {
                     el.value = valor || '';
                 }
@@ -1244,9 +838,7 @@ INSTRUÇÕES:
                 if (el && valor) {
                     if (el.tagName === 'SELECT') {
                         const option = Array.from(el.options).find(opt => opt.value == valor);
-                        if (option) {
-                            el.value = valor;
-                        }
+                        if (option) el.value = valor;
                     } else {
                         el.value = valor;
                     }
@@ -1262,26 +854,18 @@ INSTRUÇÕES:
             
             inputs.forEach(input => {
                 input.addEventListener('input', () => {
-                    if (input.value.trim()) {
-                        input.classList.remove('is-invalid');
-                    }
+                    if (input.value.trim()) input.classList.remove('is-invalid');
                 });
                 
                 input.addEventListener('blur', () => {
-                    if (!input.value.trim()) {
-                        input.classList.add('is-invalid');
-                    } else {
-                        input.classList.remove('is-invalid');
-                    }
+                    if (!input.value.trim()) input.classList.add('is-invalid');
+                    else input.classList.remove('is-invalid');
                 });
                 
                 if (input.tagName === 'SELECT') {
                     input.addEventListener('change', () => {
-                        if (input.value) {
-                            input.classList.remove('is-invalid');
-                        } else {
-                            input.classList.add('is-invalid');
-                        }
+                        if (input.value) input.classList.remove('is-invalid');
+                        else input.classList.add('is-invalid');
                     });
                 }
             });
@@ -1295,9 +879,7 @@ INSTRUÇÕES:
 
             modal.addEventListener('hidden.bs.modal', function() {
                 const form = document.getElementById('formNovaEntrada');
-                if (form) {
-                    form.reset();
-                }
+                if (form) form.reset();
                 
                 document.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
                     el.classList.remove('is-invalid', 'is-valid');
@@ -1312,21 +894,11 @@ INSTRUÇÕES:
                 const spinner = document.getElementById('submitSpinner');
                 const submitText = document.getElementById('submitText');
                 
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                }
+                if (submitBtn) submitBtn.disabled = false;
+                if (spinner) spinner.classList.add('d-none');
+                if (submitText) submitText.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Confirmar Registro';
                 
-                if (spinner) {
-                    spinner.classList.add('d-none');
-                }
-                
-                if (submitText) {
-                    submitText.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Confirmar Registro';
-                }
-                
-                if (typeof ScannerApp !== 'undefined') {
-                    ScannerApp.stop();
-                }
+                if (typeof ScannerApp !== 'undefined') ScannerApp.stop();
             });
         },
 
@@ -1346,9 +918,7 @@ INSTRUÇÕES:
                         if (index < inputs.length - 1) {
                             inputs[index + 1].focus();
                         } else {
-                            if (!this.isSubmitting) {
-                                submitBtn.click();
-                            }
+                            if (!this.isSubmitting) submitBtn.click();
                         }
                     }
                 }
@@ -1356,7 +926,7 @@ INSTRUÇÕES:
         }
     };
 
-    // ==================== SCANNER APP (CORRIGIDO - CÂMERA NÃO FICA ATIVA) ====================
+    // ==================== SCANNER APP ====================
     const ScannerApp = {
         html5QrCode: null,
         isScanning: false,
@@ -1367,22 +937,16 @@ INSTRUÇÕES:
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const oscillator = audioCtx.createOscillator();
                 const gainNode = audioCtx.createGain();
-                
                 oscillator.connect(gainNode);
                 gainNode.connect(audioCtx.destination);
-                
                 oscillator.frequency.value = 1000;
                 gainNode.gain.value = 0.2;
-                
                 oscillator.start();
                 oscillator.stop(audioCtx.currentTime + 0.1);
-            } catch (e) {
-                console.log('Beep error:', e);
-            }
+            } catch (e) {}
         },
 
         async start() {
-            // Para qualquer scanner existente primeiro
             if (this.isScanning || this.html5QrCode) {
                 await this.stop();
             }
@@ -1398,10 +962,9 @@ INSTRUÇÕES:
             try {
                 this.html5QrCode = new Html5Qrcode("scannerReader");
                 
-                // Configuração MELHORADA: FPS 60, qrbox maior, foco automático
                 const config = { 
-                    fps: 60, // Aumentado de 30 para 60
-                    qrbox: { width: 280, height: 280 }, // Área maior
+                    fps: 60,
+                    qrbox: { width: 280, height: 280 },
                     aspectRatio: 1.0
                 };
                 
@@ -1413,15 +976,12 @@ INSTRUÇÕES:
                             this.isScanning = false;
                             this.playBeep();
                             
-                            document.getElementById('scannerStatus').innerHTML = 
-                                '<span class="text-success fs-5">✅ QR Code lido com sucesso!</span>';
+                            document.getElementById('scannerStatus').innerHTML = '<span class="text-success fs-5">✅ QR Code lido com sucesso!</span>';
                             
                             const partes = decodedText.split('/');
                             if (partes.length >= 2) {
                                 document.getElementById('inputSKU').value = partes[0];
                                 document.getElementById('inputLote').value = partes[1];
-                                
-                                // Dispara busca do SKU
                                 document.getElementById('inputSKU').dispatchEvent(new Event('input'));
                                 
                                 setTimeout(() => {
@@ -1429,8 +989,7 @@ INSTRUÇÕES:
                                     document.getElementById('inputQtd').focus();
                                 }, 800);
                             } else {
-                                document.getElementById('scannerStatus').innerHTML = 
-                                    '<span class="text-warning">⚠️ Formato inválido. Use: SKU/LOTE</span>';
+                                document.getElementById('scannerStatus').innerHTML = '<span class="text-warning">⚠️ Formato inválido. Use: SKU/LOTE</span>';
                                 setTimeout(() => {
                                     this.isScanning = true;
                                     document.getElementById('scannerStatus').innerHTML = '';
@@ -1439,23 +998,17 @@ INSTRUÇÕES:
                         }
                     },
                     (errorMessage) => {
-                        // Tratamento de erros melhorado
-                        if (errorMessage?.includes('No QR code found') || 
-                            errorMessage?.includes('No MultiFormat Readers')) {
-                            return; // Ignora erros normais
+                        if (errorMessage?.includes('No QR code found') || errorMessage?.includes('No MultiFormat Readers')) {
+                            return;
                         }
                         
-                        if (errorMessage?.includes('NotAllowedError') || 
-                            errorMessage?.includes('Permission')) {
-                            document.getElementById('scannerStatus').innerHTML = 
-                                '<span class="text-danger">❌ Permissão da câmera negada</span>';
+                        if (errorMessage?.includes('NotAllowedError') || errorMessage?.includes('Permission')) {
+                            document.getElementById('scannerStatus').innerHTML = '<span class="text-danger">❌ Permissão da câmera negada</span>';
                             setTimeout(() => this.stop(), 3000);
                         }
                         
-                        if (errorMessage?.includes('NotFoundError') || 
-                            errorMessage?.includes('No camera')) {
-                            document.getElementById('scannerStatus').innerHTML = 
-                                '<span class="text-danger">❌ Nenhuma câmera encontrada</span>';
+                        if (errorMessage?.includes('NotFoundError') || errorMessage?.includes('No camera')) {
+                            document.getElementById('scannerStatus').innerHTML = '<span class="text-danger">❌ Nenhuma câmera encontrada</span>';
                             setTimeout(() => this.stop(), 3000);
                         }
                     }
@@ -1463,48 +1016,15 @@ INSTRUÇÕES:
                 
                 this.isScanning = true;
                 
-                // Mostra indicador de câmera ativa
                 const indicator = document.getElementById('cameraActiveIndicator');
                 if (indicator) indicator.style.display = 'block';
                 
-                // Tenta habilitar foco automático
-                setTimeout(() => this.enableAutoFocus(), 1000);
-                
-                // Verifica suporte a flash
                 this.checkFlashSupport();
                 
             } catch (err) {
                 console.error('Erro ao iniciar scanner:', err);
-                document.getElementById('scannerStatus').textContent = 
-                    'Erro ao iniciar câmera. Verifique as permissões.';
+                document.getElementById('scannerStatus').textContent = 'Erro ao iniciar câmera. Verifique as permissões.';
                 setTimeout(() => this.stop(), 3000);
-            }
-        },
-
-        // NOVO: Habilita foco automático
-        async enableAutoFocus() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: "environment",
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    } 
-                });
-                const track = stream.getVideoTracks()[0];
-                const capabilities = track.getCapabilities();
-                
-                if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
-                    await track.applyConstraints({ 
-                        advanced: [{ focusMode: "continuous" }] 
-                    });
-                    console.log('✅ Foco automático habilitado');
-                }
-                
-                // Não para a track pois o scanner está usando
-                // stream.getTracks().forEach(t => t.stop());
-            } catch(e) {
-                console.log('Foco automático não disponível:', e.message);
             }
         },
 
@@ -1528,22 +1048,17 @@ INSTRUÇÕES:
                         this.hasFlash = capabilities.torch || false;
                         
                         const btnFlash = document.getElementById('btnFlash');
-                        if (btnFlash) {
-                            btnFlash.disabled = !this.hasFlash;
-                        }
+                        if (btnFlash) btnFlash.disabled = !this.hasFlash;
                         
                         stream.getTracks().forEach(t => t.stop());
                     }
                 }
             } catch (e) {
                 console.log('Flash não disponível:', e);
-                this.hasFlash = false;
             }
         },
 
-        // CORRIGIDO: Para completamente a câmera
         async stop() {
-            // Para o scanner
             if (this.html5QrCode) {
                 try {
                     if (this.isScanning) {
@@ -1552,25 +1067,17 @@ INSTRUÇÕES:
                     await this.html5QrCode.clear();
                 } catch (err) {
                     console.log('Erro ao parar scanner:', err);
-                    try { 
-                        await this.html5QrCode.clear(); 
-                    } catch(e) {
-                        console.log('Erro na limpeza:', e);
-                    }
+                    try { await this.html5QrCode.clear(); } catch(e) {}
                 }
-                
-                // Libera a instância
                 this.html5QrCode = null;
             }
             
             this.isScanning = false;
             this.hasFlash = false;
             
-            // Esconde indicador de câmera
             const indicator = document.getElementById('cameraActiveIndicator');
             if (indicator) indicator.style.display = 'none';
             
-            // Restaura o formulário
             const scannerDiv = document.getElementById('scannerFullscreen');
             const formContent = document.getElementById('formContent');
             
@@ -1579,7 +1086,6 @@ INSTRUÇÕES:
                 scannerDiv.classList.add('d-none');
             }
             
-            // Reseta botão flash
             const btnFlash = document.getElementById('btnFlash');
             if (btnFlash) {
                 btnFlash.disabled = true;
@@ -1588,11 +1094,8 @@ INSTRUÇÕES:
                 btnFlash.classList.add('btn-outline-light');
             }
             
-            // Limpa status
             const scannerStatus = document.getElementById('scannerStatus');
-            if (scannerStatus) {
-                scannerStatus.innerHTML = '';
-            }
+            if (scannerStatus) scannerStatus.innerHTML = '';
         },
 
         async toggleFlash() {
@@ -1631,30 +1134,19 @@ INSTRUÇÕES:
         StockApp.init();
     });
 
-    // Garantia extra: para scanner ao fechar modal
+    // Garantias extras para parar scanner
     document.addEventListener('hidden.bs.modal', (event) => {
-        if (event.target.id === 'modalNovaEntrada') {
-            ScannerApp.stop();
-        }
+        if (event.target.id === 'modalNovaEntrada') ScannerApp.stop();
     });
     
-    // Garantia extra: para scanner ao pressionar ESC
     document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && ScannerApp.isScanning) {
-            ScannerApp.stop();
-        }
+        if (event.key === 'Escape' && ScannerApp.isScanning) ScannerApp.stop();
     });
     
-    // Garantia extra: para scanner ao sair da página
-    window.addEventListener('beforeunload', () => {
-        ScannerApp.stop();
-    });
+    window.addEventListener('beforeunload', () => ScannerApp.stop());
     
-    // Garantia extra: para scanner quando página perde foco
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden && ScannerApp.isScanning) {
-            ScannerApp.stop();
-        }
+        if (document.hidden && ScannerApp.isScanning) ScannerApp.stop();
     });
 </script>
 
