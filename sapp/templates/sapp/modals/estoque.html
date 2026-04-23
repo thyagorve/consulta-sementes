@@ -1,154 +1,230 @@
+<!-- 
+INSTRUÇÕES:
+1. CORRIGIR TODOS OS PROBLEMAS LISTADOS ACIMA
+2. MELHORAR A ESTILIZAÇÃO DO MODAL (HEADER COM GRADIENTE, CARDS COM SHADOWS, ÍCONES NOS INPUTS, CORES MODERNAS)
+3. MANTER TODAS AS FUNCIONALIDADES EXISTENTES
+4. NÃO REMOVER NENHUM CAMPO DO FORMULÁRIO
+5. O SCANNER DEVE FUNCIONAR COMO A CÂMERA NATIVA (LER À DISTÂNCIA, SEM PRECISAR APROXIMAR)
+6. A CÂMERA DEVE PARAR COMPLETAMENTE AO FECHAR O MODAL
+7. ENTREGAR O CÓDIGO HTML + CSS + JAVASCRIPT COMPLETO
+-->
+
 <!-- ESTRUTURA DO MODAL -->
 <div class="modal fade" id="modalNovaEntrada" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-fullscreen-sm-down modal-xl modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0 rounded-4">
-            <!-- Header -->
-            <div class="modal-header bg-primary text-white border-0 py-3 rounded-top-4">
-                <h5 class="modal-title fw-bold d-flex align-items-center">
-                    <i class="bi bi-box-seam me-2"></i> Nova Entrada de Estoque
+        <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden">
+            
+            <!-- ============================================ -->
+            <!-- HEADER MELHORADO COM GRADIENTE -->
+            <!-- ============================================ -->
+            <div class="modal-header bg-gradient-primary text-white border-0 py-3 px-4" style="background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <div class="icon-circle bg-white bg-opacity-25 p-2 rounded-circle">
+                        <i class="bi bi-box-seam fs-5"></i>
+                    </div>
+                    Nova Entrada de Estoque
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white opacity-75 hover-opacity-100" data-bs-dismiss="modal" aria-label="Close" id="btnCloseModal"></button>
             </div>
 
             <form id="formNovaEntrada" method="POST" action="{% url 'sapp:nova_entrada' %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 
-                <!-- SCANNER FULLSCREEN (OCULTA TUDO) -->
-                <div id="scannerFullscreen" class="d-none position-fixed top-0 start-0 w-100 h-100 bg-dark" style="z-index: 9999;">
+                <!-- ============================================ -->
+                <!-- SCANNER FULLSCREEN (CORRIGIDO) -->
+                <!-- ============================================ -->
+                <div id="scannerFullscreen" class="d-none position-fixed top-0 start-0 w-100 h-100" style="z-index: 99999; background: rgba(0,0,0,0.95);">
                     <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4">
+                        
+                        <!-- Indicador de câmera ativa -->
+                        <div id="cameraActiveIndicator" class="camera-indicator"></div>
+                        
                         <div class="text-center mb-4">
-                            <h4 class="text-white mb-2">📷 Escanear QR Code</h4>
-                            <p class="text-white-50">Posicione o código na área de leitura</p>
+                            <h4 class="text-white fw-bold mb-2">
+                                <i class="bi bi-qr-code-scan me-2"></i>Escanear QR Code
+                            </h4>
+                            <p class="text-white-50">Aponte para o código - não precisa aproximar</p>
                         </div>
                         
-                        <!-- Container do Scanner -->
-                        <div id="scannerContainer" style="width: 90%; max-width: 500px; height: auto; aspect-ratio: 1/1; position: relative; margin: 0 auto;">
-                            <div id="scannerReader" style="width: 100%; height: 100%;" class="overflow-hidden rounded-3 shadow-lg border border-primary border-4"></div>
+                        <!-- Container do Scanner (MELHORADO) -->
+                        <div id="scannerContainer" class="scanner-container-enhanced">
+                            <div id="scannerReader" class="scanner-reader-enhanced"></div>
                             
-                            <!-- Moldura do scanner -->
-                            <div class="scanner-frame">
-                                <div class="scanner-line"></div>
+                            <!-- Moldura do scanner (MELHORADA) -->
+                            <div class="scanner-frame-enhanced">
+                                <div class="scanner-corner top-left"></div>
+                                <div class="scanner-corner top-right"></div>
+                                <div class="scanner-corner bottom-left"></div>
+                                <div class="scanner-corner bottom-right"></div>
+                                <div class="scanner-line-enhanced"></div>
                             </div>
                         </div>
                         
                         <div id="scannerStatus" class="text-white mt-4 fw-bold text-center" style="min-height: 30px;"></div>
                         
                         <div class="d-flex gap-3 mt-5">
-                            <button type="button" class="btn btn-outline-light btn-lg px-4" onclick="ScannerApp.toggleFlash()" id="btnFlash" disabled>
-                                <i class="bi bi-lightning"></i> Flash
+                            <button type="button" class="btn btn-outline-light btn-lg px-4 rounded-pill" onclick="ScannerApp.toggleFlash()" id="btnFlash" disabled>
+                                <i class="bi bi-lightning-charge"></i> Flash
                             </button>
-                            <button type="button" class="btn btn-danger btn-lg px-5 fw-bold" onclick="ScannerApp.stop()">
+                            <button type="button" class="btn btn-danger btn-lg px-5 fw-bold rounded-pill shadow-lg" onclick="ScannerApp.stop()">
                                 <i class="bi bi-x-circle"></i> Fechar Scanner
                             </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- CONTEÚDO NORMAL DO FORMULÁRIO (FICA OCULTO DURANTE SCAN) -->
+                <!-- ============================================ -->
+                <!-- CONTEÚDO DO FORMULÁRIO (MELHORADO) -->
+                <!-- ============================================ -->
                 <div id="formContent">
-                    <div class="modal-body p-4 bg-light">
+                    <div class="modal-body p-4" style="background: #f8fafc;">
                         <div class="row g-3">
+                            
                             <!-- SEÇÃO 1: IDENTIFICAÇÃO -->
                             <div class="col-12">
-                                <h6 class="text-primary fw-bold mb-0 mt-2">Identificação Principal</h6>
-                                <hr class="mt-1">
+                                <div class="section-header">
+                                    <div class="section-icon">
+                                        <i class="bi bi-tag-fill"></i>
+                                    </div>
+                                    <h6 class="section-title">Identificação Principal</h6>
+                                </div>
                             </div>
                             
                             <div class="col-md-8 position-relative">
-                                <label class="form-label small fw-bold">Número do Lote *</label>
-                                <div class="input-group">
-                                    <input type="text" name="lote" id="inputLote" class="form-control form-control-lg fw-bold" required autocomplete="off" placeholder="Digite o lote ou escaneie">
+                                <label class="form-label small fw-bold text-secondary">Número do Lote *</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-hash text-primary"></i>
+                                    </span>
+                                    <input type="text" name="lote" id="inputLote" class="form-control form-control-lg fw-bold border-start-0" required autocomplete="off" placeholder="Digite o lote ou escaneie">
                                     <button type="button" class="btn btn-primary px-3" onclick="ScannerApp.start()" title="Escanear QR Code" id="btnScan">
                                         <i class="bi bi-qr-code-scan fs-5"></i>
                                     </button>
                                 </div>
-                                <!-- Dropdown Autocomplete -->
                                 <div id="autoCompleteList" class="dropdown-menu shadow-lg w-100"></div>
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Quantidade *</label>
-                                <input type="number" name="entrada" id="inputQtd" class="form-control form-control-lg text-center fw-bold" required min="1" placeholder="0">
+                                <label class="form-label small fw-bold text-secondary">Quantidade *</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-123 text-primary"></i>
+                                    </span>
+                                    <input type="number" name="entrada" id="inputQtd" class="form-control form-control-lg text-center fw-bold border-start-0" required min="1" placeholder="0">
+                                </div>
                             </div>
 
                             <!-- SEÇÃO 2: LOCALIZAÇÃO E ORIGEM -->
-                            <div class="col-12">
-                                <h6 class="text-primary fw-bold mb-0 mt-3">Localização e Origem</h6>
-                                <hr class="mt-1">
+                            <div class="col-12 mt-3">
+                                <div class="section-header">
+                                    <div class="section-icon">
+                                        <i class="bi bi-geo-alt-fill"></i>
+                                    </div>
+                                    <h6 class="section-title">Localização e Origem</h6>
+                                </div>
                             </div>
                             
-<div class="col-md-6 col-lg-3">
-    <label class="form-label small fw-bold">Origem / Destino *</label>
-
-    <select name="origem_destino" id="inputOrigem" class="form-select" required>
-        <option value="">Selecione...</option>
-
-        {% for o in origens %}
-            <option value="{{ o.nome }}">{{ o.nome }}</option>
-        {% endfor %}
-    </select>
-</div>
+                            <div class="col-md-6 col-lg-3">
+                                <label class="form-label small fw-bold text-secondary">Origem / Destino *</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-building text-primary"></i>
+                                    </span>
+                                    <select name="origem_destino" id="inputOrigem" class="form-select border-start-0" required>
+                                        <option value="">Selecione...</option>
+                                        {% for o in origens %}
+                                            <option value="{{ o.nome }}">{{ o.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
                             
                             <div class="col-md-6 col-lg-3">
-                                <label class="form-label small fw-bold">Endereço *</label>
-                                <input type="text"
-                                    name="endereco"
-                                    id="inputEndereco"
-                                    class="form-control text-uppercase"
-                                    required
-                                    placeholder="Ex: R-C LN01 P03">
+                                <label class="form-label small fw-bold text-secondary">Endereço *</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-pin-map-fill text-primary"></i>
+                                    </span>
+                                    <input type="text" name="endereco" id="inputEndereco" class="form-control text-uppercase border-start-0" required placeholder="Ex: R-C LN01 P03">
+                                </div>
                                 <div id="enderecoFeedback" class="mt-1 small" style="min-height: 24px;"></div>
-                                
                             </div>
                             
                             <div class="col-md-6 col-lg-3">
-                                <label class="form-label small fw-bold">Armazém (AZ) *</label>
-                                <input type="text" name="az" id="inputAz" class="form-control text-uppercase bg-light" 
-                                       required readonly placeholder="Preenchido automaticamente">
+                                <label class="form-label small fw-bold text-secondary">Armazém (AZ) *</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-boxes text-primary"></i>
+                                    </span>
+                                    <input type="text" name="az" id="inputAz" class="form-control text-uppercase bg-light border-start-0" required readonly placeholder="Automático">
+                                </div>
                             </div>
                             
                             <div class="col-md-6 col-lg-3">
-                                <label class="form-label small fw-bold">Cliente</label>
-                                <input type="text" name="cliente" id="inputCliente" class="form-control">
+                                <label class="form-label small fw-bold text-secondary">Cliente</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-person-fill text-primary"></i>
+                                    </span>
+                                    <input type="text" name="cliente" id="inputCliente" class="form-control border-start-0">
+                                </div>
                             </div>
 
                             <!-- SEÇÃO 3: PRODUTO E DADOS TÉCNICOS -->
-                            <div class="col-12">
-                                <h6 class="text-primary fw-bold mb-0 mt-3">Dados do Produto e SKU</h6>
-                                <hr class="mt-1">
+                            <div class="col-12 mt-3">
+                                <div class="section-header">
+                                    <div class="section-icon">
+                                        <i class="bi bi-box-seam-fill"></i>
+                                    </div>
+                                    <h6 class="section-title">Dados do Produto e SKU</h6>
+                                </div>
                             </div>
                             
                             <div class="col-md-12 col-lg-4">
-                                <label class="form-label small fw-bold">Código do Produto (SKU)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                                    <input type="text" name="produto" id="inputSKU" class="form-control fw-bold" placeholder="Digite SKU para buscar dados">
+                                <label class="form-label small fw-bold text-secondary">Código do Produto (SKU)</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-upc-scan text-primary"></i>
+                                    </span>
+                                    <input type="text" name="produto" id="inputSKU" class="form-control fw-bold border-start-0" placeholder="Digite SKU para buscar dados">
                                 </div>
-                                <small id="skuLoading" class="text-primary d-none">Buscando dados...</small>
+                                <small id="skuLoading" class="text-primary d-none mt-1">
+                                    <span class="spinner-border spinner-border-sm me-1"></span>Buscando dados...
+                                </small>
                             </div>
 
                             <div class="col-md-6 col-lg-4">
-                                <label class="form-label small fw-bold">Espécie *</label>
-                                <select name="especie" id="selEspecie" class="form-select" required>
-                                    <option value="">Selecione...</option>
-                                    {% for e in all_especies %}
-                                        <option value="{{ e.id }}">{{ e.nome }}</option>
-                                    {% endfor %}
-                                </select>
+                                <label class="form-label small fw-bold text-secondary">Espécie *</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-flower1 text-primary"></i>
+                                    </span>
+                                    <select name="especie" id="selEspecie" class="form-select border-start-0" required>
+                                        <option value="">Selecione...</option>
+                                        {% for e in all_especies %}
+                                            <option value="{{ e.id }}">{{ e.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
                             
                             <div class="col-md-6 col-lg-4">
-                                <label class="form-label small fw-bold">Cultivar *</label>
-                                <select name="cultivar" id="selCultivar" class="form-select" required>
-                                    <option value="">Selecione...</option>
-                                    {% for c in all_cultivares %}
-                                        <option value="{{ c.id }}">{{ c.nome }}</option>
-                                    {% endfor %}
-                                </select>
+                                <label class="form-label small fw-bold text-secondary">Cultivar *</label>
+                                <div class="input-group input-group-enhanced">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="bi bi-tree-fill text-primary"></i>
+                                    </span>
+                                    <select name="cultivar" id="selCultivar" class="form-select border-start-0" required>
+                                        <option value="">Selecione...</option>
+                                        {% for c in all_cultivares %}
+                                            <option value="{{ c.id }}">{{ c.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Peneira *</label>
+                                <label class="form-label small fw-bold text-secondary">Peneira *</label>
                                 <select name="peneira" id="selPeneira" class="form-select" required>
                                     <option value="">Selecione...</option>
                                     {% for p in all_peneiras %}
@@ -158,7 +234,7 @@
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Categoria *</label>
+                                <label class="form-label small fw-bold text-secondary">Categoria *</label>
                                 <select name="categoria" id="selCategoria" class="form-select" required>
                                     <option value="">Selecione...</option>
                                     {% for c in all_categorias %}
@@ -168,7 +244,7 @@
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Tratamento</label>
+                                <label class="form-label small fw-bold text-secondary">Tratamento</label>
                                 <select name="tratamento" id="selTratamento" class="form-select">
                                     <option value="">Nenhum tratamento</option>
                                     {% for t in all_tratamentos %}
@@ -178,18 +254,22 @@
                             </div>
 
                             <!-- SEÇÃO 4: COMPLEMENTO -->
-                            <div class="col-12">
-                                <h6 class="text-primary fw-bold mb-0 mt-3">Complementares</h6>
-                                <hr class="mt-1">
+                            <div class="col-12 mt-3">
+                                <div class="section-header">
+                                    <div class="section-icon">
+                                        <i class="bi bi-journal-text"></i>
+                                    </div>
+                                    <h6 class="section-title">Informações Complementares</h6>
+                                </div>
                             </div>
 
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Empresa</label>
-                                <input type="text" name="empresa" id="inputEmpresa" class="form-control">
+                                <label class="form-label small fw-bold text-secondary">Empresa</label>
+                                <input type="text" name="empresa" id="inputEmpresa" class="form-control" placeholder="Nome da empresa">
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Embalagem</label>
+                                <label class="form-label small fw-bold text-secondary">Embalagem</label>
                                 <select name="embalagem" id="selEmbalagem" class="form-select">
                                     <option value="BAG">BAG</option>
                                     <option value="SC">SACO (SC)</option>
@@ -197,49 +277,48 @@
                             </div>
                             
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Peso Unit. (Kg)</label>
+                                <label class="form-label small fw-bold text-secondary">Peso Unit. (Kg)</label>
                                 <input type="number" step="0.01" name="peso_unitario" id="inputPeso" class="form-control" placeholder="0.00">
                             </div>
                             
                             <div class="col-12">
-                                <label class="form-label small fw-bold">Fotos / Arquivos</label>
+                                <label class="form-label small fw-bold text-secondary">Fotos / Arquivos</label>
                                 <input type="file" name="fotos" class="form-control" multiple accept="image/*">
                             </div>
                             
                             <div class="col-12">
-                                <label class="form-label small fw-bold">Observações Adicionais</label>
+                                <label class="form-label small fw-bold text-secondary">Observações Adicionais</label>
                                 <textarea name="observacao" id="inputObs" class="form-control" rows="2" placeholder="Notas, histórico ou avisos..."></textarea>
                             </div>
                         </div>
                     </div>
                     
                     <!-- SEÇÃO: Último Lote da Linha -->
-                    <div class="px-4 pb-3">
-                        <div class="card border-warning bg-light">
-                            <div class="card-body py-2">
+                    <div class="px-4 pb-3" style="background: #f8fafc;">
+                        <div class="card border-warning bg-warning bg-opacity-10 shadow-sm">
+                            <div class="card-body py-3">
                                 <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" 
-                                        id="ultimo_lote_linha_novo"
-                                        name="ultimo_lote_linha"
-                                        style="transform: scale(1.2); cursor: pointer;">
-                                    <label class="form-check-label fw-bold text-warning" for="ultimo_lote_linha_novo">
+                                    <input class="form-check-input" type="checkbox" id="ultimo_lote_linha_novo" name="ultimo_lote_linha" style="transform: scale(1.3); cursor: pointer;">
+                                    <label class="form-check-label fw-bold text-warning ms-2" for="ultimo_lote_linha_novo">
                                         <i class="fas fa-flag-checkered me-1"></i> 
                                         Marcar como Último Lote da Linha
                                     </label>
-                                    <small class="text-muted d-block mt-1 ms-4">
-                                        Quando marcado, todas as posições seguintes desta linha (mesma rua + LN) 
-                                        receberão marcação visual no mapa.
+                                    <small class="text-muted d-block mt-1 ms-5">
+                                        Quando marcado, todas as posições seguintes desta linha receberão marcação visual no mapa.
                                     </small>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="modal-footer border-0 p-3 bg-white rounded-bottom-4">
-                        <button type="button" class="btn btn-light btn-lg px-4" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="submit" class="btn btn-primary btn-lg px-5 shadow fw-bold" id="btnSubmit">
-                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true" id="submitSpinner"></span>
-                            <span id="submitText">Confirmar Registro</span>
+                    <!-- FOOTER MELHORADO -->
+                    <div class="modal-footer border-0 p-4" style="background: #ffffff;">
+                        <button type="button" class="btn btn-outline-secondary btn-lg px-4 rounded-pill" data-bs-dismiss="modal" id="btnCancelarModal">
+                            <i class="bi bi-x-lg me-1"></i> Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-primary btn-lg px-5 shadow fw-bold rounded-pill" id="btnSubmit" style="background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);">
+                            <span class="spinner-border spinner-border-sm d-none" role="status" id="submitSpinner"></span>
+                            <span id="submitText"><i class="bi bi-check2-circle me-1"></i> Confirmar Registro</span>
                         </button>
                     </div>
                 </div>
@@ -248,25 +327,98 @@
     </div>
 </div>
 
-<!-- ESTILO ADICIONAL -->
+<!-- ============================================ -->
+<!-- ESTILOS CSS COMPLETOS (MELHORADOS) -->
+<!-- ============================================ -->
 <style>
-    /* Estilos existentes mantidos */
+    /* ========== ESTILOS GERAIS ========== */
+    .modal-content {
+        border: none;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+    
+    /* ========== SEÇÕES DO FORMULÁRIO ========== */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 5px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .section-icon {
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+    }
+    
+    .section-title {
+        margin: 0;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #1e293b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* ========== INPUTS MELHORADOS ========== */
+    .input-group-enhanced .form-control,
+    .input-group-enhanced .form-select {
+        border-left: none;
+        transition: all 0.2s ease;
+    }
+    
+    .input-group-enhanced .form-control:focus,
+    .input-group-enhanced .form-select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .input-group-enhanced .input-group-text {
+        transition: all 0.2s ease;
+    }
+    
+    .input-group-enhanced:focus-within .input-group-text {
+        border-color: #3b82f6;
+    }
+    
+    .form-control, .form-select {
+        border-radius: 8px;
+        border-color: #e2e8f0;
+        transition: all 0.2s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* ========== AUTOCOMPLETE ========== */
     #autoCompleteList { 
         max-height: 300px; 
         overflow-y: auto; 
         display: none; 
-        margin-top: 2px; 
-        border-radius: 8px; 
+        margin-top: 4px; 
+        border-radius: 12px; 
         position: absolute;
         z-index: 1000;
         background: white;
-        border: 1px solid #dee2e6;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     }
     
     .autocomplete-item { 
-        padding: 10px 15px; 
+        padding: 12px 16px; 
         cursor: pointer; 
-        border-bottom: 1px solid #f1f1f1; 
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.15s ease;
     }
     
     .autocomplete-item:last-child { 
@@ -274,22 +426,24 @@
     }
     
     .autocomplete-item:hover { 
-        background-color: #f8f9fa; 
+        background-color: #eff6ff; 
     }
     
     .autocomplete-item strong { 
         display: block; 
-        color: #0d6efd; 
-        font-family: monospace; 
+        color: #1e40af; 
+        font-family: 'SF Mono', 'Consolas', monospace;
+        font-size: 0.95rem;
     }
     
     .autocomplete-item small { 
         display: block; 
-        color: #6c757d; 
+        color: #64748b; 
         font-size: 0.8rem; 
-        margin-top: 2px; 
+        margin-top: 3px; 
     }
 
+    /* ========== RESPONSIVIDADE ========== */
     @media (max-width: 575.98px) {
         .modal-fullscreen-sm-down { 
             width: 100vw; 
@@ -302,24 +456,31 @@
         }
         .modal-fullscreen-sm-down .modal-body { 
             overflow-y: auto; 
-            padding: 20px !important; 
+            padding: 16px !important; 
         }
         .modal-footer { 
-            padding: 15px !important; 
-            flex-direction: column-reverse; 
+            padding: 12px !important; 
+            flex-direction: column-reverse;
+            gap: 8px;
         }
         .modal-footer .btn { 
             width: 100%; 
-            margin: 5px 0; 
+            margin: 0;
         }
     }
     
+    /* ========== VALIDAÇÃO ========== */
     .is-invalid { 
-        border-color: #dc3545 !important; 
-        background-image: none !important; 
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
     }
     
-    /* Scanner Fullscreen */
+    .is-valid {
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.1) !important;
+    }
+    
+    /* ========== SCANNER FULLSCREEN (CORRIGIDO) ========== */
     #scannerFullscreen {
         position: fixed !important;
         top: 0 !important;
@@ -327,50 +488,163 @@
         width: 100vw !important;
         height: 100vh !important;
         z-index: 99999 !important;
+        background: rgba(0, 0, 0, 0.97) !important;
     }
     
-    #scannerReader video { 
+    /* Container do scanner melhorado */
+    .scanner-container-enhanced {
+        width: 90%;
+        max-width: 450px;
+        aspect-ratio: 1/1;
+        position: relative;
+        margin: 0 auto;
+    }
+    
+    .scanner-reader-enhanced {
+        width: 100%;
+        height: 100%;
+        border-radius: 20px;
+        overflow: hidden;
+        border: 3px solid rgba(59, 130, 246, 0.6);
+        box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
+    }
+    
+    .scanner-reader-enhanced video { 
         width: 100% !important;
         height: 100% !important;
         object-fit: cover !important;
     }
     
-    /* Moldura do scanner */
-    .scanner-frame {
+    /* Moldura do scanner melhorada */
+    .scanner-frame-enhanced {
         position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        border: 3px solid rgba(13, 110, 253, 0.5);
-        border-radius: 16px;
-        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
         pointer-events: none;
     }
     
-    .scanner-line {
+    /* Cantos animados */
+    .scanner-corner {
         position: absolute;
-        top: 0;
-        left: 10%;
-        width: 80%;
-        height: 3px;
-        background: linear-gradient(90deg, transparent, #0d6efd, transparent);
-        animation: scanLine 2s linear infinite;
-        border-radius: 3px;
+        width: 30px;
+        height: 30px;
+        border-color: #3b82f6;
+        border-style: solid;
+        transition: all 0.3s ease;
     }
     
-    @keyframes scanLine {
-        0% { top: 10%; }
-        50% { top: 90%; }
-        100% { top: 10%; }
+    .scanner-corner.top-left {
+        top: -2px;
+        left: -2px;
+        border-width: 4px 0 0 4px;
+        border-radius: 6px 0 0 0;
+    }
+    
+    .scanner-corner.top-right {
+        top: -2px;
+        right: -2px;
+        border-width: 4px 4px 0 0;
+        border-radius: 0 6px 0 0;
+    }
+    
+    .scanner-corner.bottom-left {
+        bottom: -2px;
+        left: -2px;
+        border-width: 0 0 4px 4px;
+        border-radius: 0 0 0 6px;
+    }
+    
+    .scanner-corner.bottom-right {
+        bottom: -2px;
+        right: -2px;
+        border-width: 0 4px 4px 0;
+        border-radius: 0 0 6px 0;
+    }
+    
+    /* Linha do scanner melhorada */
+    .scanner-line-enhanced {
+        position: absolute;
+        left: 5%;
+        width: 90%;
+        height: 2px;
+        background: linear-gradient(90deg, 
+            transparent 0%, 
+            rgba(59, 130, 246, 0.3) 15%, 
+            #3b82f6 50%, 
+            rgba(59, 130, 246, 0.3) 85%, 
+            transparent 100%
+        );
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.4);
+        animation: scanLineEnhanced 2s ease-in-out infinite;
+        border-radius: 2px;
+    }
+    
+    @keyframes scanLineEnhanced {
+        0% { 
+            top: 8%; 
+            opacity: 0.3;
+        }
+        15% {
+            opacity: 1;
+        }
+        85% {
+            opacity: 1;
+        }
+        100% { 
+            top: 92%; 
+            opacity: 0.3;
+        }
+    }
+    
+    /* Indicador de câmera ativa */
+    .camera-indicator {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 12px;
+        height: 12px;
+        background: #22c55e;
+        border-radius: 50%;
+        z-index: 100000;
+        box-shadow: 0 0 10px #22c55e;
+        animation: cameraPulse 2s infinite;
+    }
+    
+    @keyframes cameraPulse {
+        0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+        70% { box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+    }
+    
+    /* ========== BOTÕES MELHORADOS ========== */
+    .btn {
+        transition: all 0.2s ease;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%);
+        border: none;
+    }
+    
+    .btn-primary:hover {
+        background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4);
+    }
+    
+    .btn-outline-secondary:hover {
+        transform: translateY(-1px);
     }
     
     .btn:disabled {
         cursor: not-allowed;
         opacity: 0.65;
+        transform: none !important;
     }
-
-    /* NOVOS ESTILOS PARA VALIDAÇÃO DE ENDEREÇO */
+    
+    /* ========== VALIDAÇÃO DE ENDEREÇO ========== */
     #inputEndereco.is-valid {
         border-color: #198754 !important;
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
@@ -413,12 +687,34 @@
     .text-muted small {
         font-size: 0.75rem;
     }
+    
+    /* ========== ANIMAÇÕES DE TRANSIÇÃO ========== */
+    .modal.fade .modal-dialog {
+        transition: transform 0.3s ease-out;
+    }
+    
+    /* ========== CARD DE ÚLTIMO LOTE ========== */
+    .card.border-warning {
+        border-radius: 12px;
+        transition: all 0.2s ease;
+    }
+    
+    .card.border-warning:hover {
+        box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
+    }
+    
+    /* ========== HOVER OPACITY ========== */
+    .hover-opacity-100:hover {
+        opacity: 1 !important;
+    }
 </style>
 
-<!-- SCRIPTS -->
+<!-- ============================================ -->
+<!-- SCRIPTS COMPLETOS (CORRIGIDOS) -->
+<!-- ============================================ -->
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-    // ==================== VALIDADOR DE ENDEREÇO CORRIGIDO ====================
+    // ==================== VALIDADOR DE ENDEREÇO (MANTIDO) ====================
     const EnderecoValidator = {
         timeout: null,
         
@@ -427,22 +723,18 @@
             const inputAz = document.getElementById('inputAz');
             
             if (inputEndereco && inputAz) {
-                // Desabilita o campo AZ (não deve ser editado manualmente)
                 inputAz.readOnly = true;
                 inputAz.classList.add('bg-light');
                 
-                // Eventos de validação
                 inputEndereco.addEventListener('input', () => this.validarComDebounce());
                 inputEndereco.addEventListener('blur', () => this.validar());
                 inputEndereco.addEventListener('change', () => this.validar());
                 
-                // Força uppercase enquanto digita
                 inputEndereco.addEventListener('keyup', () => {
                     inputEndereco.value = inputEndereco.value.toUpperCase();
                 });
             }
             
-            // Autocomplete para Origem/Destino
             this.setupOrigemAutocomplete();
         },
         
@@ -460,7 +752,6 @@
             
             const endereco = inputEndereco.value.trim().toUpperCase();
             
-            // Se campo vazio, limpa validação
             if (!endereco) {
                 inputEndereco.classList.remove('is-valid', 'is-invalid');
                 inputAz.value = '';
@@ -473,17 +764,11 @@
                 const data = await response.json();
                 
                 if (data.valido) {
-                    // Endereço válido
                     inputEndereco.classList.remove('is-invalid');
                     inputEndereco.classList.add('is-valid');
-                    
-                    // Preenche o AZ automaticamente
                     inputAz.value = data.dados.armazem;
-                    
-                    // Feedback visual
                     feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i> ${data.mensagem}</span>`;
                     
-                    // Dispara evento com dados completos
                     const event = new CustomEvent('enderecoValido', { 
                         detail: {
                             ...data.dados,
@@ -491,13 +776,10 @@
                         }
                     });
                     inputEndereco.dispatchEvent(event);
-                    
                 } else {
-                    // Endereço inválido
                     inputEndereco.classList.remove('is-valid');
                     inputEndereco.classList.add('is-invalid');
-                    inputAz.value = ''; // Limpa AZ
-                    
+                    inputAz.value = '';
                     feedback.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i> ${data.erro}</span>`;
                 }
             } catch (error) {
@@ -537,38 +819,9 @@
                                 div.className = 'autocomplete-item';
                                 div.innerHTML = `<i class="bi bi-geo-alt-fill me-2 text-primary"></i> ${item.nome}`;
                                 div.addEventListener('mousedown', (evt) => {
-
                                     evt.preventDefault();
-
-                                    const loteSelecionado = d.lote;
-
-                                    fetch(`/api/buscar-lote-completo/?lote=${encodeURIComponent(loteSelecionado)}`)
-                                        .then(r => r.json())
-                                        .then(data => {
-
-                                            if (data.encontrado) {
-
-                                                const dados = {
-                                                    lote: data.lote,
-                                                    produto: data.produto,
-                                                    origem_destino: data.origem_destino,
-                                                    az: data.az,
-                                                    especie_id: data.especie_id,
-                                                    cultivar_id: data.cultivar_id,
-                                                    peneira_id: data.peneira_id,
-                                                    categoria_id: data.categoria_id,
-                                                    tratamento_id: data.tratamento_id,
-                                                    empresa: data.empresa,
-                                                    peso_unitario: data.peso_unitario,
-                                                    embalagem: data.embalagem
-                                                };
-
-                                                self.fillFromData(dados);
-
-                                            }
-
-                                        });
-
+                                    inputOrigem.value = item.nome;
+                                    container.style.display = 'none';
                                 });
                                 container.appendChild(div);
                             });
@@ -593,7 +846,7 @@
         }
     };
 
-    // ==================== STOCK APP MODIFICADO ====================
+    // ==================== STOCK APP (MANTIDO COM MELHORIAS) ====================
     const StockApp = {
         isSubmitting: false,
         debounce: null,
@@ -606,9 +859,56 @@
             this.setupClean();
             this.preventDoubleSubmit();
             this.setupEnterKey();
+            this.setupModalCleanup(); // NOVO: Limpeza do modal
             
-            // Inicializa o validador de endereço
             EnderecoValidator.init();
+        },
+
+        // NOVO: Configura limpeza completa do modal
+        setupModalCleanup() {
+            const modal = document.getElementById('modalNovaEntrada');
+            if (!modal) return;
+            
+            // Botão Cancelar do footer
+            const cancelBtn = document.getElementById('btnCancelarModal');
+            cancelBtn?.addEventListener('click', () => {
+                ScannerApp.stop();
+            });
+            
+            // Botão X do header
+            const closeBtn = document.getElementById('btnCloseModal');
+            closeBtn?.addEventListener('click', () => {
+                ScannerApp.stop();
+            });
+            
+            // Quando modal for fechado (qualquer método)
+            modal.addEventListener('hidden.bs.modal', () => {
+                ScannerApp.stop();
+            });
+            
+            // Quando modal for aberto, garante scanner parado
+            modal.addEventListener('show.bs.modal', () => {
+                ScannerApp.stop();
+            });
+            
+            // Tecla ESC
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && ScannerApp.isScanning) {
+                    ScannerApp.stop();
+                }
+            });
+            
+            // Sair da página
+            window.addEventListener('beforeunload', () => {
+                ScannerApp.stop();
+            });
+            
+            // Mudança de visibilidade da página
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && ScannerApp.isScanning) {
+                    ScannerApp.stop();
+                }
+            });
         },
 
         preventDoubleSubmit() {
@@ -620,7 +920,6 @@
             const self = this;
 
             form.addEventListener('submit', function(e) {
-                // VERIFICAÇÃO DE ENDEREÇO (NOVO)
                 const inputEndereco = document.getElementById('inputEndereco');
                 if (inputEndereco && !inputEndereco.classList.contains('is-valid')) {
                     e.preventDefault();
@@ -629,27 +928,19 @@
                     return false;
                 }
 
-                // VERIFICAÇÃO DE DUPLO ENVIO
                 if (self.isSubmitting) {
                     e.preventDefault();
                     e.stopPropagation();
                     console.log('⛔ Envio bloqueado - já em processamento');
-                    
-                    if (submitBtn.disabled) {
-                        alert('Registro em andamento. Aguarde...');
-                    }
                     return false;
                 }
 
-                // VALIDAÇÕES DOS CAMPOS OBRIGATÓRIOS
                 const quantidade = document.getElementById('inputQtd');
                 if (!quantidade || !quantidade.value) {
                     e.preventDefault();
                     alert('A quantidade é obrigatória');
-                    if (quantidade) {
-                        quantidade.focus();
-                        quantidade.classList.add('is-invalid');
-                    }
+                    quantidade?.focus();
+                    quantidade?.classList.add('is-invalid');
                     return false;
                 }
 
@@ -692,27 +983,18 @@
                     }
                 }
 
-                // SE TUDO OK: BLOQUEIA DUPLO ENVIO
                 self.isSubmitting = true;
                 submitBtn.disabled = true;
                 spinner.classList.remove('d-none');
                 submitText.textContent = 'Registrando...';
                 
-                submitBtn.classList.add('btn-secondary');
-                submitBtn.classList.remove('btn-primary');
-                
-                console.log('✅ Enviando formulário...');
-                
-                // Timeout de segurança
                 setTimeout(() => {
                     if (self.isSubmitting) {
                         console.warn('⚠️ Timeout de segurança - liberando formulário');
                         self.isSubmitting = false;
                         submitBtn.disabled = false;
                         spinner.classList.add('d-none');
-                        submitText.textContent = 'Confirmar Registro';
-                        submitBtn.classList.remove('btn-secondary');
-                        submitBtn.classList.add('btn-primary');
+                        submitText.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Confirmar Registro';
                     }
                 }, 10000);
                 
@@ -721,114 +1003,90 @@
         },
 
         setupAutocomplete() {
-    const input = document.getElementById('inputLote');
-    const list = document.getElementById('autoCompleteList');
-    const self = this;
+            const input = document.getElementById('inputLote');
+            const list = document.getElementById('autoCompleteList');
+            const self = this;
 
-    if (!input || !list) return;
+            if (!input || !list) return;
 
-    input.addEventListener('input', (e) => {
+            input.addEventListener('input', (e) => {
+                clearTimeout(self.debounce);
+                const term = e.target.value.trim();
 
-        clearTimeout(self.debounce);
-
-        const term = e.target.value.trim();
-
-        if (term.length < 2) {
-            list.style.display = 'none';
-            list.innerHTML = '';
-            return;
-        }
-
-        self.debounce = setTimeout(() => {
-
-            fetch(`/api/buscar-lotes/?q=${encodeURIComponent(term)}`)
-            .then(response => response.json())
-            .then(data => {
-
-                list.innerHTML = '';
-
-                if (data.results && data.results.length > 0) {
-
-                    list.style.display = 'block';
-
-                    data.results.forEach(d => {
-
-                        const div = document.createElement('div');
-                        div.className = 'autocomplete-item';
-
-                        div.innerHTML = `
-                            <strong>${d.lote}</strong>
-                            <small>
-                                🌱 ${d.cultivar || '-'}
-                                | 📍 ${d.endereco || '-'}
-                                | 📦 Saldo: ${d.saldo || 0}
-                            </small>
-                        `;
-
-                        div.addEventListener('mousedown', (evt) => {
-
-    evt.preventDefault();
-
-    fetch(`/api/buscar-lote-completo/?lote=${encodeURIComponent(d.lote)}`)
-        .then(r => r.json())
-        .then(data => {
-
-            if (data.encontrado) {
-
-                self.fillFromData({
-                    lote: data.lote,
-                    produto: data.produto,
-                    origem_destino: data.origem_destino,
-                    az: data.az,
-                    especie_id: data.especie_id,
-                    cultivar_id: data.cultivar_id,
-                    peneira_id: data.peneira_id,
-                    categoria_id: data.categoria_id,
-                    tratamento_id: data.tratamento_id,
-                    empresa: data.empresa,
-                    cliente: data.cliente,
-                    peso_unitario: data.peso_unitario,
-                    embalagem: data.embalagem
-                });
-
-            }
-
-        });
-
-});
-
-                        list.appendChild(div);
-
-                    });
-
-                } else {
-
+                if (term.length < 2) {
                     list.style.display = 'none';
-
+                    list.innerHTML = '';
+                    return;
                 }
 
-            })
-            .catch(error => {
-                console.error("Erro no autocomplete:", error);
-                list.style.display = 'none';
+                self.debounce = setTimeout(() => {
+                    fetch(`/api/buscar-lotes/?q=${encodeURIComponent(term)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        list.innerHTML = '';
+                        if (data.results && data.results.length > 0) {
+                            list.style.display = 'block';
+                            data.results.forEach(d => {
+                                const div = document.createElement('div');
+                                div.className = 'autocomplete-item';
+                                div.innerHTML = `
+                                    <strong>${d.lote}</strong>
+                                    <small>
+                                        🌱 ${d.cultivar || '-'}
+                                        | 📍 ${d.endereco || '-'}
+                                        | 📦 Saldo: ${d.saldo || 0}
+                                    </small>
+                                `;
+                                div.addEventListener('mousedown', (evt) => {
+                                    evt.preventDefault();
+                                    fetch(`/api/buscar-lote-completo/?lote=${encodeURIComponent(d.lote)}`)
+                                        .then(r => r.json())
+                                        .then(data => {
+                                            if (data.encontrado) {
+                                                self.fillFromData({
+                                                    lote: data.lote,
+                                                    produto: data.produto,
+                                                    origem_destino: data.origem_destino,
+                                                    az: data.az,
+                                                    endereco: data.endereco,
+                                                    especie_id: data.especie_id,
+                                                    cultivar_id: data.cultivar_id,
+                                                    peneira_id: data.peneira_id,
+                                                    categoria_id: data.categoria_id,
+                                                    tratamento_id: data.tratamento_id,
+                                                    empresa: data.empresa,
+                                                    cliente: data.cliente,
+                                                    peso_unitario: data.peso_unitario,
+                                                    embalagem: data.embalagem
+                                                });
+                                            }
+                                        });
+                                });
+                                list.appendChild(div);
+                            });
+                        } else {
+                            list.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Erro no autocomplete:", error);
+                        list.style.display = 'none';
+                    });
+                }, 350);
             });
 
-        }, 350);
+            input.addEventListener('blur', () => {
+                setTimeout(() => {
+                    list.style.display = 'none';
+                }, 200);
+            });
 
-    });
-
-    input.addEventListener('blur', () => {
-        setTimeout(() => {
-            list.style.display = 'none';
-        }, 200);
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!input.contains(e.target) && !list.contains(e.target)) {
-            list.style.display = 'none';
-        }
-    });
-},
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !list.contains(e.target)) {
+                    list.style.display = 'none';
+                }
+            });
+        },
 
         setupSKUSearch() {
             const input = document.getElementById('inputSKU');
@@ -862,53 +1120,41 @@
             });
         },
 
-fillFromData(d) {
+        fillFromData(d) {
+            const campos = {
+                'inputLote': d.lote,
+                'inputSKU': d.produto,
+                'inputOrigem': d.origem_destino,
+                'inputEndereco': d.endereco,
+                'inputAz': d.az,
+                'selEspecie': d.especie_id,
+                'selCultivar': d.cultivar_id,
+                'selPeneira': d.peneira_id,
+                'selCategoria': d.categoria_id,
+                'selTratamento': d.tratamento_id,
+                'inputEmpresa': d.empresa,
+                'inputCliente': d.cliente,
+                'inputPeso': d.peso_unitario,
+                'selEmbalagem': d.embalagem
+            };
 
-    const campos = {
-        'inputLote': d.lote,
-        'inputSKU': d.produto,
-        'inputOrigem': d.origem_destino,
-        'inputEndereco': d.endereco,
-        'inputAz': d.az,
-        'selEspecie': d.especie_id,
-        'selCultivar': d.cultivar_id,
-        'selPeneira': d.peneira_id,
-        'selCategoria': d.categoria_id,
-        'selTratamento': d.tratamento_id,
-        'inputEmpresa': d.empresa,
-        'inputCliente': d.cliente,
-        'inputPeso': d.peso_unitario,
-        'selEmbalagem': d.embalagem
-    };
-
-    for (let [id, valor] of Object.entries(campos)) {
-
-        const el = document.getElementById(id);
-
-        if (!el) continue;
-
-        if (el.tagName === 'SELECT') {
-
-            const option = Array.from(el.options).find(opt => opt.value == valor);
-
-            if (option) {
-                el.value = valor;
+            for (let [id, valor] of Object.entries(campos)) {
+                const el = document.getElementById(id);
+                if (!el) continue;
+                if (el.tagName === 'SELECT') {
+                    const option = Array.from(el.options).find(opt => opt.value == valor);
+                    if (option) {
+                        el.value = valor;
+                    }
+                } else {
+                    el.value = valor || '';
+                }
             }
 
-        } else {
-
-            el.value = valor || '';
-
-        }
-
-    }
-
-    document.getElementById('autoCompleteList').style.display = 'none';
-
-    document.getElementById('inputQtd').focus();
-
-    setTimeout(() => EnderecoValidator.validar(), 100);
-},
+            document.getElementById('autoCompleteList').style.display = 'none';
+            document.getElementById('inputQtd').focus();
+            setTimeout(() => EnderecoValidator.validar(), 100);
+        },
 
         fillFields(d) {
             const campos = {
@@ -983,27 +1229,21 @@ fillFromData(d) {
                     form.reset();
                 }
                 
-                // Remove classes de validação
                 document.querySelectorAll('.is-invalid, .is-valid').forEach(el => {
                     el.classList.remove('is-invalid', 'is-valid');
                 });
                 
-                // Limpa feedback do endereço
                 const feedback = document.getElementById('enderecoFeedback');
                 if (feedback) feedback.innerHTML = '';
                 
-                // Reseta estado
                 self.isSubmitting = false;
                 
-                // Reseta botão
                 const submitBtn = document.getElementById('btnSubmit');
                 const spinner = document.getElementById('submitSpinner');
                 const submitText = document.getElementById('submitText');
                 
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.classList.remove('btn-secondary');
-                    submitBtn.classList.add('btn-primary');
                 }
                 
                 if (spinner) {
@@ -1011,10 +1251,9 @@ fillFromData(d) {
                 }
                 
                 if (submitText) {
-                    submitText.textContent = 'Confirmar Registro';
+                    submitText.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Confirmar Registro';
                 }
                 
-                // Para o scanner se estiver ativo
                 if (typeof ScannerApp !== 'undefined') {
                     ScannerApp.stop();
                 }
@@ -1047,7 +1286,7 @@ fillFromData(d) {
         }
     };
 
-    // ==================== SCANNER APP (MANTIDO IGUAL) ====================
+    // ==================== SCANNER APP (CORRIGIDO - CÂMERA NÃO FICA ATIVA) ====================
     const ScannerApp = {
         html5QrCode: null,
         isScanning: false,
@@ -1073,7 +1312,10 @@ fillFromData(d) {
         },
 
         async start() {
-            if (this.isScanning) return;
+            // Para qualquer scanner existente primeiro
+            if (this.isScanning || this.html5QrCode) {
+                await this.stop();
+            }
             
             const scannerDiv = document.getElementById('scannerFullscreen');
             const formContent = document.getElementById('formContent');
@@ -1084,13 +1326,12 @@ fillFromData(d) {
             scannerDiv.classList.remove('d-none');
             
             try {
-                if (!this.html5QrCode) {
-                    this.html5QrCode = new Html5Qrcode("scannerReader");
-                }
+                this.html5QrCode = new Html5Qrcode("scannerReader");
                 
+                // Configuração MELHORADA: FPS 60, qrbox maior, foco automático
                 const config = { 
-                    fps: 30,
-                    qrbox: { width: 300, height: 300 },
+                    fps: 60, // Aumentado de 30 para 60
+                    qrbox: { width: 280, height: 280 }, // Área maior
                     aspectRatio: 1.0
                 };
                 
@@ -1102,13 +1343,15 @@ fillFromData(d) {
                             this.isScanning = false;
                             this.playBeep();
                             
-                            document.getElementById('scannerStatus').innerHTML = '<span class="text-success">✓ QR Code lido com sucesso!</span>';
+                            document.getElementById('scannerStatus').innerHTML = 
+                                '<span class="text-success fs-5">✅ QR Code lido com sucesso!</span>';
                             
                             const partes = decodedText.split('/');
                             if (partes.length >= 2) {
                                 document.getElementById('inputSKU').value = partes[0];
                                 document.getElementById('inputLote').value = partes[1];
                                 
+                                // Dispara busca do SKU
                                 document.getElementById('inputSKU').dispatchEvent(new Event('input'));
                                 
                                 setTimeout(() => {
@@ -1116,7 +1359,8 @@ fillFromData(d) {
                                     document.getElementById('inputQtd').focus();
                                 }, 800);
                             } else {
-                                document.getElementById('scannerStatus').innerHTML = '<span class="text-danger">✗ Formato inválido (use SKU/LOTE)</span>';
+                                document.getElementById('scannerStatus').innerHTML = 
+                                    '<span class="text-warning">⚠️ Formato inválido. Use: SKU/LOTE</span>';
                                 setTimeout(() => {
                                     this.isScanning = true;
                                     document.getElementById('scannerStatus').innerHTML = '';
@@ -1124,16 +1368,73 @@ fillFromData(d) {
                             }
                         }
                     },
-                    (error) => {}
+                    (errorMessage) => {
+                        // Tratamento de erros melhorado
+                        if (errorMessage?.includes('No QR code found') || 
+                            errorMessage?.includes('No MultiFormat Readers')) {
+                            return; // Ignora erros normais
+                        }
+                        
+                        if (errorMessage?.includes('NotAllowedError') || 
+                            errorMessage?.includes('Permission')) {
+                            document.getElementById('scannerStatus').innerHTML = 
+                                '<span class="text-danger">❌ Permissão da câmera negada</span>';
+                            setTimeout(() => this.stop(), 3000);
+                        }
+                        
+                        if (errorMessage?.includes('NotFoundError') || 
+                            errorMessage?.includes('No camera')) {
+                            document.getElementById('scannerStatus').innerHTML = 
+                                '<span class="text-danger">❌ Nenhuma câmera encontrada</span>';
+                            setTimeout(() => this.stop(), 3000);
+                        }
+                    }
                 );
                 
                 this.isScanning = true;
+                
+                // Mostra indicador de câmera ativa
+                const indicator = document.getElementById('cameraActiveIndicator');
+                if (indicator) indicator.style.display = 'block';
+                
+                // Tenta habilitar foco automático
+                setTimeout(() => this.enableAutoFocus(), 1000);
+                
+                // Verifica suporte a flash
                 this.checkFlashSupport();
                 
             } catch (err) {
-                console.error('Erro:', err);
-                document.getElementById('scannerStatus').textContent = 'Erro ao iniciar câmera';
-                setTimeout(() => this.stop(), 2000);
+                console.error('Erro ao iniciar scanner:', err);
+                document.getElementById('scannerStatus').textContent = 
+                    'Erro ao iniciar câmera. Verifique as permissões.';
+                setTimeout(() => this.stop(), 3000);
+            }
+        },
+
+        // NOVO: Habilita foco automático
+        async enableAutoFocus() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: "environment",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    } 
+                });
+                const track = stream.getVideoTracks()[0];
+                const capabilities = track.getCapabilities();
+                
+                if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                    await track.applyConstraints({ 
+                        advanced: [{ focusMode: "continuous" }] 
+                    });
+                    console.log('✅ Foco automático habilitado');
+                }
+                
+                // Não para a track pois o scanner está usando
+                // stream.getTracks().forEach(t => t.stop());
+            } catch(e) {
+                console.log('Foco automático não disponível:', e.message);
             }
         },
 
@@ -1143,16 +1444,18 @@ fillFromData(d) {
                 if (devices && devices.length) {
                     const backCamera = devices.find(d => 
                         d.label.toLowerCase().includes('back') || 
-                        d.label.toLowerCase().includes('traseira')
+                        d.label.toLowerCase().includes('traseira') ||
+                        d.label.toLowerCase().includes('environment')
                     );
                     
                     if (backCamera) {
                         const stream = await navigator.mediaDevices.getUserMedia({
-                            video: { deviceId: backCamera.id }
+                            video: { deviceId: { exact: backCamera.id } }
                         });
                         
                         const track = stream.getVideoTracks()[0];
-                        this.hasFlash = track.getCapabilities().torch || false;
+                        const capabilities = track.getCapabilities();
+                        this.hasFlash = capabilities.torch || false;
                         
                         const btnFlash = document.getElementById('btnFlash');
                         if (btnFlash) {
@@ -1163,22 +1466,41 @@ fillFromData(d) {
                     }
                 }
             } catch (e) {
-                console.log('Flash check error:', e);
+                console.log('Flash não disponível:', e);
+                this.hasFlash = false;
             }
         },
 
+        // CORRIGIDO: Para completamente a câmera
         async stop() {
-            if (this.html5QrCode && this.isScanning) {
+            // Para o scanner
+            if (this.html5QrCode) {
                 try {
-                    await this.html5QrCode.stop();
+                    if (this.isScanning) {
+                        await this.html5QrCode.stop();
+                    }
+                    await this.html5QrCode.clear();
                 } catch (err) {
-                    console.log('Stop error:', err);
+                    console.log('Erro ao parar scanner:', err);
+                    try { 
+                        await this.html5QrCode.clear(); 
+                    } catch(e) {
+                        console.log('Erro na limpeza:', e);
+                    }
                 }
+                
+                // Libera a instância
+                this.html5QrCode = null;
             }
             
             this.isScanning = false;
             this.hasFlash = false;
             
+            // Esconde indicador de câmera
+            const indicator = document.getElementById('cameraActiveIndicator');
+            if (indicator) indicator.style.display = 'none';
+            
+            // Restaura o formulário
             const scannerDiv = document.getElementById('scannerFullscreen');
             const formContent = document.getElementById('formContent');
             
@@ -1187,12 +1509,16 @@ fillFromData(d) {
                 scannerDiv.classList.add('d-none');
             }
             
+            // Reseta botão flash
             const btnFlash = document.getElementById('btnFlash');
             if (btnFlash) {
                 btnFlash.disabled = true;
-                btnFlash.innerHTML = '<i class="bi bi-lightning"></i> Flash';
+                btnFlash.innerHTML = '<i class="bi bi-lightning-charge"></i> Flash';
+                btnFlash.classList.remove('btn-warning');
+                btnFlash.classList.add('btn-outline-light');
             }
             
+            // Limpa status
             const scannerStatus = document.getElementById('scannerStatus');
             if (scannerStatus) {
                 scannerStatus.innerHTML = '';
@@ -1200,46 +1526,66 @@ fillFromData(d) {
         },
 
         async toggleFlash() {
-            if (!this.html5QrCode || !this.hasFlash) return;
+            if (!this.html5QrCode || !this.hasFlash || !this.isScanning) return;
             
             try {
-                const track = await this.html5QrCode.getRunningTrackCameraConfig();
-                if (track) {
-                    const torch = !track.torch;
-                    await this.html5QrCode.applyVideoConstraints({ 
-                        advanced: [{ torch: torch }] 
+                const capabilities = await this.html5QrCode.getRunningTrackCapabilities();
+                const settings = await this.html5QrCode.getRunningTrackSettings();
+                
+                if (capabilities && 'torch' in capabilities) {
+                    const newTorchState = !settings.torch;
+                    
+                    await this.html5QrCode.applyVideoConstraints({
+                        advanced: [{ torch: newTorchState }]
                     });
                     
                     const btnFlash = document.getElementById('btnFlash');
                     if (btnFlash) {
-                        if (torch) {
-                            btnFlash.innerHTML = '<i class="bi bi-lightning-fill"></i> Flash';
+                        if (newTorchState) {
+                            btnFlash.innerHTML = '<i class="bi bi-lightning-charge-fill"></i> Flash On';
                             btnFlash.classList.replace('btn-outline-light', 'btn-warning');
                         } else {
-                            btnFlash.innerHTML = '<i class="bi bi-lightning"></i> Flash';
+                            btnFlash.innerHTML = '<i class="bi bi-lightning-charge"></i> Flash';
                             btnFlash.classList.replace('btn-warning', 'btn-outline-light');
                         }
                     }
                 }
             } catch (err) {
-                console.log('Flash error:', err);
+                console.log('Erro ao alternar flash:', err);
             }
         }
     };
 
-    // Inicialização
+    // ==================== INICIALIZAÇÃO ====================
     document.addEventListener('DOMContentLoaded', () => {
         StockApp.init();
     });
 
+    // Garantia extra: para scanner ao fechar modal
     document.addEventListener('hidden.bs.modal', (event) => {
         if (event.target.id === 'modalNovaEntrada') {
             ScannerApp.stop();
         }
     });
-
-
     
+    // Garantia extra: para scanner ao pressionar ESC
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && ScannerApp.isScanning) {
+            ScannerApp.stop();
+        }
+    });
+    
+    // Garantia extra: para scanner ao sair da página
+    window.addEventListener('beforeunload', () => {
+        ScannerApp.stop();
+    });
+    
+    // Garantia extra: para scanner quando página perde foco
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && ScannerApp.isScanning) {
+            ScannerApp.stop();
+        }
+    });
 </script>
 
 
