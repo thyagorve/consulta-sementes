@@ -1,17 +1,18 @@
-<!-- templates/sapp/base.html -->
+{% load humanize %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   
   <title>{% block title %}Sementes App - Gestão Inteligente{% endblock %}</title>
 
-  <!-- Favicon (Gerado via código para não depender de arquivo externo) -->
+  <!-- Favicon -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%232f8f4e'/%3E%3Cpath d='M32 42c0 0-4-8-4-14s4-8 4-8 4 4 4 8-4 14-4 14z' fill='%23ffffff'/%3E%3C/svg%3E" />
   
-  <!-- Fontes Google (Inter para modernidade) -->
+  <!-- Fontes Google -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -19,296 +20,481 @@
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   
-
   <!-- FontAwesome 6 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
-  <!-- DataTables CSS (Essencial + Responsivo) -->
+  <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css">
 
-  {% load humanize %}
-
   <style>
-    /* --- CORES E VARIÁVEIS GLOBAIS --- */
+    /* --- VARIÁVEIS CSS --- */
     :root {
-      --brand-primary: #2f8f4e;       /* Verde Principal */
-      --brand-secondary: #267a41;     /* Verde Escuro */
-      --brand-accent: #e6fffa;        /* Fundo claro */
-      --nav-bg: #1a202c;              /* Fundo Navbar */
-      --nav-height: 70px;
+      --brand-primary: #2f8f4e;
+      --brand-secondary: #267a41;
+      --brand-light: #e6fffa;
+      --nav-bg: #1a202c;
+      --nav-height: 72px;
+      --nav-height-mobile: 64px;
       --text-main: #2d3748;
+      --text-muted: #718096;
       --bg-body: #f8f9fa;
-      --radius: 10px;
-      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --radius: 12px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+      --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+      --transition-fast: 0.2s ease;
+      --transition-smooth: 0.3s ease;
+    }
+
+    /* --- RESET & BASE --- */
+    * {
+      box-sizing: border-box;
     }
 
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
       background-color: var(--bg-body);
       color: var(--text-main);
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      padding-top: var(--nav-height); /* Espaço para a navbar fixa */
-      overflow-x: hidden; /* Evita rolagem horizontal indesejada */
+      padding-top: var(--nav-height);
+      overflow-x: hidden;
+      line-height: 1.6;
+      margin: 0;
     }
 
-    /* --- NAVBAR MODERNA COM GLASSMORPHISM --- */
+    /* --- NAVBAR PRINCIPAL --- */
     .navbar {
-      background: rgba(26, 32, 44, 0.95);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      background: rgba(26, 32, 44, 0.97);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--shadow-sm);
       height: var(--nav-height);
-      transition: all 0.3s ease;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
+      transition: all var(--transition-smooth);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      z-index: 1030;
+    }
+
+    .navbar.scrolled {
+      box-shadow: var(--shadow-lg);
+      background: rgba(26, 32, 44, 0.99);
     }
 
     .navbar-brand {
       font-weight: 700;
-      font-size: 1.35rem;
-      letter-spacing: -0.5px;
-      color: white !important;
+      font-size: 1.4rem;
+      letter-spacing: -0.6px;
+      color: #fff !important;
       display: flex;
       align-items: center;
       gap: 10px;
+      text-decoration: none;
+      transition: opacity var(--transition-fast);
+    }
+
+    .navbar-brand:hover {
+      opacity: 0.9;
     }
 
     .brand-icon {
-      filter: drop-shadow(0 0 5px rgba(47, 143, 78, 0.6));
-      transition: transform 0.3s;
+      filter: drop-shadow(0 0 8px rgba(47, 143, 78, 0.5));
+      transition: transform var(--transition-smooth);
     }
 
     .navbar-brand:hover .brand-icon {
-      transform: scale(1.1) rotate(10deg);
+      transform: scale(1.1) rotate(-5deg);
+    }
+
+    /* --- TOGGLER MOBILE --- */
+    .navbar-toggler {
+      padding: 0.5rem;
+      border: 1px solid rgba(255,255,255,0.15) !important;
+      border-radius: 8px;
+      transition: all var(--transition-fast);
+      outline: none !important;
+    }
+
+    .navbar-toggler:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .navbar-toggler:focus {
+      box-shadow: 0 0 0 2px rgba(47, 143, 78, 0.4) !important;
+    }
+
+    .navbar-toggler .fa-bars {
+      transition: transform var(--transition-smooth);
+    }
+
+    .navbar-toggler[aria-expanded="true"] .fa-bars {
+      transform: rotate(90deg);
     }
 
     /* --- LINKS DE NAVEGAÇÃO --- */
     .nav-link {
-      color: rgba(255, 255, 255, 0.75) !important;
+      color: rgba(255,255,255,0.8) !important;
       font-weight: 500;
       font-size: 0.95rem;
-      padding: 0.5rem 1rem !important;
+      padding: 0.6rem 1rem !important;
       border-radius: 8px;
-      transition: all 0.2s;
+      transition: all var(--transition-fast);
       display: flex;
       align-items: center;
       gap: 8px;
-      margin: 0 4px;
-    }
-
-    .nav-link:hover {
-      color: white !important;
-      background: rgba(255, 255, 255, 0.1);
-      transform: translateY(-1px);
-    }
-
-    /* Link Ativo */
-    .nav-link.active {
-      background: var(--brand-primary);
-      color: white !important;
-      box-shadow: 0 4px 12px rgba(47, 143, 78, 0.3);
+      margin: 0 2px;
+      white-space: nowrap;
+      position: relative;
     }
 
     .nav-link i {
-      font-size: 1.1em;
-      width: 20px;
+      font-size: 1.05em;
+      width: 18px;
       text-align: center;
+      transition: transform var(--transition-fast);
+    }
+
+    .nav-link:hover {
+      color: #fff !important;
+      background: rgba(255,255,255,0.1);
+    }
+
+    .nav-link:hover i {
+      transform: scale(1.1);
+    }
+
+    .nav-link.active {
+      background: var(--brand-primary) !important;
+      color: #fff !important;
+      box-shadow: 0 4px 12px rgba(47,143,78,0.35);
+      font-weight: 600;
+    }
+
+    .nav-link.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 3px;
+      height: 60%;
+      background: rgba(255,255,255,0.5);
+      border-radius: 0 3px 3px 0;
     }
 
     /* --- BOTÃO LOGOUT --- */
     .btn-logout {
-      background: none;
-      border: 1px solid rgba(239, 68, 68, 0.5);
+      background: transparent;
+      border: 1px solid rgba(239,68,68,0.4) !important;
       color: #fca5a5 !important;
+      cursor: pointer;
     }
 
     .btn-logout:hover {
-      background: rgba(239, 68, 68, 0.2);
-      color: white !important;
-      border-color: #ef4444;
+      background: rgba(239,68,68,0.15) !important;
+      color: #fff !important;
+      border-color: #ef4444 !important;
+    }
+
+    .btn-logout:hover i {
+      animation: pulse 0.6s ease infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
     }
 
     /* --- CONTEÚDO PRINCIPAL --- */
     main {
       flex: 1;
-      padding-bottom: 40px;
-      animation: fadeIn 0.5s ease-out;
+      padding-bottom: 2rem;
+      animation: fadeInUp 0.4s ease-out;
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* --- ALERTAS FLUTUANTES --- */
     .alert-container {
       position: fixed;
-      top: 90px;
+      top: calc(var(--nav-height) + 16px);
       right: 20px;
-      z-index: 9999;
-      width: 90%;
-      max-width: 400px;
+      z-index: 1050;
+      width: min(90%, 420px);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .alert-container .alert {
+      pointer-events: auto;
     }
 
     .alert {
       border: none;
-      border-left: 5px solid transparent;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      border-left: 5px solid;
+      box-shadow: var(--shadow-lg);
       border-radius: 8px;
-      background: white;
-      color: #333;
+      background: #fff;
+      color: #1a202c;
+      padding: 1rem 1.25rem;
+      margin: 0;
+      animation: slideInRight 0.4s ease-out;
     }
 
-    .alert-success { border-color: #10b981; }
-    .alert-danger { border-color: #ef4444; }
-    .alert-warning { border-color: #f59e0b; }
-    .alert-info { border-color: #3b82f6; }
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .alert-success { border-left-color: #10b981; }
+    .alert-danger { border-left-color: #ef4444; }
+    .alert-warning { border-left-color: #f59e0b; }
+    .alert-info { border-left-color: #3b82f6; }
+
+    .alert i { 
+      font-size: 1.3rem; 
+      flex-shrink: 0;
+    }
 
     /* --- FOOTER --- */
     footer {
       background: #1a202c;
       color: #a0aec0;
-      padding: 20px 0;
+      padding: 1.25rem 0;
       font-size: 0.9rem;
       border-top: 1px solid rgba(255,255,255,0.05);
+      margin-top: auto;
     }
 
-    /* --- MOBILE & RESPONSIVIDADE (CRÍTICO) --- */
-    @media (max-width: 991px) {
-      /* Menu Mobile Estilizado */
+    footer .fw-bold {
+      color: #e2e8f0;
+    }
+
+    /* ============================================ */
+    /* RESPONSIVIDADE MOBILE - CORRIGIDA 100%       */
+    /* ============================================ */
+    @media (max-width: 991.98px) {
+      :root {
+        --nav-height: var(--nav-height-mobile);
+      }
+
+      body {
+        padding-top: var(--nav-height-mobile);
+      }
+
+      .navbar {
+        height: var(--nav-height-mobile);
+      }
+
+      .navbar-brand {
+        font-size: 1.2rem;
+      }
+
+      /* Menu colapsado - comportamento padrão Bootstrap 5 */
       .navbar-collapse {
-        background: #1a202c;
+        background: rgba(26, 32, 44, 0.99);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         position: absolute;
-        top: var(--nav-height);
+        top: 100%;
         left: 0;
         right: 0;
-        padding: 1rem;
-        border-bottom-left-radius: 15px;
-        border-bottom-right-radius: 15px;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        border-top: 1px solid rgba(255,255,255,0.05);
+        max-height: calc(100vh - var(--nav-height-mobile));
+        overflow-y: auto;
+        padding: 1rem 1.25rem;
+        box-shadow: var(--shadow-lg);
+        border-top: 1px solid rgba(255,255,255,0.08);
+        border-radius: 0 0 16px 16px;
+        z-index: 1029;
       }
 
-      .navbar-nav { gap: 5px; }
-      
-      .nav-link {
-        padding: 12px 15px !important; /* Área de toque maior */
-        font-size: 1rem;
+      /* Estado collapsing - transição suave */
+      .navbar-collapse.collapsing {
+        overflow: hidden;
+        transition: height 0.35s ease;
       }
-      
-      .logout-form { margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; }
-      
-      /* Ajuste container */
-      .container-fluid { padding-left: 15px; padding-right: 15px; }
+
+      /* Estado aberto */
+      .navbar-collapse.show {
+        display: block;
+      }
+
+      .navbar-nav {
+        gap: 6px;
+        padding-bottom: 1rem;
+      }
+
+      .nav-link {
+        padding: 14px 16px !important;
+        font-size: 1.05rem;
+        border-radius: 10px;
+        margin: 0;
+        transition: all var(--transition-fast);
+      }
+
+      .nav-link:active {
+        transform: scale(0.98);
+        background: rgba(255,255,255,0.15) !important;
+      }
+
+      .nav-link.active::before {
+        display: none;
+      }
+
+      .logout-form {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.1);
+      }
+
+      .logout-form .btn-logout {
+        justify-content: flex-start !important;
+      }
+
+      .alert-container {
+        top: calc(var(--nav-height-mobile) + 8px);
+        right: 4%;
+        width: 92%;
+      }
     }
 
-    @media (max-width: 576px) {
-      .navbar-brand span { font-size: 1.1rem; }
-      .alert-container { right: 5%; width: 90%; }
-      
-      /* Ajuste para Cards do conteúdo ficarem cheios */
-      .card { border-radius: 0 !important; border-left: none; border-right: none; }
-      .container-fluid.mt-3 { padding: 0; margin-top: 10px !important; }
-      .page-title { margin: 10px; border-radius: 8px; }
+    @media (max-width: 575.98px) {
+      .navbar-brand {
+        font-size: 1.1rem;
+      }
+
+      .brand-icon {
+        width: 28px;
+        height: 28px;
+      }
+
+      .alert-container {
+        right: 3%;
+        width: 94%;
+      }
+
+      footer {
+        font-size: 0.8rem;
+        padding: 1rem 0;
+      }
     }
   </style>
+  
+  {% block extra_css %}{% endblock %}
 </head>
 
 <body>
 
   <!-- NAVBAR -->
-  <nav class="navbar navbar-expand-lg fixed-top">
+  <nav class="navbar navbar-expand-lg fixed-top" id="mainNavbar" aria-label="Navegação principal">
     <div class="container-fluid px-lg-4">
       
       <!-- Brand -->
-      <a class="navbar-brand" href="{% url 'sapp:dashboard' %}">
-        <svg class="brand-icon" width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="32" cy="32" r="32" fill="#2f8f4e"/>
-          <path d="M32 12C32 12 42 22 42 32C42 42 32 52 32 52C32 52 22 42 22 32C22 22 32 12 32 12Z" fill="white"/>
-          <path d="M32 20V44" stroke="#2f8f4e" stroke-width="2" stroke-linecap="round"/>
-          <path d="M32 32H40" stroke="#2f8f4e" stroke-width="2" stroke-linecap="round"/>
-          <path d="M32 26H26" stroke="#2f8f4e" stroke-width="2" stroke-linecap="round"/>
+      <a class="navbar-brand" href="{% url 'sapp:dashboard' %}" aria-label="Sementes App - Ir para Dashboard">
+        <svg class="brand-icon" width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="32" cy="32" r="30" fill="#2f8f4e"/>
+          <path d="M32 14C32 14 42 24 42 34C42 44 32 54 32 54C32 54 22 44 22 34C22 24 32 14 32 14Z" fill="white" opacity="0.95"/>
+          <circle cx="32" cy="34" r="4" fill="#2f8f4e"/>
         </svg>
         <span>Sementes App</span>
       </a>
 
       <!-- Toggler Mobile -->
-      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
-        <i class="fas fa-bars text-white fs-4"></i>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" 
+              aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menu de navegação">
+        <i class="fas fa-bars text-white fs-5"></i>
       </button>
 
-      <!-- Menu Items -->
-      <div class="collapse navbar-collapse" id="mainNavbar">
-        <ul class="navbar-nav ms-auto align-items-lg-center">
+      <!-- Menu de Navegação -->
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav ms-auto align-items-lg-center py-2 py-lg-0">
           
           {% if user.is_authenticated %}
+          
             <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'sapp:dashboard' %}">
-                <i class="fa-solid fa-chart-pie"></i> Dashboard
+              <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                 href="{% url 'sapp:dashboard' %}">
+                <i class="fa-solid fa-chart-pie" aria-hidden="true"></i> Dashboard
               </a>
             </li>
             
             <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'lista_estoque' %}active{% endif %}" href="{% url 'sapp:lista_estoque' %}">
-                <i class="fa-solid fa-boxes-stacked"></i> Estoque
+              <a class="nav-link {% if request.resolver_match.url_name == 'lista_estoque' %}active{% endif %}" 
+                 href="{% url 'sapp:lista_estoque' %}">
+                <i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i> Estoque
               </a>
             </li>
 
             <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'gestao_estoque' %}active{% endif %}" href="{% url 'sapp:gestao_estoque' %}">
-                <i class="fa-solid fa-dolly"></i> Movimentar
+              <a class="nav-link {% if request.resolver_match.url_name == 'gestao_estoque' %}active{% endif %}" 
+                 href="{% url 'sapp:gestao_estoque' %}">
+                <i class="fa-solid fa-dolly" aria-hidden="true"></i> Movimentar
               </a>
             </li>
             
-
-
-             <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'pagina_rascunho' %}active{% endif %}" href="{% url 'sapp:pagina_rascunho' %}">
-                    <i class="fa-solid fa-clipboard-list"></i> Empenho
-                </a>
-            </li>
-
-
-
-           <!-- Menu dropdown com todos os armazéns -->
-<li class="nav-item">
-    <!-- Aponta para a visualização, não para o editor -->
-    <a class="nav-link" href="{% url 'sapp:mapa_canvas' 1 %}">
-        <i class="fas fa-map-marked-alt me-1"></i> Mapa do Armazém
-    </a>
-</li>
-
-
-
             <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'historico_geral' %}active{% endif %}" href="{% url 'sapp:historico_geral' %}">
-                <i class="fa-solid fa-clock-rotate-left"></i> Histórico
+              <a class="nav-link {% if request.resolver_match.url_name == 'pagina_rascunho' %}active{% endif %}" 
+                 href="{% url 'sapp:pagina_rascunho' %}">
+                <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> Empenho
               </a>
             </li>
 
             <li class="nav-item">
-                <a class="nav-link {% if request.resolver_match.url_name == 'configuracoes' %}active{% endif %}" href="{% url 'sapp:configuracoes' %}">
-                  <i class="fa-solid fa-gear"></i> Config
-                </a>
-              </li>
+              <a class="nav-link {% if 'mapa_canvas' in request.resolver_match.url_name %}active{% endif %}" 
+                 href="{% url 'sapp:mapa_canvas' 1 %}">
+                <i class="fas fa-map-marked-alt" aria-hidden="true"></i> Mapa
+              </a>
+            </li>
 
-            <!-- Separador Mobile -->
-            <li class="nav-item py-2 d-lg-none"></li>
+            <li class="nav-item">
+              <a class="nav-link {% if request.resolver_match.url_name == 'historico_geral' %}active{% endif %}" 
+                 href="{% url 'sapp:historico_geral' %}">
+                <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Histórico
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link {% if request.resolver_match.url_name == 'configuracoes' %}active{% endif %}" 
+                 href="{% url 'sapp:configuracoes' %}">
+                <i class="fa-solid fa-gear" aria-hidden="true"></i> Config
+              </a>
+            </li>
+
+            <li class="nav-item d-lg-none"><hr class="my-2 border-secondary opacity-25"></li>
 
             <li class="nav-item logout-form">
               <form action="{% url 'sapp:logout' %}" method="post" class="d-flex">
                 {% csrf_token %}
-                <button type="submit" class="nav-link btn-logout w-100 justify-content-start justify-content-lg-center">
-                  <i class="fa-solid fa-power-off"></i> Sair
+                <button type="submit" class="nav-link btn-logout w-100" 
+                        aria-label="Sair do sistema">
+                  <i class="fa-solid fa-power-off" aria-hidden="true"></i> Sair
                 </button>
               </form>
             </li>
 
           {% else %}
             <li class="nav-item">
-              <a class="nav-link btn btn-primary text-white px-4" href="{% url 'sapp:login' %}">
-                <i class="fa-solid fa-right-to-bracket"></i> Acessar
+              <a class="nav-link btn btn-primary text-white px-4 rounded-pill" 
+                 href="{% url 'sapp:login' %}">
+                <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> Acessar
               </a>
             </li>
           {% endif %}
@@ -317,83 +503,185 @@
     </div>
   </nav>
 
-  <!-- ÁREA DE MENSAGENS FLUTUANTES -->
-  <div class="alert-container">
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show d-flex align-items-center shadow-sm" role="alert">
-          <i class="fa-solid 
-            {% if message.tags == 'success' %}fa-circle-check text-success
-            {% elif message.tags == 'error' %}fa-circle-exclamation text-danger
-            {% elif message.tags == 'warning' %}fa-triangle-exclamation text-warning
-            {% else %}fa-circle-info text-primary{% endif %} 
-            me-3 fs-4"></i>
-          <div>
-            <strong>{{ message.tags|title }}!</strong> {{ message }}
-          </div>
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      {% endfor %}
-    {% endif %}
+  <!-- MENSAGENS FLUTUANTES -->
+  {% if messages %}
+  <div class="alert-container" aria-live="polite" aria-atomic="true">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show d-flex align-items-start gap-3 shadow-sm" 
+         role="alert">
+      <i class="fa-solid 
+        {% if message.tags == 'success' %}fa-circle-check text-success
+        {% elif message.tags == 'error' or message.tags == 'danger' %}fa-circle-exclamation text-danger
+        {% elif message.tags == 'warning' %}fa-triangle-exclamation text-warning
+        {% else %}fa-circle-info text-primary{% endif %} 
+        mt-1" aria-hidden="true"></i>
+      <div class="flex-grow-1">
+        <strong>{{ message.tags|title }}!</strong> {{ message }}
+      </div>
+      <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="alert" aria-label="Fechar notificação"></button>
+    </div>
+    {% endfor %}
   </div>
+  {% endif %}
 
   <!-- CONTEÚDO PRINCIPAL -->
-  <main>
+  <main id="main-content">
     {% block content %}{% endblock %}
   </main>
 
   <!-- FOOTER -->
-  <footer class="text-center">
+  <footer role="contentinfo">
     <div class="container">
-      <div class="row align-items-center">
-        <div class="col-md-6 text-md-start mb-2 mb-md-0">
-          <span class="fw-bold text-white">Sementes App</span> &copy; {% now "Y" %}
+      <div class="row align-items-center g-2">
+        <div class="col-md-6 text-center text-md-start">
+          <span class="fw-bold text-white">Sementes App</span> 
+          <span class="text-secondary">&copy; {% now "Y" %}</span>
         </div>
-        <div class="col-md-6 text-md-end">
-          <small>Desenvolvido com <i class="fas fa-heart text-danger mx-1"></i> para o Agro</small>
+        <div class="col-md-6 text-center text-md-end">
+          <small class="text-muted">
+            Desenvolvido com <i class="fas fa-heart text-danger mx-1" aria-label="amor"></i> para o Agro
+          </small>
         </div>
       </div>
     </div>
   </footer>
 
-  <!-- SCRIPTS - ORDEM IMPORTANTE -->
-  <!-- 1. jQuery -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  
-  <!-- 2. Bootstrap Bundle -->
+  <!-- SCRIPTS -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  
-  <!-- 3. DataTables Core e Bootstrap Integration -->
   <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-  
-  <!-- 4. DataTables Responsive (CRUCIAL PARA MOBILE) -->
   <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
   <script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap5.min.js"></script>
 
-  <!-- Scripts Globais -->
+  <!-- SCRIPTS GLOBAIS - 100% FUNCIONAL -->
   <script>
-    $(document).ready(function() {
+    (function() {
+      'use strict';
       
-      // Auto-fechar alertas após 5 segundos
-      setTimeout(function() {
-        $(".alert").alert('close');
-      }, 5000);
-
-      // Fechar menu mobile ao clicar em um link (UX improvement)
-      $('.navbar-nav>li>a').on('click', function(){
-          $('.navbar-collapse').collapse('hide');
-      });
-
-      // Efeito de sombra na navbar ao rolar
-      $(window).scroll(function() {
-        if ($(this).scrollTop() > 50) {
-          $('.navbar').css('box-shadow', '0 4px 20px rgba(0,0,0,0.3)');
-        } else {
-          $('.navbar').css('box-shadow', '0 4px 20px rgba(0,0,0,0.1)');
+      document.addEventListener('DOMContentLoaded', function() {
+        
+        // ===== MENU MOBILE - CORRIGIDO DEFINITIVAMENTE =====
+        var navCollapse = document.getElementById('mainNav');
+        var navbarToggler = document.querySelector('.navbar-toggler');
+        var isMenuOpen = false;
+        
+        if (navCollapse && navbarToggler) {
+          
+          // Monitora estado do menu
+          navCollapse.addEventListener('show.bs.collapse', function() {
+            isMenuOpen = true;
+          });
+          
+          navCollapse.addEventListener('shown.bs.collapse', function() {
+            isMenuOpen = true;
+          });
+          
+          navCollapse.addEventListener('hide.bs.collapse', function() {
+            isMenuOpen = false;
+          });
+          
+          navCollapse.addEventListener('hidden.bs.collapse', function() {
+            isMenuOpen = false;
+          });
+          
+          // CRÍTICO: Impede que clique no toggler propague para document
+          navbarToggler.addEventListener('click', function(event) {
+            event.stopPropagation();
+          });
+          
+          // Fecha menu ao clicar em links DENTRO do menu
+          navCollapse.addEventListener('click', function(event) {
+            var clickedLink = event.target.closest('.nav-link');
+            
+            if (clickedLink && window.innerWidth < 992 && isMenuOpen) {
+              // Delay para feedback visual do clique
+              setTimeout(function() {
+                var bsCollapse = bootstrap.Collapse.getInstance(navCollapse);
+                if (bsCollapse && navCollapse.classList.contains('show')) {
+                  bsCollapse.hide();
+                }
+              }, 150);
+            }
+          });
+          
+          // Fecha menu ao clicar FORA (exceto no toggler)
+          document.addEventListener('click', function(event) {
+            if (window.innerWidth < 992 && isMenuOpen) {
+              var clickedOnNav = navCollapse.contains(event.target);
+              var clickedOnToggler = navbarToggler.contains(event.target);
+              
+              if (!clickedOnNav && !clickedOnToggler) {
+                var bsCollapse = bootstrap.Collapse.getInstance(navCollapse);
+                if (bsCollapse) {
+                  bsCollapse.hide();
+                }
+              }
+            }
+          });
+          
+          // Fecha menu ao redimensionar para desktop
+          window.addEventListener('resize', function() {
+            if (window.innerWidth >= 992 && navCollapse.classList.contains('show')) {
+              var bsCollapse = bootstrap.Collapse.getInstance(navCollapse);
+              if (bsCollapse) {
+                bsCollapse.hide();
+              }
+            }
+          });
         }
+
+        // ===== ALERTAS - AUTO FECHAR =====
+        setTimeout(function() {
+          var alerts = document.querySelectorAll('.alert');
+          alerts.forEach(function(alertElement) {
+            setTimeout(function() {
+              var bsAlert = bootstrap.Alert.getInstance(alertElement);
+              if (bsAlert) {
+                bsAlert.close();
+              }
+            }, 6000);
+          });
+        }, 500);
+
+        // ===== EFEITO SCROLL NAVBAR =====
+        var navbar = document.getElementById('mainNavbar');
+        var ticking = false;
+        
+        window.addEventListener('scroll', function() {
+          if (!ticking) {
+            window.requestAnimationFrame(function() {
+              var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+              
+              if (scrollTop > 15) {
+                if (!navbar.classList.contains('scrolled')) {
+                  navbar.classList.add('scrolled');
+                }
+              } else {
+                if (navbar.classList.contains('scrolled')) {
+                  navbar.classList.remove('scrolled');
+                }
+              }
+              ticking = false;
+            });
+            ticking = true;
+          }
+        }, { passive: true });
+
+        // ===== TOOLTIPS E POPOVERS =====
+        var tooltipTriggers = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltipTriggers.forEach(function(el) {
+          new bootstrap.Tooltip(el);
+        });
+
+        var popoverTriggers = document.querySelectorAll('[data-bs-toggle="popover"]');
+        popoverTriggers.forEach(function(el) {
+          new bootstrap.Popover(el);
+        });
+
+        console.log('✅ Sementes App - Base carregada com sucesso');
       });
-    });
+    })();
   </script>
   
   {% block extra_js %}{% endblock %}

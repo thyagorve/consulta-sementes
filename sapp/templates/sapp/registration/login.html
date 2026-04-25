@@ -3,55 +3,411 @@
 {% block title %}Login - Sementes App{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-5">
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <h3 class="text-center mb-0">Acessar o Sistema</h3>
-            </div>
-            <div class="card-body">
-                
-                <!-- Exibe erros do formulário, como "usuário/senha inválidos" -->
-                {% if form.errors %}
-                    <div class="alert alert-danger" role="alert">
-                        Seu nome de usuário e senha não correspondem. Por favor, tente novamente.
-                    </div>
-                {% endif %}
+<style>
+    /* ========== FUNDO DA PÁGINA DE LOGIN ========== */
+    .login-page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 30%, #0f172a 60%, #1a1a2e 100%);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Partículas decorativas no fundo */
+    .login-page::before {
+        content: '';
+        position: absolute;
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
+        top: -200px;
+        right: -200px;
+        border-radius: 50%;
+        animation: floatBubble 8s ease-in-out infinite;
+    }
+    
+    .login-page::after {
+        content: '';
+        position: absolute;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 70%);
+        bottom: -150px;
+        left: -100px;
+        border-radius: 50%;
+        animation: floatBubble 10s ease-in-out infinite reverse;
+    }
+    
+    @keyframes floatBubble {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33% { transform: translate(30px, -30px) scale(1.1); }
+        66% { transform: translate(-20px, 20px) scale(0.95); }
+    }
+    
+    /* Grid decorativo no fundo */
+    .login-page .grid-bg {
+        position: absolute;
+        inset: 0;
+        background-image: 
+            linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 60px 60px;
+        pointer-events: none;
+    }
+    
+    /* ========== CONTAINER DO CARD ========== */
+    .login-card-wrapper {
+        position: relative;
+        z-index: 10;
+        width: 100%;
+        max-width: 440px;
+        padding: 20px;
+    }
+    
+    /* ========== LOGO/ÍCONE ========== */
+    .login-logo {
+        text-align: center;
+        margin-bottom: 25px;
+    }
+    
+    .login-logo .logo-circle {
+        width: 70px;
+        height: 70px;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        color: white;
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4);
+        animation: logoPulse 3s ease-in-out infinite;
+    }
+    
+    @keyframes logoPulse {
+        0%, 100% { box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4); }
+        50% { box-shadow: 0 15px 40px rgba(59, 130, 246, 0.6); }
+    }
+    
+    .login-logo .system-name {
+        color: #e2e8f0;
+        font-weight: 300;
+        font-size: 1.5rem;
+        margin-top: 12px;
+        letter-spacing: 1px;
+    }
+    
+    .login-logo .system-name strong {
+        font-weight: 700;
+        color: #ffffff;
+    }
+    
+    /* ========== CARD DE LOGIN ========== */
+    .login-card {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 24px;
+        padding: 40px 35px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .login-card:hover {
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+    }
+    
+    .login-card .card-title {
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 1.4rem;
+        text-align: center;
+        margin-bottom: 30px;
+        letter-spacing: 0.5px;
+    }
+    
+    .login-card .card-title i {
+        color: #3b82f6;
+        margin-right: 8px;
+    }
+    
+    /* ========== LABELS ========== */
+    .login-card .form-label {
+        color: #94a3b8;
+        font-weight: 500;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .login-card .form-label i {
+        font-size: 1rem;
+        color: #3b82f6;
+    }
+    
+    /* ========== INPUTS ========== */
+    .login-card .form-control {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 12px;
+        padding: 14px 16px;
+        color: #ffffff;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        caret-color: #3b82f6;
+    }
+    
+    .login-card .form-control::placeholder {
+        color: rgba(255, 255, 255, 0.3);
+    }
+    
+    .login-card .form-control:focus {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+        outline: none;
+    }
+    
+    .login-card .form-control:-webkit-autofill,
+    .login-card .form-control:-webkit-autofill:hover,
+    .login-card .form-control:-webkit-autofill:focus {
+        -webkit-text-fill-color: #ffffff;
+        -webkit-box-shadow: 0 0 0px 1000px #1e293b inset;
+        transition: background-color 5000s ease-in-out 0s;
+    }
+    
+    /* ========== BOTÃO DE LOGIN ========== */
+    .login-card .btn-login {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 14px;
+        font-weight: 600;
+        font-size: 1rem;
+        letter-spacing: 0.5px;
+        color: white;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .login-card .btn-login::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+    
+    .login-card .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.4);
+    }
+    
+    .login-card .btn-login:hover::before {
+        left: 100%;
+    }
+    
+    .login-card .btn-login:active {
+        transform: translateY(0);
+    }
+    
+    .login-card .btn-login:focus-visible {
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+        outline: none;
+    }
+    
+    /* ========== ALERTAS ========== */
+    .login-card .alert {
+        border-radius: 12px;
+        padding: 14px 16px;
+        font-size: 0.9rem;
+        border: none;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .login-card .alert-danger {
+        background: rgba(239, 68, 68, 0.15);
+        color: #fca5a5;
+        border-left: 4px solid #ef4444;
+    }
+    
+    .login-card .alert-warning {
+        background: rgba(245, 158, 11, 0.15);
+        color: #fcd34d;
+        border-left: 4px solid #f59e0b;
+    }
+    
+    .login-card .alert-info {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93c5fd;
+        border-left: 4px solid #3b82f6;
+    }
+    
+    .login-card .alert i {
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+    
+    /* ========== AVISO CSRF (SUTIL) ========== */
+    .csrf-notice {
+        text-align: center;
+        margin-top: 20px;
+        color: rgba(255, 255, 255, 0.3);
+        font-size: 0.7rem;
+        letter-spacing: 0.5px;
+    }
+    
+    .csrf-notice i {
+        font-size: 0.65rem;
+    }
+    
+    /* ========== ANIMAÇÃO DE ENTRADA ========== */
+    .login-card-wrapper {
+        animation: fadeInUp 0.8s ease forwards;
+        opacity: 0;
+    }
+    
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* ========== RESPONSIVO ========== */
+    @media (max-width: 576px) {
+        .login-card {
+            padding: 30px 20px;
+            border-radius: 20px;
+        }
+        
+        .login-logo .logo-circle {
+            width: 55px;
+            height: 55px;
+            font-size: 26px;
+            border-radius: 16px;
+        }
+        
+        .login-logo .system-name {
+            font-size: 1.2rem;
+        }
+    }
+</style>
 
-                <!-- Exibe mensagens de outros lugares, como "Você foi deslogado" -->
-                {% if next %}
-                    {% if user.is_authenticated %}
+<div class="login-page">
+    <!-- Grid decorativo de fundo -->
+    <div class="grid-bg"></div>
+    
+    <div class="login-card-wrapper">
+        <!-- Logo e nome do sistema -->
+        <div class="login-logo">
+            <div class="logo-circle">
+                <i class="bi bi-flower1"></i>
+            </div>
+            <div class="system-name">
+                <strong>Sementes</strong> App
+            </div>
+        </div>
+        
+        <!-- Card de Login -->
+        <div class="login-card">
+            <h4 class="card-title">
+                <i class="bi bi-shield-lock-fill"></i> Acessar o Sistema
+            </h4>
+            
+            <!-- Exibe erros do formulário -->
+            {% if form.errors %}
+                <div class="alert alert-danger" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>Usuário ou senha inválidos. Tente novamente.</span>
+                </div>
+            {% endif %}
+
+            <!-- Exibe mensagens de redirecionamento -->
+            {% if next %}
+                {% if user.is_authenticated %}
                     <div class="alert alert-warning" role="alert">
-                      Sua conta não tem acesso a esta página. Para prosseguir,
-                      faça o login com uma conta que tenha permissão.
+                        <i class="bi bi-lock-fill"></i>
+                        <span>Sua conta não tem acesso a esta página. Faça login com uma conta autorizada.</span>
                     </div>
-                    {% else %}
+                {% else %}
                     <div class="alert alert-info" role="alert">
-                      Por favor, faça o login para ver esta página.
+                        <i class="bi bi-info-circle-fill"></i>
+                        <span>Faça login para continuar.</span>
                     </div>
-                    {% endif %}
                 {% endif %}
+            {% endif %}
 
-                <form method="post" action="{% url 'sapp:login' %}">
-                    {% csrf_token %}
-                    <input type="hidden" name="next" value="{{ next }}">
-                    
-                    <div class="mb-3">
-                        <label for="id_username" class="form-label">Nome de Usuário</label>
-                        <input type="text" name="username" autofocus autocapitalize="none" autocomplete="username" maxlength="150" class="form-control" required id="id_username">
-                    </div>
+            <form method="post" action="{% url 'sapp:login' %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next }}">
+                
+                <div class="mb-4">
+                    <label for="id_username" class="form-label">
+                        <i class="bi bi-person-fill"></i> Nome de Usuário
+                    </label>
+                    <input 
+                        type="text" 
+                        name="username" 
+                        autofocus 
+                        autocapitalize="none" 
+                        autocomplete="username" 
+                        maxlength="150" 
+                        class="form-control" 
+                        required 
+                        id="id_username"
+                        placeholder="Digite seu usuário"
+                    >
+                </div>
 
-                    <div class="mb-3">
-                        <label for="id_password" class="form-label">Senha</label>
-                        <input type="password" name="password" autocomplete="current-password" class="form-control" required id="id_password">
-                    </div>
-                    
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Entrar</button>
-                    </div>
-                </form>
-            </div>
+                <div class="mb-4">
+                    <label for="id_password" class="form-label">
+                        <i class="bi bi-key-fill"></i> Senha
+                    </label>
+                    <input 
+                        type="password" 
+                        name="password" 
+                        autocomplete="current-password" 
+                        class="form-control" 
+                        required 
+                        id="id_password"
+                        placeholder="Digite sua senha"
+                    >
+                </div>
+                
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-login">
+                        <i class="bi bi-box-arrow-in-right me-2"></i> Entrar
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Aviso sutil sobre CSRF -->
+        <div class="csrf-notice">
+            <i class="bi bi-shield-check"></i> Conexão segura • Se houver erro de CSRF, verifique se os cookies estão habilitados
         </div>
     </div>
 </div>
+
 {% endblock %}
