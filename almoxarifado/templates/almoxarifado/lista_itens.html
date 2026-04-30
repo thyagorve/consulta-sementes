@@ -169,30 +169,30 @@
                 </div>
             </div>
             
-            <!-- FOTO COM OPÇÃO DE CÂMERA -->
-            <div class="form-group">
-                <label>Foto</label>
-                <div class="foto-upload-area" id="foto-upload-area">
-                    <input type="file" name="foto" id="foto-input" accept="image/*" capture="environment" 
-                           style="display:none;" onchange="handleFotoSelecionada(this)">
-                    <input type="file" id="camera-input" accept="image/*" capture="environment" 
-                           style="display:none;" onchange="handleFotoSelecionada(this)">
-                    
-                    <div class="foto-actions">
-                        <button type="button" class="btn-foto" onclick="document.getElementById('foto-input').click()" title="Escolher da galeria">
-                            🖼️ Galeria
-                        </button>
-                        <button type="button" class="btn-foto" onclick="document.getElementById('camera-input').click()" title="Tirar foto">
-                            📷 Câmera
-                        </button>
-                    </div>
-                    
-                    <div class="foto-preview-container" id="foto-preview-container" style="display:none;">
-                        <img id="foto-preview" alt="Preview">
-                        <button type="button" class="btn-remove-foto" onclick="removerFoto()">✕</button>
-                    </div>
-                </div>
-            </div>
+            <!-- FOTO COM DETECÇÃO DE DISPOSITIVO -->
+<div class="form-group">
+    <label>Foto</label>
+    <div class="foto-upload-area" id="foto-upload-area">
+        <input type="file" name="foto" id="foto-input" accept="image/*" 
+               style="display:none;" onchange="handleFotoSelecionada(this)">
+        <input type="file" id="camera-input" accept="image/*" capture="environment" 
+               style="display:none;" onchange="handleFotoSelecionada(this)">
+        
+        <div class="foto-actions" id="foto-actions">
+            <button type="button" class="btn-foto" onclick="document.getElementById('foto-input').click()" title="Escolher da galeria">
+                🖼️ Galeria
+            </button>
+            <button type="button" class="btn-foto" id="btn-camera" onclick="abrirCamera()" title="Tirar foto">
+                📷 Câmera
+            </button>
+        </div>
+        
+        <div class="foto-preview-container" id="foto-preview-container" style="display:none;">
+            <img id="foto-preview" alt="Preview">
+            <button type="button" class="btn-remove-foto" onclick="removerFoto()">✕</button>
+        </div>
+    </div>
+</div>
         </form>
     </div>
     <div class="side-panel-footer">
@@ -722,6 +722,69 @@ async function excluirItem(id) {
     } catch(e) {
         mostrarToast('Erro', 'error');
     }
+}
+
+
+
+
+// ===== DETECÇÃO DE DISPOSITIVO PARA CÂMERA =====
+function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent) || 
+           ('ontouchstart' in window) ||
+           (navigator.maxTouchPoints > 0);
+}
+
+function abrirCamera() {
+    if (isMobileDevice()) {
+        // Mobile: abre câmera nativa
+        document.getElementById('camera-input').click();
+    } else {
+        // PC: abre seletor de arquivos (fallback)
+        document.getElementById('foto-input').click();
+    }
+}
+
+// Inicialização: esconde botão de câmera no PC se quiser
+document.addEventListener('DOMContentLoaded', function() {
+    const btnCamera = document.getElementById('btn-camera');
+    if (btnCamera && !isMobileDevice()) {
+        // Opção 1: Mudar ícone/texto do botão
+        btnCamera.innerHTML = '📁 Upload';
+        btnCamera.title = 'Fazer upload de arquivo';
+        
+        // Opção 2 (alternativa): Esconder completamente
+        // btnCamera.style.display = 'none';
+    }
+});
+
+// ===== HANDLER DE FOTO (CORRIGIDO) =====
+function handleFotoSelecionada(input) {
+    if (input.files && input.files[0]) {
+        // Transfere para o input principal (se for o da câmera)
+        const fotoInput = document.getElementById('foto-input');
+        if (input.id === 'camera-input') {
+            const dt = new DataTransfer();
+            dt.items.add(input.files[0]);
+            fotoInput.files = dt.files;
+        }
+        
+        // Mostra preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('foto-preview');
+            preview.src = e.target.result;
+            document.getElementById('foto-preview-container').style.display = 'block';
+            document.getElementById('foto-actions').style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function removerFoto() {
+    document.getElementById('foto-input').value = '';
+    document.getElementById('camera-input').value = '';
+    document.getElementById('foto-preview-container').style.display = 'none';
+    document.getElementById('foto-actions').style.display = 'flex';
 }
 </script>
 
