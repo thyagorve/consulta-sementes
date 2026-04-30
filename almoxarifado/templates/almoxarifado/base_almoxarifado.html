@@ -1,0 +1,275 @@
+{% extends "sapp/base.html" %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --almox-primary: #2f8f4e;
+        --almox-danger: #dc3545;
+        --almox-warning: #ffc107;
+        --almox-bg: #f8f9fa;
+        --almox-border: #dee2e6;
+        --almox-text: #2d3748;
+        --almox-muted: #718096;
+        --sidebar-width: 420px;
+    }
+
+    .almox-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 15px;
+    }
+
+    /* Botão flutuante para adicionar */
+    .fab-add {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: var(--almox-primary);
+        color: white;
+        border: none;
+        font-size: 28px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(47,143,78,0.4);
+        z-index: 100;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .fab-add:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(47,143,78,0.6);
+    }
+    .fab-add:active {
+        transform: scale(0.95);
+    }
+
+    /* Painel Lateral */
+    .side-panel {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        width: 95%;
+        max-width: 500px;
+        height: 100vh;
+        background: white;
+        box-shadow: -5px 0 25px rgba(0,0,0,0.15);
+        z-index: 1050;
+        transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    }
+    .side-panel.open {
+        right: 0;
+    }
+    .side-panel-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1040;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s;
+    }
+    .side-panel-overlay.active {
+        opacity: 1;
+        visibility: visible;
+    }
+    .side-panel-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--almox-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 2;
+    }
+    .side-panel-body {
+        flex: 1;
+        padding: 20px;
+    }
+    .side-panel-footer {
+        padding: 20px;
+        border-top: 1px solid var(--almox-border);
+        display: flex;
+        gap: 10px;
+        position: sticky;
+        bottom: 0;
+        background: white;
+    }
+
+    /* Tabela responsive */
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .table-almox {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .table-almox th {
+        background: #1a202c;
+        color: white;
+        padding: 12px 10px;
+        text-align: left;
+        font-size: 0.9rem;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+    .table-almox td {
+        padding: 10px;
+        border-bottom: 1px solid var(--almox-border);
+        font-size: 0.9rem;
+    }
+    .table-almox tr:hover {
+        background: #f0f8f0;
+    }
+    .table-almox tr.clickable {
+        cursor: pointer;
+    }
+
+    /* Badges de estoque */
+    .badge-estoque {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .badge-zerado { background: #fee; color: #c00; }
+    .badge-baixo { background: #fff3cd; color: #856404; }
+    .badge-medio { background: #d1ecf1; color: #0c5460; }
+    .badge-alto { background: #d4edda; color: #155724; }
+
+    /* Filtros */
+    .filtros-bar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 15px;
+        align-items: center;
+    }
+    .filtro-select {
+        padding: 8px 12px;
+        border: 1px solid var(--almox-border);
+        border-radius: 6px;
+        font-size: 0.85rem;
+        background: white;
+    }
+    .search-input {
+        flex: 1;
+        min-width: 200px;
+        padding: 8px 12px;
+        border: 1px solid var(--almox-border);
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+
+    /* Formulário */
+    .form-almox .form-group {
+        margin-bottom: 12px;
+    }
+    .form-almox label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--almox-muted);
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-almox input,
+    .form-almox select,
+    .form-almox textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--almox-border);
+        border-radius: 6px;
+        font-size: 0.9rem;
+        transition: border-color 0.2s;
+    }
+    .form-almox input:focus,
+    .form-almox select:focus,
+    .form-almox textarea:focus {
+        border-color: var(--almox-primary);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(47,143,78,0.1);
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+    .btn {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-primary { background: var(--almox-primary); color: white; }
+    .btn-danger { background: var(--almox-danger); color: white; }
+    .btn-outline { background: white; border: 1px solid var(--almox-border); color: var(--almox-text); }
+    .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+    .btn-block { width: 100%; }
+    .btn:active { transform: scale(0.97); }
+
+    /* Toast */
+    .toast-msg {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        border-radius: 8px;
+        color: white;
+        z-index: 2000;
+        animation: slideDown 0.3s ease;
+        max-width: 90%;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    .toast-success { background: #28a745; }
+    .toast-error { background: #dc3545; }
+    @keyframes slideDown {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* MOBILE */
+    @media (max-width: 768px) {
+        .side-panel {
+            width: 100%;
+            max-width: 100%;
+        }
+        .table-almox th,
+        .table-almox td {
+            padding: 8px 6px;
+            font-size: 0.8rem;
+        }
+        .fab-add {
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+        }
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}

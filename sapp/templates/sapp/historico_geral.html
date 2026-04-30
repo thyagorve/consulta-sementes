@@ -1,4 +1,3 @@
-<!-- sapp/templates/sapp/historico_geral.html -->
 {% extends 'sapp/base.html' %}
 {% load humanize %}
 
@@ -252,31 +251,54 @@
         background: #f1f5f9;
         color: #1e293b;
         font-weight: 600;
-        padding: 6px 10px;
+        padding: 8px 12px;
         border-radius: 20px;
-        font-size: 0.85rem;
-        display: inline-block;
-        min-width: 70px;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-width: 100%;
+        width: 100%;
         text-align: center;
         border: 1px solid #e2e8f0;
+        white-space: nowrap;
+        transition: all 0.3s ease;
     }
 
     .badge-quantidade.entrada { 
-        background: #dcfce7; 
-        color: #059669;
-        border-left: 4px solid #059669;
+        background: linear-gradient(135deg, #dcfce7, #d1fae5); 
+        color: #065f46;
+        border: 2px solid #059669;
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
     }
     
     .badge-quantidade.saida { 
-        background: #fee2e2; 
-        color: #dc2626;
-        border-left: 4px solid #dc2626;
+        background: linear-gradient(135deg, #fee2e2, #fecaca); 
+        color: #991b1b;
+        border: 2px solid #dc2626;
+        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
     }
     
     .badge-quantidade.transferencia {
-        background: #fff3e6;
-        color: #d97706;
-        border-left: 4px solid #d97706;
+        background: linear-gradient(135deg, #fff3e6, #ffedd5);
+        color: #9a3412;
+        border: 2px solid #d97706;
+        box-shadow: 0 2px 8px rgba(217, 119, 6, 0.15);
+    }
+
+    .badge-quantidade.extraido {
+        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+        color: #0369a1;
+        border: 2px solid #0284c7;
+        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
+    }
+
+    .badge-quantidade.sem-quantidade {
+        background: #f8f9fa !important;
+        color: #6c757d !important;
+        border: 1px dashed #dee2e6 !important;
+        box-shadow: none !important;
     }
 
     .badge {
@@ -453,6 +475,22 @@
         line-height: 1.4;
     }
 
+    /* Estilo para linha hover */
+    #tabelaHistorico tbody tr {
+        transition: background-color 0.2s;
+    }
+
+    #tabelaHistorico tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    /* Badge de extração */
+    .quantidade-extraida-badge {
+        font-size: 0.65rem;
+        opacity: 0.7;
+        margin-top: 2px;
+    }
+
     /* --- Mobile --- */
     @media (max-width: 768px) {
         .page-title { flex-direction: column; text-align: center; gap: 10px; }
@@ -470,9 +508,10 @@
         .filter-header { padding: 0 5px; }
         
         .badge-quantidade {
-            min-width: 50px;
-            padding: 4px 6px;
-            font-size: 0.75rem;
+            min-width: 100%;
+            width: 100%;
+            padding: 6px 8px;
+            font-size: 0.8rem;
         }
         
         .descricao-cell {
@@ -508,7 +547,7 @@
             </div>
             <div class="stats-content">
                 <div class="stats-label">Total de Registros</div>
-                <div class="stats-value">{{ historico_lista|length|intcomma }}</div>
+                <div class="stats-value">{{ total_registros|default:"0"|intcomma }}</div>
                 <div class="stats-sub">movimentações no sistema</div>
             </div>
         </div>
@@ -554,19 +593,19 @@
                 <table id="tabelaHistorico" class="table table-hover align-middle" style="width:100%">
                     <thead>
                         <tr>
-                            <th style="width: 12%;">
+                            <th style="width: 10%;">
                                 <div class="filter-header" data-column="0">
                                     <span>DATA/HORA</span>
                                     <div class="filter-icon"><i class="fas fa-filter"></i></div>
                                 </div>
                             </th>
-                            <th style="width: 10%;">
+                            <th style="width: 8%;">
                                 <div class="filter-header" data-column="1">
                                     <span>TIPO</span>
                                     <div class="filter-icon"><i class="fas fa-filter"></i></div>
                                 </div>
                             </th>
-                            <th style="width: 10%;">
+                            <th style="width: 8%;">
                                 <div class="filter-header" data-column="2">
                                     <span>LOTE</span>
                                     <div class="filter-icon"><i class="fas fa-filter"></i></div>
@@ -578,7 +617,7 @@
                                     <div class="filter-icon"><i class="fas fa-filter"></i></div>
                                 </div>
                             </th>
-                            <th style="width: 8%;">
+                            <th style="width: 12%; min-width: 130px;">
                                 <div class="filter-header" data-column="4">
                                     <span>QUANTIDADE</span>
                                     <div class="filter-icon"><i class="fas fa-filter"></i></div>
@@ -590,7 +629,7 @@
                                     <div class="filter-icon"><i class="fas fa-filter"></i></div>
                                 </div>
                             </th>
-                            <th style="width: 40%;">
+                            <th style="width: auto;">
                                 <div class="filter-header" data-column="6">
                                     <span>DETALHES</span>
                                     <div class="filter-icon"><i class="fas fa-filter"></i></div>
@@ -650,28 +689,54 @@
                                 {% endif %}
                             </td>
                             
-                            <!-- QUANTIDADE - AGORA CORRETO -->
-                            <td data-order="{{ h.quantidade }}" class="text-center">
+                            <!-- QUANTIDADE - USANDO SAFE E FILTRO PARA EXTRAIR -->
+                            <td data-order="{{ h.quantidade|default:'0' }}" class="text-center quantidade-col">
                                 {% if h.quantidade and h.quantidade > 0 %}
+                                    <!-- QUANTIDADE DO CAMPO -->
                                     {% if 'Entrada' in h.tipo %}
-                                        <span class="badge-quantidade entrada">
-                                            <i class="fas fa-plus-circle me-1"></i>{{ h.quantidade|intcomma }}
-                                        </span>
+                                        <div class="badge-quantidade entrada">
+                                            <i class="fas fa-plus-circle"></i>
+                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
+                                            {% if h.estoque.embalagem %}
+                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
+                                            {% endif %}
+                                        </div>
                                     {% elif 'Saída' in h.tipo or 'Expedição' in h.tipo %}
-                                        <span class="badge-quantidade saida">
-                                            <i class="fas fa-minus-circle me-1"></i>{{ h.quantidade|intcomma }}
-                                        </span>
+                                        <div class="badge-quantidade saida">
+                                            <i class="fas fa-minus-circle"></i>
+                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
+                                            {% if h.estoque.embalagem %}
+                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
+                                            {% endif %}
+                                        </div>
                                     {% elif 'Transferência' in h.tipo %}
-                                        <span class="badge-quantidade transferencia">
-                                            <i class="fas fa-arrows-spin me-1"></i>{{ h.quantidade|intcomma }}
-                                        </span>
+                                        <div class="badge-quantidade transferencia">
+                                            <i class="fas fa-exchange-alt"></i>
+                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
+                                            {% if h.estoque.embalagem %}
+                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
+                                            {% endif %}
+                                        </div>
                                     {% else %}
-                                        <span class="badge-quantidade">
-                                            {{ h.quantidade|intcomma }}
-                                        </span>
+                                        <div class="badge-quantidade">
+                                            <i class="fas fa-hashtag"></i>
+                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
+                                            {% if h.estoque.embalagem %}
+                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
+                                            {% endif %}
+                                        </div>
                                     {% endif %}
                                 {% else %}
-                                    <span class="text-muted small">—</span>
+                                    <!-- SEM QUANTIDADE - SERÁ PROCESSADO POR JAVASCRIPT -->
+                                    <div class="quantidade-pendente" 
+                                         data-descricao="{{ h.descricao|escapejs }}"
+                                         data-tipo="{{ h.tipo|escapejs }}"
+                                         data-embalagem="{% if h.estoque.embalagem %}{{ h.estoque.embalagem }}{% endif %}">
+                                        <div class="badge-quantidade sem-quantidade">
+                                            <i class="fas fa-spinner fa-pulse"></i>
+                                            <span>Carregando...</span>
+                                        </div>
+                                    </div>
                                 {% endif %}
                             </td>
                             
@@ -742,6 +807,11 @@
 <script>
 $(document).ready(function() {
     
+    // Forçar renderização antes de iniciar DataTable
+    setTimeout(function() {
+        processarQuantidadesPendentes();
+    }, 100);
+    
     // Configuração do DataTable
     var table = $('#tabelaHistorico').DataTable({
         language: {
@@ -749,83 +819,323 @@ $(document).ready(function() {
             search: "",
             searchPlaceholder: "Pesquisar em tudo..."
         },
-        ordering: false,
-        order: [],
+        // HABILITAR ORDENAÇÃO E BUSCA
+        ordering: true,
+        order: [[0, 'desc']], // Ordenar por data decrescente
         autoWidth: false,
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
         dom: '<"top"f>rt<"bottom"ip><"clear">',
+        
+        columnDefs: [
+            { orderable: false, targets: [1, 2, 3, 5, 6] }, // Colunas não ordenáveis
+            { orderable: true, targets: [0, 4] }, // Data e Quantidade ordenáveis
+            { type: 'num', targets: 4 } // Coluna quantidade como numérica
+        ],
         
         drawCallback: function() {
             var footer = $('#custom-footer');
             $('.dataTables_info').detach().appendTo(footer);
             $('.dataTables_paginate').detach().appendTo(footer);
             $('.dataTables_length').detach().appendTo(footer);
+            
+            // Reprocessar quantidades após redesenhar
+            setTimeout(function() {
+                processarQuantidadesPendentes();
+            }, 100);
         }
     });
 
-    // Função para extrair texto puro do HTML
+    // =============================================
+    // FUNÇÃO CORRIGIDA PARA EXTRAIR QUANTIDADE
+    // =============================================
+    function extrairQuantidadeDescricao(htmlDescricao) {
+        if (!htmlDescricao) return null;
+        
+        // Criar elemento temporário para extrair texto puro
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlDescricao;
+        var textoPuro = (tempDiv.textContent || tempDiv.innerText || '').trim();
+        
+        console.log('Extraindo de:', textoPuro.substring(0, 100));
+        
+        // PRIORIDADE 1: Procurar explicitamente "Quantidade: numero"
+        var matchQuantidade = textoPuro.match(/Quantidade:\s*(\d+(?:\.\d+)?)/i);
+        if (matchQuantidade && matchQuantidade[1]) {
+            var qtd = parseFloat(matchQuantidade[1]);
+            if (qtd > 0 && qtd < 1000000) {
+                console.log('Encontrado por "Quantidade:":', qtd);
+                return qtd;
+            }
+        }
+        
+        // PRIORIDADE 2: Procurar "Qtde:" ou "Qtd:"
+        var matchQtde = textoPuro.match(/Qtde?:?\s*(\d+(?:\.\d+)?)/i);
+        if (matchQtde && matchQtde[1]) {
+            var qtd2 = parseFloat(matchQtde[1]);
+            if (qtd2 > 0 && qtd2 < 1000000) {
+                console.log('Encontrado por "Qtde:":', qtd2);
+                return qtd2;
+            }
+        }
+        
+        // PRIORIDADE 3: Número seguido de BAG ou SC (mas não KG ou TON)
+        var matchUnidade = textoPuro.match(/(\d+(?:\.\d+)?)\s*(?:BAG|SC)(?!\s*(?:KG|TON))/i);
+        if (matchUnidade && matchUnidade[1]) {
+            var qtd3 = parseFloat(matchUnidade[1]);
+            if (qtd3 > 0 && qtd3 < 1000000) {
+                console.log('Encontrado por unidade BAG/SC:', qtd3);
+                return qtd3;
+            }
+        }
+        
+        // PRIORIDADE 4: Primeiro número que aparece ANTES de "KG" ou "Peso"
+        // Divide o texto em partes para pegar o número antes de mencionar peso
+        var partes = textoPuro.split(/[.,;:!?]/);
+        for (var i = 0; i < partes.length; i++) {
+            var parte = partes[i].trim();
+            // Ignora partes que contêm "KG", "Peso", "Ton"
+            if (parte.match(/(?:KG|Peso|Ton|peso|ton)/i)) {
+                continue;
+            }
+            
+            var numeros = parte.match(/\d+/g);
+            if (numeros) {
+                for (var j = 0; j < numeros.length; j++) {
+                    var num = parseInt(numeros[j]);
+                    if (num > 0 && num < 1000000) {
+                        console.log('Encontrado primeiro número válido:', num);
+                        return num;
+                    }
+                }
+            }
+        }
+        
+        console.log('Nenhuma quantidade encontrada');
+        return null;
+    }
+    
+    function extrairEmbalagemDescricao(htmlDescricao) {
+        if (!htmlDescricao) return null;
+        
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlDescricao;
+        var textoPuro = (tempDiv.textContent || tempDiv.innerText || '').toUpperCase();
+        
+        // Procurar por BAG ou SC no contexto de Quantidade
+        var matchContexto = textoPuro.match(/Quantidade:\s*\d+(?:\.\d+)?\s*(BAG|SC)/i);
+        if (matchContexto) {
+            return matchContexto[1].toUpperCase();
+        }
+        
+        // Procurar em todo o texto
+        if (textoPuro.indexOf('BAG') > -1) return 'BAG';
+        if (textoPuro.indexOf('SC') > -1) return 'SC';
+        
+        return null;
+    }
+    
+    function formatarNumero(num) {
+        if (!num && num !== 0) return '0';
+        var partes = num.toString().split('.');
+        partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return partes.join(',');
+    }
+    
+    function processarQuantidadesPendentes() {
+        var processados = 0;
+        $('.quantidade-pendente').each(function() {
+            var $div = $(this);
+            var descricao = $div.data('descricao');
+            var tipo = $div.data('tipo') || '';
+            var embalagem = $div.data('embalagem');
+            
+            if (!descricao) {
+                $div.html(
+                    '<div class="badge-quantidade sem-quantidade">' +
+                    '<i class="fas fa-question-circle"></i>' +
+                    '<span>--</span>' +
+                    '</div>'
+                );
+                return;
+            }
+            
+            // Extrair quantidade da descrição
+            var quantidade = extrairQuantidadeDescricao(descricao);
+            
+            // Se não tem embalagem, extrair da descrição
+            if (!embalagem) {
+                embalagem = extrairEmbalagemDescricao(descricao);
+            }
+            
+            var $td = $div.closest('td');
+            
+            if (quantidade && quantidade > 0) {
+                // Determinar ícone e classe baseado no tipo
+                var icone = 'fa-hashtag';
+                var classeTipo = '';
+                var classeExtra = ' extraido';
+                
+                var tipoUpper = tipo.toUpperCase();
+                var tipoLower = tipo.toLowerCase();
+                
+                if (tipoUpper.indexOf('ENTRADA') > -1 || tipoLower.indexOf('entrada') > -1) {
+                    icone = 'fa-plus-circle';
+                    classeTipo = 'entrada';
+                    classeExtra = '';
+                } else if (tipoUpper.indexOf('SAÍDA') > -1 || tipoUpper.indexOf('SAIDA') > -1 || 
+                           tipoUpper.indexOf('EXPEDIÇÃO') > -1 || tipoUpper.indexOf('EXPEDICAO') > -1 ||
+                           tipoLower.indexOf('saída') > -1 || tipoLower.indexOf('saida') > -1 || 
+                           tipoLower.indexOf('expedição') > -1 || tipoLower.indexOf('expedicao') > -1) {
+                    icone = 'fa-minus-circle';
+                    classeTipo = 'saida';
+                    classeExtra = '';
+                } else if (tipoUpper.indexOf('TRANSFERÊNCIA') > -1 || tipoUpper.indexOf('TRANSFERENCIA') > -1 ||
+                           tipoLower.indexOf('transferência') > -1 || tipoLower.indexOf('transferencia') > -1) {
+                    icone = 'fa-exchange-alt';
+                    classeTipo = 'transferencia';
+                    classeExtra = '';
+                }
+                
+                var qtdFormatada = formatarNumero(quantidade);
+                
+                // Construir HTML do badge
+                var html = '<div class="badge-quantidade ' + classeTipo + classeExtra + '">';
+                html += '<i class="fas ' + icone + '"></i>';
+                html += '<span>' + qtdFormatada + '</span>';
+                
+                if (embalagem) {
+                    html += '<small style="font-size:0.7rem;opacity:0.8;">' + embalagem + '</small>';
+                }
+                
+                html += '</div>';
+                
+                // Se foi extraído, mostrar indicador
+                if (classeExtra.indexOf('extraido') > -1) {
+                    html += '<div class="quantidade-extraida-badge text-muted mt-1">';
+                    html += '<i class="fas fa-info-circle"></i> Extraído';
+                    html += '</div>';
+                }
+                
+                // Atualizar célula
+                $div.html(html);
+                
+                // Atualizar data-order para filtros funcionarem
+                $td.attr('data-order', quantidade);
+                
+                processados++;
+                console.log('Processado:', quantidade, embalagem);
+                
+            } else {
+                // Não encontrou nada
+                $div.html(
+                    '<div class="badge-quantidade sem-quantidade">' +
+                    '<i class="fas fa-question-circle"></i>' +
+                    '<span>--</span>' +
+                    '</div>'
+                );
+                $td.attr('data-order', '0');
+            }
+        });
+        
+        console.log('Total processados:', processados);
+    }
+    
+    // Processar quantidades ao carregar
+    setTimeout(function() {
+        processarQuantidadesPendentes();
+    }, 300);
+
+    // CORRIGIR FILTROS - Função para extrair texto puro
     function getTextFromHtml(html) {
         if (!html) return "";
-        // Cria um elemento temporário para converter HTML em texto
         var temp = document.createElement('div');
         temp.innerHTML = html;
-        return temp.textContent || temp.innerText || "";
+        return (temp.textContent || temp.innerText || '').trim();
     }
 
-    // Função para obter valor da célula baseado na coluna
+    // Função para obter valor da célula para filtro
     function getCellValue(cell, colIndex) {
         if (!cell) return "";
         
-        // Para coluna de quantidade, usar o atributo data-order
+        // Para coluna de quantidade (4), usar data-order
         if (colIndex === 4) {
             var orderValue = cell.getAttribute('data-order');
-            if (orderValue && orderValue !== "0") {
+            if (orderValue && orderValue !== '0') {
                 return orderValue;
             }
+            // Tentar pegar do texto do badge
+            var badgeSpan = cell.querySelector('.badge-quantidade span');
+            if (badgeSpan) {
+                var texto = badgeSpan.textContent.trim();
+                if (texto && texto !== '--' && texto !== 'Carregando...') {
+                    return texto;
+                }
+            }
+            return '0';
         }
         
         // Para outras colunas, usar data-order se existir
         var orderAttr = cell.getAttribute('data-order');
-        if (orderAttr) {
-            return orderAttr;
+        if (orderAttr && orderAttr.trim() !== '') {
+            return orderAttr.trim();
         }
         
         // Fallback: texto puro da célula
         return getTextFromHtml(cell.innerHTML).trim();
     }
 
-    // Abrir Filtro ao Clicar no Header
+    // FILTRO - Abrir ao Clicar no Header
     $(document).on('click', '.filter-header', function(e) {
         e.stopPropagation();
         
         var $header = $(this);
-        var colIndex = $header.data('column');
+        var colIndex = parseInt($header.data('column'));
+        
+        console.log('Abrindo filtro para coluna:', colIndex);
         
         // Fechar filtros anteriores
-        $('.excel-filter-dropdown').remove();
+        $('.excel-filter-dropdown').fadeOut(100, function(){ $(this).remove(); });
         $('#filter-overlay').fadeIn(200);
 
         // Coletar dados únicos da coluna
         var column = table.column(colIndex);
-        var uniqueValues = new Map(); // Usar Map para contar ocorrências
+        var uniqueValues = new Map();
         
         column.nodes().each(function(cell) {
             var value = getCellValue(cell, colIndex);
-            if (value && value.trim() !== '' && value !== '—' && value !== '0') {
+            console.log('Valor da célula:', value);
+            
+            if (value && value.trim() !== '' && value !== '—' && value !== '0' && value !== '--') {
                 var count = uniqueValues.get(value) || 0;
                 uniqueValues.set(value, count + 1);
             }
         });
         
+        console.log('Valores únicos:', uniqueValues.size);
+        
+        // Se não houver valores, não abrir dropdown
+        if (uniqueValues.size === 0) {
+            $('#filter-overlay').fadeOut(200);
+            return;
+        }
+        
         // Converter para array e ordenar
-        var sortedData = Array.from(uniqueValues.entries())
-            .sort(function(a, b) {
-                // Ordenar por valor (texto)
-                if (a[0] < b[0]) return -1;
-                if (a[0] > b[0]) return 1;
-                return 0;
-            });
+        var sortedData = [];
+        uniqueValues.forEach(function(count, value) {
+            sortedData.push({value: value, count: count});
+        });
+        
+        sortedData.sort(function(a, b) {
+            // Tentar ordenar numericamente
+            var numA = parseFloat(a.value);
+            var numB = parseFloat(b.value);
+            if (!isNaN(numA) && !isNaN(numB)) {
+                return numA - numB;
+            }
+            // Ordenar alfabeticamente
+            return a.value.localeCompare(b.value);
+        });
         
         var currentSearch = column.search();
         
@@ -847,10 +1157,12 @@ $(document).ready(function() {
         `;
 
         sortedData.forEach(function(item) {
-            var value = item[0];
-            var count = item[1];
+            var value = item.value;
+            var count = item.count;
             
-            // Determinar se deve estar marcado baseado no filtro atual
+            // Escapar valor para HTML
+            var escapedValue = value.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
             var isChecked = true;
             if (currentSearch) {
                 try {
@@ -861,11 +1173,13 @@ $(document).ready(function() {
                 }
             }
 
+            var displayValue = value.length > 30 ? value.substring(0, 30) + '...' : value;
+
             dropdownHtml += `
                 <li class="filter-checkbox-item">
                     <label>
-                        <input type="checkbox" class="val-checkbox" value="${value.replace(/"/g, '&quot;')}" ${isChecked ? 'checked' : ''}>
-                        <span class="valor-texto" title="${value}">${value.length > 30 ? value.substring(0, 30) + '...' : value}</span>
+                        <input type="checkbox" class="val-checkbox" value="${escapedValue}" ${isChecked ? 'checked' : ''}>
+                        <span class="valor-texto" title="${escapedValue}">${displayValue}</span>
                         <span class="contador">${count}</span>
                     </label>
                 </li>`;
@@ -896,15 +1210,20 @@ $(document).ready(function() {
         } else if (left + 320 > screenWidth) {
             left = screenWidth - 330;
         }
+        
+        // Garantir que não fique fora da tela
+        if (left < 0) left = 10;
+        if (top < 0) top = 10;
 
-        dropdown.css({ top: top, left: left }).show();
+        dropdown.css({ top: top + 'px', left: left + 'px', position: 'fixed' }).show();
         dropdown.find('.filter-search-box').focus();
     });
 
     // Busca dentro do filtro
     $(document).on('keyup', '.filter-search-box', function() {
         var term = $(this).val().toLowerCase();
-        $('.excel-filter-content li:not(:first)').each(function() {
+        var dropdown = $(this).closest('.excel-filter-dropdown');
+        dropdown.find('.excel-filter-content li:not(:first)').each(function() {
             var text = $(this).find('.valor-texto').text().toLowerCase();
             $(this).toggle(text.indexOf(term) > -1);
         });
@@ -913,10 +1232,12 @@ $(document).ready(function() {
     // Checkbox "Selecionar Tudo"
     $(document).on('change', '.select-all', function() {
         var checked = $(this).prop('checked');
-        $(this).closest('.excel-filter-dropdown').find('.val-checkbox:visible').prop('checked', checked);
+        var dropdown = $(this).closest('.excel-filter-dropdown');
+        dropdown.find('.val-checkbox:visible').prop('checked', checked);
+        dropdown.find('.select-all').prop('indeterminate', false);
     });
 
-    // Quando um checkbox individual muda, atualizar o "Selecionar Tudo"
+    // Quando um checkbox individual muda
     $(document).on('change', '.val-checkbox', function() {
         var dropdown = $(this).closest('.excel-filter-dropdown');
         var totalVisible = dropdown.find('.val-checkbox:visible').length;
@@ -935,62 +1256,97 @@ $(document).ready(function() {
         }
     });
 
-    // Botão Aplicar
+    // Botão Aplicar Filtro
     $(document).on('click', '.apply-filter', function() {
         var dropdown = $(this).closest('.excel-filter-dropdown');
-        var colIndex = dropdown.data('col');
+        var colIndex = parseInt(dropdown.attr('data-col'));
+        
+        console.log('Aplicando filtro na coluna:', colIndex);
+        
         var checkedValues = [];
         
         dropdown.find('.val-checkbox:checked').each(function() {
             var val = $(this).val();
-            if (val) {
+            if (val && val.trim() !== '') {
                 // Escapar caracteres especiais para regex
-                val = val.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
-                checkedValues.push(val);
+                var escapedVal = val.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+                checkedValues.push(escapedVal);
             }
         });
+
+        console.log('Valores selecionados:', checkedValues);
 
         var searchString = '';
         var $icon = $(`.filter-header[data-column="${colIndex}"] .filter-icon`);
         
-        var totalVisible = dropdown.find('.val-checkbox').length;
+        var totalDisponiveis = dropdown.find('.val-checkbox').length;
         
-        if (checkedValues.length > 0 && checkedValues.length < totalVisible) {
+        if (checkedValues.length > 0 && checkedValues.length < totalDisponiveis) {
+            // Regex para buscar exatamente os valores selecionados
             searchString = '^(' + checkedValues.join('|') + ')$';
             $icon.addClass('active');
         } else if (checkedValues.length === 0) {
+            // Nenhum selecionado = não mostra nada
             searchString = '^$';
             $icon.addClass('active');
         } else {
+            // Todos selecionados = sem filtro
             searchString = '';
             $icon.removeClass('active');
         }
 
+        console.log('Search string:', searchString);
+
+        // Aplicar o filtro
         table.column(colIndex).search(searchString, true, false).draw();
         closeFilters();
     });
 
-    // Botão Limpar
+    // Botão Limpar Filtro
     $(document).on('click', '.clear-filter', function() {
-        var colIndex = $(this).closest('.excel-filter-dropdown').data('col');
+        var dropdown = $(this).closest('.excel-filter-dropdown');
+        var colIndex = parseInt(dropdown.attr('data-col'));
+        
+        console.log('Limpando filtro da coluna:', colIndex);
+        
         table.column(colIndex).search('').draw();
         $(`.filter-header[data-column="${colIndex}"] .filter-icon`).removeClass('active');
         closeFilters();
     });
 
-    // Fechar filtros
+    // Fechar todos os filtros
     function closeFilters() {
-        $('.excel-filter-dropdown').fadeOut(100, function(){ $(this).remove(); });
+        $('.excel-filter-dropdown').fadeOut(100, function(){ 
+            $(this).remove(); 
+        });
         $('#filter-overlay').fadeOut(200);
     }
 
-    $(document).on('click', '.close-filter', closeFilters);
-    $('#filter-overlay').on('click', closeFilters);
+    // Eventos de fechamento
+    $(document).on('click', '.close-filter', function(e) {
+        e.preventDefault();
+        closeFilters();
+    });
+    
+    $('#filter-overlay').on('click', function() {
+        closeFilters();
+    });
     
     // Prevenir fechamento ao clicar dentro do dropdown
     $(document).on('click', '.excel-filter-dropdown', function(e) {
         e.stopPropagation();
     });
+    
+    // Fechar com tecla ESC
+    $(document).on('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeFilters();
+        }
+    });
+    
+    // Log para debug
+    console.log('DataTable inicializado. Linhas:', table.rows().count());
+    console.log('Colunas:', table.columns().count());
 });
 </script>
 {% endblock %}

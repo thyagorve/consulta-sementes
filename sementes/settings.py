@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     
     # Nossa aplicação
     'sapp',
+    'almoxarifado',
 ]
 
 # ========== MIDDLEWARE ==========

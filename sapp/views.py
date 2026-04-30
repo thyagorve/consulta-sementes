@@ -2197,7 +2197,7 @@ def historico_geral(request):
         tipo__icontains='Transferência'
     ).count()
     
-    # Totais de bags e sc (opcional)
+    # Totais de bags e sc
     entradas_bags = historico_completo.filter(
         tipo__icontains='Entrada', 
         estoque__embalagem='BAG'
@@ -2231,6 +2231,8 @@ def historico_geral(request):
     }
     
     return render(request, 'sapp/historico_geral.html', context)
+
+
 
 @login_required
 def mudar_senha(request):

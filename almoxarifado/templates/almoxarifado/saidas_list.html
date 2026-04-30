@@ -1,0 +1,100 @@
+{% extends "almoxarifado/base_almoxarifado.html" %}
+
+{% block title %}Histórico de Saídas{% endblock %}
+
+{% block content %}
+<div class="almox-container">
+    
+    <!-- HEADER -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:15px;">
+        <div>
+            <h2 style="margin:0;">📋 Histórico de Saídas</h2>
+            <small style="color:var(--almox-muted);">
+                {{ total_saidas }} saídas • {{ total_itens_retirados }} itens retirados
+            </small>
+        </div>
+        <a href="{% url 'almoxarifado:lista_itens' %}" class="btn btn-outline" style="text-decoration:none;">
+            📦 Voltar ao Estoque
+        </a>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="filtros-bar">
+        <input type="text" id="busca" class="search-input" placeholder="🔍 Buscar por solicitante, item..." value="{{ busca }}">
+        <input type="date" id="data-inicio" class="filtro-select" value="{{ data_inicio }}" onchange="aplicarFiltros()" title="Data início">
+        <span style="font-size:0.9rem;">até</span>
+        <input type="date" id="data-fim" class="filtro-select" value="{{ data_fim }}" onchange="aplicarFiltros()" title="Data fim">
+        <select id="filtro-dept" class="filtro-select" onchange="aplicarFiltros()">
+            <option value="">Todos departamentos</option>
+            {% for key, name in departamentos %}
+                <option value="{{ key }}" {% if dept == key %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- TABELA -->
+    <div class="table-responsive">
+        <table class="table-almox">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Hora</th>
+                    <th>Solicitante</th>
+                    <th>Dept</th>
+                    <th>Código</th>
+                    <th>Item</th>
+                    <th>Qtd</th>
+                    <th>Obs</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for saida in saidas %}
+                <tr>
+                    <td><strong>{{ saida.data|date:"d/m/Y" }}</strong></td>
+                    <td>{{ saida.hora|time:"H:i" }}</td>
+                    <td>{{ saida.solicitante }}</td>
+                    <td><small>{{ saida.get_departamento_display|default:"-" }}</small></td>
+                    <td><small style="color:var(--almox-primary);">{{ saida.item_codigo|default:"-" }}</small></td>
+                    <td>{{ saida.item_nome }}</td>
+                    <td><strong>{{ saida.quantidade }}</strong></td>
+                    <td><small>{{ saida.observacao|truncatechars:30|default:"-" }}</small></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="empty-state">
+                        <div>📭</div>
+                        <strong>Nenhuma saída registrada</strong>
+                        <p>As retiradas aparecerão aqui</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let buscaTimeout;
+document.getElementById('busca').addEventListener('input', function() {
+    clearTimeout(buscaTimeout);
+    buscaTimeout = setTimeout(aplicarFiltros, 400);
+});
+
+function aplicarFiltros() {
+    const params = new URLSearchParams();
+    const busca = document.getElementById('busca').value;
+    const inicio = document.getElementById('data-inicio').value;
+    const fim = document.getElementById('data-fim').value;
+    const dept = document.getElementById('filtro-dept').value;
+    
+    if (busca) params.set('busca', busca);
+    if (inicio) params.set('data_inicio', inicio);
+    if (fim) params.set('data_fim', fim);
+    if (dept) params.set('dept', dept);
+    
+    window.location.href = `?${params.toString()}`;
+}
+</script>
+{% endblock %}

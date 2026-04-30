@@ -1,8 +1,8 @@
-from django.urls import path
 from . import views
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
+from django.urls import path, include
 
 app_name = 'sapp'
 
@@ -70,6 +70,8 @@ urlpatterns = [
     path('api/buscar-enderecos/', views.api_buscar_enderecos, name='api_buscar_enderecos'),  # NOVA
     path('api/listar-enderecos/', views.api_listar_enderecos, name='api_listar_enderecos'),  # NOVA
     path('dashboard-data/', views.dashboard_data, name='dashboard_data'),
+
+
 ]
 
 # ============================================================================

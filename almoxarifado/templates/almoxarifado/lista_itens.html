@@ -1,0 +1,857 @@
+{% extends "almoxarifado/base_almoxarifado.html" %}
+
+{% block title %}Almoxarifado{% endblock %}
+
+{% block content %}
+<div class="almox-container">
+    
+    <!-- HEADER -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:15px;">
+        <div>
+            <h2 style="margin:0;color:var(--almox-text);">📦 Almoxarifado</h2>
+            <small style="color:var(--almox-muted);" id="stats-info">
+                {{ total_itens }} itens • {{ total_quantidade }} unidades
+            </small>
+        </div>
+        <a href="{% url 'almoxarifado:saidas_list' %}" class="btn btn-outline" style="text-decoration:none;">
+            📋 Histórico
+        </a>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="filtros-bar">
+        <input type="text" id="busca" class="search-input" placeholder="🔍 Buscar..." value="{{ busca }}" autocomplete="off">
+        <select id="filtro-departamento" class="filtro-select">
+            <option value="">Todos departamentos</option>
+            {% for key, name in departamentos %}
+                <option value="{{ key }}" {% if departamento == key %}selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
+        <select id="filtro-ordenar" class="filtro-select">
+            <option value="nome" {% if ordenar == 'nome' %}selected{% endif %}>Nome A-Z</option>
+            <option value="-quantidade" {% if ordenar == '-quantidade' %}selected{% endif %}>Maior estoque</option>
+            <option value="quantidade" {% if ordenar == 'quantidade' %}selected{% endif %}>Menor estoque</option>
+            <option value="recente" {% if ordenar == 'recente' %}selected{% endif %}>Mais recentes</option>
+        </select>
+        <label class="checkbox-filter">
+            <input type="checkbox" id="mostrar-todos" {% if mostrar_todos %}checked{% endif %}>
+            Zerados
+        </label>
+    </div>
+
+    <!-- TABELA -->
+    <div class="table-responsive">
+        <table class="table-almox">
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th>Estoque</th>
+                    <th>Local</th>
+                    <th>Dept</th>
+                </tr>
+            </thead>
+            <tbody id="tabela-body">
+                {% for item in itens %}
+                <tr class="clickable-row" onclick="abrirDetalhe({{ item.id }})" style="cursor:pointer;">
+                    <td><strong style="color:var(--almox-primary);">{{ item.codigo }}</strong></td>
+                    <td>{{ item.nome }}</td>
+                    <td>
+                        <span class="badge-estoque badge-{{ item.status_estoque }}">
+                            {{ item.quantidade }} {{ item.get_unidade_display }}
+                        </span>
+                    </td>
+                    <td>{{ item.localizacao|default:"-" }}</td>
+                    <td><small>{{ item.get_departamento_display|truncatechars:10 }}</small></td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="empty-state">
+                        <div style="font-size:3rem;">📦</div>
+                        <strong>Nenhum item encontrado</strong>
+                        <p>Clique no botão + para adicionar</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- BOTÃO FLUTUANTE -->
+<button class="fab-add" onclick="abrirPanelAdicionar()" title="Adicionar item">+</button>
+
+<!-- OVERLAY -->
+<div class="side-panel-overlay" id="panel-overlay" onclick="fecharTodosPanels()"></div>
+
+<!-- ========================================= -->
+<!-- PAINEL ADICIONAR/EDITAR -->
+<!-- ========================================= -->
+<div class="side-panel" id="panel-form">
+    <div class="side-panel-header">
+        <h3 id="panel-form-titulo">➕ Novo Item</h3>
+        <button class="btn-close-panel" onclick="fecharTodosPanels()">✕</button>
+    </div>
+    <div class="side-panel-body">
+        <form id="form-item" class="form-almox" enctype="multipart/form-data">
+            {% csrf_token %}
+            <input type="hidden" id="form-item-id">
+            <input type="hidden" id="form-modo" value="adicionar">
+            
+            <div class="form-group">
+                <label>Código <span style="color:var(--almox-muted);font-weight:400;">(opcional)</span></label>
+                <div style="display:flex;gap:5px;">
+                    <input type="text" name="codigo" id="form-codigo" maxlength="20" 
+                           placeholder="Auto-gerado" style="flex:1;" onblur="buscarPorCodigo()">
+                    <button type="button" class="btn btn-outline" onclick="buscarPorCodigo()" title="Verificar">🔍</button>
+                </div>
+                <small id="codigo-feedback" style="display:none;margin-top:4px;"></small>
+            </div>
+            
+            <div class="form-group">
+                <label>Nome *</label>
+                <input type="text" name="nome" id="form-nome" required placeholder="Nome do item">
+            </div>
+            
+            <div class="form-group">
+                <label>Descrição</label>
+                <textarea name="descricao" id="form-descricao" rows="2" placeholder="Detalhes..."></textarea>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantidade</label>
+                    <input type="number" name="quantidade" id="form-quantidade" value="0" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Unidade</label>
+                    <select name="unidade" id="form-unidade">
+                        <option value="UN">Unidade</option>
+                        <option value="CX">Caixa</option>
+                        <option value="PCT">Pacote</option>
+                        <option value="KG">Kg</option>
+                        <option value="G">Grama</option>
+                        <option value="L">Litro</option>
+                        <option value="M">Metro</option>
+                        <option value="PAR">Par</option>
+                        <option value="DZ">Dúzia</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Estoque Mínimo</label>
+                    <input type="number" name="estoque_minimo" id="form-estoque-minimo" value="5" min="0">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Departamento</label>
+                    <select name="departamento" id="form-departamento">
+                        {% for key, name in departamentos %}
+                            <option value="{{ key }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Localização</label>
+                    <input type="text" name="localizacao" id="form-localizacao" placeholder="Ex: Prateleira A2">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Valor Unitário R$</label>
+                    <input type="text" name="valor_unitario" id="form-valor" placeholder="0,00">
+                </div>
+                <div class="form-group">
+                    <label>Fornecedor</label>
+                    <input type="text" name="fornecedor" id="form-fornecedor" placeholder="Fornecedor">
+                </div>
+            </div>
+            
+            <!-- FOTO COM OPÇÃO DE CÂMERA -->
+            <div class="form-group">
+                <label>Foto</label>
+                <div class="foto-upload-area" id="foto-upload-area">
+                    <input type="file" name="foto" id="foto-input" accept="image/*" capture="environment" 
+                           style="display:none;" onchange="handleFotoSelecionada(this)">
+                    <input type="file" id="camera-input" accept="image/*" capture="environment" 
+                           style="display:none;" onchange="handleFotoSelecionada(this)">
+                    
+                    <div class="foto-actions">
+                        <button type="button" class="btn-foto" onclick="document.getElementById('foto-input').click()" title="Escolher da galeria">
+                            🖼️ Galeria
+                        </button>
+                        <button type="button" class="btn-foto" onclick="document.getElementById('camera-input').click()" title="Tirar foto">
+                            📷 Câmera
+                        </button>
+                    </div>
+                    
+                    <div class="foto-preview-container" id="foto-preview-container" style="display:none;">
+                        <img id="foto-preview" alt="Preview">
+                        <button type="button" class="btn-remove-foto" onclick="removerFoto()">✕</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="side-panel-footer">
+        <button class="btn btn-outline btn-block" onclick="fecharTodosPanels()">Cancelar</button>
+        <button class="btn btn-primary btn-block" onclick="salvarItem()" id="btn-salvar">💾 Salvar</button>
+    </div>
+</div>
+
+<!-- ========================================= -->
+<!-- PAINEL DETALHE (MODAL BONITO COM AÇÕES) -->
+<!-- ========================================= -->
+<div class="side-panel" id="panel-detalhe">
+    <div class="side-panel-header" style="border-bottom:none;padding-bottom:0;">
+        <button class="btn-close-panel" onclick="fecharTodosPanels()" style="margin-left:auto;">✕</button>
+    </div>
+    <div class="side-panel-body" id="detalhe-conteudo">
+        <p style="text-align:center;color:var(--almox-muted);">Carregando...</p>
+    </div>
+</div>
+
+<!-- ========================================= -->
+<!-- PAINEL BAIXA -->
+<!-- ========================================= -->
+<div class="side-panel" id="panel-baixa">
+    <div class="side-panel-header">
+        <h3>➖ Dar Baixa</h3>
+        <button class="btn-close-panel" onclick="fecharTodosPanels()">✕</button>
+    </div>
+    <div class="side-panel-body">
+        <div style="background:#fff3cd;padding:15px;border-radius:8px;margin-bottom:15px;">
+            <strong id="baixa-item-info">---</strong>
+        </div>
+        <form id="form-baixa" class="form-almox">
+            {% csrf_token %}
+            <input type="hidden" id="baixa-item-id">
+            <div class="form-group">
+                <label>Solicitante *</label>
+                <input type="text" id="baixa-solicitante" required placeholder="Nome de quem retira">
+            </div>
+            <div class="form-group">
+                <label>Departamento</label>
+                <select id="baixa-departamento">
+                    <option value="">Selecione...</option>
+                    {% for key, name in departamentos %}
+                        <option value="{{ key }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quantidade *</label>
+                    <input type="number" id="baixa-quantidade" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Data</label>
+                    <input type="date" id="baixa-data">
+                </div>
+                <div class="form-group">
+                    <label>Hora</label>
+                    <input type="time" id="baixa-hora">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Observação</label>
+                <textarea id="baixa-observacao" rows="2" placeholder="Motivo..."></textarea>
+            </div>
+        </form>
+    </div>
+    <div class="side-panel-footer">
+        <button class="btn btn-outline btn-block" onclick="fecharTodosPanels()">Cancelar</button>
+        <button class="btn btn-danger btn-block" onclick="confirmarBaixa()">✅ Confirmar</button>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast-msg" style="display:none;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+// ===== UTILITÁRIOS =====
+function mostrarToast(msg, tipo='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast-msg toast-${tipo}`;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3500);
+}
+
+function fecharTodosPanels() {
+    document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('open'));
+    document.getElementById('panel-overlay').classList.remove('active');
+}
+
+// ===== BUSCA SEM PERDER FOCO (AJAX) =====
+let buscaTimeout;
+document.getElementById('busca').addEventListener('input', function(e) {
+    clearTimeout(buscaTimeout);
+    const valor = this.value;
+    buscaTimeout = setTimeout(() => atualizarTabela(), 300);
+});
+
+document.getElementById('filtro-departamento').addEventListener('change', atualizarTabela);
+document.getElementById('filtro-ordenar').addEventListener('change', atualizarTabela);
+document.getElementById('mostrar-todos').addEventListener('change', atualizarTabela);
+
+async function atualizarTabela() {
+    const busca = document.getElementById('busca').value;
+    const dept = document.getElementById('filtro-departamento').value;
+    const ordenar = document.getElementById('filtro-ordenar').value;
+    const todos = document.getElementById('mostrar-todos').checked ? '1' : '0';
+    
+    const params = new URLSearchParams({busca, departamento: dept, ordenar, todos});
+    
+    try {
+        const resp = await fetch(`/almoxarifado/buscar/?${params.toString()}`);
+        const data = await resp.json();
+        
+        const tbody = document.getElementById('tabela-body');
+        
+        if (data.itens.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="empty-state">
+                        <div style="font-size:3rem;">📦</div>
+                        <strong>Nenhum item encontrado</strong>
+                        <p>Clique no botão + para adicionar</p>
+                    </td>
+                </tr>`;
+        } else {
+            tbody.innerHTML = data.itens.map(item => `
+                <tr class="clickable-row" onclick="abrirDetalhe(${item.id})" style="cursor:pointer;">
+                    <td><strong style="color:var(--almox-primary);">${item.codigo}</strong></td>
+                    <td>${item.nome}</td>
+                    <td>
+                        <span class="badge-estoque badge-${item.status_estoque}">
+                            ${item.quantidade} ${item.unidade}
+                        </span>
+                    </td>
+                    <td>${item.localizacao}</td>
+                    <td><small>${item.departamento.substring(0, 10)}</small></td>
+                </tr>
+            `).join('');
+        }
+        
+        document.getElementById('stats-info').textContent = 
+            `${data.total_itens} itens • ${data.total_quantidade} unidades`;
+            
+    } catch(e) {
+        console.error('Erro na busca:', e);
+    }
+}
+
+// ===== BUSCAR POR CÓDIGO =====
+async function buscarPorCodigo() {
+    const codigo = document.getElementById('form-codigo').value.trim();
+    const feedback = document.getElementById('codigo-feedback');
+    const modo = document.getElementById('form-modo').value;
+    
+    if (!codigo || modo === 'editar') {
+        feedback.style.display = 'none';
+        return;
+    }
+    
+    try {
+        const resp = await fetch(`/almoxarifado/item/buscar-codigo/?codigo=${encodeURIComponent(codigo)}`);
+        const data = await resp.json();
+        
+        if (data.encontrado) {
+            const item = data.item;
+            feedback.style.display = 'block';
+            feedback.className = 'feedback-existente';
+            feedback.innerHTML = `⚠️ Código <strong>${codigo}</strong> já existe: <strong>${item.nome}</strong> (${item.quantidade} ${item.unidade})`;
+            
+            document.getElementById('form-item-id').value = item.id;
+            document.getElementById('form-nome').value = item.nome;
+            document.getElementById('form-descricao').value = item.descricao || '';
+            document.getElementById('form-departamento').value = item.departamento;
+            document.getElementById('form-unidade').value = item.unidade;
+            document.getElementById('form-localizacao').value = item.localizacao || '';
+            document.getElementById('form-estoque-minimo').value = item.estoque_minimo;
+            document.getElementById('form-valor').value = item.valor_unitario ? item.valor_unitario.toFixed(2).replace('.', ',') : '';
+            document.getElementById('form-fornecedor').value = item.fornecedor || '';
+            document.getElementById('form-modo').value = 'somar';
+            document.getElementById('panel-form-titulo').textContent = '📦 Atualizar Item';
+            document.getElementById('btn-salvar').textContent = '➕ Somar ao Estoque';
+        } else {
+            feedback.style.display = 'block';
+            feedback.className = 'feedback-disponivel';
+            feedback.innerHTML = `✅ Código <strong>${codigo}</strong> disponível`;
+        }
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+// ===== FOTO - GALERIA OU CÂMERA =====
+function handleFotoSelecionada(input) {
+    if (input.files && input.files[0]) {
+        // Transfere o arquivo para o input principal
+        const fotoInput = document.getElementById('foto-input');
+        const dt = new DataTransfer();
+        dt.items.add(input.files[0]);
+        fotoInput.files = dt.files;
+        
+        // Mostra preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('foto-preview');
+            preview.src = e.target.result;
+            document.getElementById('foto-preview-container').style.display = 'block';
+            document.querySelector('.foto-actions').style.display = 'none';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function removerFoto() {
+    document.getElementById('foto-input').value = '';
+    document.getElementById('camera-input').value = '';
+    document.getElementById('foto-preview-container').style.display = 'none';
+    document.querySelector('.foto-actions').style.display = 'flex';
+}
+
+// ===== ABRIR PAINÉIS =====
+function abrirPanelAdicionar() {
+    document.getElementById('form-item').reset();
+    document.getElementById('form-item-id').value = '';
+    document.getElementById('form-modo').value = 'adicionar';
+    document.getElementById('panel-form-titulo').textContent = '➕ Novo Item';
+    document.getElementById('btn-salvar').textContent = '💾 Salvar';
+    document.getElementById('codigo-feedback').style.display = 'none';
+    document.getElementById('foto-preview-container').style.display = 'none';
+    document.querySelector('.foto-actions').style.display = 'flex';
+    document.getElementById('panel-form').classList.add('open');
+    document.getElementById('panel-overlay').classList.add('active');
+    document.getElementById('form-nome').focus();
+}
+
+async function abrirEditar(id) {
+    try {
+        const resp = await fetch(`/almoxarifado/item/${id}/detalhe/`);
+        const item = await resp.json();
+        
+        document.getElementById('form-item-id').value = item.id;
+        document.getElementById('form-codigo').value = item.codigo;
+        document.getElementById('form-nome').value = item.nome;
+        document.getElementById('form-descricao').value = item.descricao !== 'Sem descrição' ? item.descricao : '';
+        document.getElementById('form-quantidade').value = item.quantidade;
+        
+        const unidadeMap = {'Unidade':'UN','Caixa':'CX','Pacote':'PCT','Quilograma':'KG','Grama':'G','Litro':'L','Mililitro':'ML','Metro':'M','Centímetro':'CM','Par':'PAR','Dúzia':'DZ','Rolo':'RL'};
+        document.getElementById('form-unidade').value = unidadeMap[item.unidade] || 'UN';
+        
+        document.getElementById('form-localizacao').value = item.localizacao !== 'Não definida' ? item.localizacao : '';
+        document.getElementById('form-estoque-minimo').value = item.estoque_minimo;
+        document.getElementById('form-valor').value = item.valor_unitario ? item.valor_unitario.toFixed(2).replace('.', ',') : '';
+        document.getElementById('form-fornecedor').value = item.fornecedor !== 'Não informado' ? item.fornecedor : '';
+        
+        const deptMap = {'Administrativo':'ADM','Produção':'PROD','Manutenção':'MAN','Tecnologia':'TI','Marketing':'MKT','Vendas':'VEND','Recursos Humanos':'RH','Financeiro':'FIN','Jurídico':'JUR','Logística':'LOG','Qualidade':'QUAL','Pesquisa':'PESQ','Outros':'OUT'};
+        document.getElementById('form-departamento').value = deptMap[item.departamento] || 'OUT';
+        
+        document.getElementById('form-modo').value = 'editar';
+        document.getElementById('panel-form-titulo').textContent = '✏️ Editar Item';
+        document.getElementById('btn-salvar').textContent = '💾 Atualizar';
+        document.getElementById('codigo-feedback').style.display = 'none';
+        document.getElementById('foto-preview-container').style.display = 'none';
+        document.querySelector('.foto-actions').style.display = 'flex';
+        
+        document.getElementById('panel-form').classList.add('open');
+        document.getElementById('panel-overlay').classList.add('active');
+    } catch(e) {
+        mostrarToast('Erro ao carregar dados', 'error');
+    }
+}
+
+function abrirBaixa(id, nome, estoque, codigo) {
+    document.getElementById('form-baixa').reset();
+    document.getElementById('baixa-item-id').value = id;
+    document.getElementById('baixa-item-info').innerHTML = `${codigo} - ${nome}<br>Estoque atual: <strong>${estoque}</strong>`;
+    document.getElementById('baixa-quantidade').max = estoque;
+    document.getElementById('baixa-quantidade').value = '';
+    
+    const agora = new Date();
+    document.getElementById('baixa-data').value = agora.toISOString().split('T')[0];
+    document.getElementById('baixa-hora').value = agora.toTimeString().slice(0,5);
+    
+    fecharTodosPanels();
+    document.getElementById('panel-baixa').classList.add('open');
+    document.getElementById('panel-overlay').classList.add('active');
+    document.getElementById('baixa-solicitante').focus();
+}
+
+async function abrirDetalhe(id) {
+    document.getElementById('panel-detalhe').classList.add('open');
+    document.getElementById('panel-overlay').classList.add('active');
+    document.getElementById('detalhe-conteudo').innerHTML = '<p style="text-align:center;padding:40px;">⏳ Carregando...</p>';
+    
+    try {
+        const resp = await fetch(`/almoxarifado/item/${id}/detalhe/`);
+        const d = await resp.json();
+        
+        let html = `
+            <!-- FOTO -->
+            ${d.foto_url ? `
+            <div class="detalhe-foto-container">
+                <img src="${d.foto_url}" alt="${d.nome}" class="detalhe-foto">
+            </div>
+            ` : `
+            <div class="detalhe-foto-container" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:4rem;">📦</span>
+            </div>
+            `}
+            
+            <!-- CÓDIGO E STATUS -->
+            <div style="text-align:center;margin:15px 0;">
+                <span class="badge-estoque badge-${d.status_estoque}" style="font-size:1.1rem;padding:8px 20px;">
+                    ${d.codigo}
+                </span>
+            </div>
+            
+            <!-- NOME E DESCRIÇÃO -->
+            <h2 style="text-align:center;margin:10px 0;color:#1a202c;">${d.nome}</h2>
+            <p style="text-align:center;color:var(--almox-muted);margin-bottom:20px;">${d.descricao}</p>
+            
+            <!-- INFORMAÇÕES -->
+            <div class="info-grid">
+                <div class="info-item">
+                    <span>📊 Estoque</span>
+                    <strong>${d.quantidade} ${d.unidade}</strong>
+                </div>
+                <div class="info-item">
+                    <span>⚠️ Mínimo</span>
+                    <strong>${d.estoque_minimo} ${d.unidade}</strong>
+                </div>
+                <div class="info-item">
+                    <span>🏢 Departamento</span>
+                    <strong>${d.departamento}</strong>
+                </div>
+                <div class="info-item">
+                    <span>📍 Localização</span>
+                    <strong>${d.localizacao}</strong>
+                </div>
+                ${d.valor_unitario ? `
+                <div class="info-item">
+                    <span>💲 Valor Un.</span>
+                    <strong>R$ ${d.valor_unitario.toFixed(2)}</strong>
+                </div>` : ''}
+                ${d.valor_total ? `
+                <div class="info-item">
+                    <span>💰 Valor Total</span>
+                    <strong>R$ ${d.valor_total.toFixed(2)}</strong>
+                </div>` : ''}
+                <div class="info-item">
+                    <span>🚚 Fornecedor</span>
+                    <strong>${d.fornecedor}</strong>
+                </div>
+            </div>
+            
+            <!-- DATAS -->
+            <div style="font-size:0.75rem;color:var(--almox-muted);text-align:center;margin:15px 0;">
+                Criado: ${d.created_at} | Atualizado: ${d.updated_at}
+            </div>
+            
+            <!-- BOTÕES DE AÇÃO -->
+            <div class="detalhe-actions">
+                <button class="btn btn-danger" onclick="abrirBaixa(${d.id}, '${d.nome.replace(/'/g, "\\'")}', ${d.quantidade}, '${d.codigo}')">
+                    ➖ Dar Baixa
+                </button>
+                <button class="btn btn-outline" onclick="abrirEditar(${d.id})">
+                    ✏️ Editar
+                </button>
+                <button class="btn btn-outline" onclick="if(confirm('Desativar este item?')) excluirItem(${d.id})">
+                    🗑️ Desativar
+                </button>
+            </div>
+            
+            <!-- ÚLTIMAS SAÍDAS -->
+            ${d.ultimas_saidas && d.ultimas_saidas.length > 0 ? `
+            <div style="margin-top:20px;">
+                <h4 style="margin-bottom:10px;">📋 Últimas Saídas</h4>
+                ${d.ultimas_saidas.map(s => `
+                    <div style="padding:8px 0;border-bottom:1px solid #eee;font-size:0.85rem;">
+                        <strong>${s.data}</strong> ${s.hora} - ${s.solicitante} retirou <strong>${s.quantidade}</strong>
+                        ${s.observacao ? `<br><small style="color:var(--almox-muted);">${s.observacao}</small>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+            ` : ''}
+        `;
+        
+        document.getElementById('detalhe-conteudo').innerHTML = html;
+    } catch(e) {
+        document.getElementById('detalhe-conteudo').innerHTML = '<p style="color:red;text-align:center;">Erro ao carregar</p>';
+    }
+}
+
+// ===== SALVAR ITEM =====
+async function salvarItem() {
+    const form = document.getElementById('form-item');
+    const modo = document.getElementById('form-modo').value;
+    const itemId = document.getElementById('form-item-id').value;
+    const nome = document.getElementById('form-nome').value.trim();
+    
+    if (!nome) {
+        mostrarToast('Nome do item é obrigatório!', 'error');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    
+    try {
+        let url = '/almoxarifado/item/adicionar/';
+        
+        if (modo === 'editar' && itemId) {
+            url = `/almoxarifado/item/${itemId}/editar/`;
+        } else if (modo === 'somar' && itemId) {
+            formData.append('somar', 'true');
+        }
+        
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF_TOKEN },
+            body: formData
+        });
+        
+        const data = await resp.json();
+        
+        if (resp.status === 409 && data.codigo_existente) {
+            mostrarToast(data.error, 'error');
+            return;
+        }
+        
+        if (resp.status === 409 && data.nome_existente) {
+            if (confirm(data.error)) {
+                formData.append('somar', 'true');
+                const resp2 = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': CSRF_TOKEN },
+                    body: formData
+                });
+                const data2 = await resp2.json();
+                if (data2.success) {
+                    mostrarToast(data2.message);
+                    fecharTodosPanels();
+                    setTimeout(() => location.reload(), 600);
+                }
+            }
+            return;
+        }
+        
+        if (data.success) {
+            mostrarToast(data.message);
+            fecharTodosPanels();
+            setTimeout(() => location.reload(), 600);
+        } else {
+            mostrarToast(data.error || 'Erro', 'error');
+        }
+    } catch(e) {
+        mostrarToast('Erro de conexão', 'error');
+    }
+}
+
+// ===== CONFIRMAR BAIXA =====
+async function confirmarBaixa() {
+    const itemId = document.getElementById('baixa-item-id').value;
+    const solicitante = document.getElementById('baixa-solicitante').value.trim();
+    const quantidade = parseInt(document.getElementById('baixa-quantidade').value);
+    
+    if (!solicitante) {
+        mostrarToast('Solicitante é obrigatório!', 'error');
+        return;
+    }
+    
+    if (!quantidade || quantidade <= 0) {
+        mostrarToast('Quantidade inválida!', 'error');
+        return;
+    }
+    
+    const body = {
+        solicitante,
+        quantidade,
+        data: document.getElementById('baixa-data').value,
+        hora: document.getElementById('baixa-hora').value,
+        departamento: document.getElementById('baixa-departamento').value,
+        observacao: document.getElementById('baixa-observacao').value.trim()
+    };
+    
+    try {
+        const resp = await fetch(`/almoxarifado/item/${itemId}/baixa/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify(body)
+        });
+        
+        const data = await resp.json();
+        
+        if (data.success) {
+            mostrarToast(data.message);
+            fecharTodosPanels();
+            setTimeout(() => location.reload(), 600);
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    } catch(e) {
+        mostrarToast('Erro de conexão', 'error');
+    }
+}
+
+// ===== EXCLUIR ITEM =====
+async function excluirItem(id) {
+    try {
+        const resp = await fetch(`/almoxarifado/item/${id}/excluir/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF_TOKEN }
+        });
+        const data = await resp.json();
+        if (data.success) {
+            mostrarToast(data.message);
+            fecharTodosPanels();
+            setTimeout(() => location.reload(), 600);
+        }
+    } catch(e) {
+        mostrarToast('Erro', 'error');
+    }
+}
+</script>
+
+<style>
+/* Estilos adicionais */
+.feedback-existente {
+    background: #fff3cd;
+    color: #856404;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+.feedback-disponivel {
+    background: #d4edda;
+    color: #155724;
+    padding: 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+/* Área de upload de foto */
+.foto-upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+.foto-upload-area:hover {
+    border-color: var(--almox-primary);
+}
+.foto-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.btn-foto {
+    padding: 10px 20px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.btn-foto:hover {
+    background: #f0f8f0;
+    border-color: var(--almox-primary);
+}
+.btn-foto:active {
+    transform: scale(0.97);
+}
+.foto-preview-container {
+    position: relative;
+    margin-top: 10px;
+}
+.foto-preview-container img {
+    max-width: 100%;
+    max-height: 250px;
+    border-radius: 8px;
+    object-fit: cover;
+}
+.btn-remove-foto {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(220,53,69,0.9);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Detalhe */
+.detalhe-foto-container {
+    width: 100%;
+    height: 250px;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 15px;
+    background: #f0f0f0;
+}
+.detalhe-foto {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.detalhe-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+.detalhe-actions .btn {
+    flex: 1;
+    min-width: 100px;
+}
+
+/* Botão fechar painel */
+.btn-close-panel {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #aaa;
+    padding: 5px 10px;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+.btn-close-panel:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+/* Linha clicável */
+.clickable-row {
+    transition: background 0.15s;
+}
+.clickable-row:hover {
+    background: #f0f8f0 !important;
+}
+</style>
+{% endblock %}
