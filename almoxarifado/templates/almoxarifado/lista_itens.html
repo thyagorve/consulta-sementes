@@ -435,74 +435,122 @@ function parseDecimalVal(val) {
     return parseFloat(String(val).trim().replace(',', '.')) || 0;
 }
 
-// ===== BUSCA AJAX COM MAIS COLUNAS =====
+// ===== BUSCA AJAX CORRIGIDA =====
 var buscaTimeout;
-document.getElementById('busca').addEventListener('input', function() {
-    clearTimeout(buscaTimeout);
-    buscaTimeout = setTimeout(atualizarTabela, 300);
-});
-document.getElementById('filtro-departamento').addEventListener('change', atualizarTabela);
-document.getElementById('filtro-ordenar').addEventListener('change', atualizarTabela);
-document.getElementById('mostrar-todos').addEventListener('change', atualizarTabela);
+var isUpdating = false;
 
-async function atualizarTabela() {
+function atualizarTabela() {
+    if (isUpdating) return;
+    isUpdating = true;
+    
+    var busca = document.getElementById('busca') ? document.getElementById('busca').value : '';
+    var departamento = document.getElementById('filtro-departamento') ? document.getElementById('filtro-departamento').value : '';
+    var ordenar = document.getElementById('filtro-ordenar') ? document.getElementById('filtro-ordenar').value : '';
+    var mostrarTodos = document.getElementById('mostrar-todos') ? document.getElementById('mostrar-todos').checked : false;
+    
     var params = new URLSearchParams({
-        busca: document.getElementById('busca').value,
-        departamento: document.getElementById('filtro-departamento').value,
-        ordenar: document.getElementById('filtro-ordenar').value,
-        todos: document.getElementById('mostrar-todos').checked ? '1' : '0'
+        busca: busca,
+        departamento: departamento,
+        ordenar: ordenar,
+        todos: mostrarTodos ? '1' : '0'
     });
     
-    try {
-        var resp = await fetch('/almoxarifado/buscar/?' + params.toString());
-        var data = await resp.json();
-        var tbody = document.getElementById('tabela-body');
-        
-        if (data.itens.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div>📦</div><strong>Nenhum item encontrado</strong><p>Clique no botão + para adicionar ou ajuste os filtros</p></td></tr>';
-        } else {
-            var html = '';
-            for (var i = 0; i < data.itens.length; i++) {
-                var item = data.itens[i];
-                html += '<tr class="clickable-row" onclick="abrirDetalhe(' + item.id + ')">' +
-                    '<td><strong style="color:var(--almox-primary);font-size:0.85rem;">' + item.codigo + '</strong></td>' +
-                    '<td><span style="display:block; word-wrap:break-word;" title="' + item.nome.replace(/"/g, '&quot;') + '">' + item.nome + '</span></td>'
-                    '<td class="col-hide-md"><small>' + (item.lote || '-') + '</small></td>' +
-                    '<td class="col-hide-md"><small>' + (item.ca || '-') + '</small></td>' +
-                    '<td><span class="badge-estoque badge-' + item.status_estoque + '">' + item.quantidade + '</span></td>' +
-                    '<td class="col-hide-sm"><small>' + item.unidade + '</small></td>' +
-                    '<td><small>' + (item.localizacao || '-').substring(0, 12) + '</small></td>' +
-                    '<td class="col-hide-sm"><small>' + (item.departamento || '-').substring(0, 8) + '</small></td>' +
-                    '</tr>';
+    fetch('/almoxarifado/buscar/?' + params.toString())
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            var tbody = document.getElementById('tabela-body');
+            if (!tbody) return;
+            
+            if (!data.itens || data.itens.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div>📦</div><strong>Nenhum item encontrado</strong><p>Clique no botão + para adicionar ou ajuste os filtros</p></td></tr>';
+            } else {
+                var html = '';
+                for (var i = 0; i < data.itens.length; i++) {
+                    var item = data.itens[i];
+                    var nomeEscaped = item.nome.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    
+                    html += '<tr class="clickable-row" onclick="abrirDetalhe(' + item.id + ')">' +
+                        '<td><strong style="color:var(--almox-primary);font-size:0.85rem;">' + escapeHtml(item.codigo) + '</strong></td>' +
+                        '<td><span style="display:block;word-wrap:break-word;white-space:normal;" title="' + nomeEscaped + '">' + escapeHtml(item.nome) + '</span></td>' +
+                        '<td class="col-hide-md"><small>' + escapeHtml(item.lote || '-') + '</small></td>' +
+                        '<td class="col-hide-md"><small>' + escapeHtml(item.ca || '-') + '</small></td>' +
+                        '<td><span class="badge-estoque badge-' + item.status_estoque + '">' + formatNumber(item.quantidade) + '</span></td>' +
+                        '<td class="col-hide-sm"><small>' + escapeHtml(item.unidade || '-') + '</small></td>' +
+                        '<td><small>' + escapeHtml((item.localizacao || '-').substring(0, 12)) + '</small></td>' +
+                        '<td class="col-hide-sm"><small>' + escapeHtml((item.departamento || '-').substring(0, 8)) + '</small></td>' +
+                        '</tr>';
+                }
+                tbody.innerHTML = html;
             }
-            tbody.innerHTML = html;
-        }
-        
-        // Atualiza stats
-        var baixo = 0, zerado = 0;
-        for (var j = 0; j < data.itens.length; j++) {
-            if (data.itens[j].status_estoque === 'baixo') baixo++;
-            if (data.itens[j].status_estoque === 'zerado') zerado++;
-        }
-        document.getElementById('stats-baixo').textContent = baixo;
-        document.getElementById('stats-zerado').textContent = zerado;
-        
-    } catch(e) {
-        console.error('Erro na busca:', e);
-    }
+            
+            // Atualiza stats corretamente
+            var baixo = 0, zerado = 0;
+            if (data.itens) {
+                for (var j = 0; j < data.itens.length; j++) {
+                    if (data.itens[j].status_estoque === 'baixo') baixo++;
+                    if (data.itens[j].status_estoque === 'zerado') zerado++;
+                }
+            }
+            var statsBaixo = document.getElementById('stats-baixo');
+            var statsZerado = document.getElementById('stats-zerado');
+            if (statsBaixo) statsBaixo.textContent = baixo;
+            if (statsZerado) statsZerado.textContent = zerado;
+            
+            isUpdating = false;
+        })
+        .catch(function(e) {
+            console.error('Erro na busca:', e);
+            isUpdating = false;
+        });
 }
 
-// Inicializa stats
-document.addEventListener('DOMContentLoaded', function() {
-    var baixo = {{ itens|length }} ? 0 : '-';
-    var zerado = {{ itens|length }} ? 0 : '-';
-    {% for item in itens %}
-        {% if item.status_estoque == 'baixo' %}baixo++;{% endif %}
-        {% if item.status_estoque == 'zerado' %}zerado++;{% endif %}
-    {% endfor %}
-    document.getElementById('stats-baixo').textContent = baixo;
-    document.getElementById('stats-zerado').textContent = zerado;
-});
+// Funções auxiliares
+function escapeHtml(text) {
+    if (!text) return '';
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
+    var n = parseFloat(num);
+    if (isNaN(n)) return '0';
+    if (Number.isInteger(n)) return n.toString();
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
+
+// ===== EVENTOS COM DEBOUNCE MELHORADO =====
+function setupEventListeners() {
+    var buscaInput = document.getElementById('busca');
+    if (buscaInput) {
+        buscaInput.addEventListener('input', function() {
+            clearTimeout(buscaTimeout);
+            buscaTimeout = setTimeout(atualizarTabela, 500);
+        });
+    }
+    
+    var filtroDepartamento = document.getElementById('filtro-departamento');
+    if (filtroDepartamento) {
+        filtroDepartamento.addEventListener('change', function() {
+            atualizarTabela();
+        });
+    }
+    
+    var filtroOrdenar = document.getElementById('filtro-ordenar');
+    if (filtroOrdenar) {
+        filtroOrdenar.addEventListener('change', function() {
+            atualizarTabela();
+        });
+    }
+    
+    var mostrarTodos = document.getElementById('mostrar-todos');
+    if (mostrarTodos) {
+        mostrarTodos.addEventListener('change', function() {
+            atualizarTabela();
+        });
+    }
+}
 
 // ===== BUSCAR POR CÓDIGO =====
 async function buscarPorCodigo() {
@@ -510,7 +558,10 @@ async function buscarPorCodigo() {
     var feedback = document.getElementById('codigo-feedback');
     var modo = document.getElementById('form-modo').value;
     
-    if (!codigo || modo === 'editar') { feedback.style.display = 'none'; return; }
+    if (!codigo || modo === 'editar') { 
+        if (feedback) feedback.style.display = 'none'; 
+        return; 
+    }
     
     try {
         var resp = await fetch('/almoxarifado/item/buscar-codigo/?codigo=' + encodeURIComponent(codigo));
@@ -518,9 +569,11 @@ async function buscarPorCodigo() {
         
         if (data.encontrado) {
             var item = data.item;
-            feedback.style.display = 'block';
-            feedback.className = 'feedback-existente';
-            feedback.innerHTML = '⚠️ Código <strong>' + codigo + '</strong> já existe: <strong>' + item.nome + '</strong> (' + item.quantidade + ')';
+            if (feedback) {
+                feedback.style.display = 'block';
+                feedback.className = 'feedback-existente';
+                feedback.innerHTML = '⚠️ Código <strong>' + escapeHtml(codigo) + '</strong> já existe: <strong>' + escapeHtml(item.nome) + '</strong> (' + item.quantidade + ')';
+            }
             
             document.getElementById('form-item-id').value = item.id;
             document.getElementById('form-nome').value = item.nome;
@@ -539,9 +592,11 @@ async function buscarPorCodigo() {
             document.getElementById('panel-form-titulo').textContent = '📦 Atualizar Item';
             document.getElementById('btn-salvar').textContent = '➕ Somar ao Estoque';
         } else {
-            feedback.style.display = 'block';
-            feedback.className = 'feedback-disponivel';
-            feedback.innerHTML = '✅ Código <strong>' + codigo + '</strong> disponível';
+            if (feedback) {
+                feedback.style.display = 'block';
+                feedback.className = 'feedback-disponivel';
+                feedback.innerHTML = '✅ Código <strong>' + escapeHtml(codigo) + '</strong> disponível';
+            }
         }
     } catch(e) { console.error(e); }
 }
@@ -550,60 +605,98 @@ async function buscarPorCodigo() {
 function isMobileDevice() {
     return /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent) || ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 }
+
 function abrirCamera() {
-    document.getElementById(isMobileDevice() ? 'camera-input' : 'foto-input').click();
+    var cameraInput = document.getElementById('camera-input');
+    var fotoInput = document.getElementById('foto-input');
+    if (isMobileDevice() && cameraInput) {
+        cameraInput.click();
+    } else if (fotoInput) {
+        fotoInput.click();
+    }
 }
+
 function handleFotoSelecionada(input) {
     if (input.files && input.files[0]) {
         var fotoInput = document.getElementById('foto-input');
-        if (input.id === 'camera-input') {
-            var dt = new DataTransfer(); dt.items.add(input.files[0]); fotoInput.files = dt.files;
+        if (input.id === 'camera-input' && fotoInput) {
+            var dt = new DataTransfer();
+            dt.items.add(input.files[0]);
+            fotoInput.files = dt.files;
         }
         var reader = new FileReader();
         reader.onload = function(e) {
-            document.getElementById('foto-preview').src = e.target.result;
-            document.getElementById('foto-preview-container').style.display = 'block';
-            document.getElementById('foto-actions').style.display = 'none';
+            var preview = document.getElementById('foto-preview');
+            var container = document.getElementById('foto-preview-container');
+            var actions = document.getElementById('foto-actions');
+            if (preview) preview.src = e.target.result;
+            if (container) container.style.display = 'block';
+            if (actions) actions.style.display = 'none';
         };
         reader.readAsDataURL(input.files[0]);
     }
 }
+
 function removerFoto() {
-    document.getElementById('foto-input').value = '';
-    document.getElementById('camera-input').value = '';
-    document.getElementById('foto-preview-container').style.display = 'none';
-    document.getElementById('foto-actions').style.display = 'flex';
+    var fotoInput = document.getElementById('foto-input');
+    var cameraInput = document.getElementById('camera-input');
+    var container = document.getElementById('foto-preview-container');
+    var actions = document.getElementById('foto-actions');
+    
+    if (fotoInput) fotoInput.value = '';
+    if (cameraInput) cameraInput.value = '';
+    if (container) container.style.display = 'none';
+    if (actions) actions.style.display = 'flex';
 }
 
 // ===== ABRIR PAINÉIS =====
 function abrirPanelAdicionar() {
-    document.getElementById('form-item').reset();
+    var form = document.getElementById('form-item');
+    if (form) form.reset();
+    
     document.getElementById('form-item-id').value = '';
     document.getElementById('form-modo').value = 'adicionar';
     document.getElementById('panel-form-titulo').textContent = '➕ Novo Item';
     document.getElementById('btn-salvar').textContent = '💾 Salvar';
-    document.getElementById('codigo-feedback').style.display = 'none';
-    document.getElementById('foto-preview-container').style.display = 'none';
-    document.getElementById('foto-actions').style.display = 'flex';
+    
+    var feedback = document.getElementById('codigo-feedback');
+    if (feedback) feedback.style.display = 'none';
+    
+    removerFoto();
     document.getElementById('form-quantidade').value = '0';
+    
     document.getElementById('panel-form').classList.add('open');
     document.getElementById('panel-overlay').classList.add('active');
-    document.getElementById('form-nome').focus();
+    
+    var nomeField = document.getElementById('form-nome');
+    if (nomeField) nomeField.focus();
 }
 
 function abrirBaixa(id, nome, estoque, codigo) {
-    document.getElementById('form-baixa').reset();
+    var form = document.getElementById('form-baixa');
+    if (form) form.reset();
+    
     document.getElementById('baixa-item-id').value = id;
-    document.getElementById('baixa-item-info').innerHTML = codigo + ' - ' + nome + '<br>Estoque: <strong>' + estoque + '</strong>';
-    document.getElementById('baixa-quantidade').setAttribute('data-max', estoque);
-    document.getElementById('baixa-quantidade').value = '';
+    document.getElementById('baixa-item-info').innerHTML = escapeHtml(codigo) + ' - ' + escapeHtml(nome) + '<br>Estoque: <strong>' + formatNumber(estoque) + '</strong>';
+    
+    var qtdField = document.getElementById('baixa-quantidade');
+    if (qtdField) {
+        qtdField.setAttribute('data-max', estoque);
+        qtdField.value = '';
+    }
+    
     var agora = new Date();
-    document.getElementById('baixa-data').value = agora.toISOString().split('T')[0];
-    document.getElementById('baixa-hora').value = agora.toTimeString().slice(0,5);
+    var dataField = document.getElementById('baixa-data');
+    var horaField = document.getElementById('baixa-hora');
+    if (dataField) dataField.value = agora.toISOString().split('T')[0];
+    if (horaField) horaField.value = agora.toTimeString().slice(0,5);
+    
     fecharTodosPanels();
     document.getElementById('panel-baixa').classList.add('open');
     document.getElementById('panel-overlay').classList.add('active');
-    document.getElementById('baixa-solicitante').focus();
+    
+    var solicitanteField = document.getElementById('baixa-solicitante');
+    if (solicitanteField) solicitanteField.focus();
 }
 
 async function abrirDetalhe(id) {
@@ -617,34 +710,34 @@ async function abrirDetalhe(id) {
         var html = '';
         
         if (d.foto_url) {
-            html += '<div class="detalhe-foto-container"><img src="' + d.foto_url + '" alt="' + d.nome + '" class="detalhe-foto"></div>';
+            html += '<div class="detalhe-foto-container"><img src="' + d.foto_url + '" alt="' + escapeHtml(d.nome) + '" class="detalhe-foto"></div>';
         } else {
             html += '<div class="detalhe-foto-container" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;"><span style="font-size:4rem;">📦</span></div>';
         }
         
-        html += '<div style="text-align:center;margin:15px 0;"><span class="badge-estoque badge-' + d.status_estoque + '" style="font-size:1.1rem;padding:8px 20px;">' + d.codigo + '</span></div>';
-        html += '<h2 style="text-align:center;margin:10px 0;color:#1a202c;">' + d.nome + '</h2>';
-        html += '<p style="text-align:center;color:var(--almox-muted);margin-bottom:20px;">' + d.descricao + '</p>';
+        html += '<div style="text-align:center;margin:15px 0;"><span class="badge-estoque badge-' + d.status_estoque + '" style="font-size:1.1rem;padding:8px 20px;">' + escapeHtml(d.codigo) + '</span></div>';
+        html += '<h2 style="text-align:center;margin:10px 0;color:#1a202c;">' + escapeHtml(d.nome) + '</h2>';
+        html += '<p style="text-align:center;color:var(--almox-muted);margin-bottom:20px;">' + escapeHtml(d.descricao || '') + '</p>';
         
         html += '<div class="info-grid">';
-        html += '<div class="info-item"><span>📊 Estoque</span><strong>' + d.quantidade + ' ' + d.unidade + '</strong></div>';
-        html += '<div class="info-item"><span>⚠️ Mínimo</span><strong>' + d.estoque_minimo + ' ' + d.unidade + '</strong></div>';
-        html += '<div class="info-item"><span>🏢 Dept</span><strong>' + d.departamento + '</strong></div>';
-        html += '<div class="info-item"><span>📍 Local</span><strong>' + d.localizacao + '</strong></div>';
-        if (d.lote !== '-') html += '<div class="info-item"><span>🔖 Lote</span><strong>' + d.lote + '</strong></div>';
-        if (d.ca !== '-') html += '<div class="info-item"><span>📜 CA</span><strong>' + d.ca + '</strong></div>';
-        if (d.validade_ca !== '-') html += '<div class="info-item"><span>📅 Validade CA</span><strong>' + d.validade_ca + '</strong></div>';
-        if (d.categoria !== '-') html += '<div class="info-item"><span>🏷️ Categoria</span><strong>' + d.categoria + '</strong></div>';
-        if (d.marca !== '-') html += '<div class="info-item"><span>🏭 Marca</span><strong>' + d.marca + '</strong></div>';
+        html += '<div class="info-item"><span>📊 Estoque</span><strong>' + formatNumber(d.quantidade) + ' ' + escapeHtml(d.unidade) + '</strong></div>';
+        html += '<div class="info-item"><span>⚠️ Mínimo</span><strong>' + formatNumber(d.estoque_minimo) + ' ' + escapeHtml(d.unidade) + '</strong></div>';
+        html += '<div class="info-item"><span>🏢 Dept</span><strong>' + escapeHtml(d.departamento) + '</strong></div>';
+        html += '<div class="info-item"><span>📍 Local</span><strong>' + escapeHtml(d.localizacao || '-') + '</strong></div>';
+        if (d.lote && d.lote !== '-') html += '<div class="info-item"><span>🔖 Lote</span><strong>' + escapeHtml(d.lote) + '</strong></div>';
+        if (d.ca && d.ca !== '-') html += '<div class="info-item"><span>📜 CA</span><strong>' + escapeHtml(d.ca) + '</strong></div>';
+        if (d.validade_ca && d.validade_ca !== '-') html += '<div class="info-item"><span>📅 Validade CA</span><strong>' + escapeHtml(d.validade_ca) + '</strong></div>';
+        if (d.categoria && d.categoria !== '-') html += '<div class="info-item"><span>🏷️ Categoria</span><strong>' + escapeHtml(d.categoria) + '</strong></div>';
+        if (d.marca && d.marca !== '-') html += '<div class="info-item"><span>🏭 Marca</span><strong>' + escapeHtml(d.marca) + '</strong></div>';
         if (d.valor_unitario) html += '<div class="info-item"><span>💲 Valor Un.</span><strong>R$ ' + d.valor_unitario.toFixed(2) + '</strong></div>';
         if (d.valor_total) html += '<div class="info-item"><span>💰 Total</span><strong>R$ ' + d.valor_total.toFixed(2) + '</strong></div>';
-        html += '<div class="info-item"><span>🚚 Fornecedor</span><strong>' + d.fornecedor + '</strong></div>';
+        html += '<div class="info-item"><span>🚚 Fornecedor</span><strong>' + escapeHtml(d.fornecedor || '-') + '</strong></div>';
         html += '</div>';
         
-        html += '<div style="font-size:0.75rem;color:var(--almox-muted);text-align:center;margin:15px 0;">Criado: ' + d.created_at + ' | Atualizado: ' + d.updated_at + '</div>';
+        html += '<div style="font-size:0.75rem;color:var(--almox-muted);text-align:center;margin:15px 0;">Criado: ' + escapeHtml(d.created_at) + ' | Atualizado: ' + escapeHtml(d.updated_at) + '</div>';
         
         html += '<div class="detalhe-actions">';
-        html += '<button class="btn btn-danger" onclick="abrirBaixa(' + d.id + ', \'' + d.nome.replace(/'/g, "\\'") + '\', ' + d.quantidade + ', \'' + d.codigo + '\')">➖ Dar Baixa</button>';
+        html += '<button class="btn btn-danger" onclick="abrirBaixa(' + d.id + ', \'' + d.nome.replace(/'/g, "\\'") + '\', ' + d.quantidade + ', \'' + d.codigo.replace(/'/g, "\\'") + '\')">➖ Dar Baixa</button>';
         html += '<button class="btn btn-outline" onclick="adicionarAoCarrinho(' + d.id + ', \'' + d.nome.replace(/'/g, "\\'") + '\', ' + d.quantidade + ')">🛒 Carrinho</button>';
         html += '<button class="btn btn-outline" onclick="abrirEditar(' + d.id + ')">✏️ Editar</button>';
         html += '<button class="btn btn-outline" onclick="if(confirm(\'Desativar este item?\')) excluirItem(' + d.id + ')">🗑️ Desativar</button>';
@@ -654,14 +747,15 @@ async function abrirDetalhe(id) {
             html += '<div style="margin-top:20px;"><h4 style="margin-bottom:10px;">📋 Últimas Saídas</h4>';
             for (var i = 0; i < d.ultimas_saidas.length; i++) {
                 var s = d.ultimas_saidas[i];
-                html += '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:0.85rem;"><strong>' + s.data + '</strong> ' + s.hora + ' - ' + s.solicitante + ' retirou <strong>' + s.quantidade + '</strong>' + (s.observacao ? '<br><small>' + s.observacao + '</small>' : '') + '</div>';
+                html += '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:0.85rem;"><strong>' + escapeHtml(s.data) + '</strong> ' + escapeHtml(s.hora) + ' - ' + escapeHtml(s.solicitante) + ' retirou <strong>' + formatNumber(s.quantidade) + '</strong>' + (s.observacao ? '<br><small>' + escapeHtml(s.observacao) + '</small>' : '') + '</div>';
             }
             html += '</div>';
         }
         
         document.getElementById('detalhe-conteudo').innerHTML = html;
     } catch(e) {
-        document.getElementById('detalhe-conteudo').innerHTML = '<p style="color:red;text-align:center;">Erro ao carregar</p>';
+        console.error(e);
+        document.getElementById('detalhe-conteudo').innerHTML = '<p style="color:red;text-align:center;">Erro ao carregar detalhes</p>';
     }
 }
 
@@ -674,31 +768,33 @@ async function abrirEditar(id) {
         document.getElementById('form-item-id').value = item.id;
         document.getElementById('form-codigo').value = item.codigo;
         document.getElementById('form-nome').value = item.nome;
-        document.getElementById('form-descricao').value = item.descricao !== 'Sem descrição' ? item.descricao : '';
+        document.getElementById('form-descricao').value = (item.descricao !== 'Sem descrição' ? item.descricao : '');
         document.getElementById('form-quantidade').value = item.quantidade.toString().replace('.', ',');
         
         var unidadeMap = {'Unidade':'UN','Caixa':'CX','Pacote':'PCT','Quilograma':'KG','Grama':'G','Litro':'L','Mililitro':'ML','Metro':'M','Centímetro':'CM','Par':'PAR','Dúzia':'DZ','Rolo':'RL','Folha':'FL'};
         document.getElementById('form-unidade').value = unidadeMap[item.unidade] || 'UN';
-        document.getElementById('form-localizacao').value = item.localizacao !== 'Não definida' ? item.localizacao : '';
+        document.getElementById('form-localizacao').value = (item.localizacao !== 'Não definida' ? item.localizacao : '');
         document.getElementById('form-estoque-minimo').value = item.estoque_minimo.toString().replace('.', ',');
         document.getElementById('form-valor').value = item.valor_unitario ? item.valor_unitario.toFixed(2).replace('.', ',') : '';
-        document.getElementById('form-fornecedor').value = item.fornecedor !== 'Não informado' ? item.fornecedor : '';
-        document.getElementById('form-lote').value = item.lote !== '-' ? item.lote : '';
-        document.getElementById('form-ca').value = item.ca !== '-' ? item.ca : '';
-        document.getElementById('form-categoria').value = item.categoria !== '-' ? item.categoria : '';
-        document.getElementById('form-marca').value = item.marca !== '-' ? item.marca : '';
+        document.getElementById('form-fornecedor').value = (item.fornecedor !== 'Não informado' ? item.fornecedor : '');
+        document.getElementById('form-lote').value = (item.lote !== '-' ? item.lote : '');
+        document.getElementById('form-ca').value = (item.ca !== '-' ? item.ca : '');
+        document.getElementById('form-categoria').value = (item.categoria !== '-' ? item.categoria : '');
+        document.getElementById('form-marca').value = (item.marca !== '-' ? item.marca : '');
         
-        if (item.validade_ca !== '-') {
+        if (item.validade_ca && item.validade_ca !== '-') {
             var p = item.validade_ca.split('/');
             if (p.length === 3) document.getElementById('form-validade-ca').value = p[2] + '-' + p[1] + '-' + p[0];
-            else document.getElementById('form-validade-ca').value = '';
-        } else document.getElementById('form-validade-ca').value = '';
+        } else {
+            document.getElementById('form-validade-ca').value = '';
+        }
         
-        if (item.data_aquisicao !== '-') {
+        if (item.data_aquisicao && item.data_aquisicao !== '-') {
             var p2 = item.data_aquisicao.split('/');
             if (p2.length === 3) document.getElementById('form-data-aquisicao').value = p2[2] + '-' + p2[1] + '-' + p2[0];
-            else document.getElementById('form-data-aquisicao').value = '';
-        } else document.getElementById('form-data-aquisicao').value = '';
+        } else {
+            document.getElementById('form-data-aquisicao').value = '';
+        }
         
         var deptMap = {'Administrativo':'ADM','Produção':'PROD','Manutenção':'MAN','Tecnologia':'TI','Marketing':'MKT','Vendas':'VEND','Recursos Humanos':'RH','Financeiro':'FIN','Jurídico':'JUR','Logística':'LOG','Qualidade':'QUAL','Pesquisa':'PESQ','Outros':'OUT'};
         document.getElementById('form-departamento').value = deptMap[item.departamento] || 'OUT';
@@ -706,85 +802,173 @@ async function abrirEditar(id) {
         document.getElementById('form-modo').value = 'editar';
         document.getElementById('panel-form-titulo').textContent = '✏️ Editar Item';
         document.getElementById('btn-salvar').textContent = '💾 Atualizar';
-        document.getElementById('codigo-feedback').style.display = 'none';
-        document.getElementById('foto-preview-container').style.display = 'none';
-        document.getElementById('foto-actions').style.display = 'flex';
+        
+        var feedback = document.getElementById('codigo-feedback');
+        if (feedback) feedback.style.display = 'none';
+        
+        removerFoto();
         
         fecharTodosPanels();
         setTimeout(function() {
             document.getElementById('panel-form').classList.add('open');
             document.getElementById('panel-overlay').classList.add('active');
         }, 300);
-    } catch(e) { mostrarToast('Erro ao carregar dados', 'error'); }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao carregar dados', 'error'); 
+    }
 }
 
-// ===== SALVAR, BAIXA, EXCLUIR, CARRINHO (mantidos iguais) =====
+// ===== SALVAR, BAIXA, EXCLUIR =====
 async function salvarItem() {
     var form = document.getElementById('form-item');
     var modo = document.getElementById('form-modo').value;
     var itemId = document.getElementById('form-item-id').value;
     var nome = document.getElementById('form-nome').value.trim();
-    if (!nome) { mostrarToast('Nome obrigatório!', 'error'); return; }
+    
+    if (!nome) { 
+        mostrarToast('Nome obrigatório!', 'error'); 
+        return; 
+    }
     
     var formData = new FormData(form);
     var url = '/almoxarifado/item/adicionar/';
-    if (modo === 'editar' && itemId) url = '/almoxarifado/item/' + itemId + '/editar/';
-    else if (modo === 'somar' && itemId) formData.append('somar', 'true');
+    
+    if (modo === 'editar' && itemId) {
+        url = '/almoxarifado/item/' + itemId + '/editar/';
+    } else if (modo === 'somar' && itemId) {
+        formData.append('somar', 'true');
+    }
     
     try {
-        var resp = await fetch(url, { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: formData });
+        var resp = await fetch(url, { 
+            method: 'POST', 
+            headers: {'X-CSRFToken': CSRF_TOKEN}, 
+            body: formData 
+        });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); fecharTodosPanels(); setTimeout(function(){location.reload();}, 600); }
-        else mostrarToast(data.error || 'Erro', 'error');
-    } catch(e) { mostrarToast('Erro de conexão', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            fecharTodosPanels(); 
+            setTimeout(function() {
+                atualizarTabela();
+                location.reload();
+            }, 600); 
+        } else {
+            mostrarToast(data.error || 'Erro ao salvar', 'error');
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro de conexão', 'error'); 
+    }
 }
 
 async function confirmarBaixa() {
     var itemId = document.getElementById('baixa-item-id').value;
     var solicitante = document.getElementById('baixa-solicitante').value.trim();
     var quantidade = parseDecimalVal(document.getElementById('baixa-quantidade').value);
-    var max = parseFloat(document.getElementById('baixa-quantidade').getAttribute('data-max'));
-    if (!solicitante) { mostrarToast('Solicitante obrigatório!', 'error'); return; }
-    if (!quantidade || quantidade <= 0) { mostrarToast('Quantidade inválida!', 'error'); return; }
-    if (quantidade > max) { mostrarToast('Estoque insuficiente! Disponível: ' + max, 'error'); return; }
+    var max = parseFloat(document.getElementById('baixa-quantidade').getAttribute('data-max') || 0);
+    
+    if (!solicitante) { 
+        mostrarToast('Solicitante obrigatório!', 'error'); 
+        return; 
+    }
+    if (!quantidade || quantidade <= 0) { 
+        mostrarToast('Quantidade inválida!', 'error'); 
+        return; 
+    }
+    if (quantidade > max) { 
+        mostrarToast('Estoque insuficiente! Disponível: ' + formatNumber(max), 'error'); 
+        return; 
+    }
     
     try {
         var resp = await fetch('/almoxarifado/item/' + itemId + '/baixa/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
-            body: JSON.stringify({solicitante, quantidade, data: document.getElementById('baixa-data').value, hora: document.getElementById('baixa-hora').value, departamento: document.getElementById('baixa-departamento').value, observacao: document.getElementById('baixa-observacao').value.trim()})
+            body: JSON.stringify({
+                solicitante: solicitante,
+                quantidade: quantidade,
+                data: document.getElementById('baixa-data').value,
+                hora: document.getElementById('baixa-hora').value,
+                departamento: document.getElementById('baixa-departamento').value,
+                observacao: document.getElementById('baixa-observacao').value.trim()
+            })
         });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); fecharTodosPanels(); setTimeout(function(){location.reload();}, 600); }
-        else mostrarToast(data.error, 'error');
-    } catch(e) { mostrarToast('Erro', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            fecharTodosPanels(); 
+            setTimeout(function() {
+                atualizarTabela();
+                location.reload();
+            }, 600); 
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao processar baixa', 'error'); 
+    }
 }
 
 async function excluirItem(id) {
     try {
-        var resp = await fetch('/almoxarifado/item/' + id + '/excluir/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN} });
+        var resp = await fetch('/almoxarifado/item/' + id + '/excluir/', { 
+            method: 'POST', 
+            headers: {'X-CSRFToken': CSRF_TOKEN} 
+        });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); fecharTodosPanels(); setTimeout(function(){location.reload();}, 600); }
-    } catch(e) { mostrarToast('Erro', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            fecharTodosPanels(); 
+            setTimeout(function() {
+                atualizarTabela();
+                location.reload();
+            }, 600); 
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao excluir', 'error'); 
+    }
 }
 
-// ===== CARRINHO (mantido completo) =====
+// ===== CARRINHO =====
 async function adicionarAoCarrinho(itemId, nome, quantidade) {
     var qtd = prompt('Quantidade de "' + nome + '" para o carrinho:', '1');
     if (!qtd) return;
+    
     var qtdNum = parseDecimalVal(qtd);
-    if (isNaN(qtdNum) || qtdNum <= 0) { mostrarToast('Quantidade inválida!', 'error'); return; }
+    if (isNaN(qtdNum) || qtdNum <= 0) { 
+        mostrarToast('Quantidade inválida!', 'error'); 
+        return; 
+    }
     
     var formData = new FormData();
     formData.append('item_id', itemId);
     formData.append('quantidade', String(qtdNum).replace('.', ','));
     
     try {
-        var resp = await fetch('/almoxarifado/carrinho/adicionar/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: formData });
+        var resp = await fetch('/almoxarifado/carrinho/adicionar/', { 
+            method: 'POST', 
+            headers: {'X-CSRFToken': CSRF_TOKEN}, 
+            body: formData 
+        });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(data.carrinho_count); }
-        else mostrarToast(data.error, 'error');
-    } catch(e) { mostrarToast('Erro', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            atualizarBadgeCarrinho(data.carrinho_count); 
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao adicionar', 'error'); 
+    }
 }
 
 async function abrirCarrinho() {
@@ -795,100 +979,210 @@ async function abrirCarrinho() {
     try {
         var resp = await fetch('/almoxarifado/carrinho/');
         var data = await resp.json();
-        if (data.itens.length === 0) {
+        
+        if (!data.itens || data.itens.length === 0) {
             document.getElementById('carrinho-conteudo').innerHTML = '<div style="text-align:center;padding:40px;"><div style="font-size:4rem;">🛒</div><strong>Carrinho vazio</strong><p>Adicione itens para solicitar</p></div>';
             document.getElementById('carrinho-footer').style.display = 'none';
         } else {
             var html = '';
             for (var i = 0; i < data.itens.length; i++) {
                 var item = data.itens[i];
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eee;"><div style="flex:1;"><strong>' + item.codigo + ' - ' + item.nome + '</strong><div style="font-size:0.85rem;">' + item.quantidade + ' ' + item.unidade + ' | Estoque: ' + item.estoque + '</div></div><button class="btn btn-sm btn-outline" onclick="removerDoCarrinho(' + item.id + ')">🗑️</button></div>';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eee;">' +
+                        '<div style="flex:1;"><strong>' + escapeHtml(item.codigo) + ' - ' + escapeHtml(item.nome) + '</strong>' +
+                        '<div style="font-size:0.85rem;">' + formatNumber(item.quantidade) + ' ' + escapeHtml(item.unidade) + ' | Estoque: ' + formatNumber(item.estoque) + '</div></div>' +
+                        '<button class="btn btn-sm btn-outline" onclick="removerDoCarrinho(' + item.id + ')">🗑️</button></div>';
             }
             document.getElementById('carrinho-conteudo').innerHTML = html;
             document.getElementById('carrinho-footer').style.display = 'flex';
         }
-    } catch(e) { document.getElementById('carrinho-conteudo').innerHTML = '<p style="color:red;">Erro</p>'; }
+    } catch(e) { 
+        console.error(e);
+        document.getElementById('carrinho-conteudo').innerHTML = '<p style="color:red;text-align:center;">Erro ao carregar carrinho</p>'; 
+    }
 }
 
 async function removerDoCarrinho(id) {
     try {
-        var resp = await fetch('/almoxarifado/carrinho/' + id + '/remover/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN} });
+        var resp = await fetch('/almoxarifado/carrinho/' + id + '/remover/', { 
+            method: 'POST', 
+            headers: {'X-CSRFToken': CSRF_TOKEN} 
+        });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(data.carrinho_count); abrirCarrinho(); }
-    } catch(e) { mostrarToast('Erro', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            atualizarBadgeCarrinho(data.carrinho_count); 
+            abrirCarrinho(); 
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao remover', 'error'); 
+    }
 }
 
 async function limparCarrinho() {
-    if (!confirm('Limpar todos os itens?')) return;
+    if (!confirm('Limpar todos os itens do carrinho?')) return;
+    
     try {
-        var resp = await fetch('/almoxarifado/carrinho/limpar/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN} });
+        var resp = await fetch('/almoxarifado/carrinho/limpar/', { 
+            method: 'POST', 
+            headers: {'X-CSRFToken': CSRF_TOKEN} 
+        });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(0); fecharTodosPanels(); }
-    } catch(e) { mostrarToast('Erro', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            atualizarBadgeCarrinho(0); 
+            fecharTodosPanels(); 
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao limpar', 'error'); 
+    }
 }
 
 async function abrirFinalizarCarrinho() {
     try {
         var resp = await fetch('/almoxarifado/carrinho/');
         var data = await resp.json();
+        
         var resumo = '';
         for (var i = 0; i < data.itens.length; i++) {
             var item = data.itens[i];
-            resumo += '<div style="font-size:0.9rem;margin:3px 0;">• ' + item.codigo + ' - ' + item.nome + ': <strong>' + item.quantidade + ' ' + item.unidade + '</strong></div>';
+            resumo += '<div style="font-size:0.9rem;margin:3px 0;">• ' + escapeHtml(item.codigo) + ' - ' + escapeHtml(item.nome) + ': <strong>' + formatNumber(item.quantidade) + ' ' + escapeHtml(item.unidade) + '</strong></div>';
         }
+        
         document.getElementById('resumo-carrinho').innerHTML = resumo;
         fecharTodosPanels();
+        
         setTimeout(function() {
             document.getElementById('panel-finalizar-carrinho').classList.add('open');
             document.getElementById('panel-overlay').classList.add('active');
-            document.getElementById('carrinho-solicitante').focus();
+            var solicitanteField = document.getElementById('carrinho-solicitante');
+            if (solicitanteField) solicitanteField.focus();
         }, 300);
-    } catch(e) { mostrarToast('Erro', 'error'); }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao carregar resumo', 'error'); 
+    }
 }
 
 async function finalizarCarrinho() {
     var solicitante = document.getElementById('carrinho-solicitante').value.trim();
-    if (!solicitante) { mostrarToast('Solicitante obrigatório!', 'error'); return; }
+    
+    if (!solicitante) { 
+        mostrarToast('Solicitante obrigatório!', 'error'); 
+        return; 
+    }
     
     try {
         var resp = await fetch('/almoxarifado/carrinho/finalizar/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
-            body: JSON.stringify({solicitante, departamento: document.getElementById('carrinho-departamento').value, observacao: document.getElementById('carrinho-observacao').value.trim()})
+            body: JSON.stringify({
+                solicitante: solicitante,
+                departamento: document.getElementById('carrinho-departamento').value,
+                observacao: document.getElementById('carrinho-observacao').value.trim()
+            })
         });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(0); fecharTodosPanels(); setTimeout(function(){location.reload();}, 800); }
-        else mostrarToast(data.error, 'error');
-    } catch(e) { mostrarToast('Erro', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            atualizarBadgeCarrinho(0); 
+            fecharTodosPanels(); 
+            setTimeout(function() {
+                atualizarTabela();
+                location.reload();
+            }, 800); 
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro ao finalizar', 'error'); 
+    }
 }
 
 function atualizarBadgeCarrinho(count) {
     var badge = document.getElementById('carrinho-badge');
     if (badge) {
-        if (count > 0) { badge.style.display = 'inline-flex'; document.getElementById('carrinho-count-badge').textContent = '(' + count + ')'; }
-        else badge.style.display = 'none';
+        if (count > 0) { 
+            badge.style.display = 'inline-flex'; 
+            var countSpan = document.getElementById('carrinho-count-badge');
+            if (countSpan) countSpan.textContent = '(' + count + ')';
+        } else {
+            badge.style.display = 'none';
+        }
     }
 }
 
 // ===== IMPORTAR =====
 async function importarExcel(input) {
     if (!input.files || !input.files[0]) return;
-    var formData = new FormData(); formData.append('arquivo', input.files[0]);
+    
+    var formData = new FormData();
+    formData.append('arquivo', input.files[0]);
+    
     try {
-        mostrarToast('Importando...');
-        var resp = await fetch('/almoxarifado/importar/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: formData });
+        mostrarToast('Importando arquivo...', 'info');
+        
+        var resp = await fetch('/almoxarifado/importar/', { 
+            method: 'POST', 
+            headers: {'X-CSRFToken': CSRF_TOKEN}, 
+            body: formData 
+        });
         var data = await resp.json();
-        if (data.success) { mostrarToast(data.message); if (data.erros && data.erros.length) alert('Erros:\n' + data.erros.join('\n')); setTimeout(function(){location.reload();}, 1000); }
-        else mostrarToast(data.error, 'error');
-    } catch(e) { mostrarToast('Erro', 'error'); }
+        
+        if (data.success) { 
+            mostrarToast(data.message); 
+            if (data.erros && data.erros.length) {
+                alert('Alguns erros ocorreram:\n' + data.erros.join('\n'));
+            }
+            setTimeout(function() {
+                atualizarTabela();
+                location.reload();
+            }, 1000); 
+        } else {
+            mostrarToast(data.error, 'error');
+        }
+    } catch(e) { 
+        console.error(e);
+        mostrarToast('Erro na importação', 'error'); 
+    }
+    
     input.value = '';
 }
 
-// ===== INIT =====
+// ===== INICIALIZAÇÃO =====
 document.addEventListener('DOMContentLoaded', function() {
-    if (document.getElementById('btn-camera') && !isMobileDevice()) {
-        document.getElementById('btn-camera').innerHTML = '📁 Upload';
+    // Configurar eventos
+    setupEventListeners();
+    
+    // Ajustar botão da câmera para mobile
+    var btnCamera = document.getElementById('btn-camera');
+    if (btnCamera && !isMobileDevice()) {
+        btnCamera.innerHTML = '📁 Upload';
     }
+    
+    // Inicializar stats com valores do Django
+    var baixo = 0, zerado = 0;
+    {% for item in itens %}
+        {% if item.status_estoque == 'baixo' %}baixo++;{% endif %}
+        {% if item.status_estoque == 'zerado' %}zerado++;{% endif %}
+    {% endfor %}
+    
+    var statsBaixo = document.getElementById('stats-baixo');
+    var statsZerado = document.getElementById('stats-zerado');
+    if (statsBaixo) statsBaixo.textContent = baixo;
+    if (statsZerado) statsZerado.textContent = zerado;
+    
+    // Garantir que o campo de busca não tenha delay no primeiro carregamento
+    setTimeout(function() {
+        if (document.getElementById('busca') && document.getElementById('busca').value) {
+            atualizarTabela();
+        }
+    }, 100);
 });
 </script>
 {% endblock %}
