@@ -7,9 +7,14 @@ class Departamento(models.TextChoices):
     PRODUCAO = 'PROD', 'Produção'
     MANUTENCAO = 'MAN', 'Manutenção'
     TI = 'TI', 'Tecnologia'
-    MARKETING = 'fAC', 'Facilit'
+    MARKETING = 'MKT', 'Marketing'
+    VENDAS = 'VEND', 'Vendas'
+    RH = 'RH', 'Recursos Humanos'
+    FINANCEIRO = 'FIN', 'Financeiro'
+    JURIDICO = 'JUR', 'Jurídico'
     LOGISTICA = 'LOG', 'Logística'
     QUALIDADE = 'QUAL', 'Qualidade'
+    PESQUISA = 'PESQ', 'Pesquisa'
     OUTROS = 'OUT', 'Outros'
 
 
@@ -30,85 +35,56 @@ class UnidadeMedida(models.TextChoices):
 
 
 class Item(models.Model):
-    # Código - opcional, se não informado gera automático
+    # Identificação
     codigo = models.CharField(
         max_length=20, 
-        unique=True, 
         blank=True, 
         null=True,
         verbose_name='Código'
+        # REMOVIDO: unique=True
     )
+    nome = models.CharField(max_length=200)
+    descricao = models.TextField(blank=True, null=True)
     
-    nome = models.CharField(max_length=200, verbose_name='Nome do Item')
-    descricao = models.TextField(blank=True, null=True, verbose_name='Descrição')
+    # Classificação
+    departamento = models.CharField(max_length=4, choices=Departamento.choices, default=Departamento.OUTROS)
+    categoria = models.CharField(max_length=100, blank=True, null=True, verbose_name='Categoria')
     
-    # Departamento
-    departamento = models.CharField(
-        max_length=4,
-        choices=Departamento.choices,
-        default=Departamento.OUTROS,
-        verbose_name='Departamento'
-    )
+    # Certificação e Rastreabilidade
+    lote = models.CharField(max_length=100, blank=True, null=True, verbose_name='Nº do Lote')
+    ca = models.CharField(max_length=100, blank=True, null=True, verbose_name='CA (Certificado de Aprovação)')
+    validade_ca = models.DateField(blank=True, null=True, verbose_name='Validade do CA')
     
-    # Quantidade e unidade
-    quantidade = models.IntegerField(
-        default=0, 
+    # Estoque - AGORA DECIMAL
+    quantidade = models.DecimalField(
+        max_digits=12, 
+        decimal_places=3, 
+        default=0,
         validators=[MinValueValidator(0)],
         verbose_name='Quantidade'
     )
-    unidade = models.CharField(
-        max_length=3,
-        choices=UnidadeMedida.choices,
-        default=UnidadeMedida.UNIDADE,
-        verbose_name='Unidade de Medida'
-    )
-    
-    # Localização
-    localizacao = models.CharField(
-        max_length=100, 
-        blank=True, 
-        null=True,
-        verbose_name='Localização'
-    )
-    
-    # Controle de estoque
-    estoque_minimo = models.IntegerField(
+    unidade = models.CharField(max_length=3, choices=UnidadeMedida.choices, default=UnidadeMedida.UNIDADE)
+    localizacao = models.CharField(max_length=100, blank=True, null=True)
+    estoque_minimo = models.DecimalField(
+        max_digits=12, 
+        decimal_places=3, 
         default=5,
-        validators=[MinValueValidator(0)],
-        verbose_name='Estoque Mínimo'
+        validators=[MinValueValidator(0)]
     )
     
-    # Valores (opcionais)
-    valor_unitario = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        blank=True, 
-        null=True,
-        verbose_name='Valor Unitário (R$)'
-    )
+    # Valores
+    valor_unitario = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    fornecedor = models.CharField(max_length=200, blank=True, null=True)
+    marca = models.CharField(max_length=100, blank=True, null=True, verbose_name='Marca/Fabricante')
     
-    # Fornecedor
-    fornecedor = models.CharField(
-        max_length=200, 
-        blank=True, 
-        null=True,
-        verbose_name='Fornecedor'
-    )
+    # Mídia
+    foto = models.ImageField(upload_to='itens_fotos/', blank=True, null=True)
     
-    # Foto
-    foto = models.ImageField(
-        upload_to='itens_fotos/', 
-        blank=True, 
-        null=True,
-        verbose_name='Foto'
-    )
-    
-    # Datas
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Criado em')
-    updated_at = models.DateTimeField(auto_now=True, verbose_name='Atualizado em')
-    
-    # Status
-    ativo = models.BooleanField(default=True, verbose_name='Ativo')
+    # Datas e Status
+    data_aquisicao = models.DateField(blank=True, null=True, verbose_name='Data de Aquisição')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    ativo = models.BooleanField(default=True)
 
     class Meta:
         ordering = ['nome']
@@ -117,86 +93,76 @@ class Item(models.Model):
         indexes = [
             models.Index(fields=['codigo']),
             models.Index(fields=['departamento']),
-            models.Index(fields=['ativo']),
+            models.Index(fields=['lote']),
+            models.Index(fields=['ca']),
         ]
 
     def __str__(self):
         return f"{self.codigo or 'S/N'} - {self.nome}"
     
     def save(self, *args, **kwargs):
-        # Gera código automático se não informado
         if not self.codigo:
             self.codigo = self._gerar_codigo()
         super().save(*args, **kwargs)
     
     def _gerar_codigo(self):
-        """Gera código único de 3 dígitos"""
         ultimo = Item.objects.all().order_by('-id').first()
-        if ultimo and ultimo.codigo and ultimo.codigo.isdigit():
-            proximo = int(ultimo.codigo) + 1
-        else:
-            proximo = 1
-        
+        proximo = (int(ultimo.codigo) + 1) if (ultimo and ultimo.codigo and ultimo.codigo.isdigit()) else 1
         codigo = str(proximo).zfill(3)
-        
-        # Garante que não existe duplicado
         while Item.objects.filter(codigo=codigo).exists():
             proximo += 1
             codigo = str(proximo).zfill(3)
-        
         return codigo
     
     @property
     def status_estoque(self):
-        """Retorna o status do estoque"""
-        if self.quantidade == 0:
+        if self.quantidade <= 0:
             return 'zerado'
         elif self.quantidade <= self.estoque_minimo:
             return 'baixo'
         elif self.quantidade <= self.estoque_minimo * 3:
             return 'medio'
-        else:
-            return 'alto'
+        return 'alto'
     
     @property
     def valor_total(self):
-        """Calcula valor total em estoque"""
         if self.valor_unitario:
-            return self.quantidade * self.valor_unitario
+            return float(self.quantidade) * float(self.valor_unitario)
         return None
 
 
 class Saida(models.Model):
-    item = models.ForeignKey(
-        Item, 
-        on_delete=models.CASCADE, 
-        related_name='saidas',
-        verbose_name='Item'
-    )
-    item_nome = models.CharField(max_length=200, verbose_name='Nome do Item')
-    item_codigo = models.CharField(max_length=20, blank=True, null=True, verbose_name='Código')
-    solicitante = models.CharField(max_length=200, verbose_name='Solicitante')
-    departamento = models.CharField(
-        max_length=4,
-        choices=Departamento.choices,
-        blank=True,
-        null=True,
-        verbose_name='Departamento'
-    )
-    quantidade = models.IntegerField(verbose_name='Quantidade')
-    data = models.DateField(verbose_name='Data')
-    hora = models.TimeField(verbose_name='Hora')
-    observacao = models.TextField(blank=True, null=True, verbose_name='Observação')
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Registrado em')
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='saidas')
+    item_nome = models.CharField(max_length=200)
+    item_codigo = models.CharField(max_length=20, blank=True, null=True)
+    solicitante = models.CharField(max_length=200)
+    departamento = models.CharField(max_length=4, choices=Departamento.choices, blank=True, null=True)
+    quantidade = models.DecimalField(max_digits=12, decimal_places=3)
+    data = models.DateField()
+    hora = models.TimeField()
+    observacao = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-data', '-hora']
         verbose_name = 'Saída'
         verbose_name_plural = 'Saídas'
-        indexes = [
-            models.Index(fields=['data']),
-            models.Index(fields=['solicitante']),
-        ]
 
     def __str__(self):
-        return f"{self.solicitante} - {self.item_nome} - {self.quantidade} em {self.data}"
+        return f"{self.solicitante} - {self.item_nome} - {self.quantidade}"
+
+
+class CarrinhoSolicitacao(models.Model):
+    """Carrinho para múltiplas solicitações"""
+    usuario = models.CharField(max_length=200)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    quantidade = models.DecimalField(max_digits=12, decimal_places=3)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['usuario', 'item']
+        verbose_name = 'Item no Carrinho'
+        verbose_name_plural = 'Itens no Carrinho'
+
+    def __str__(self):
+        return f"{self.usuario} - {self.item.nome} x{self.quantidade}"
