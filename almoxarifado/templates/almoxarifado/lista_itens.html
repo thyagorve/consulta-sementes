@@ -25,7 +25,7 @@
             <div class="almox-stat-icon yellow">⚠️</div>
             <div class="almox-stat-info">
                 <div class="stat-value" id="stats-baixo">-</div>
-                <div class="stat-label">Estoque Baixo</div>
+                <div class="stat-label" title="Itens com quantidade abaixo do mínimo">Estoque Baixo</div>
             </div>
         </div>
         <div class="almox-stat-card">
@@ -59,7 +59,7 @@
 
     <!-- FILTROS -->
     <div class="filtros-bar">
-        <input type="text" id="busca" class="search-input" placeholder="🔍 Buscar por nome, código, lote, CA, fornecedor..." value="{{ busca }}" autocomplete="off">
+        <input type="text" id="busca" class="search-input" placeholder="🔍 Buscar por nome, código, lote, CA, fornecedor, tamanho..." value="{{ busca }}" autocomplete="off">
         <select id="filtro-departamento" class="filtro-select">
             <option value="">Todos departamentos</option>
             {% for key, name in departamentos %}
@@ -78,44 +78,42 @@
         </label>
     </div>
 
-    <!-- TABELA COM MAIS COLUNAS -->
+    <!-- TABELA CORRIGIDA -->
     <div class="table-responsive">
         <table class="table-almox">
             <thead>
                 <tr>
-                    <th style="width:60px;">Código</th>
-                    <th style="min-width:150px;">Nome</th>
-                    <th class="col-hide-md" style="width:100px;">Lote</th>
-                    <th class="col-hide-md" style="width:100px;">CA</th>
-                    <th style="width:90px;">Estoque</th>
-                    <th class="col-hide-sm" style="width:60px;">Un</th>
-                    <th style="width:100px;">Local</th>
-                    <th class="col-hide-sm" style="width:80px;">Dept</th>
+                    <th>Código</th>
+                    <th>Nome</th>
+                    <th class="col-hide-md">Lote</th>
+                    <th>Tam</th>
+                    <th class="col-hide-md">CA</th>
+                    <th>Estoque</th>
+                    <th class="col-hide-sm">Un</th>
+                    <th>Local</th>
+                    <th class="col-hide-sm">Dept</th>
                 </tr>
             </thead>
             <tbody id="tabela-body">
                 {% for item in itens %}
                 <tr class="clickable-row" onclick="abrirDetalhe({{ item.id }})">
-                    <td><strong style="color:var(--almox-primary);font-size:0.85rem;">{{ item.codigo }}</strong></td>
-                   
-                    <td style="min-width:200px; max-width:300px; word-wrap:break-word;">
-                        <span title="{{ item.nome }}">{{ item.nome }}</span>
-                    </td>
-
-                    <td class="col-hide-md"><small>{{ item.lote|default:"-" }}</small></td>
-                    <td class="col-hide-md"><small>{{ item.ca|default:"-" }}</small></td>
-                    <td>
+                    <td><strong class="codigo-item">{{ item.codigo }}</strong></td>
+                    <td class="nome-item" title="{{ item.nome }}">{{ item.nome }}</td>
+                    <td class="col-hide-md">{{ item.lote|default:"-" }}</td>
+                    <td>{{ item.tamanho|default:"-"|truncatechars:10 }}</td>
+                    <td class="col-hide-md">{{ item.ca|default:"-" }}</td>
+                    <td class="estoque-cell">
                         <span class="badge-estoque badge-{{ item.status_estoque }}">
                             {{ item.quantidade|floatformat:"-3" }}
                         </span>
                     </td>
-                    <td class="col-hide-sm"><small>{{ item.get_unidade_display }}</small></td>
-                    <td><small>{{ item.localizacao|default:"-"|truncatechars:12 }}</small></td>
-                    <td class="col-hide-sm"><small>{{ item.get_departamento_display|truncatechars:8 }}</small></td>
+                    <td class="col-hide-sm">{{ item.get_unidade_display }}</td>
+                    <td>{{ item.localizacao|default:"-"|truncatechars:12 }}</td>
+                    <td class="col-hide-sm">{{ item.get_departamento_display|truncatechars:8 }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="empty-state">
+                    <td colspan="9" class="empty-state">
                         <div>📦</div>
                         <strong>Nenhum item encontrado</strong>
                         <p>Clique no botão <strong>+</strong> para adicionar ou ajuste os filtros</p>
@@ -148,7 +146,7 @@
             <input type="hidden" id="form-modo" value="adicionar">
             
             <div class="form-group">
-                <label>Código <span style="color:var(--almox-muted);font-weight:400;">(opcional, auto-gerado)</span></label>
+                <label>Código <span class="opcional">(opcional, auto-gerado)</span></label>
                 <div style="display:flex;gap:5px;">
                     <input type="text" name="codigo" id="form-codigo" maxlength="20" placeholder="Auto-gerado" style="flex:1;" onblur="buscarPorCodigo()">
                     <button type="button" class="btn btn-outline btn-sm" onclick="buscarPorCodigo()" title="Verificar código">🔍</button>
@@ -226,16 +224,20 @@
                     <input type="text" name="lote" id="form-lote" placeholder="Nº do lote">
                 </div>
                 <div class="form-group">
-                    <label>CA (Certificado)</label>
-                    <input type="text" name="ca" id="form-ca" placeholder="Nº do CA">
+                    <label>Tamanho</label>
+                    <input type="text" name="tamanho" id="form-tamanho" placeholder="Ex: P, M, G, GG, 10x15cm">
                 </div>
                 <div class="form-group">
-                    <label>Validade CA</label>
-                    <input type="date" name="validade_ca" id="form-validade-ca">
+                    <label>CA (Certificado)</label>
+                    <input type="text" name="ca" id="form-ca" placeholder="Nº do CA">
                 </div>
             </div>
             
             <div class="form-row">
+                <div class="form-group">
+                    <label>Validade CA</label>
+                    <input type="date" name="validade_ca" id="form-validade-ca">
+                </div>
                 <div class="form-group">
                     <label>Categoria</label>
                     <input type="text" name="categoria" id="form-categoria" placeholder="Categoria">
@@ -244,6 +246,9 @@
                     <label>Marca/Fabricante</label>
                     <input type="text" name="marca" id="form-marca" placeholder="Marca">
                 </div>
+            </div>
+            
+            <div class="form-row">
                 <div class="form-group">
                     <label>Data Aquisição</label>
                     <input type="date" name="data_aquisicao" id="form-data-aquisicao">
@@ -275,9 +280,7 @@
     </div>
 </div>
 
-<!-- ========================================= -->
 <!-- PAINEL DETALHE -->
-<!-- ========================================= -->
 <div class="side-panel" id="panel-detalhe">
     <div class="side-panel-header" style="border-bottom:none;padding-bottom:0;">
         <button class="btn-close-panel" onclick="fecharTodosPanels()" style="margin-left:auto;">✕</button>
@@ -287,18 +290,14 @@
     </div>
 </div>
 
-<!-- ========================================= -->
 <!-- PAINEL BAIXA -->
-<!-- ========================================= -->
 <div class="side-panel" id="panel-baixa">
     <div class="side-panel-header">
         <h3>➖ Dar Baixa</h3>
         <button class="btn-close-panel" onclick="fecharTodosPanels()">✕</button>
     </div>
     <div class="side-panel-body">
-        <div style="background:#fef3c7;padding:15px;border-radius:8px;margin-bottom:15px;">
-            <strong id="baixa-item-info">---</strong>
-        </div>
+        <div class="baixa-info-box" id="baixa-item-info">---</div>
         <form id="form-baixa" class="form-almox">
             {% csrf_token %}
             <input type="hidden" id="baixa-item-id">
@@ -341,9 +340,7 @@
     </div>
 </div>
 
-<!-- ========================================= -->
 <!-- PAINEL CARRINHO -->
-<!-- ========================================= -->
 <div class="side-panel" id="panel-carrinho">
     <div class="side-panel-header">
         <h3>🛒 Carrinho de Solicitações</h3>
@@ -358,19 +355,14 @@
     </div>
 </div>
 
-<!-- ========================================= -->
 <!-- PAINEL FINALIZAR CARRINHO -->
-<!-- ========================================= -->
 <div class="side-panel" id="panel-finalizar-carrinho">
     <div class="side-panel-header">
         <h3>✅ Finalizar Solicitação</h3>
         <button class="btn-close-panel" onclick="fecharTodosPanels()">✕</button>
     </div>
     <div class="side-panel-body">
-        <div style="background:#d1fae5;padding:15px;border-radius:8px;margin-bottom:15px;">
-            <strong>Itens no carrinho:</strong>
-            <div id="resumo-carrinho" style="margin-top:8px;"></div>
-        </div>
+        <div class="carrinho-resumo-box" id="resumo-carrinho"></div>
         <form class="form-almox">
             {% csrf_token %}
             <div class="form-group">
@@ -400,9 +392,163 @@
 
 <!-- TOAST -->
 <div id="toast" class="toast-msg" style="display:none;"></div>
-{% endblock %}
 
-{% block extra_js %}
+<!-- CSS DE CORREÇÃO -->
+<style>
+/* CORREÇÃO DA TABELA - CABEÇALHO FIXO E CORRETO */
+.table-responsive {
+    overflow-x: auto;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    background: white;
+}
+
+.table-almox {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+    font-size: 0.85rem;
+}
+
+.table-almox thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.table-almox th {
+    background: #1e293b;
+    color: #f1f5f9;
+    padding: 12px 10px;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 3px solid #2f8f4e;
+}
+
+.table-almox td {
+    padding: 10px;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+    background: white;
+    color: #1e293b;
+}
+
+.table-almox tbody tr {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.table-almox tbody tr:hover {
+    background: #f0fdf4;
+}
+
+.table-almox tbody tr:hover td {
+    background: #f0fdf4;
+}
+
+/* Código do item */
+.codigo-item {
+    color: #2f8f4e;
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: inline-block;
+}
+
+/* Nome do item */
+.nome-item {
+    max-width: 250px;
+    word-wrap: break-word;
+    line-height: 1.3;
+}
+
+/* Badges de estoque */
+.badge-estoque {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    min-width: 55px;
+}
+
+.badge-zerado { background: #fee2e2; color: #991b1b; }
+.badge-baixo { background: #fef3c7; color: #92400e; }
+.badge-medio { background: #dbeafe; color: #1e40af; }
+.badge-alto { background: #d1fae5; color: #065f46; }
+
+/* Célula de estoque */
+.estoque-cell {
+    text-align: center;
+}
+
+/* Colunas ocultas em mobile */
+@media (max-width: 992px) {
+    .col-hide-md {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .col-hide-sm {
+        display: none;
+    }
+    .table-almox {
+        min-width: 600px;
+    }
+    .table-almox td,
+    .table-almox th {
+        padding: 8px 6px;
+        font-size: 0.75rem;
+    }
+    .nome-item {
+        max-width: 180px;
+    }
+}
+
+/* Caixa de informação da baixa */
+.baixa-info-box {
+    background: #fef3c7;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid #f59e0b;
+}
+
+/* Resumo do carrinho */
+.carrinho-resumo-box {
+    background: #d1fae5;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid #10b981;
+}
+
+/* Texto opcional */
+.opcional {
+    color: #64748b;
+    font-weight: normal;
+    font-size: 0.7rem;
+}
+
+/* Estado vazio */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #64748b;
+}
+
+.empty-state div {
+    font-size: 3rem;
+    margin-bottom: 10px;
+    opacity: 0.6;
+}
+</style>
+
 <script>
 const CSRF_TOKEN = '{{ csrf_token }}';
 
@@ -435,7 +581,22 @@ function parseDecimalVal(val) {
     return parseFloat(String(val).trim().replace(',', '.')) || 0;
 }
 
-// ===== BUSCA AJAX CORRIGIDA =====
+function escapeHtml(text) {
+    if (!text) return '';
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
+    var n = parseFloat(num);
+    if (isNaN(n)) return '0';
+    if (Number.isInteger(n)) return n.toString();
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+}
+
+// ===== BUSCA AJAX =====
 var buscaTimeout;
 var isUpdating = false;
 
@@ -462,28 +623,30 @@ function atualizarTabela() {
             if (!tbody) return;
             
             if (!data.itens || data.itens.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><div>📦</div><strong>Nenhum item encontrado</strong><p>Clique no botão + para adicionar ou ajuste os filtros</p></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div>📦</div><strong>Nenhum item encontrado</strong><p>Clique no botão + para adicionar ou ajuste os filtros</p></td></tr>';
             } else {
                 var html = '';
                 for (var i = 0; i < data.itens.length; i++) {
                     var item = data.itens[i];
-                    var nomeEscaped = item.nome.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    var nomeEscaped = escapeHtml(item.nome);
+                    var codigoEscaped = escapeHtml(item.codigo);
                     
                     html += '<tr class="clickable-row" onclick="abrirDetalhe(' + item.id + ')">' +
-                        '<td><strong style="color:var(--almox-primary);font-size:0.85rem;">' + escapeHtml(item.codigo) + '</strong></td>' +
-                        '<td><span style="display:block;word-wrap:break-word;white-space:normal;" title="' + nomeEscaped + '">' + escapeHtml(item.nome) + '</span></td>' +
-                        '<td class="col-hide-md"><small>' + escapeHtml(item.lote || '-') + '</small></td>' +
-                        '<td class="col-hide-md"><small>' + escapeHtml(item.ca || '-') + '</small></td>' +
-                        '<td><span class="badge-estoque badge-' + item.status_estoque + '">' + formatNumber(item.quantidade) + '</span></td>' +
-                        '<td class="col-hide-sm"><small>' + escapeHtml(item.unidade || '-') + '</small></td>' +
-                        '<td><small>' + escapeHtml((item.localizacao || '-').substring(0, 12)) + '</small></td>' +
-                        '<td class="col-hide-sm"><small>' + escapeHtml((item.departamento || '-').substring(0, 8)) + '</small></td>' +
+                        '<td><strong class="codigo-item">' + codigoEscaped + '</strong></td>' +
+                        '<td class="nome-item" title="' + nomeEscaped + '">' + nomeEscaped + '</td>' +
+                        '<td class="col-hide-md">' + escapeHtml(item.lote || '-') + '</td>' +
+                        '<td>' + escapeHtml(item.tamanho || '-') + '</td>' +
+                        '<td class="col-hide-md">' + escapeHtml(item.ca || '-') + '</td>' +
+                        '<td class="estoque-cell"><span class="badge-estoque badge-' + item.status_estoque + '">' + formatNumber(item.quantidade) + '</span></td>' +
+                        '<td class="col-hide-sm">' + escapeHtml(item.unidade || '-') + '</td>' +
+                        '<td>' + escapeHtml((item.localizacao || '-').substring(0, 12)) + '</td>' +
+                        '<td class="col-hide-sm">' + escapeHtml((item.departamento || '-').substring(0, 8)) + '</td>' +
                         '</tr>';
                 }
                 tbody.innerHTML = html;
             }
             
-            // Atualiza stats corretamente
+            // Atualiza stats
             var baixo = 0, zerado = 0;
             if (data.itens) {
                 for (var j = 0; j < data.itens.length; j++) {
@@ -504,23 +667,7 @@ function atualizarTabela() {
         });
 }
 
-// Funções auxiliares
-function escapeHtml(text) {
-    if (!text) return '';
-    var div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function formatNumber(num) {
-    if (num === undefined || num === null) return '0';
-    var n = parseFloat(num);
-    if (isNaN(n)) return '0';
-    if (Number.isInteger(n)) return n.toString();
-    return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
-}
-
-// ===== EVENTOS COM DEBOUNCE MELHORADO =====
+// ===== EVENTOS =====
 function setupEventListeners() {
     var buscaInput = document.getElementById('busca');
     if (buscaInput) {
@@ -585,6 +732,7 @@ async function buscarPorCodigo() {
             document.getElementById('form-valor').value = item.valor_unitario ? item.valor_unitario.toFixed(2).replace('.', ',') : '';
             document.getElementById('form-fornecedor').value = item.fornecedor || '';
             document.getElementById('form-lote').value = item.lote || '';
+            document.getElementById('form-tamanho').value = item.tamanho || '';
             document.getElementById('form-ca').value = item.ca || '';
             document.getElementById('form-categoria').value = item.categoria || '';
             document.getElementById('form-marca').value = item.marca || '';
@@ -677,7 +825,7 @@ function abrirBaixa(id, nome, estoque, codigo) {
     if (form) form.reset();
     
     document.getElementById('baixa-item-id').value = id;
-    document.getElementById('baixa-item-info').innerHTML = escapeHtml(codigo) + ' - ' + escapeHtml(nome) + '<br>Estoque: <strong>' + formatNumber(estoque) + '</strong>';
+    document.getElementById('baixa-item-info').innerHTML = '<strong>' + escapeHtml(codigo) + ' - ' + escapeHtml(nome) + '</strong><br>Estoque disponível: <strong>' + formatNumber(estoque) + '</strong>';
     
     var qtdField = document.getElementById('baixa-quantidade');
     if (qtdField) {
@@ -712,12 +860,14 @@ async function abrirDetalhe(id) {
         if (d.foto_url) {
             html += '<div class="detalhe-foto-container"><img src="' + d.foto_url + '" alt="' + escapeHtml(d.nome) + '" class="detalhe-foto"></div>';
         } else {
-            html += '<div class="detalhe-foto-container" style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;"><span style="font-size:4rem;">📦</span></div>';
+            html += '<div class="detalhe-foto-container no-photo"><span>📦</span></div>';
         }
         
-        html += '<div style="text-align:center;margin:15px 0;"><span class="badge-estoque badge-' + d.status_estoque + '" style="font-size:1.1rem;padding:8px 20px;">' + escapeHtml(d.codigo) + '</span></div>';
-        html += '<h2 style="text-align:center;margin:10px 0;color:#1a202c;">' + escapeHtml(d.nome) + '</h2>';
-        html += '<p style="text-align:center;color:var(--almox-muted);margin-bottom:20px;">' + escapeHtml(d.descricao || '') + '</p>';
+        html += '<div class="detalhe-header">';
+        html += '<span class="badge-estoque badge-' + d.status_estoque + '">' + escapeHtml(d.codigo) + '</span>';
+        html += '<h2>' + escapeHtml(d.nome) + '</h2>';
+        html += '<p>' + escapeHtml(d.descricao || 'Sem descrição') + '</p>';
+        html += '</div>';
         
         html += '<div class="info-grid">';
         html += '<div class="info-item"><span>📊 Estoque</span><strong>' + formatNumber(d.quantidade) + ' ' + escapeHtml(d.unidade) + '</strong></div>';
@@ -725,16 +875,17 @@ async function abrirDetalhe(id) {
         html += '<div class="info-item"><span>🏢 Dept</span><strong>' + escapeHtml(d.departamento) + '</strong></div>';
         html += '<div class="info-item"><span>📍 Local</span><strong>' + escapeHtml(d.localizacao || '-') + '</strong></div>';
         if (d.lote && d.lote !== '-') html += '<div class="info-item"><span>🔖 Lote</span><strong>' + escapeHtml(d.lote) + '</strong></div>';
+        if (d.tamanho && d.tamanho !== '-') html += '<div class="info-item"><span>📏 Tamanho</span><strong>' + escapeHtml(d.tamanho) + '</strong></div>';
         if (d.ca && d.ca !== '-') html += '<div class="info-item"><span>📜 CA</span><strong>' + escapeHtml(d.ca) + '</strong></div>';
         if (d.validade_ca && d.validade_ca !== '-') html += '<div class="info-item"><span>📅 Validade CA</span><strong>' + escapeHtml(d.validade_ca) + '</strong></div>';
         if (d.categoria && d.categoria !== '-') html += '<div class="info-item"><span>🏷️ Categoria</span><strong>' + escapeHtml(d.categoria) + '</strong></div>';
         if (d.marca && d.marca !== '-') html += '<div class="info-item"><span>🏭 Marca</span><strong>' + escapeHtml(d.marca) + '</strong></div>';
-        if (d.valor_unitario) html += '<div class="info-item"><span>💲 Valor Un.</span><strong>R$ ' + d.valor_unitario.toFixed(2) + '</strong></div>';
-        if (d.valor_total) html += '<div class="info-item"><span>💰 Total</span><strong>R$ ' + d.valor_total.toFixed(2) + '</strong></div>';
+        if (d.valor_unitario) html += '<div class="info-item"><span>💲 Valor Un.</span><strong>R$ ' + d.valor_unitario.toFixed(2).replace('.', ',') + '</strong></div>';
+        if (d.valor_total) html += '<div class="info-item"><span>💰 Total</span><strong>R$ ' + d.valor_total.toFixed(2).replace('.', ',') + '</strong></div>';
         html += '<div class="info-item"><span>🚚 Fornecedor</span><strong>' + escapeHtml(d.fornecedor || '-') + '</strong></div>';
         html += '</div>';
         
-        html += '<div style="font-size:0.75rem;color:var(--almox-muted);text-align:center;margin:15px 0;">Criado: ' + escapeHtml(d.created_at) + ' | Atualizado: ' + escapeHtml(d.updated_at) + '</div>';
+        html += '<div class="detalhe-meta">Criado: ' + escapeHtml(d.created_at) + ' | Atualizado: ' + escapeHtml(d.updated_at) + '</div>';
         
         html += '<div class="detalhe-actions">';
         html += '<button class="btn btn-danger" onclick="abrirBaixa(' + d.id + ', \'' + d.nome.replace(/'/g, "\\'") + '\', ' + d.quantidade + ', \'' + d.codigo.replace(/'/g, "\\'") + '\')">➖ Dar Baixa</button>';
@@ -744,10 +895,10 @@ async function abrirDetalhe(id) {
         html += '</div>';
         
         if (d.ultimas_saidas && d.ultimas_saidas.length > 0) {
-            html += '<div style="margin-top:20px;"><h4 style="margin-bottom:10px;">📋 Últimas Saídas</h4>';
+            html += '<div class="ultimas-saidas"><h4>📋 Últimas Saídas</h4>';
             for (var i = 0; i < d.ultimas_saidas.length; i++) {
                 var s = d.ultimas_saidas[i];
-                html += '<div style="padding:8px 0;border-bottom:1px solid #eee;font-size:0.85rem;"><strong>' + escapeHtml(s.data) + '</strong> ' + escapeHtml(s.hora) + ' - ' + escapeHtml(s.solicitante) + ' retirou <strong>' + formatNumber(s.quantidade) + '</strong>' + (s.observacao ? '<br><small>' + escapeHtml(s.observacao) + '</small>' : '') + '</div>';
+                html += '<div class="saida-item"><strong>' + escapeHtml(s.data) + '</strong> ' + escapeHtml(s.hora) + ' - ' + escapeHtml(s.solicitante) + ' retirou <strong>' + formatNumber(s.quantidade) + '</strong>' + (s.observacao ? '<br><small>' + escapeHtml(s.observacao) + '</small>' : '') + '</div>';
             }
             html += '</div>';
         }
@@ -778,6 +929,7 @@ async function abrirEditar(id) {
         document.getElementById('form-valor').value = item.valor_unitario ? item.valor_unitario.toFixed(2).replace('.', ',') : '';
         document.getElementById('form-fornecedor').value = (item.fornecedor !== 'Não informado' ? item.fornecedor : '');
         document.getElementById('form-lote').value = (item.lote !== '-' ? item.lote : '');
+        document.getElementById('form-tamanho').value = (item.tamanho !== '-' ? item.tamanho : '');
         document.getElementById('form-ca').value = (item.ca !== '-' ? item.ca : '');
         document.getElementById('form-categoria').value = (item.categoria !== '-' ? item.categoria : '');
         document.getElementById('form-marca').value = (item.marca !== '-' ? item.marca : '');
@@ -853,7 +1005,6 @@ async function salvarItem() {
             fecharTodosPanels(); 
             setTimeout(function() {
                 atualizarTabela();
-                location.reload();
             }, 600); 
         } else {
             mostrarToast(data.error || 'Erro ao salvar', 'error');
@@ -903,7 +1054,6 @@ async function confirmarBaixa() {
             fecharTodosPanels(); 
             setTimeout(function() {
                 atualizarTabela();
-                location.reload();
             }, 600); 
         } else {
             mostrarToast(data.error, 'error');
@@ -927,7 +1077,6 @@ async function excluirItem(id) {
             fecharTodosPanels(); 
             setTimeout(function() {
                 atualizarTabela();
-                location.reload();
             }, 600); 
         }
     } catch(e) { 
@@ -981,16 +1130,16 @@ async function abrirCarrinho() {
         var data = await resp.json();
         
         if (!data.itens || data.itens.length === 0) {
-            document.getElementById('carrinho-conteudo').innerHTML = '<div style="text-align:center;padding:40px;"><div style="font-size:4rem;">🛒</div><strong>Carrinho vazio</strong><p>Adicione itens para solicitar</p></div>';
+            document.getElementById('carrinho-conteudo').innerHTML = '<div class="empty-state"><div>🛒</div><strong>Carrinho vazio</strong><p>Adicione itens para solicitar</p></div>';
             document.getElementById('carrinho-footer').style.display = 'none';
         } else {
             var html = '';
             for (var i = 0; i < data.itens.length; i++) {
                 var item = data.itens[i];
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eee;">' +
-                        '<div style="flex:1;"><strong>' + escapeHtml(item.codigo) + ' - ' + escapeHtml(item.nome) + '</strong>' +
-                        '<div style="font-size:0.85rem;">' + formatNumber(item.quantidade) + ' ' + escapeHtml(item.unidade) + ' | Estoque: ' + formatNumber(item.estoque) + '</div></div>' +
-                        '<button class="btn btn-sm btn-outline" onclick="removerDoCarrinho(' + item.id + ')">🗑️</button></div>';
+                html += '<div class="carrinho-item">' +
+                        '<div><strong>' + escapeHtml(item.codigo) + ' - ' + escapeHtml(item.nome) + '</strong>' +
+                        '<div class="carrinho-qtd">' + formatNumber(item.quantidade) + ' ' + escapeHtml(item.unidade) + ' | Estoque: ' + formatNumber(item.estoque) + '</div></div>' +
+                        '<button class="btn-remover-carrinho" onclick="removerDoCarrinho(' + item.id + ')">🗑️</button></div>';
             }
             document.getElementById('carrinho-conteudo').innerHTML = html;
             document.getElementById('carrinho-footer').style.display = 'flex';
@@ -1046,10 +1195,10 @@ async function abrirFinalizarCarrinho() {
         var resp = await fetch('/almoxarifado/carrinho/');
         var data = await resp.json();
         
-        var resumo = '';
+        var resumo = '<strong>Itens a serem retirados:</strong>';
         for (var i = 0; i < data.itens.length; i++) {
             var item = data.itens[i];
-            resumo += '<div style="font-size:0.9rem;margin:3px 0;">• ' + escapeHtml(item.codigo) + ' - ' + escapeHtml(item.nome) + ': <strong>' + formatNumber(item.quantidade) + ' ' + escapeHtml(item.unidade) + '</strong></div>';
+            resumo += '<div class="resumo-item">• ' + escapeHtml(item.codigo) + ' - ' + escapeHtml(item.nome) + ': <strong>' + formatNumber(item.quantidade) + ' ' + escapeHtml(item.unidade) + '</strong></div>';
         }
         
         document.getElementById('resumo-carrinho').innerHTML = resumo;
@@ -1093,7 +1242,6 @@ async function finalizarCarrinho() {
             fecharTodosPanels(); 
             setTimeout(function() {
                 atualizarTabela();
-                location.reload();
             }, 800); 
         } else {
             mostrarToast(data.error, 'error');
@@ -1141,7 +1289,6 @@ async function importarExcel(input) {
             }
             setTimeout(function() {
                 atualizarTabela();
-                location.reload();
             }, 1000); 
         } else {
             mostrarToast(data.error, 'error');
@@ -1156,16 +1303,14 @@ async function importarExcel(input) {
 
 // ===== INICIALIZAÇÃO =====
 document.addEventListener('DOMContentLoaded', function() {
-    // Configurar eventos
     setupEventListeners();
     
-    // Ajustar botão da câmera para mobile
     var btnCamera = document.getElementById('btn-camera');
     if (btnCamera && !isMobileDevice()) {
         btnCamera.innerHTML = '📁 Upload';
     }
     
-    // Inicializar stats com valores do Django
+    // Inicializar stats
     var baixo = 0, zerado = 0;
     {% for item in itens %}
         {% if item.status_estoque == 'baixo' %}baixo++;{% endif %}
@@ -1177,7 +1322,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (statsBaixo) statsBaixo.textContent = baixo;
     if (statsZerado) statsZerado.textContent = zerado;
     
-    // Garantir que o campo de busca não tenha delay no primeiro carregamento
     setTimeout(function() {
         if (document.getElementById('busca') && document.getElementById('busca').value) {
             atualizarTabela();

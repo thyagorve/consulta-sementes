@@ -209,6 +209,7 @@ def buscar_por_codigo(request):
 
 @require_http_methods(["POST"])
 def adicionar_item(request):
+    
     """Adiciona novo item - SÓ SOMA se código + lote + CA + localização forem iguais"""
     try:
         nome = request.POST.get('nome', '').strip()
@@ -220,6 +221,7 @@ def adicionar_item(request):
         lote = request.POST.get('lote', '').strip() or None
         ca = request.POST.get('ca', '').strip() or None
         localizacao = request.POST.get('localizacao', '').strip() or None
+        tamanho = request.POST.get('tamanho', '').strip() or None
         
         # ===== BUSCAR ITEM EXATAMENTE IGUAL =====
         # Só soma se Código + Lote + CA + Localização forem TODOS iguais
@@ -307,6 +309,7 @@ def adicionar_item(request):
             categoria=request.POST.get('categoria', '').strip() or None,
             marca=request.POST.get('marca', '').strip() or None,
             data_aquisicao=request.POST.get('data_aquisicao') or None,
+            tamanho=tamanho,
         )
         
         if 'foto' in request.FILES:
@@ -347,6 +350,7 @@ def editar_item(request, pk):
         if data.get('data_aquisicao'): item.data_aquisicao = data['data_aquisicao'] or None
         if data.get('quantidade'): item.quantidade = parse_decimal(data['quantidade'], item.quantidade)
         if 'ativo' in data: item.ativo = str(data['ativo']).lower() in ['true', '1', 'on']
+        if 'tamanho' in data: item.tamanho = str(data.get('tamanho', '')).strip() or None
         
         if 'foto' in request.FILES:
             item.foto = request.FILES['foto']
@@ -383,6 +387,7 @@ def detalhe_item(request, pk):
         'foto_url': item.foto.url if item.foto else None,
         'created_at': item.created_at.strftime('%d/%m/%Y %H:%M'),
         'updated_at': item.updated_at.strftime('%d/%m/%Y %H:%M'),
+        'tamanho': item.tamanho or '-',
         'ultimas_saidas': [{
             'data': s.data.strftime('%d/%m/%Y'), 'hora': s.hora.strftime('%H:%M'),
             'solicitante': s.solicitante, 'quantidade': float(s.quantidade),

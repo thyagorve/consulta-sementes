@@ -43,6 +43,17 @@ class Item(models.Model):
         verbose_name='Código'
         # REMOVIDO: unique=True
     )
+
+
+    tamanho = models.CharField(
+        max_length=50, 
+        blank=True, 
+        null=True,
+        verbose_name='Tamanho/Medida',
+        help_text='Ex: P, M, G, GG, 10x15cm, Único'
+    )
+
+    
     nome = models.CharField(max_length=200)
     descricao = models.TextField(blank=True, null=True)
     
