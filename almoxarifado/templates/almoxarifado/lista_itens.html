@@ -1248,19 +1248,33 @@ function abrirBaixa(id, nome, estoque, codigo) {
 async function abrirDetalhe(id) {
     document.getElementById('panel-detalhe').classList.add('open');
     document.getElementById('panel-overlay').classList.add('active');
-    document.getElementById('detalhe-conteudo').innerHTML = '<p style="text-align:center;">Carregando...</p>';
+    document.getElementById('detalhe-conteudo').innerHTML = '<p style="text-align:center;padding:40px;">⏳ Carregando...</p>';
     
     try {
         var resp = await fetch('/almoxarifado/item/' + id + '/detalhe/');
         var d = await resp.json();
+        var html = '';
         
-        var html = '<div class="info-grid">' +
+        // CORREÇÃO DA FOTO
+        if (d.foto_url && d.foto_url !== 'null' && d.foto_url !== '') {
+            html += '<div style="text-align:center;margin-bottom:15px;">' +
+                '<img src="' + d.foto_url + '" alt="' + escapeHtml(d.nome) + '" style="max-width:100%;max-height:200px;border-radius:10px;object-fit:contain;">' +
+                '</div>';
+        } else {
+            html += '<div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;text-align:center;border-radius:10px;margin-bottom:15px;">' +
+                '<span style="font-size:4rem;">📦</span>' +
+                '</div>';
+        }
+        
+        // Resto do código...
+        html += '<div class="info-grid">' +
             '<div class="info-item"><span>Código</span><strong>' + escapeHtml(d.codigo) + '</strong></div>' +
             '<div class="info-item"><span>Nome</span><strong>' + escapeHtml(d.nome) + '</strong></div>' +
             '<div class="info-item"><span>Estoque</span><strong>' + formatNumber(d.quantidade) + ' ' + escapeHtml(d.unidade) + '</strong></div>' +
             '<div class="info-item"><span>Mínimo</span><strong>' + formatNumber(d.estoque_minimo) + '</strong></div>' +
             '<div class="info-item"><span>Departamento</span><strong>' + escapeHtml(d.departamento) + '</strong></div>' +
             '<div class="info-item"><span>Localização</span><strong>' + escapeHtml(d.localizacao || '-') + '</strong></div>';
+        
         if (d.lote && d.lote !== '-') html += '<div class="info-item"><span>Lote</span><strong>' + escapeHtml(d.lote) + '</strong></div>';
         if (d.tamanho && d.tamanho !== '-') html += '<div class="info-item"><span>Tamanho</span><strong>' + escapeHtml(d.tamanho) + '</strong></div>';
         if (d.ca && d.ca !== '-') html += '<div class="info-item"><span>CA</span><strong>' + escapeHtml(d.ca) + '</strong></div>';
@@ -1275,7 +1289,10 @@ async function abrirDetalhe(id) {
             '</div>';
         
         document.getElementById('detalhe-conteudo').innerHTML = html;
-    } catch(e) { document.getElementById('detalhe-conteudo').innerHTML = '<p style="color:red;">Erro ao carregar</p>'; }
+    } catch(e) { 
+        console.error(e);
+        document.getElementById('detalhe-conteudo').innerHTML = '<p style="color:red;">Erro ao carregar detalhes</p>'; 
+    }
 }
 
 async function abrirEditar(id) {

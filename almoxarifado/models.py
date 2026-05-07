@@ -85,7 +85,13 @@ class Item(models.Model):
     marca = models.CharField(max_length=100, blank=True, null=True, verbose_name='Marca/Fabricante')
     
     # Mídia
-    foto = models.ImageField(upload_to='itens_fotos/', blank=True, null=True)
+    
+    foto = models.ImageField(
+        upload_to='itens_fotos/', 
+        blank=True, 
+        null=True,
+        verbose_name='Foto'
+    )
     
     # Datas e Status
     data_aquisicao = models.DateField(blank=True, null=True, verbose_name='Data de Aquisição')
