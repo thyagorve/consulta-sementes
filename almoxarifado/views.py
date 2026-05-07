@@ -158,6 +158,7 @@ def buscar_itens_ajax(request):
             'quantidade': float(i.quantidade), 'unidade': i.get_unidade_display(),
             'localizacao': i.localizacao or '-', 'departamento': i.get_departamento_display(),
             'status_estoque': i.status_estoque, 'lote': i.lote or '-', 'ca': i.ca or '-',
+            'tamanho': i.tamanho or '-',  # <-- ADICIONE ESTA LINHA!
         } for i in itens],
         'total_itens': itens.count(),
         'total_quantidade': float(itens.aggregate(Sum('quantidade'))['quantidade__sum'] or 0),

@@ -7,14 +7,10 @@ class Departamento(models.TextChoices):
     PRODUCAO = 'PROD', 'Produção'
     MANUTENCAO = 'MAN', 'Manutenção'
     TI = 'TI', 'Tecnologia'
-    MARKETING = 'MKT', 'Marketing'
-    VENDAS = 'VEND', 'Vendas'
-    RH = 'RH', 'Recursos Humanos'
-    FINANCEIRO = 'FIN', 'Financeiro'
-    JURIDICO = 'JUR', 'Jurídico'
+    FACILITES = 'FAC', 'Facilities'
+    LABORATORIO = 'LAB', 'Laboratório'
     LOGISTICA = 'LOG', 'Logística'
-    QUALIDADE = 'QUAL', 'Qualidade'
-    PESQUISA = 'PESQ', 'Pesquisa'
+    EPI = 'EPI', 'Seguranca'
     OUTROS = 'OUT', 'Outros'
 
 
@@ -53,7 +49,7 @@ class Item(models.Model):
         help_text='Ex: P, M, G, GG, 10x15cm, Único'
     )
 
-    
+
     nome = models.CharField(max_length=200)
     descricao = models.TextField(blank=True, null=True)
     
