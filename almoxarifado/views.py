@@ -172,40 +172,46 @@ def buscar_por_codigo(request):
     if not codigo:
         return JsonResponse({'encontrado': False})
     
+    # Buscar ITEM ATIVO mais recente com este código
     try:
-        item = Item.objects.get(codigo=codigo, ativo=True)
-        return JsonResponse({
-            'encontrado': True,
-            'item': {
-                'id': item.id, 'codigo': item.codigo, 'nome': item.nome,
-                'descricao': item.descricao, 'departamento': item.departamento,
-                'unidade': item.unidade, 'localizacao': item.localizacao,
-                'estoque_minimo': float(item.estoque_minimo),
-                'valor_unitario': float(item.valor_unitario) if item.valor_unitario else None,
-                'fornecedor': item.fornecedor, 'quantidade': float(item.quantidade),
-                'lote': item.lote, 'ca': item.ca, 'categoria': item.categoria,
-                'marca': item.marca,
-            }
-        })
-    except Item.DoesNotExist:
-        # Verifica se existe desativado
-        item_inativo = Item.objects.filter(codigo=codigo, ativo=False).first()
-        if item_inativo:
+        item = Item.objects.filter(codigo=codigo, ativo=True).first()
+        
+        if item:
             return JsonResponse({
-                'encontrado': True, 
-                'reativar': True,
+                'encontrado': True,
                 'item': {
-                    'id': item_inativo.id, 'codigo': item_inativo.codigo, 'nome': item_inativo.nome,
-                    'descricao': item_inativo.descricao, 'departamento': item_inativo.departamento,
-                    'unidade': item_inativo.unidade, 'localizacao': item_inativo.localizacao,
-                    'estoque_minimo': float(item_inativo.estoque_minimo),
-                    'valor_unitario': float(item_inativo.valor_unitario) if item_inativo.valor_unitario else None,
-                    'fornecedor': item_inativo.fornecedor, 'quantidade': 0,
-                    'lote': item_inativo.lote, 'ca': item_inativo.ca, 'categoria': item_inativo.categoria,
-                    'marca': item_inativo.marca,
+                    'id': item.id, 'codigo': item.codigo, 'nome': item.nome,
+                    'descricao': item.descricao, 'departamento': item.departamento,
+                    'unidade': item.unidade, 'localizacao': item.localizacao,
+                    'estoque_minimo': float(item.estoque_minimo),
+                    'valor_unitario': float(item.valor_unitario) if item.valor_unitario else None,
+                    'fornecedor': item.fornecedor, 'quantidade': float(item.quantidade),
+                    'lote': item.lote, 'ca': item.ca, 'categoria': item.categoria,
+                    'marca': item.marca, 'tamanho': item.tamanho,
                 }
             })
-        return JsonResponse({'encontrado': False})
+        else:
+            # Verifica se existe desativado
+            item_inativo = Item.objects.filter(codigo=codigo, ativo=False).first()
+            if item_inativo:
+                return JsonResponse({
+                    'encontrado': True, 
+                    'reativar': True,
+                    'item': {
+                        'id': item_inativo.id, 'codigo': item_inativo.codigo, 'nome': item_inativo.nome,
+                        'descricao': item_inativo.descricao, 'departamento': item_inativo.departamento,
+                        'unidade': item_inativo.unidade, 'localizacao': item_inativo.localizacao,
+                        'estoque_minimo': float(item_inativo.estoque_minimo),
+                        'valor_unitario': float(item_inativo.valor_unitario) if item_inativo.valor_unitario else None,
+                        'fornecedor': item_inativo.fornecedor, 'quantidade': 0,
+                        'lote': item_inativo.lote, 'ca': item_inativo.ca, 'categoria': item_inativo.categoria,
+                        'marca': item_inativo.marca, 'tamanho': item.tamanho,
+                    }
+                })
+            return JsonResponse({'encontrado': False})
+            
+    except Exception as e:
+        return JsonResponse({'encontrado': False, 'error': str(e)})
 
 
 @require_http_methods(["POST"])
@@ -995,4 +1001,250 @@ def excluir_item(request, pk):
         item.save()
         return JsonResponse({'success': True, 'message': f'Item {item.codigo} desativado!'})
     except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    
+
+
+import xmltodict
+from decimal import Decimal
+from django.db import transaction
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from .models import Item, EntradaNotaFiscal, ItemEntrada
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def importar_xml_nfe(request):
+    """Importa XML de Nota Fiscal e atualiza o estoque automaticamente"""
+    
+    if not request.FILES.get('xml_file'):
+        return JsonResponse({'success': False, 'error': 'Nenhum arquivo XML enviado'}, status=400)
+    
+    xml_file = request.FILES['xml_file']
+    
+    # Verificar extensão
+    if not xml_file.name.endswith('.xml'):
+        return JsonResponse({'success': False, 'error': 'Arquivo deve ser XML'}, status=400)
+    
+    try:
+        # Converte o arquivo para dicionário
+        content = xml_file.read()
+        data_dict = xmltodict.parse(content)
+        
+        # Navega até a parte dos itens (suporta diferentes estruturas de XML)
+        if 'nfeProc' in data_dict:
+            infNFe = data_dict['nfeProc']['NFe']['infNFe']
+        elif 'NFe' in data_dict:
+            infNFe = data_dict['NFe']['infNFe']
+        else:
+            return JsonResponse({'success': False, 'error': 'Estrutura XML não reconhecida'}, status=400)
+        
+        # Extrair chave da nota (remover prefixo 'NFe')
+        chave = infNFe.get('@Id', '')
+        if chave.startswith('NFe'):
+            chave = chave[3:]
+        
+        if not chave:
+            return JsonResponse({'success': False, 'error': 'Chave de acesso não encontrada'}, status=400)
+        
+        with transaction.atomic():
+            # Verificar se nota já foi importada
+            if EntradaNotaFiscal.objects.filter(chave_acesso=chave).exists():
+                return JsonResponse({'success': False, 'error': 'Esta nota fiscal já foi importada!'}, status=400)
+            
+            # Extrair CNPJ do fornecedor
+            emitente = infNFe.get('emit', {})
+            cnpj = emitente.get('CNPJ', '')
+            if not cnpj and 'CPF' in emitente:
+                cnpj = emitente.get('CPF', '')
+            
+            # 1. Registrar a Nota no Banco
+            nota = EntradaNotaFiscal.objects.create(
+                chave_acesso=chave,
+                numero_nota=infNFe.get('ide', {}).get('nNF', ''),
+                fornecedor_nome=emitente.get('xNome', 'Fornecedor não identificado'),
+                cnpj_fornecedor=cnpj,
+                data_emissao=infNFe.get('ide', {}).get('dhEmi', '')[:10] if infNFe.get('ide', {}).get('dhEmi') else None,
+                valor_total=Decimal(infNFe.get('total', {}).get('ICMSTot', {}).get('vNF', '0')),
+                xml_arquivo=xml_file
+            )
+            
+            # 2. Processa os itens da nota
+            detalhes = infNFe.get('det', [])
+            if not detalhes:
+                return JsonResponse({'success': False, 'error': 'Nenhum item encontrado na nota'}, status=400)
+            
+            if not isinstance(detalhes, list):
+                detalhes = [detalhes]
+            
+            itens_importados = 0
+            
+            for item_nfe in detalhes:
+                produto = item_nfe.get('prod', {})
+                
+                if not produto:
+                    continue
+                
+                # Dados do produto
+                codigo_produto = produto.get('cProd', '').strip()
+                nome_produto = produto.get('xProd', 'Sem nome')[:200]
+                unidade = produto.get('uCom', 'UN')[:3].upper()
+                quantidade = Decimal(str(produto.get('qCom', '0')).replace(',', '.'))
+                valor_unitario = Decimal(str(produto.get('vUnCom', '0')).replace(',', '.'))
+                
+                if quantidade <= 0:
+                    continue
+                
+                # Tenta encontrar o item pelo código
+                item_estoque = None
+                
+                if codigo_produto:
+                    item_estoque = Item.objects.filter(codigo=codigo_produto).first()
+                
+                # Se não encontrou pelo código, tenta pelo nome exato
+                if not item_estoque:
+                    item_estoque = Item.objects.filter(nome__iexact=nome_produto).first()
+                
+                if item_estoque:
+                    # Item existe - somar quantidade
+                    item_estoque.quantidade += quantidade
+                    
+                    # Atualizar valor unitário se não tiver ou se o novo for maior
+                    if not item_estoque.valor_unitario or valor_unitario > item_estoque.valor_unitario:
+                        item_estoque.valor_unitario = valor_unitario
+                    
+                    # Atualizar fornecedor se não tiver
+                    if not item_estoque.fornecedor:
+                        item_estoque.fornecedor = nota.fornecedor_nome
+                    
+                    item_estoque.save()
+                    mensagem_acao = f"quantidade somada (+{quantidade})"
+                else:
+                    # Criar novo item
+                    item_estoque = Item.objects.create(
+                        codigo=codigo_produto if codigo_produto else None,
+                        nome=nome_produto,
+                        quantidade=quantidade,
+                        unidade=unidade if unidade in dict(UnidadeMedida.choices) else 'UN',
+                        valor_unitario=valor_unitario,
+                        fornecedor=nota.fornecedor_nome,
+                        departamento='OUT',
+                        ativo=True
+                    )
+                    mensagem_acao = "criado"
+                
+                # Registrar entrada do item
+                ItemEntrada.objects.create(
+                    nota_fiscal=nota,
+                    item=item_estoque,
+                    quantidade_nota=quantidade,
+                    preco_unitario=valor_unitario
+                )
+                
+                itens_importados += 1
+            
+            return JsonResponse({
+                'success': True,
+                'message': f'Nota fiscal {nota.numero_nota} importada com sucesso!\n{itens_importados} itens processados.',
+                'nota_id': nota.id,
+                'itens': itens_importados
+            })
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'error': f'Erro ao processar XML: {str(e)}'}, status=500)
+    
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def visualizar_xml_nfe(request):
+    """Visualiza dados do XML antes de importar"""
+    
+    if not request.FILES.get('xml_file'):
+        return JsonResponse({'success': False, 'error': 'Nenhum arquivo XML enviado'}, status=400)
+    
+    xml_file = request.FILES['xml_file']
+    
+    if not xml_file.name.endswith('.xml'):
+        return JsonResponse({'success': False, 'error': 'Arquivo deve ser XML'}, status=400)
+    
+    try:
+        content = xml_file.read()
+        data_dict = xmltodict.parse(content)
+        
+        if 'nfeProc' in data_dict:
+            infNFe = data_dict['nfeProc']['NFe']['infNFe']
+        elif 'NFe' in data_dict:
+            infNFe = data_dict['NFe']['infNFe']
+        else:
+            return JsonResponse({'success': False, 'error': 'Estrutura XML não reconhecida'}, status=400)
+        
+        chave = infNFe.get('@Id', '')
+        if chave.startswith('NFe'):
+            chave = chave[3:]
+        
+        emitente = infNFe.get('emit', {})
+        cnpj = emitente.get('CNPJ', '')
+        if not cnpj and 'CPF' in emitente:
+            cnpj = emitente.get('CPF', '')
+        
+        # Processar itens da nota
+        detalhes = infNFe.get('det', [])
+        if not isinstance(detalhes, list):
+            detalhes = [detalhes]
+        
+        itens = []
+        itens_existentes = []
+        
+        for item_nfe in detalhes:
+            produto = item_nfe.get('prod', {})
+            if not produto:
+                continue
+            
+            codigo_produto = produto.get('cProd', '').strip()
+            nome_produto = produto.get('xProd', 'Sem nome')[:200]
+            unidade = produto.get('uCom', 'UN')[:3].upper()
+            quantidade = Decimal(str(produto.get('qCom', '0')).replace(',', '.'))
+            valor_unitario = Decimal(str(produto.get('vUnCom', '0')).replace(',', '.'))
+            
+            if quantidade <= 0:
+                continue
+            
+            item_data = {
+                'codigo': codigo_produto,
+                'nome': nome_produto,
+                'unidade': unidade,
+                'quantidade': float(quantidade),
+                'preco_unitario': float(valor_unitario)
+            }
+            itens.append(item_data)
+            
+            # Verificar se item já existe
+            item_existente = Item.objects.filter(codigo=codigo_produto, ativo=True).first()
+            if item_existente:
+                itens_existentes.append({
+                    'codigo': codigo_produto,
+                    'nome': nome_produto,
+                    'estoque_atual': float(item_existente.quantidade)
+                })
+        
+        return JsonResponse({
+            'success': True,
+            'chave_acesso': chave,
+            'numero_nota': infNFe.get('ide', {}).get('nNF', ''),
+            'fornecedor_nome': emitente.get('xNome', 'Fornecedor não identificado'),
+            'cnpj_fornecedor': cnpj,
+            'data_emissao': infNFe.get('ide', {}).get('dhEmi', '')[:10] if infNFe.get('ide', {}).get('dhEmi') else '',
+            'valor_total': float(infNFe.get('total', {}).get('ICMSTot', {}).get('vNF', '0')),
+            'itens': itens,
+            'itens_existentes': itens_existentes,
+            'total_itens': len(itens)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)

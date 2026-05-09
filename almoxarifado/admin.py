@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Item, Saida
+from .models import Item, Saida, EntradaNotaFiscal, ItemEntrada
 
 
 @admin.register(Item)
@@ -31,10 +31,15 @@ class ItemAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(Saida)
-class SaidaAdmin(admin.ModelAdmin):
-    list_display = ['data', 'hora', 'solicitante', 'departamento', 'item_codigo', 'item_nome', 'quantidade']
-    list_filter = ['data', 'departamento', 'solicitante']
-    search_fields = ['solicitante', 'item_nome', 'item_codigo']
-    readonly_fields = ['created_at']
-    date_hierarchy = 'data'
+@admin.register(EntradaNotaFiscal)
+class EntradaNotaFiscalAdmin(admin.ModelAdmin):
+    list_display = ('numero_nota', 'fornecedor_nome', 'data_emissao', 'valor_total', 'data_recebimento')
+    search_fields = ('numero_nota', 'chave_acesso', 'fornecedor_nome')
+    date_hierarchy = 'data_emissao'
+
+# No arquivo almoxarifado/admin.py
+@admin.register(ItemEntrada)
+class ItemEntradaAdmin(admin.ModelAdmin):
+    # Verifique se os nomes abaixo batem EXATAMENTE com o seu models.py
+    list_display = ('nota_fiscal', 'item', 'quantidade_nota', 'preco_unitario') 
+    list_filter = ('item',)

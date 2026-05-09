@@ -15,19 +15,19 @@ class Departamento(models.TextChoices):
 
 
 class UnidadeMedida(models.TextChoices):
-    UNIDADE = 'UN', 'Unidade'
-    CAIXA = 'CX', 'Caixa'
-    PACOTE = 'PCT', 'Pacote'
-    KILO = 'KG', 'Quilograma'
-    GRAMA = 'G', 'Grama'
-    LITRO = 'L', 'Litro'
-    MILILITRO = 'ML', 'Mililitro'
-    METRO = 'M', 'Metro'
-    CENTIMETRO = 'CM', 'Centímetro'
+    UNIDADE = 'UN', 'UN'
+    CAIXA = 'CX', 'CX'
+    PACOTE = 'PCT', 'PCT'
+    KILO = 'KG', 'KG'
+    GRAMA = 'G', 'G'
+    LITRO = 'L', 'L'
+    MILILITRO = 'ML', 'ML'
+    METRO = 'M', 'M'
+    CENTIMETRO = 'CM', 'CM'
     PAR = 'PAR', 'Par'
-    DUZIA = 'DZ', 'Dúzia'
-    ROLO = 'RL', 'Rolo'
-    FOLHA = 'FL', 'Folha'
+    DUZIA = 'DZ', 'DZ'
+    ROLO = 'RL', 'RL'
+    FOLHA = 'FL', 'FL'
 
 
 class Item(models.Model):
@@ -37,9 +37,7 @@ class Item(models.Model):
         blank=True, 
         null=True,
         verbose_name='Código'
-        # REMOVIDO: unique=True
     )
-
 
     tamanho = models.CharField(
         max_length=50, 
@@ -48,7 +46,6 @@ class Item(models.Model):
         verbose_name='Tamanho/Medida',
         help_text='Ex: P, M, G, GG, 10x15cm, Único'
     )
-
 
     nome = models.CharField(max_length=200)
     descricao = models.TextField(blank=True, null=True)
@@ -62,7 +59,7 @@ class Item(models.Model):
     ca = models.CharField(max_length=100, blank=True, null=True, verbose_name='CA (Certificado de Aprovação)')
     validade_ca = models.DateField(blank=True, null=True, verbose_name='Validade do CA')
     
-    # Estoque - AGORA DECIMAL
+    # Estoque
     quantidade = models.DecimalField(
         max_digits=12, 
         decimal_places=3, 
@@ -85,7 +82,6 @@ class Item(models.Model):
     marca = models.CharField(max_length=100, blank=True, null=True, verbose_name='Marca/Fabricante')
     
     # Mídia
-    
     foto = models.ImageField(
         upload_to='itens_fotos/', 
         blank=True, 
@@ -179,3 +175,27 @@ class CarrinhoSolicitacao(models.Model):
 
     def __str__(self):
         return f"{self.usuario} - {self.item.nome} x{self.quantidade}"
+
+
+class EntradaNotaFiscal(models.Model):
+    chave_acesso = models.CharField(max_length=44, unique=True)
+    numero_nota = models.CharField(max_length=20)
+    fornecedor_nome = models.CharField(max_length=200)
+    cnpj_fornecedor = models.CharField(max_length=18, blank=True, null=True)  # Permitir nulo
+    data_emissao = models.DateField()
+    data_recebimento = models.DateTimeField(auto_now_add=True)
+    valor_total = models.DecimalField(max_digits=12, decimal_places=2)
+    xml_arquivo = models.FileField(upload_to='nfe_xmls/', blank=True, null=True)
+
+    def __str__(self):
+        return f"NF {self.numero_nota} - {self.fornecedor_nome}"
+
+
+class ItemEntrada(models.Model):
+    nota_fiscal = models.ForeignKey(EntradaNotaFiscal, related_name='itens_nota', on_delete=models.CASCADE)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='entradas_nota')  # Adicionado related_name
+    quantidade_nota = models.DecimalField(max_digits=12, decimal_places=3)
+    preco_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.nota_fiscal.numero_nota} - {self.item.nome} - {self.quantidade_nota}"
