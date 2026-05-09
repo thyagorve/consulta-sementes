@@ -1,35 +1,43 @@
-# Dockerfile
+# Dockerfile otimizado
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
+# Instalar dependências de sistema mínimas
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
-        postgresql-client \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Copiar apenas requirements primeiro (melhor cache)
 COPY requirements.txt .
-RUN pip install --upgrade pip \
-    && pip install -r requirements.txt gunicorn
 
+# Instalar dependências Python
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copiar o resto do código
 COPY . .
 
-# 🔥 CRIAR DIRETÓRIOS E PERMISSÕES
-RUN mkdir -p /app/media/logos /app/media/historico_fotos /app/staticfiles \
+# Criar diretórios necessários
+RUN mkdir -p /app/media /app/media/logos /app/media/historico_fotos /app/staticfiles \
     && chmod -R 755 /app/media \
     && chmod -R 755 /app/staticfiles
 
 EXPOSE 8001
 
-# 🔥 MUDANÇA CRÍTICA: Usar Gunicorn em vez de runserver
+# Comando Gunicorn
 CMD gunicorn --bind 0.0.0.0:8001 \
              --workers 3 \
              --timeout 120 \
+             --max-requests 1000 \
+             --max-requests-jitter 50 \
              --access-logfile - \
              --error-logfile - \
              sementes.wsgi:application
