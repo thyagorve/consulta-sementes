@@ -43,6 +43,23 @@ from .forms import (
     CategoriaForm, TratamentoForm, NovoConferenteUserForm, MudarSenhaForm  
 )
 
+
+# sapp/views.py - No início do arquivo, adicione:
+
+from django.shortcuts import render, redirect, reverse  # Adicione 'reverse' aqui
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User, Group, Permission
+from django.contrib.auth.hashers import make_password
+from django.http import JsonResponse
+from django.db import transaction
+from django.urls import reverse  # Também pode importar assim
+from .models import (
+    Produto, Cultivar, Peneira, Especie, Categoria, Tratamento, 
+    Armazem, Endereco, OrigemDestino, Configuracao
+)
+from .forms import ConfiguracaoForm, NovoConferenteUserForm
+
 # Pandas e outros imports
 import pandas as pd
 from django.http import HttpResponse
@@ -140,6 +157,7 @@ from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from .models import ArmazemLayout, ElementoMapa, Estoque
 import json
 # ================================================================
@@ -197,19 +215,11 @@ from django.http import JsonResponse
 from datetime import datetime, timedelta
 from .models import Estoque, HistoricoMovimentacao, Especie, Cultivar, Peneira
 
-@login_required
-def dashboard(request):
-    """Dashboard inicial"""
-    context = {
-        'tipos_semente': Especie.objects.filter(estoque__saldo__gt=0).values_list('nome', flat=True).distinct().order_by('nome'),
-        'cultivares_lista': Cultivar.objects.filter(estoque__saldo__gt=0).distinct().order_by('nome'),
-        'peneiras_lista': Peneira.objects.filter(estoque__saldo__gt=0).distinct().order_by('nome'),
-        'armazens_lista': Estoque.objects.filter(saldo__gt=0).exclude(az__isnull=True).exclude(az='').values_list('az', flat=True).distinct().order_by('az'),
-    }
-    return render(request, 'sapp/dashboard.html', context)
+
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def dashboard_data(request):
     """Endpoint AJAX para dados do dashboard"""
     try:
@@ -379,6 +389,7 @@ def dashboard_data(request):
 # ================================================================
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     """
     View para a página principal de estoque - MOSTRA TODOS OS LOTES
@@ -555,6 +566,7 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
 
 
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     """
     View para gestão de estoque - MOSTRA APENAS LOTES COM SALDO > 0
@@ -720,6 +732,7 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     return render(request, template_name, context)
 
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def registrar_saida(request, id):
     print("🔍 [REGISTRAR SAÍDA] Iniciando processamento da expedição")
     
@@ -875,6 +888,7 @@ from django.views.decorators.csrf import csrf_protect
 
 @csrf_protect
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def transferir(request, id):
     origem = get_object_or_404(Estoque, id=id)
     
@@ -1145,6 +1159,7 @@ def transferir(request, id):
 from django.http import JsonResponse
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def detalhes_estoque_api(request, id):
     """API para retornar dados de um item do estoque"""
     try:
@@ -1173,6 +1188,7 @@ def detalhes_estoque_api(request, id):
         return JsonResponse({'error': 'Item não encontrado'}, status=404)
 
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def nova_entrada(request):
     if request.method == 'POST':
         try:
@@ -1314,6 +1330,7 @@ def nova_entrada(request):
     return redirect('sapp:lista_estoque')
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def nova_saida(request):
     print("veio aqui na função  nova_saida")
     """Registra uma nova saída geral (para qualquer lote)"""
@@ -1398,6 +1415,7 @@ def nova_saida(request):
     return redirect('sapp:lista_estoque')
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def relatorio_saidas(request):
     """Relatório detalhado de todas as saídas"""
     if request.method == 'POST':
@@ -1435,6 +1453,7 @@ from django.db.models import Sum, Q
 from django.contrib.auth.decorators import login_required
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_estoque_estatisticas(request):
     """API para atualizar os cards de estatísticas com base nos filtros atuais"""
     
@@ -1537,6 +1556,7 @@ def api_estoque_estatisticas(request):
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_opcoes_filtro(request):
     """Retorna opções de filtro baseadas nos filtros atuais (encadeamento)"""
     coluna = request.GET.get('coluna')
@@ -1664,6 +1684,7 @@ def api_opcoes_filtro(request):
 ############################################################################
 # NO VIEWS.PY - CORRIGIR A FUNÇÃO editar COMPLETAMENTE:
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def editar(request, id):
     item = get_object_or_404(Estoque, id=id)
     
@@ -1865,6 +1886,7 @@ def editar(request, id):
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def excluir_lote(request, id):
     item = get_object_or_404(Estoque, id=id)
     if request.method == 'POST':
@@ -1891,52 +1913,61 @@ def logout_view(request):
 
 
 
+# sapp/views.py - Função completa corrigida
+
+# sapp/views.py - Substitua a função configuracoes por esta versão SIMPLIFICADA
 
 @login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def configuracoes(request):
+    """
+    View completa de configurações do sistema
+    Gerencia: Produtos, Armazéns, Endereços, Usuários, Permissões
+    """
     
     config = Configuracao.get_solo()
     
+    # =============================
+    # QUERYSETS PRINCIPAIS
+    # =============================
+    
+    # Usuários (todos exceto o próprio usuário logado)
     usuarios_conferentes = User.objects.filter(
         is_superuser=False
-    ).order_by('username')
+    ).exclude(id=request.user.id).order_by('username')
     
-    # =============================
-    # QUERYSETS
-    # =============================
-    
+    # Produtos com relacionamentos
     produtos = Produto.objects.select_related(
-        'cultivar',
-        'peneira',
-        'especie',
-        'categoria',
-        'tratamento'
+        'cultivar', 'peneira', 'especie', 'categoria', 'tratamento'
     ).all().order_by('-data_cadastro')
     
+    # Parâmetros
     cultivares = Cultivar.objects.all().order_by('nome')
     peneiras = Peneira.objects.all().order_by('nome')
     especies = Especie.objects.all().order_by('nome')
     categorias = Categoria.objects.all().order_by('nome')
     tratamentos = Tratamento.objects.all().order_by('nome')
     
-    # ARMAZÉNS (de volta!)
+    # Armazéns
     armazens_lista = Armazem.objects.all().order_by('nome')
     
-    # ENDEREÇOS (com armazém)
+    # Endereços com armazém
     enderecos_lista = Endereco.objects.select_related('armazem').all().order_by('codigo')
     
+    # Origens/Destinos
     origens_lista = OrigemDestino.objects.all().order_by('nome')
     
     # =============================
-    # POST
+    # PROCESSAMENTO POST
     # =============================
     
     if request.method == 'POST':
         
         acao = request.POST.get('acao')
+        active_tab = request.POST.get('active_tab', 'produto')
         
         # ====================================
-        # PRODUTOS
+        # 1. PRODUTOS
         # ====================================
         
         if acao == 'add_produto':
@@ -1950,22 +1981,23 @@ def configuracoes(request):
                 elif Produto.objects.filter(codigo=codigo).exists():
                     messages.error(request, f"❌ Código '{codigo}' já existe!")
                 else:
-                    produto = Produto.objects.create(
-                        cultivar_id=cultivar_id,
-                        codigo=codigo,
-                        descricao=descricao,
-                        tipo=request.POST.get('tipo', '').strip(),
-                        empresa=request.POST.get('empresa', '').strip(),
-                        ativo=request.POST.get('ativo') == 'on'
-                    )
-                    produto.peneira_id = request.POST.get('peneira') or None
-                    produto.especie_id = request.POST.get('especie') or None
-                    produto.categoria_id = request.POST.get('categoria') or None
-                    produto.tratamento_id = request.POST.get('tratamento') or None
-                    produto.save()
-                    messages.success(request, f"✅ Produto '{codigo}' cadastrado!")
+                    with transaction.atomic():
+                        produto = Produto.objects.create(
+                            cultivar_id=cultivar_id,
+                            codigo=codigo,
+                            descricao=descricao,
+                            tipo=request.POST.get('tipo', '').strip(),
+                            empresa=request.POST.get('empresa', '').strip(),
+                            ativo=request.POST.get('ativo') == 'on'
+                        )
+                        produto.peneira_id = request.POST.get('peneira') or None
+                        produto.especie_id = request.POST.get('especie') or None
+                        produto.categoria_id = request.POST.get('categoria') or None
+                        produto.tratamento_id = request.POST.get('tratamento') or None
+                        produto.save()
+                        messages.success(request, f"✅ Produto '{codigo}' cadastrado com sucesso!")
             except Exception as e:
-                messages.error(request, f"❌ Erro: {str(e)}")
+                messages.error(request, f"❌ Erro ao cadastrar produto: {str(e)}")
         
         elif acao == 'delete_produto':
             try:
@@ -1973,40 +2005,211 @@ def configuracoes(request):
                 if not item_id:
                     messages.error(request, "❌ Produto não identificado!")
                 else:
-                    Produto.objects.filter(id=item_id).delete()
-                    messages.success(request, "✅ Produto excluído!")
+                    produto = Produto.objects.get(id=item_id)
+                    codigo = produto.codigo
+                    produto.delete()
+                    messages.success(request, f"✅ Produto '{codigo}' excluído com sucesso!")
+            except Produto.DoesNotExist:
+                messages.error(request, "❌ Produto não encontrado!")
             except Exception as e:
-                messages.error(request, f"❌ Erro ao excluir: {str(e)}")
+                messages.error(request, f"❌ Erro ao excluir produto: {str(e)}")
         
         # ====================================
-        # USUÁRIOS
+        # 2. USUÁRIOS E PERMISSÕES (APENAS INDIVIDUAIS - SEM GRUPOS)
         # ====================================
         
-        elif acao == 'add_conferente_user':
-            if request.user.is_superuser:
-                username = request.POST.get('username', '').strip()
-                if username and not User.objects.filter(username=username).exists():
-                    User.objects.create_user(
-                        username=username,
-                        password='conceito',
-                        first_name=request.POST.get('first_name', '').strip()
-                    )
-                    messages.success(request, f"✅ Usuário {username} criado! Senha padrão: conceito")
+        elif acao == 'create_conferente_user':
+            # Verifica permissão para criar usuários
+            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+                messages.error(request, "❌ Você não tem permissão para criar usuários!")
+            else:
+                username = request.POST.get('username', '').strip().lower()
+                first_name = request.POST.get('first_name', '').strip()
+                password = request.POST.get('password', '').strip()
+                
+                # Validações
+                if not username or not first_name:
+                    messages.error(request, "❌ Nome de usuário e nome completo são obrigatórios!")
+                elif User.objects.filter(username=username).exists():
+                    messages.error(request, f"❌ Usuário '{username}' já existe!")
                 else:
-                    messages.error(request, "❌ Usuário já existe ou nome inválido.")
+                    try:
+                        with transaction.atomic():
+                            # Define senha padrão se não for fornecida
+                            if not password:
+                                password = 'conceito123'
+                            elif len(password) < 6:
+                                messages.error(request, "❌ A senha deve ter no mínimo 6 caracteres!")
+                                return redirect(f"{reverse('sapp:configuracoes')}#{active_tab}")
+                            
+                            # Cria o usuário (SEM grupos)
+                            user = User.objects.create_user(
+                                username=username,
+                                first_name=first_name,
+                                password=password
+                            )
+                            
+                            # NÃO ADICIONA GRUPOS - apenas permissões individuais
+                            
+                            # 🔥 Adiciona permissões específicas selecionadas nos checkboxes
+                            permissions_added = []
+                            for key, value in request.POST.items():
+                                if key.startswith('pode_') and value == 'on':
+                                    try:
+                                        # Buscar permissão no app sapp
+                                        permission = Permission.objects.filter(
+                                            codename=key,
+                                            content_type__app_label='sapp'
+                                        ).first()
+                                        
+                                        # Se não encontrar, buscar no almoxarifado
+                                        if not permission:
+                                            permission = Permission.objects.filter(
+                                                codename=key,
+                                                content_type__app_label='almoxarifado'
+                                            ).first()
+                                        
+                                        if permission:
+                                            user.user_permissions.add(permission)
+                                            permissions_added.append(key)
+                                    except Exception as e:
+                                        print(f"Erro ao adicionar permissão {key}: {e}")
+                            
+                            messages.success(request, f"✅ Usuário '{first_name}' criado com sucesso! Senha: {password}")
+                            if permissions_added:
+                                messages.info(request, f"📋 Permissões adicionadas: {', '.join(permissions_added)}")
+                    
+                    except Exception as e:
+                        messages.error(request, f"❌ Erro ao criar usuário: {str(e)}")
+        
+# sapp/views.py - Substitua a função update_user_permissions
+
+        elif acao == 'update_user_permissions':
+            # Verifica permissão para editar permissões
+            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+                messages.error(request, "❌ Você não tem permissão para editar permissões!")
+            else:
+                user_id = request.POST.get('user_id')
+                
+                print(f"\n🔍 [DEBUG] Recebida requisição update_user_permissions")
+                print(f"   user_id: {user_id}")
+                print(f"   POST keys: {list(request.POST.keys())}")
+                
+                try:
+                    user = User.objects.get(id=user_id)
+                    
+                    if user == request.user and not request.user.is_superuser:
+                        messages.error(request, "❌ Você não pode editar suas próprias permissões!")
+                    else:
+                        with transaction.atomic():
+                            # 🔥 LIMPA TODAS as permissões atuais
+                            user.user_permissions.clear()
+                            print(f"   ✅ Permissões antigas removidas")
+                            
+                            # 🔥 Lista para guardar as permissões adicionadas
+                            permissions_added = []
+                            
+                            # 🔥 Percorre todos os campos do POST
+                            for key, value in request.POST.items():
+                                # Ignora campos que não são permissões
+                                if key in ['csrfmiddlewaretoken', 'acao', 'user_id', 'active_tab', 'group_name']:
+                                    continue
+                                
+                                print(f"   Campo: {key} = {value}")
+                                
+                                # sapp/views.py - Substitua a parte de busca de permissão
+
+                                if value == 'on':  # Checkbox marcado
+                                    permission = None
+                                    
+                                    # 🔥 CORREÇÃO: Buscar em ORDEM CORRETA
+                                    # Primeiro no app almoxarifado (para permissões de almoxarifado)
+                                    if key in ['pode_ver_almoxarifado', 'pode_gerenciar_almoxarifado']:
+                                        permission = Permission.objects.filter(
+                                            codename=key,
+                                            content_type__app_label='almoxarifado'
+                                        ).first()
+                                    
+                                    # Depois no app sapp
+                                    if not permission:
+                                        permission = Permission.objects.filter(
+                                            codename=key,
+                                            content_type__app_label='sapp'
+                                        ).first()
+                                    
+                                    if permission:
+                                        user.user_permissions.add(permission)
+                                        permissions_added.append(key)
+                                        print(f"   ✅ Adicionada permissão: {key} (app: {permission.content_type.app_label})")
+                                    else:
+                                        print(f"   ❌ Permissão não encontrada: {key}")
+                            
+                            # 🔥 Salvar (garantir que foi salvo)
+                            user.save()
+                            
+                            # 🔥 Verificar se salvou
+                            saved_perms = list(user.user_permissions.values_list('codename', flat=True))
+                            print(f"   📋 Permissões salvas no banco: {saved_perms}")
+                            
+                            if permissions_added:
+                                messages.success(request, f"✅ Permissões de '{user.first_name}' atualizadas! ({len(permissions_added)} permissões)")
+                            else:
+                                messages.success(request, f"✅ Todas as permissões de '{user.first_name}' foram removidas!")
+                            
+                except User.DoesNotExist:
+                    messages.error(request, "❌ Usuário não encontrado!")
+                except Exception as e:
+                    print(f"❌ Erro: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    messages.error(request, f"❌ Erro ao atualizar permissões: {str(e)}")
+        elif acao == 'reset_password':
+            # Verifica permissão para resetar senha
+            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+                messages.error(request, "❌ Você não tem permissão para resetar senhas!")
+            else:
+                user_id = request.POST.get('user_id')
+                try:
+                    user = User.objects.get(id=user_id)
+                    
+                    # Não permite resetar próprio usuário (exceto se for superusuário)
+                    if user == request.user and not request.user.is_superuser:
+                        messages.error(request, "❌ Você não pode resetar sua própria senha!")
+                    else:
+                        new_password = 'conceito123'
+                        user.set_password(new_password)
+                        user.save()
+                        messages.success(request, f"✅ Senha de '{user.first_name}' resetada para: {new_password}")
+                
+                except User.DoesNotExist:
+                    messages.error(request, "❌ Usuário não encontrado!")
+                except Exception as e:
+                    messages.error(request, f"❌ Erro ao resetar senha: {str(e)}")
+        
+        elif acao == 'delete_user':
+            # Verifica permissão para excluir usuário
+            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+                messages.error(request, "❌ Você não tem permissão para excluir usuários!")
+            else:
+                user_id = request.POST.get('user_id')
+                try:
+                    user = User.objects.get(id=user_id)
+                    
+                    # Não permite excluir próprio usuário
+                    if user == request.user:
+                        messages.error(request, "❌ Você não pode excluir sua própria conta!")
+                    else:
+                        username = user.username
+                        user.delete()
+                        messages.success(request, f"✅ Usuário '{username}' excluído com sucesso!")
+                
+                except User.DoesNotExist:
+                    messages.error(request, "❌ Usuário não encontrado!")
+                except Exception as e:
+                    messages.error(request, f"❌ Erro ao excluir usuário: {str(e)}")
         
         # ====================================
-        # CONFIGURAÇÃO GERAL
-        # ====================================
-        
-        elif acao == 'config_geral':
-            form = ConfiguracaoForm(request.POST, instance=config)
-            if form.is_valid():
-                form.save()
-                messages.success(request, "✅ Configurações salvas!")
-        
-        # ====================================
-        # ARMAZÉM (de volta!)
+        # 3. ARMAZÉNS
         # ====================================
         
         elif acao == 'add_armazem':
@@ -2014,12 +2217,14 @@ def configuracoes(request):
             if nome:
                 obj, created = Armazem.objects.get_or_create(nome=nome)
                 if created:
-                    messages.success(request, f"✅ Armazém {nome} criado!")
+                    messages.success(request, f"✅ Armazém '{nome}' criado com sucesso!")
                 else:
-                    messages.warning(request, "⚠️ Armazém já existe.")
+                    messages.warning(request, f"⚠️ Armazém '{nome}' já existe!")
+            else:
+                messages.error(request, "❌ Nome do armazém não informado!")
         
         # ====================================
-        # ENDEREÇO (com armazém)
+        # 4. ENDEREÇOS
         # ====================================
         
         elif acao == 'add_endereco':
@@ -2041,7 +2246,7 @@ def configuracoes(request):
                             codigo=endereco_codigo,
                             armazem=armazem
                         )
-                        messages.success(request, f"✅ Endereço '{endereco_codigo}' cadastrado no armazém {armazem.nome}!")
+                        messages.success(request, f"✅ Endereço '{endereco_codigo}' cadastrado no armazém '{armazem.nome}'!")
                         
                 except Armazem.DoesNotExist:
                     messages.error(request, "❌ Armazém não encontrado!")
@@ -2049,7 +2254,19 @@ def configuracoes(request):
                     messages.error(request, f"❌ Erro ao cadastrar endereço: {str(e)}")
         
         # ====================================
-        # CADASTROS SIMPLES
+        # 5. CONFIGURAÇÃO GERAL
+        # ====================================
+        
+        elif acao == 'config_geral':
+            form = ConfiguracaoForm(request.POST, instance=config)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "✅ Configurações gerais salvas com sucesso!")
+            else:
+                messages.error(request, "❌ Erro ao salvar configurações. Verifique os dados.")
+        
+        # ====================================
+        # 6. CADASTROS SIMPLES (CRUD)
         # ====================================
         
         elif acao in ['add_cultivar', 'add_peneira', 'add_especie', 'add_categoria', 'add_tratamento', 'add_origem']:
@@ -2062,17 +2279,28 @@ def configuracoes(request):
                 'add_origem': OrigemDestino
             }
             model = model_map.get(acao)
+            nome_display = {
+                'add_cultivar': 'Cultivar',
+                'add_peneira': 'Peneira',
+                'add_especie': 'Espécie',
+                'add_categoria': 'Categoria',
+                'add_tratamento': 'Tratamento',
+                'add_origem': 'Origem/Destino'
+            }
+            
             if model:
                 nome = request.POST.get('nome', '').strip()
                 if nome:
                     obj, created = model.objects.get_or_create(nome=nome)
                     if created:
-                        messages.success(request, f"✅ '{nome}' adicionado!")
+                        messages.success(request, f"✅ {nome_display[acao]} '{nome}' adicionado com sucesso!")
                     else:
-                        messages.warning(request, "⚠️ Registro já existe.")
+                        messages.warning(request, f"⚠️ {nome_display[acao]} '{nome}' já existe!")
+                else:
+                    messages.error(request, f"❌ Nome do {nome_display[acao]} não informado!")
         
         # ====================================
-        # EXCLUSÃO
+        # 7. EXCLUSÃO GENÉRICA
         # ====================================
         
         elif acao == 'delete_item':
@@ -2083,72 +2311,54 @@ def configuracoes(request):
                 messages.error(request, "❌ Item não identificado!")
             else:
                 model_map = {
-                    'cultivar': Cultivar,
-                    'especie': Especie,
-                    'peneira': Peneira,
-                    'categoria': Categoria,
-                    'tratamento': Tratamento,
-                    'armazem': Armazem,
-                    'endereco': Endereco,
-                    'origem': OrigemDestino,
-                    'conferente': User,
-                    'produto': Produto,
+                    'cultivar': (Cultivar, 'Cultivar'),
+                    'especie': (Especie, 'Espécie'),
+                    'peneira': (Peneira, 'Peneira'),
+                    'categoria': (Categoria, 'Categoria'),
+                    'tratamento': (Tratamento, 'Tratamento'),
+                    'armazem': (Armazem, 'Armazém'),
+                    'endereco': (Endereco, 'Endereço'),
+                    'origem': (OrigemDestino, 'Origem/Destino'),
+                    'produto': (Produto, 'Produto'),
                 }
                 
                 if tipo in model_map:
+                    model, nome_tipo = model_map[tipo]
                     try:
-                        item = model_map[tipo].objects.get(id=item_id)
+                        item = model.objects.get(id=item_id)
                         nome_excluido = str(item)
                         
-                        if tipo == 'conferente' and item.is_superuser:
-                            messages.error(request, "❌ Não é possível excluir um Administrador.")
+                        # Validações de integridade referencial
+                        if tipo == 'endereco' and hasattr(item, 'estoque_set') and item.estoque_set.exists():
+                            messages.error(request, f"❌ Endereço '{nome_excluido}' está sendo usado em lotes de estoque!")
+                        elif tipo == 'armazem' and hasattr(item, 'enderecos') and item.enderecos.exists():
+                            messages.error(request, f"❌ Armazém '{nome_excluido}' possui endereços vinculados!")
+                        elif tipo == 'cultivar' and Produto.objects.filter(cultivar=item).exists():
+                            messages.error(request, f"❌ Cultivar '{nome_excluido}' está sendo usado em produtos!")
+                        elif tipo == 'especie' and Produto.objects.filter(especie=item).exists():
+                            messages.error(request, f"❌ Espécie '{nome_excluido}' está sendo usada em produtos!")
+                        elif tipo == 'peneira' and Produto.objects.filter(peneira=item).exists():
+                            messages.error(request, f"❌ Peneira '{nome_excluido}' está sendo usada em produtos!")
+                        elif tipo == 'categoria' and Produto.objects.filter(categoria=item).exists():
+                            messages.error(request, f"❌ Categoria '{nome_excluido}' está sendo usada em produtos!")
+                        elif tipo == 'tratamento' and Produto.objects.filter(tratamento=item).exists():
+                            messages.error(request, f"❌ Tratamento '{nome_excluido}' está sendo usado em produtos!")
                         else:
-                            # Verifica se o endereço está sendo usado
-                            if tipo == 'endereco' and Estoque.objects.filter(endereco=item.codigo).exists():
-                                messages.error(request, f"❌ Endereço '{nome_excluido}' está sendo usado em lotes de estoque.")
-                            elif tipo == 'armazem' and Endereco.objects.filter(armazem=item).exists():
-                                messages.error(request, f"❌ Armazém '{nome_excluido}' possui endereços vinculados.")
-                            else:
-                                item.delete()
-                                messages.success(request, f"✅ Registro '{nome_excluido}' removido!")
-                                
-                    except model_map[tipo].DoesNotExist:
-                        messages.error(request, "❌ Registro não encontrado.")
+                            item.delete()
+                            messages.success(request, f"✅ {nome_tipo} '{nome_excluido}' removido com sucesso!")
+                            
+                    except model.DoesNotExist:
+                        messages.error(request, f"❌ {nome_tipo} não encontrado!")
                     except Exception as e:
-                        messages.error(request, f"❌ Erro ao remover: {str(e)}")
+                        messages.error(request, f"❌ Erro ao remover {nome_tipo.lower()}: {str(e)}")
                 else:
                     messages.error(request, "❌ Tipo de item inválido!")
         
-        return redirect('sapp:configuracoes')
+        # Redireciona para a mesma aba
+        return redirect(f"{reverse('sapp:configuracoes')}#{active_tab}")
     
     # =============================
-    # CONTEXT
-    # =============================
-    
-    context = {
-        'form_config': ConfiguracaoForm(instance=config),
-        
-        'cultivares': cultivares,
-        'especies': especies,
-        'peneiras': peneiras,
-        'categorias': categorias,
-        'tratamentos': tratamentos,
-        
-        'usuarios_conferentes': usuarios_conferentes,
-        
-        'form_conf_user': NovoConferenteUserForm(),
-        
-        'produtos': produtos,
-        
-        'armazens': armazens_lista,  # De volta!
-        'enderecos': enderecos_lista,
-        'origens': origens_lista,
-    }
-    
-    return render(request, 'sapp/configuracoes.html', context)
-    
-    # =============================
-    # CONTEXT (ATUALIZADO - sem ruas/linhas)
+    # CONTEXT PARA RENDERIZAÇÃO
     # =============================
     
     context = {
@@ -2167,7 +2377,7 @@ def configuracoes(request):
         'produtos': produtos,
         
         'armazens': armazens_lista,
-        'enderecos': enderecos_lista,  # Lista de endereços unificada
+        'enderecos': enderecos_lista,
         'origens': origens_lista,
     }
     
@@ -2176,6 +2386,38 @@ def configuracoes(request):
 
 
 @login_required
+@permission_required('sapp.pode_gerenciar_usuarios', raise_exception=True)
+def api_user_permissions(request, user_id):
+    """
+    API para buscar as permissões atuais de um usuário
+    """
+    if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+        return JsonResponse({'success': False, 'error': 'Permissão negada'}, status=403)
+    
+    try:
+        user = User.objects.get(id=user_id)
+        
+        # 🔥 Retornar o nome completo da permissão (com app)
+        permissions = []
+        for perm in user.user_permissions.all():
+            permissions.append(perm.codename)
+        
+        return JsonResponse({
+            'success': True,
+            'permissions': permissions,
+            'username': user.username,
+            'first_name': user.first_name,
+            'is_superuser': user.is_superuser,
+            'groups': []
+        })
+        
+    except User.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Usuário não encontrado'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def historico_geral(request):
     """Histórico completo para DataTables"""
     historico_completo = HistoricoMovimentacao.objects.all().select_related(
@@ -2235,6 +2477,7 @@ def historico_geral(request):
 
 
 @login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def mudar_senha(request):
     if request.method == 'POST':
         form = MudarSenhaForm(request.POST)
@@ -2371,6 +2614,7 @@ def exportar_pdf(request):
 
 ################ DEBUG #####################
 @login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def debug_estoque_completo(request):
     """Debug COMPLETO do estoque atual"""
     estoque = Estoque.objects.all().select_related('peneira', 'cultivar', 'tratamento', 'categoria')
@@ -2391,6 +2635,7 @@ def debug_estoque_completo(request):
     return JsonResponse({'success': True, 'message': 'Check console for debug info'})
 
 @login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def debug_estoque_status(request):
     """Debug para ver status do estoque"""
     total_lotes = Estoque.objects.count()
@@ -2416,6 +2661,7 @@ def debug_estoque_status(request):
     })
 ################     API    ############################
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_saldo_lote(request, id):
     """API para obter saldo de um lote específico"""
     try:
@@ -2439,6 +2685,7 @@ def api_saldo_lote(request, id):
         }, status=500)
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_buscar_lotes(request):
 
     query = request.GET.get('q', '')
@@ -2485,6 +2732,7 @@ def api_buscar_lotes(request):
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_buscar_lote_completo(request):
     """API para buscar todos os dados de um lote existente"""
     lote = request.GET.get('lote', '')
@@ -2515,6 +2763,7 @@ def api_buscar_lote_completo(request):
     return JsonResponse({'encontrado': False})
 
 @login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def api_verificar_lote(request):
     """API para verificar se um lote existe"""
     lote = request.GET.get('lote', '')
@@ -2527,6 +2776,7 @@ def api_verificar_lote(request):
     return JsonResponse({'existe': existe, 'lote': lote})
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_estoque_resumo(request):
     """API para resumo do estoque (usado no dashboard)"""
     total_lotes = Estoque.objects.count()
@@ -2554,6 +2804,7 @@ def api_estoque_resumo(request):
     })
 
 @login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def api_ultimas_movimentacoes(request):
     """API para últimas movimentações"""
     movimentacoes = HistoricoMovimentacao.objects.select_related(
@@ -2577,6 +2828,7 @@ def api_ultimas_movimentacoes(request):
     })
     
 @login_required
+@permission_required('sapp.pode_ver_empenhos', raise_exception=True)
 def pagina_rascunho(request):
     user = request.user
     MARCA_ORIGEM = "[REP]"
@@ -2831,6 +3083,7 @@ def pagina_rascunho(request):
     })
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)  # CORRIGIDO
 def api_buscar_dados_lote(request):
     item_id = request.GET.get('item_id')
     
@@ -2864,7 +3117,17 @@ def api_buscar_dados_lote(request):
     except Exception as e:
         return JsonResponse({'encontrado': False, 'erro': str(e)}, status=500)
 
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@        ESTA COM DECORADOR         @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @login_required
+@permission_required('sapp.pode_ver_empenhos', raise_exception=True)
 def api_itens_empenhos(request):
     """API para buscar itens dos empenhos selecionados"""
     empenhos_ids = request.GET.get('empenhos_ids', '')
@@ -2892,12 +3155,13 @@ def api_itens_empenhos(request):
         'itens': itens_data,
         'total': len(itens_data)
     })
-    
+
+
+
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def api_autocomplete_nova_entrada(request):
-    """
-    Busca lotes pelo termo digitado e retorna TODOS os dados para preenchimento.
-    """
+    
     # No views.py, dentro de nova_entrada ou editar:
 
     endereco_raw = request.POST.get('endereco', '').strip().upper() # R-A LN01 P01
@@ -2974,6 +3238,9 @@ def api_autocomplete_nova_entrada(request):
             
     return JsonResponse(resultados, safe=False)
 
+    
+
+
 @staff_member_required
 def api_status_enderecos(request):
     enderecos = MapeamentoEndereco.objects.filter(ativo=True)
@@ -2997,6 +3264,9 @@ def api_status_enderecos(request):
 # APIs PARA O CANVAS (ADMIN APENAS)
 # ============================================================================
 
+
+@login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def verificar_estoque_endereco(request, endereco):
     """API para verificar se existe estoque em um endereço"""
     if request.method == 'GET':
@@ -3032,8 +3302,10 @@ def verificar_estoque_endereco(request, endereco):
     
     return JsonResponse({'success': False, 'error': 'Método não permitido'})
 
+
+
 def exportar_mapa_json(request, armazem_numero):
-    """Exporta o layout do mapa como JSON"""
+   
     if not request.user.is_staff:
         return JsonResponse({'error': 'Acesso negado'}, status=403)
     
@@ -3077,10 +3349,11 @@ def exportar_mapa_json(request, armazem_numero):
     
     return JsonResponse(dados, json_dumps_params={'indent': 2})
 
+
 @staff_member_required
 @csrf_exempt
 def importar_mapa_json(request, armazem_numero):
-    """Importa layout do mapa a partir de JSON"""
+   
     if request.method == 'POST':
         try:
             armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero)
@@ -3130,8 +3403,10 @@ def importar_mapa_json(request, armazem_numero):
 # VIEW DE FALLBACK (para compatibilidade)
 # ============================================================================
 
+@login_required
+@permission_required('sapp.pode_ver_mapa', raise_exception=True)  # 🔥 ADICIONAR
 def lista_armazens(request):
-    """Lista todos os armazéns disponíveis"""
+  
     armazens = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
     
     context = {
@@ -3162,7 +3437,7 @@ def criar_armazem(request):
 
 @staff_member_required
 def editar_config_armazem(request, armazem_id):
-    """Edita as configurações (tamanho/nome) de um AZ existente"""
+  
     if request.method == 'POST':
         armazem = get_object_or_404(ArmazemLayout, id=armazem_id)
         armazem.numero = request.POST.get('numero')
@@ -3180,6 +3455,7 @@ def editar_config_armazem(request, armazem_id):
 # ============================================================================
 
 @login_required
+@permission_required('sapp.pode_ver_mapa', raise_exception=True)
 def mapa_ocupacao_canvas(request, armazem_numero=1):
     # 1. Busca Armazém e Elementos
     armazem = get_object_or_404(ArmazemLayout, numero=armazem_numero, ativo=True)
@@ -3302,7 +3578,7 @@ def salvar_todos_elementos(request):
 # ============================================================================
 # FUNÇÕES AUXILIARES
 # ============================================================================
-
+"""
 def lista_armazens(request):
     armazens = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
     
@@ -3312,7 +3588,7 @@ def lista_armazens(request):
         'titulo_pagina': 'Mapas dos Armazéns'
     }
     return render(request, 'sapp/lista_armazens.html', context)
-
+"""
 @staff_member_required
 @csrf_exempt
 def criar_armazens_automaticos(request):
@@ -3363,7 +3639,8 @@ def editor_avancado(request, armazem_numero=1):
     return render(request, 'sapp/editor_avancado.html', context)
 
 
-@csrf_exempt  # Se precisar de POST, mas GET não precisa normalmente
+@login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)  # CORRIGIDO
 def api_buscar_produto(request):
 
     try:
@@ -3452,6 +3729,7 @@ def api_buscar_produto(request):
 
 
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def api_atualizar_status_sistemico(request):
     """API para atualizar o status sistêmico de um lote (qualquer usuário)"""
     if request.method == 'POST':
@@ -3518,8 +3796,12 @@ def is_admin(user):
     return user.is_superuser or user.groups.filter(name='Administradores').exists()
 
 @login_required
-def dashboard_view(request):
+def dashboard(request):
     """Dashboard principal com gráficos dinâmicos"""
+    
+    if not request.user.is_superuser and not request.user.has_perm('sapp.pode_ver_dashboard') and not request.user.has_perm('sapp.pode_ver_estoque'):
+        # Redireciona para a primeira página que o usuário tem permissão
+        return redirect('sapp:redirecionar')
     
     # ==================== CONFIGURAÇÃO DO DASHBOARD ====================
     try:
@@ -3804,6 +4086,7 @@ from .models import Estoque, Produto, ConfiguracaoLogo
 import re
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def ficha_rastreabilidade(request):
     """
     View para exibir a ficha de rastreabilidade
@@ -4111,11 +4394,6 @@ def processar_item_ficha(request, item):
     return render(request, 'sapp/ficha_rastreabilidade.html', context)
 
 
-def extrair_safra(lote):
-    """Mantida para compatibilidade, mas não usada"""
-    return "2025/2026"
-
-
 
 
 def extrair_safra(lote):
@@ -4159,39 +4437,9 @@ def extrair_safra(lote):
     
     return '______________'
 
-def get_safra_from_lote(lote):
-    """
-    Função auxiliar para extrair safra do número do lote
-    Adapte conforme o formato dos seus lotes
-    """
-    if not lote:
-        return '______________'
-    
-    # Tenta encontrar padrões comuns de safra (ex: 22/23, 2022, SAFRA22)
-    import re
-    
-    # Padrão: XX/XX (ex: 22/23)
-    safra_pattern = r'(\d{2}[/-]\d{2})'
-    match = re.search(safra_pattern, lote)
-    if match:
-        return match.group(1)
-    
-    # Padrão: 20XX (ex: 2022)
-    ano_pattern = r'(20\d{2})'
-    match = re.search(ano_pattern, lote)
-    if match:
-        return match.group(1)
-    
-    # Padrão: SAFRAXX
-    safra_text_pattern = r'(SAFRA\d{2})'
-    match = re.search(safra_text_pattern, lote, re.IGNORECASE)
-    if match:
-        return match.group(1)
-    
-    return '______________'
 
-# View alternativa que busca por ID (caso queira usar ID em vez de lote)
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def ficha_rastreabilidade_por_id(request, estoque_id):
     """
     View para exibir ficha de rastreabilidade por ID do estoque
@@ -4202,7 +4450,7 @@ def ficha_rastreabilidade_por_id(request, estoque_id):
         
         item_data = {
             'lote': item.lote,
-            'safra': get_safra_from_lote(item.lote),
+            'safra': extrair_safra(item.lote),
             'produto': str(item.cultivar) if item.cultivar else item.produto,
             'az': item.az or item.endereco[:2] if item.endereco else '',
             'empresa': item.empresa or 'GRUPO CONCEITO',
@@ -4252,6 +4500,7 @@ def ficha_rastreabilidade_por_id(request, estoque_id):
 
 # View para múltiplos lotes (caso queira uma ficha com vários itens)
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)  # CORRIGIDO
 def ficha_rastreabilidade_multipla(request):
     """
     View para exibir fichas de múltiplos lotes
@@ -4267,7 +4516,7 @@ def ficha_rastreabilidade_multipla(request):
             if item:
                 itens.append({
                     'lote': item.lote,
-                    'safra': get_safra_from_lote(item.lote),
+                    'safra': extrair_safra(item.lote),
                     'produto': str(item.cultivar) if item.cultivar else item.produto,
                     'az': item.az or item.endereco[:2] if item.endereco else '',
                     'empresa': item.empresa or 'GRUPO CONCEITO',
@@ -4333,6 +4582,7 @@ def get_posicoes_linha(rua, ln):
     return sorted(posicoes, key=lambda x: x['posicao'])
 
 @login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def marcar_ultimo_lote_linha(request, estoque_id):
     """
     Marca/desmarca um lote como último da linha
@@ -4396,6 +4646,7 @@ def marcar_ultimo_lote_linha(request, estoque_id):
         return JsonResponse({'success': False, 'error': str(e)})
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def get_marcacoes_linha(request, rua, ln):
     """
     Retorna as posições afetadas pela marcação
@@ -4445,6 +4696,7 @@ def get_marcacoes_linha(request, rua, ln):
 
 
 @login_required
+@permission_required('sapp.pode_ver_mapa', raise_exception=True)
 def api_mapa_dados(request, armazem_numero):
     """API para retornar dados do mapa em formato JSON"""
     try:
@@ -4497,6 +4749,7 @@ def api_mapa_dados(request, armazem_numero):
         return JsonResponse({'success': False, 'error': str(e)})
 
 @login_required
+@permission_required('sapp.pode_ver_mapa', raise_exception=True) 
 def api_marcacoes_ultimo_lote(request):
     """
     Retorna todas as posições que devem receber marcação de X
@@ -4554,6 +4807,7 @@ def api_marcacoes_ultimo_lote(request):
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_get_armazem_by_rua(request):
     """
     Obtém o armazém a partir de um endereço
@@ -4652,6 +4906,7 @@ def extrair_info_endereco(endereco_str):
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)  # Mude
 def validar_endereco(request):
     """
     Valida endereço - busca nos endereços cadastrados e sugere cadastro se não existir
@@ -4709,6 +4964,7 @@ def validar_endereco(request):
     
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def buscar_origens(request):
     """
     Busca origens/destinos para autocomplete (mantida igual)
@@ -4724,6 +4980,7 @@ def buscar_origens(request):
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True) 
 def api_buscar_enderecos(request):
     """
     Busca ENDEREÇOS para autocomplete (NOVA)
@@ -4751,6 +5008,7 @@ def api_buscar_enderecos(request):
 
 
 @login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)  # Mude
 def api_listar_enderecos(request):
     """
     Lista TODOS os endereços para o frontend (NOVA)
@@ -4767,3 +5025,69 @@ def api_listar_enderecos(request):
         })
     
     return JsonResponse(dados, safe=False)
+
+
+
+
+# sapp/views.py - Adicione ou substitua esta função
+
+@login_required
+def redirecionar_usuario(request):
+    """
+    Redireciona o usuário para a primeira página que ele tem permissão
+    """
+    user = request.user
+    
+    print(f"\n🔍 REDIRECIONANDO USUÁRIO: {user.username}")
+    print(f"Superusuário: {user.is_superuser}")
+    
+    # Mostrar todas as permissões para debug
+    all_perms = list(user.get_all_permissions())
+    print(f"Permissões totais: {all_perms}")
+    
+    # Superusuário vai para dashboard
+    if user.is_superuser:
+        print("✅ Superusuário -> Dashboard")
+        return redirect('sapp:dashboard')
+    
+    # 🔥 PRIORIDADE 1: ALMOXARIFADO (APENAS VISUALIZAÇÃO)
+    if user.has_perm('almoxarifado.pode_ver_almoxarifado'):
+        print("✅ Usuário tem permissão de almoxarifado -> Redirecionando para Almoxarifado")
+        return redirect('almoxarifado:lista_itens')
+    
+    # 🔥 PRIORIDADE 2: ALMOXARIFADO (GERENCIAR)
+    if user.has_perm('almoxarifado.pode_gerenciar_almoxarifado'):
+        print("✅ Usuário tem permissão de gerenciar almoxarifado -> Redirecionando para Almoxarifado")
+        return redirect('almoxarifado:lista_itens')
+    
+    # 🔥 PRIORIDADE 3: EMPENHO
+    if user.has_perm('sapp.pode_ver_empenhos') or user.has_perm('sapp.pode_criar_empenhos'):
+        print("✅ Usuário tem permissão de empenho -> Redirecionando para Empenho")
+        return redirect('sapp:pagina_rascunho')
+    
+    # 🔥 PRIORIDADE 4: ESTOQUE (visualização)
+    if user.has_perm('sapp.pode_ver_estoque'):
+        print("✅ Usuário tem permissão de estoque -> Redirecionando para Estoque")
+        return redirect('sapp:lista_estoque')
+    
+    # 🔥 PRIORIDADE 5: MOVIMENTAR ESTOQUE
+    if user.has_perm('sapp.pode_movimentar_estoque'):
+        print("✅ Usuário tem permissão de movimentar -> Redirecionando para Gestão")
+        return redirect('sapp:gestao_estoque')
+    
+    # 🔥 PRIORIDADE 6: MAPA
+    if user.has_perm('sapp.pode_ver_mapa'):
+        print("✅ Usuário tem permissão de mapa -> Redirecionando para Mapa")
+        return redirect('sapp:mapa_canvas', armazem_numero=1)
+    
+    # 🔥 PRIORIDADE 7: DASHBOARD (apenas se tiver permissão específica)
+    if user.has_perm('sapp.pode_ver_dashboard'):
+        print("✅ Usuário tem permissão de dashboard -> Redirecionando para Dashboard")
+        return redirect('sapp:dashboard')
+    
+    # Se não tiver nenhuma permissão, fazer logout com mensagem
+    print("❌ Usuário sem nenhuma permissão! Fazendo logout...")
+    from django.contrib.auth import logout
+    messages.error(request, "❌ Você não tem permissão para acessar nenhuma página do sistema!")
+    logout(request)
+    return redirect('sapp:login')

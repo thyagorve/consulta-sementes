@@ -105,7 +105,10 @@ class Item(models.Model):
             models.Index(fields=['lote']),
             models.Index(fields=['ca']),
         ]
-
+        permissions = [
+            ("pode_ver_almoxarifado", "Pode visualizar itens do almoxarifado"),
+            ("pode_gerenciar_almoxarifado", "Pode gerenciar almoxarifado (CRUD)"),
+        ]
     def __str__(self):
         return f"{self.codigo or 'S/N'} - {self.nome}"
     

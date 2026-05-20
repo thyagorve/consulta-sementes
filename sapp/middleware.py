@@ -89,3 +89,57 @@ class ForcePasswordChangeMiddleware:
 
         response = self.get_response(request)
         return response
+    
+
+# sapp/middleware.py
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.contrib import messages
+
+class PermissionMiddleware:
+    """
+    Middleware para verificar permissões de acesso às páginas
+    """
+    
+    # Mapeamento de URLs para permissões necessárias
+    URL_PERMISSIONS = {
+        # Estoque
+        '/estoque/lista/': 'sapp.pode_ver_estoque',
+        '/estoque/movimentar/': 'sapp.pode_movimentar_estoque',
+        
+        # Almoxarifado
+        '/almoxarifado/lista/': 'sapp.pode_ver_almoxarifado',
+        '/almoxarifado/criar/': 'sapp.pode_gerenciar_almoxarifado',
+        '/almoxarifado/editar/': 'sapp.pode_gerenciar_almoxarifado',
+        '/almoxarifado/excluir/': 'sapp.pode_gerenciar_almoxarifado',
+        
+        # Empenho
+        '/empenho/': 'sapp.pode_ver_empenhos',
+        '/empenho/criar/': 'sapp.pode_criar_empenhos',
+        
+        # Mapa
+        '/mapa/': 'sapp.pode_ver_mapa',
+        
+        # Configurações
+        '/configuracoes/': 'sapp.pode_configuracoes',
+    }
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        # Verifica se o usuário está autenticado
+        if request.user.is_authenticated and not request.user.is_superuser:
+            path = request.path
+            
+            # Verifica cada URL pattern
+            for url_path, permission_needed in self.URL_PERMISSIONS.items():
+                if url_path in path:
+                    # Se não tiver a permissão, redireciona para dashboard
+                    if not request.user.has_perm(permission_needed):
+                        messages.error(request, f"❌ Você não tem permissão para acessar esta página!")
+                        return redirect(reverse('sapp:dashboard'))
+                    break
+        
+        response = self.get_response(request)
+        return response

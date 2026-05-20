@@ -41,6 +41,21 @@ INSTALLED_APPS = [
     'almoxarifado',
 ]
 
+
+# settings.py - Adicionar no final
+
+# Definição de permissões disponíveis no sistema
+PERMISSIONS_CONFIG = {
+    'pode_ver_estoque': 'Pode visualizar estoque',
+    'pode_movimentar_estoque': 'Pode movimentar estoque',
+    'pode_ver_almoxarifado': 'Pode visualizar almoxarifado',
+    'pode_gerenciar_almoxarifado': 'Pode gerenciar almoxarifado',
+    'pode_ver_empenhos': 'Pode visualizar empenhos',
+    'pode_criar_empenhos': 'Pode criar empenhos',
+    'pode_ver_mapa': 'Pode acessar mapa canvas',
+    'pode_gerenciar_usuarios': 'Pode gerenciar usuários',
+    'pode_configuracoes': 'Pode alterar configurações',
+}
 # ========== MIDDLEWARE ==========
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -56,6 +71,7 @@ MIDDLEWARE = [
     'sapp.middleware.AutoLogoutMiddleware',
     'sapp.middleware.Smart404FallbackMiddleware',
     'sapp.middleware.ForcePasswordChangeMiddleware',
+    'sapp.middleware.PermissionMiddleware',
 ]
 
 # ========== AUTO LOGOUT ==========

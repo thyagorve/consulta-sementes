@@ -10,8 +10,10 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='sapp/registration/login.html', redirect_authenticated_user=True), name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('mudar-senha/', views.mudar_senha, name='mudar_senha'),
-    path('', views.dashboard, name='dashboard'),  # Mantém o dashboard original
-    path('dashboard/', views.dashboard_view, name='dashboard_novo'),  # Renomeado para não conflitar
+    path('', views.redirecionar_usuario, name='redirecionar'),
+    path('dashboard/', views.dashboard, name='dashboard'),
+    path('dashboard-data/', views.dashboard_data, name='dashboard_data'),   
+    
     path('estoque/', views.lista_estoque, name='lista_estoque'),
     path('estoque/gestao/', views.gestao_estoque, name='gestao_estoque'),
     path('mapa-armazem/', views.lista_armazens, name='lista_armazens'),
@@ -70,7 +72,8 @@ urlpatterns = [
     path('api/buscar-enderecos/', views.api_buscar_enderecos, name='api_buscar_enderecos'),  # NOVA
     path('api/listar-enderecos/', views.api_listar_enderecos, name='api_listar_enderecos'),  # NOVA
     path('dashboard-data/', views.dashboard_data, name='dashboard_data'),
-
+    path('configuracoes/', views.configuracoes, name='configuracoes'),
+    path('api/user-permissions/<int:user_id>/', views.api_user_permissions, name='api_user_permissions'),
 
 ]
 

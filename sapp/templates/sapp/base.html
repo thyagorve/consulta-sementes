@@ -183,6 +183,13 @@
       border-radius: 0 3px 3px 0;
     }
 
+    /* Menu item desabilitado */
+    .nav-link.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
     /* --- BOTÃO LOGOUT --- */
     .btn-logout {
       background: transparent;
@@ -308,7 +315,6 @@
         font-size: 1.2rem;
       }
 
-      /* Menu colapsado - comportamento padrão Bootstrap 5 */
       .navbar-collapse {
         background: rgba(26, 32, 44, 0.99);
         backdrop-filter: blur(20px);
@@ -326,13 +332,11 @@
         z-index: 1029;
       }
 
-      /* Estado collapsing - transição suave */
       .navbar-collapse.collapsing {
         overflow: hidden;
         transition: height 0.35s ease;
       }
 
-      /* Estado aberto */
       .navbar-collapse.show {
         display: block;
       }
@@ -408,88 +412,104 @@
     <div class="container-fluid px-lg-4">
       
       <!-- Brand -->
-      <a class="navbar-brand" href="{% url 'sapp:dashboard' %}" aria-label="Sementes App - Ir para Dashboard">
-        <svg class="brand-icon" width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <circle cx="32" cy="32" r="30" fill="#2f8f4e"/>
-          <path d="M32 14C32 14 42 24 42 34C42 44 32 54 32 54C32 54 22 44 22 34C22 24 32 14 32 14Z" fill="white" opacity="0.95"/>
-          <circle cx="32" cy="34" r="4" fill="#2f8f4e"/>
-        </svg>
-        <span>Sementes App</span>
+      <!-- Brand - Agora usando o redirecionador -->
+      <a class="navbar-brand" href="{% url 'sapp:redirecionar' %}" aria-label="Sementes App - Ir para página inicial">
+          <svg class="brand-icon" width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              ...
+          </svg>
+          <span>Sementes App</span>
       </a>
-
       <!-- Toggler Mobile -->
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" 
               aria-controls="mainNav" aria-expanded="false" aria-label="Abrir menu de navegação">
         <i class="fas fa-bars text-white fs-5"></i>
       </button>
 
-      <!-- Menu de Navegação -->
+      <!-- Menu de Navegação com Controle de Permissões COMPLETO -->
       <div class="collapse navbar-collapse" id="mainNav">
         <ul class="navbar-nav ms-auto align-items-lg-center py-2 py-lg-0">
           
           {% if user.is_authenticated %}
           
-            <li class="nav-item">
-              <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
-                 href="{% url 'sapp:dashboard' %}">
+        <!-- Dashboard - Agora com permissão específica OU ver estoque -->
+        {% if user.is_superuser or perms.sapp.pode_ver_dashboard or perms.sapp.pode_ver_estoque %}
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+              href="{% url 'sapp:dashboard' %}">
                 <i class="fa-solid fa-chart-pie" aria-hidden="true"></i> Dashboard
-              </a>
-            </li>
+            </a>
+        </li>
+        {% endif %}
             
+            <!-- Estoque - Verifica permissão -->
+            {% if user.is_superuser or perms.sapp.pode_ver_estoque %}
             <li class="nav-item">
               <a class="nav-link {% if request.resolver_match.url_name == 'lista_estoque' %}active{% endif %}" 
                  href="{% url 'sapp:lista_estoque' %}">
                 <i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i> Estoque
               </a>
             </li>
+            {% endif %}
 
+            <!-- Movimentar Estoque - Verifica permissão específica -->
+            {% if user.is_superuser or perms.sapp.pode_movimentar_estoque %}
             <li class="nav-item">
               <a class="nav-link {% if request.resolver_match.url_name == 'gestao_estoque' %}active{% endif %}" 
                  href="{% url 'sapp:gestao_estoque' %}">
                 <i class="fa-solid fa-dolly" aria-hidden="true"></i> Movimentar
               </a>
             </li>
+            {% endif %}
 
-
-
-            <li class="nav-item">
+          <!-- Almoxarifado - Permissão do app almoxarifado -->
+          {% if user.is_superuser or perms.almoxarifado.pode_ver_almoxarifado %}
+          <li class="nav-item">
               <a class="nav-link almoxarifado-link {% if 'almoxarifado' in request.path %}active{% endif %}" 
                 href="{% url 'almoxarifado:lista_itens' %}">
-                <i class="fa-solid fa-warehouse" aria-hidden="true"></i> Almoxarifado
+                  <i class="fa-solid fa-warehouse" aria-hidden="true"></i> Almoxarifado
               </a>
-            </li>
+          </li>
+          {% endif %}
 
-
-
-
-            
+            <!-- Empenho - Verifica permissão -->
+            {% if user.is_superuser or perms.sapp.pode_ver_empenhos %}
             <li class="nav-item">
               <a class="nav-link {% if request.resolver_match.url_name == 'pagina_rascunho' %}active{% endif %}" 
                  href="{% url 'sapp:pagina_rascunho' %}">
                 <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> Empenho
               </a>
             </li>
+            {% endif %}
 
+            <!-- Mapa - Verifica permissão -->
+            {% if user.is_superuser or perms.sapp.pode_ver_mapa %}
             <li class="nav-item">
               <a class="nav-link {% if 'mapa_canvas' in request.resolver_match.url_name %}active{% endif %}" 
                  href="{% url 'sapp:mapa_canvas' 1 %}">
                 <i class="fas fa-map-marked-alt" aria-hidden="true"></i> Mapa
               </a>
             </li>
+            {% endif %}
 
+            <!-- Histórico - Requer permissão de ver estoque -->
+            {% if user.is_superuser or perms.sapp.pode_ver_estoque %}
             <li class="nav-item">
               <a class="nav-link {% if request.resolver_match.url_name == 'historico_geral' %}active{% endif %}" 
                  href="{% url 'sapp:historico_geral' %}">
                 <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Histórico
               </a>
             </li>
+            {% endif %}
 
+            <!-- Configurações - Apenas quem tem permissão específica -->
+            {% if user.is_superuser or perms.sapp.pode_configuracoes %}
             <li class="nav-item">
               <a class="nav-link {% if request.resolver_match.url_name == 'configuracoes' %}active{% endif %}" 
                  href="{% url 'sapp:configuracoes' %}">
                 <i class="fa-solid fa-gear" aria-hidden="true"></i> Config
               </a>
             </li>
+            {% endif %}
 
             <li class="nav-item d-lg-none"><hr class="my-2 border-secondary opacity-25"></li>
 
@@ -567,21 +587,20 @@
   <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
   <script src="https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap5.min.js"></script>
 
-  <!-- SCRIPTS GLOBAIS - 100% FUNCIONAL -->
+  <!-- SCRIPTS GLOBAIS -->
   <script>
     (function() {
       'use strict';
       
       document.addEventListener('DOMContentLoaded', function() {
         
-        // ===== MENU MOBILE - CORRIGIDO DEFINITIVAMENTE =====
+        // ===== MENU MOBILE =====
         var navCollapse = document.getElementById('mainNav');
         var navbarToggler = document.querySelector('.navbar-toggler');
         var isMenuOpen = false;
         
         if (navCollapse && navbarToggler) {
           
-          // Monitora estado do menu
           navCollapse.addEventListener('show.bs.collapse', function() {
             isMenuOpen = true;
           });
@@ -598,17 +617,14 @@
             isMenuOpen = false;
           });
           
-          // CRÍTICO: Impede que clique no toggler propague para document
           navbarToggler.addEventListener('click', function(event) {
             event.stopPropagation();
           });
           
-          // Fecha menu ao clicar em links DENTRO do menu
           navCollapse.addEventListener('click', function(event) {
             var clickedLink = event.target.closest('.nav-link');
             
             if (clickedLink && window.innerWidth < 992 && isMenuOpen) {
-              // Delay para feedback visual do clique
               setTimeout(function() {
                 var bsCollapse = bootstrap.Collapse.getInstance(navCollapse);
                 if (bsCollapse && navCollapse.classList.contains('show')) {
@@ -618,7 +634,6 @@
             }
           });
           
-          // Fecha menu ao clicar FORA (exceto no toggler)
           document.addEventListener('click', function(event) {
             if (window.innerWidth < 992 && isMenuOpen) {
               var clickedOnNav = navCollapse.contains(event.target);
@@ -633,7 +648,6 @@
             }
           });
           
-          // Fecha menu ao redimensionar para desktop
           window.addEventListener('resize', function() {
             if (window.innerWidth >= 992 && navCollapse.classList.contains('show')) {
               var bsCollapse = bootstrap.Collapse.getInstance(navCollapse);

@@ -13,6 +13,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from .models import Item, Saida, CarrinhoSolicitacao, Departamento, UnidadeMedida
+from django.contrib.auth.decorators import login_required, permission_required
 
 
 def parse_decimal(value, default=None):
@@ -30,9 +31,11 @@ def parse_decimal(value, default=None):
     except (InvalidOperation, ValueError):
         return default
 
-
-@ensure_csrf_cookie
+@login_required
+@permission_required('almoxarifado.pode_ver_almoxarifado', raise_exception=True)
 def lista_itens(request):
+    print(f"🔍 Usuário {request.user.username} acessando almoxarifado")
+    print(f"   Permissões: {list(request.user.get_all_permissions())}")
     mostrar_todos = request.GET.get('todos', '0') == '1'
     
     itens = Item.objects.filter(ativo=True)
@@ -85,7 +88,8 @@ def lista_itens(request):
     }
     return render(request, 'almoxarifado/lista_itens.html', context)
 
-
+@login_required
+@permission_required('almoxarifado.pode_ver_almoxarifado', raise_exception=True)
 def saidas_list(request):
     saidas = Saida.objects.select_related('item').all().order_by('-data', '-hora')
     
@@ -214,7 +218,8 @@ def buscar_por_codigo(request):
         return JsonResponse({'encontrado': False, 'error': str(e)})
 
 
-@require_http_methods(["POST"])
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def adicionar_item(request):
     
     """Adiciona novo item - SÓ SOMA se código + lote + CA + localização forem iguais"""
@@ -334,7 +339,8 @@ def adicionar_item(request):
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
-@require_http_methods(["POST"])
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def editar_item(request, pk):
     """Edita um item existente"""
     try:
@@ -402,8 +408,8 @@ def detalhe_item(request, pk):
         } for s in ultimas_saidas]
     })
 
-
-@require_http_methods(["POST"])
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def dar_baixa(request, pk):
     try:
         item = get_object_or_404(Item, pk=pk)
@@ -453,6 +459,8 @@ def ver_carrinho(request):
 
 
 @require_http_methods(["POST"])
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def adicionar_ao_carrinho(request):
     try:
         usuario = request.session.get('usuario_carrinho', 'anonimo')
@@ -489,6 +497,8 @@ def remover_do_carrinho(request, pk):
 
 
 @require_http_methods(["POST"])
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def finalizar_carrinho(request):
     try:
         usuario = request.session.get('usuario_carrinho', 'anonimo')
@@ -994,6 +1004,8 @@ def exportar_saidas_excel(request):
 
 
 @require_http_methods(["POST"])
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def excluir_item(request, pk):
     try:
         item = get_object_or_404(Item, pk=pk)

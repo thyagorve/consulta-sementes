@@ -313,6 +313,8 @@ class ItemEmpenho(models.Model):
 # PRODUTO
 # ============================================================================
 
+# sapp/models.py - Classe Produto CORRIGIDA
+
 class Produto(models.Model):
     cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT, verbose_name="Cultivar")
     tipo = models.CharField(max_length=50, verbose_name="Tipo", blank=True, null=True)
@@ -331,6 +333,18 @@ class Produto(models.Model):
         verbose_name = "Produto"
         verbose_name_plural = "Produtos"
         ordering = ['cultivar__nome', 'codigo']
+        permissions = [
+            ("pode_ver_estoque", "Pode visualizar estoque"),
+            ("pode_movimentar_estoque", "Pode movimentar estoque"),
+            ("pode_ver_dashboard", "Pode acessar o dashboard"),
+            ("pode_ver_almoxarifado", "Pode visualizar almoxarifado"),
+            ("pode_gerenciar_almoxarifado", "Pode gerenciar almoxarifado"),
+            ("pode_ver_empenhos", "Pode visualizar empenhos"),
+            ("pode_criar_empenhos", "Pode criar empenhos"),
+            ("pode_ver_mapa", "Pode acessar mapa canvas"),
+            ("pode_gerenciar_usuarios", "Pode gerenciar usuários"),
+            ("pode_configuracoes", "Pode alterar configurações"),
+        ]
     
     def __str__(self):
         return f"{self.codigo} - {self.cultivar.nome}"
@@ -344,7 +358,6 @@ class Produto(models.Model):
         if self.categoria: info.append(f"Categoria: {self.categoria.nome}")
         if self.tratamento: info.append(f"Tratamento: {self.tratamento.nome}")
         return " | ".join(info)
-
 # ============================================================================
 # DASHBOARD
 # ============================================================================
@@ -553,3 +566,7 @@ class ConfiguracaoLogo(models.Model):
             primeira = cls.objects.filter(ativo=True).first()
             cls.objects.filter(ativo=True).exclude(pk=primeira.pk).update(ativo=False)
             return primeira
+        
+
+
+
