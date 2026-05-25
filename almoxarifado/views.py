@@ -1260,3 +1260,475 @@ def visualizar_xml_nfe(request):
         import traceback
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    
+
+
+
+
+
+
+# ============================================
+# VIEWS DE NOTIFICAÇÃO WHATSAPP
+# ============================================
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required, permission_required
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from .models import ConfiguracaoWhatsApp, HistoricoNotificacaoAlmoxarifado, Item
+from .services import get_notificacao_service
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
+def configurar_notificacoes(request):
+    """Configurações de notificações WhatsApp"""
+    
+    config = ConfiguracaoWhatsApp.get_config()
+    historico = HistoricoNotificacaoAlmoxarifado.objects.all()[:50]
+    
+    # Lista de instâncias disponíveis (mock - você pode buscar da API)
+    instancias = []
+    
+    if request.method == 'POST':
+        if 'salvar_templates' in request.POST:
+            # Salvar templates
+            config.template_estoque_baixo = request.POST.get('template_estoque_baixo', config.template_estoque_baixo)
+            config.template_estoque_zerado = request.POST.get('template_estoque_zerado', config.template_estoque_zerado)
+            config.template_reposicao = request.POST.get('template_reposicao', config.template_reposicao)
+            config.save()
+            messages.success(request, 'Templates salvos com sucesso!')
+        else:
+            # Salvar configurações gerais
+            config.api_url = request.POST.get('api_url', config.api_url)
+            config.api_key = request.POST.get('api_key', config.api_key)
+            config.instance_name = request.POST.get('instance_name', config.instance_name)
+            config.numeros_destino = request.POST.get('numeros_destino', config.numeros_destino)
+            config.notificar_estoque_baixo = request.POST.get('notificar_estoque_baixo') == 'on'
+            config.notificar_estoque_zerado = request.POST.get('notificar_estoque_zerado') == 'on'
+            config.notificar_reposicao = request.POST.get('notificar_reposicao') == 'on'
+            config.ativo = request.POST.get('ativo') == 'on'
+            config.save()
+            messages.success(request, 'Configurações salvas com sucesso!')
+        
+        return redirect('almoxarifado:configurar_notificacoes')
+    
+    context = {
+        'config': config,
+        'historico_recente': historico,
+        'instancias': instancias,
+    }
+    return render(request, 'almoxarifado/configurar_notificacoes.html', context)
+
+
+@login_required
+@require_http_methods(["POST"])
+@csrf_exempt
+def testar_notificacao(request):
+    """Testa o envio de notificação"""
+    try:
+        data = json.loads(request.body)
+        numero_teste = data.get('numero_teste')
+        
+        if not numero_teste:
+            return JsonResponse({'success': False, 'error': 'Número não informado'})
+        
+        service = get_notificacao_service()
+        success, response = service.testar_conexao(numero_teste)
+        
+        if success:
+            return JsonResponse({'success': True, 'message': 'Mensagem de teste enviada!'})
+        else:
+            return JsonResponse({'success': False, 'error': str(response)})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+def historico_notificacoes(request):
+    """Histórico de notificações"""
+    notificacoes = HistoricoNotificacaoAlmoxarifado.objects.all().select_related('item')[:100]
+    
+    return render(request, 'almoxarifado/historico_notificacoes.html', {
+        'notificacoes': notificacoes
+    })
+
+
+
+
+
+# ============================================
+# WHATSAPP API VIEWS
+# ============================================
+
+import json
+import requests
+import logging
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.contrib.auth.decorators import login_required
+
+logger = logging.getLogger(__name__)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def api_config_whatsapp(request):
+    from .models import ConfiguracaoWhatsApp
+    
+    if request.method == "GET":
+        config = ConfiguracaoWhatsApp.get_config()
+        return JsonResponse({
+            'success': True,
+            'config': {
+                'ativo': config.ativo,
+                'api_url': config.api_url,
+                'api_key': config.api_key,
+                'instance_name': config.instance_name,
+                'numeros_padrao': config.numeros_padrao or '',
+                'numeros_por_departamento': config.numeros_por_departamento or {},
+                'notificar_estoque_baixo': config.notificar_estoque_baixo,
+                'notificar_estoque_zerado': config.notificar_estoque_zerado,
+                'notificar_reposicao': config.notificar_reposicao,
+                'template_estoque_baixo': config.template_estoque_baixo,
+                'template_estoque_zerado': config.template_estoque_zerado,
+                'template_reposicao': config.template_reposicao,
+                'tipo_envio': getattr(config, 'tipo_envio', 'tempo-real'),
+                'horario_agendado': config.horario_agendado.strftime('%H:%M') if hasattr(config, 'horario_agendado') and config.horario_agendado else '08:00',
+                'dias_semana': getattr(config, 'dias_semana', [1, 2, 3, 4, 5]),
+                'notificar_baixo': getattr(config, 'notificar_baixo', True),
+                'notificar_zerado': getattr(config, 'notificar_zerado', True),
+                'notificar_reposicao': getattr(config, 'notificar_reposicao', True),
+                'repetir_notificacoes': getattr(config, 'repetir_notificacoes', False),
+                'intervalo_repeticao': getattr(config, 'intervalo_repeticao', 24),
+                'departamentos_ativos': getattr(config, 'departamentos_ativos', []),
+                'template_resumo': getattr(config, 'template_resumo', ''),
+            }
+        })
+    
+    elif request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            config = ConfiguracaoWhatsApp.get_config()
+            
+            # Campos básicos
+            config.ativo = data.get('ativo', config.ativo)
+            config.api_url = data.get('api_url', config.api_url)
+            config.api_key = data.get('api_key', config.api_key)
+            config.instance_name = data.get('instance_name', config.instance_name)
+            config.numeros_padrao = data.get('numeros_padrao', config.numeros_padrao)
+            config.numeros_por_departamento = data.get('numeros_por_departamento', {})
+            config.notificar_estoque_baixo = data.get('notificar_estoque_baixo', True)
+            config.notificar_estoque_zerado = data.get('notificar_estoque_zerado', True)
+            config.notificar_reposicao = data.get('notificar_reposicao', True)
+            config.template_estoque_baixo = data.get('template_estoque_baixo', config.template_estoque_baixo)
+            config.template_estoque_zerado = data.get('template_estoque_zerado', config.template_estoque_zerado)
+            config.template_reposicao = data.get('template_reposicao', config.template_reposicao)
+            
+            # NOVOS CAMPOS DE AGENDAMENTO
+            config.tipo_envio = data.get('tipo_envio', 'tempo-real')
+            
+            # Converter horário para time object se vier como string
+            horario_str = data.get('horario_agendado', '08:00')
+            if isinstance(horario_str, str):
+                from datetime import time
+                horas, minutos = map(int, horario_str.split(':'))
+                config.horario_agendado = time(horas, minutos)
+            else:
+                config.horario_agendado = horario_str
+            
+            config.dias_semana = data.get('dias_semana', [1, 2, 3, 4, 5])
+            config.notificar_baixo = data.get('notificar_baixo', True)
+            config.notificar_zerado = data.get('notificar_zerado', True)
+            config.notificar_reposicao = data.get('notificar_reposicao', True)
+            config.repetir_notificacoes = data.get('repetir_notificacoes', False)
+            config.intervalo_repeticao = data.get('intervalo_repeticao', 24)
+            config.departamentos_ativos = data.get('departamentos_ativos', [])
+            config.template_resumo = data.get('template_resumo', config.template_resumo)
+            
+            config.save()
+            
+            print(f"✅ Configuração salva: tipo_envio={config.tipo_envio}, horario={config.horario_agendado}")
+            
+            return JsonResponse({'success': True, 'message': 'Configurações salvas'})
+            
+        except Exception as e:
+            print(f"❌ Erro ao salvar: {e}")
+            return JsonResponse({'success': False, 'error': str(e)})
+        
+
+@login_required
+@require_http_methods(["POST"])
+def api_enviar_notificacao_agora(request):
+    """Envia notificação imediatamente (via botão)"""
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        
+        out = StringIO()
+        call_command('enviar_notificacoes_almoxarifado', '--now', stdout=out)
+        
+        return JsonResponse({'success': True, 'message': 'Notificações enviadas com sucesso!'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+    
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_listar_instancias(request):
+    """Lista todas as instâncias da Evolution API"""
+    try:
+        data = json.loads(request.body)
+        api_url = data.get('api_url')
+        api_key = data.get('api_key')
+        
+        if not api_url:
+            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
+        
+        # Garantir protocolo
+        if not api_url.startswith(('http://', 'https://')):
+            api_url = 'https://' + api_url
+        
+        headers = {'apikey': api_key} if api_key else {}
+        url = f"{api_url.rstrip('/')}/instance/fetchInstances"
+        
+        response = requests.get(url, headers=headers, timeout=10, verify=False)
+        
+        if response.status_code == 200:
+            instancias = response.json()
+            if not isinstance(instancias, list):
+                instancias = [instancias] if instancias else []
+            return JsonResponse({'success': True, 'instancias': instancias})
+        else:
+            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}: {response.text[:100]}'})
+            
+    except requests.exceptions.ConnectionError:
+        return JsonResponse({'success': False, 'error': 'Não foi possível conectar à Evolution API'})
+    except Exception as e:
+        logger.error(f"Erro ao listar instâncias: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_criar_instancia(request):
+    """Cria uma nova instância na Evolution API"""
+    try:
+        data = json.loads(request.body)
+        api_url = data.get('api_url')
+        api_key = data.get('api_key')
+        instance_name = data.get('instance_name')
+        
+        if not api_url:
+            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
+        
+        if not instance_name:
+            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
+        
+        if not api_url.startswith(('http://', 'https://')):
+            api_url = 'https://' + api_url
+        
+        headers = {'Content-Type': 'application/json'}
+        if api_key:
+            headers['apikey'] = api_key
+            
+        url = f"{api_url.rstrip('/')}/instance/create"
+        payload = {
+            "instanceName": instance_name,
+            "qrcode": True,
+            "integration": "WHATSAPP-BAILEYS"
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
+        
+        if response.status_code in [200, 201]:
+            return JsonResponse({'success': True, 'message': f'Instância "{instance_name}" criada'})
+        else:
+            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}: {response.text[:100]}'})
+            
+    except Exception as e:
+        logger.error(f"Erro ao criar instância: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_qrcode_instancia(request):
+    """Obtém QR Code ou Pairing Code para conectar a instância"""
+    try:
+        data = json.loads(request.body)
+        api_url = data.get('api_url')
+        api_key = data.get('api_key')
+        instance_name = data.get('instance_name')
+        
+        if not api_url:
+            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
+        
+        if not instance_name:
+            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
+        
+        if not api_url.startswith(('http://', 'https://')):
+            api_url = 'https://' + api_url
+        
+        headers = {'apikey': api_key} if api_key else {}
+        url = f"{api_url.rstrip('/')}/instance/connect/{instance_name}"
+        
+        response = requests.get(url, headers=headers, timeout=30, verify=False)
+        
+        if response.status_code == 200:
+            qrcode_data = response.json()
+            
+            # Tentar extrair pairing code
+            pairing_code = qrcode_data.get('pairingCode')
+            
+            # Tentar extrair QR Code base64
+            qrcode = None
+            if 'base64' in qrcode_data:
+                qrcode = qrcode_data['base64']
+            elif 'qrcode' in qrcode_data:
+                if isinstance(qrcode_data['qrcode'], dict):
+                    qrcode = qrcode_data['qrcode'].get('base64')
+                else:
+                    qrcode = qrcode_data['qrcode']
+            elif 'code' in qrcode_data:
+                # Se for apenas o code sem base64, é um pairing code
+                if len(str(qrcode_data['code'])) > 20:
+                    qrcode = qrcode_data['code']
+            
+            # Retornar o que tiver disponível
+            if pairing_code and pairing_code != 'null':
+                return JsonResponse({'success': True, 'pairingCode': pairing_code})
+            elif qrcode:
+                return JsonResponse({'success': True, 'qrcode': qrcode})
+            else:
+                return JsonResponse({'success': False, 'error': 'Nenhum código de conexão disponível'})
+        else:
+            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}: {response.text[:200]}'})
+            
+    except Exception as e:
+        logger.error(f"Erro ao obter QR Code: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+    
+
+@login_required
+@require_http_methods(["POST"])
+def api_status_instancia(request):
+    """Verifica status da instância"""
+    try:
+        data = json.loads(request.body)
+        api_url = data.get('api_url')
+        api_key = data.get('api_key')
+        instance_name = data.get('instance_name')
+        
+        if not api_url:
+            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
+        
+        if not instance_name:
+            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
+        
+        if not api_url.startswith(('http://', 'https://')):
+            api_url = 'https://' + api_url
+        
+        headers = {'apikey': api_key} if api_key else {}
+        url = f"{api_url.rstrip('/')}/instance/fetchInstances?instanceName={instance_name}"
+        
+        response = requests.get(url, headers=headers, timeout=10, verify=False)
+        
+        if response.status_code == 200:
+            inst_data = response.json()
+            if isinstance(inst_data, list) and len(inst_data) > 0:
+                inst_data = inst_data[0]
+            status = inst_data.get('connectionStatus', 'close')
+            return JsonResponse({'success': True, 'status': 'connected' if status == 'open' else 'disconnected'})
+        else:
+            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}'})
+            
+    except Exception as e:
+        logger.error(f"Erro ao verificar status: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_deletar_instancia(request):
+    """Deleta uma instância da Evolution API"""
+    try:
+        data = json.loads(request.body)
+        api_url = data.get('api_url')
+        api_key = data.get('api_key')
+        instance_name = data.get('instance_name')
+        
+        if not api_url:
+            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
+        
+        if not instance_name:
+            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
+        
+        # Garantir protocolo
+        if not api_url.startswith(('http://', 'https://')):
+            api_url = 'https://' + api_url
+        
+        headers = {'apikey': api_key} if api_key else {}
+        
+        # Tentar diferentes endpoints para deletar
+        endpoints = [
+            f"{api_url}/instance/delete/{instance_name}",
+            f"{api_url}/instance/logout/{instance_name}",
+        ]
+        
+        for url in endpoints:
+            try:
+                response = requests.delete(url, headers=headers, timeout=10, verify=False)
+                if response.status_code in [200, 204]:
+                    logger.info(f"Instância {instance_name} deletada via {url}")
+                    return JsonResponse({'success': True, 'message': f'Instância "{instance_name}" deletada'})
+            except:
+                continue
+        
+        # Se nenhum endpoint funcionou
+        return JsonResponse({'success': False, 'error': 'Não foi possível deletar a instância. Tente novamente.'})
+            
+    except Exception as e:
+        logger.error(f"Erro ao deletar instância: {e}")
+        return JsonResponse({'success': False, 'error': str(e)})
+    
+
+@login_required
+@require_http_methods(["POST"])
+def api_proxy_evolution(request):
+    """Proxy para chamadas à Evolution API (útil para depuração)"""
+    try:
+        data = json.loads(request.body)
+        target_url = data.get('url')
+        api_key = data.get('api_key')
+        method = data.get('method', 'GET')
+        body = data.get('body', {})
+        
+        headers = {'Content-Type': 'application/json'}
+        if api_key:
+            headers['apikey'] = api_key
+        
+        if method == 'GET':
+            response = requests.get(target_url, headers=headers, timeout=30, verify=False)
+        elif method == 'DELETE':
+            response = requests.delete(target_url, headers=headers, timeout=30, verify=False)
+        else:
+            response = requests.post(target_url, json=body, headers=headers, timeout=30, verify=False)
+        
+        return JsonResponse({
+            'success': response.status_code in [200, 201, 204],
+            'status': response.status_code,
+            'data': response.json() if response.text else {},
+            'text': response.text
+        })
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})

@@ -1,0 +1,79 @@
+{% extends "almoxarifado/base_almoxarifado.html" %}
+
+{% block title %}Histórico de Notificações{% endblock %}
+
+{% block content %}
+<div class="almox-container">
+    <div class="dashboard-header">
+        <div class="header-title">
+            <div class="title-icon">📨</div>
+            <div>
+                <h1>Histórico de Notificações</h1>
+                <p class="header-subtitle">Mensagens enviadas via WhatsApp</p>
+            </div>
+        </div>
+        <a href="{% url 'almoxarifado:configurar_notificacoes' %}" class="action-chip">
+            ⚙️ Configurações
+        </a>
+    </div>
+
+    <div class="table-wrapper-modern">
+        <div class="table-scroll">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Item</th>
+                        <th>Tipo</th>
+                        <th>Destinatário</th>
+                        <th>Status</th>
+                        <th>Mensagem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for notif in notificacoes %}
+                    <tr>
+                        <td>{{ notif.criado_em|date:"d/m/Y H:i:s" }}</td>
+                        <td>
+                            <a href="{% url 'almoxarifado:detalhe_item' notif.item.id %}">
+                                {{ notif.item.nome }}
+                            </a>
+                        </td>
+                        <td>{{ notif.get_tipo_display }}</td>
+                        <td>{{ notif.destinatario }}</td>
+                        <td>
+                            {% if notif.status == 'enviado' %}
+                                <span class="stock-badge stock-alto">✅ Enviado</span>
+                            {% elif notif.status == 'pendente' %}
+                                <span class="stock-badge stock-baixo">⏳ Pendente</span>
+                            {% else %}
+                                <span class="stock-badge stock-zerado">❌ Erro</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <details>
+                                <summary>Ver mensagem</summary>
+                                <pre style="white-space: pre-wrap; font-size: 0.75rem; margin-top: 8px;">{{ notif.mensagem }}</pre>
+                                {% if notif.erro %}
+                                    <div class="error-detail" style="color: red; margin-top: 8px;">
+                                        <strong>Erro:</strong> {{ notif.erro }}
+                                    </div>
+                                {% endif %}
+                            </details>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="empty-state-row">
+                            <div class="empty-state">📭</div>
+                            <div class="empty-state-text">Nenhuma notificação enviada ainda</div>
+                            <div class="empty-state-hint">Configure as notificações e aguarde itens com estoque baixo</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

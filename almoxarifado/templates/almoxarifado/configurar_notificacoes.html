@@ -1,0 +1,249 @@
+<!-- almoxarifado/configurar_notificacoes.html -->
+{% extends "almoxarifado/base_almoxarifado.html" %}
+{% load static %}
+
+{% block title %}Configurar Notificações - Almoxarifado{% endblock %}
+
+{% block content %}
+<div class="almox-container">
+    <div class="dashboard-header">
+        <div class="header-title">
+            <div class="title-icon">🔔</div>
+            <div>
+                <h1>Configurações de Notificações</h1>
+                <p class="header-subtitle">Configure alertas automáticos para estoque baixo via WhatsApp</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Coluna esquerda - Formulário -->
+        <div class="col-lg-6">
+            <div class="card-wa">
+                <div class="card-wa-header">
+                    <i class="fas fa-sliders-h me-2"></i> Configurações Gerais
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" id="form-config">
+                        {% csrf_token %}
+                        
+                        <div class="form-group mb-4">
+                            <label class="form-label fw-bold">🌐 Status do Sistema</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="ativo" name="ativo" {% if config.ativo %}checked{% endif %}>
+                                <label class="form-check-label" for="ativo">Sistema de notificações ativo</label>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="fw-bold mb-3">📱 Conexão WhatsApp</h5>
+                        
+                        <div class="form-group mb-3">
+                            <label>URL da API Evolution</label>
+                            <input type="url" name="api_url" class="form-control" value="{{ config.api_url }}" placeholder="http://localhost:8080">
+                            <small class="text-muted">URL base da API Evolution (ex: http://localhost:8080)</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label>API Key</label>
+                            <input type="text" name="api_key" class="form-control" value="{{ config.api_key }}" placeholder="Global API Key">
+                            <small class="text-muted">Chave global da API Evolution</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label>Instância WhatsApp</label>
+                            <select name="instance_name" class="form-control">
+                                <option value="">Selecione uma instância</option>
+                                {% for instancia in instancias %}
+                                <option value="{{ instancia.instance_name }}" {% if config.instance_name == instancia.instance_name %}selected{% endif %}>
+                                    {{ instancia.instance_name }} ({{ instancia.get_status_display }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Instância que irá enviar as mensagens</small>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label>Números de Destino</label>
+                            <textarea name="numeros_destino" class="form-control" rows="3" placeholder="5511999999999, 5511988888888&#10;ou um por linha">{{ config.numeros_destino }}</textarea>
+                            <small class="text-muted">Números de WhatsApp que receberão as notificações (com código do país)</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-primary" onclick="testarConexao()">
+                                📱 Testar Conexão
+                            </button>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="fw-bold mb-3">🔔 Tipos de Notificação</h5>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="notificar_estoque_baixo" id="notificar_baixo" {% if config.notificar_estoque_baixo %}checked{% endif %}>
+                            <label class="form-check-label" for="notificar_baixo">
+                                Notificar quando estoque estiver BAIXO (abaixo do mínimo)
+                            </label>
+                        </div>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="notificar_estoque_zerado" id="notificar_zerado" {% if config.notificar_estoque_zerado %}checked{% endif %}>
+                            <label class="form-check-label" for="notificar_zerado">
+                                Notificar quando estoque estiver ZERADO
+                            </label>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="notificar_reposicao" id="notificar_reposicao" {% if config.notificar_reposicao %}checked{% endif %}>
+                            <label class="form-check-label" for="notificar_reposicao">
+                                Notificar quando item for REPOSTO
+                            </label>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="fw-bold mb-3">⏰ Agendamento</h5>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="verificar_ao_adicionar" id="verificar_ao_adicionar" {% if config.verificar_ao_adicionar %}checked{% endif %}>
+                            <label class="form-check-label" for="verificar_ao_adicionar">
+                                Verificar ao adicionar/editar item
+                            </label>
+                        </div>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="verificar_agendado" id="verificar_agendado" {% if config.verificar_agendado %}checked{% endif %}>
+                            <label class="form-check-label" for="verificar_agendado">
+                                Verificação agendada (cron job)
+                            </label>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label>Horário da verificação</label>
+                            <input type="time" name="horario_verificacao" class="form-control" value="{{ config.horario_verificacao|time:'H:i' }}">
+                            <small class="text-muted">Horário para executar a verificação automática</small>
+                        </div>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" name="repetir_notificacao" id="repetir_notificacao" {% if config.repetir_notificacao %}checked{% endif %}>
+                            <label class="form-check-label" for="repetir_notificacao">
+                                Repetir notificação enquanto estiver baixo
+                            </label>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label>Intervalo de repetição (horas)</label>
+                            <input type="number" name="intervalo_repeticao" class="form-control" value="{{ config.intervalo_repeticao }}" min="1" max="168">
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Coluna direita - Templates -->
+        <div class="col-lg-6">
+            <div class="card-wa">
+                <div class="card-wa-header">
+                    <i class="fas fa-edit me-2"></i> Templates das Mensagens
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="salvar_templates" value="1">
+                        
+                        <div class="form-group mb-4">
+                            <label class="fw-bold">🔴 Template - Estoque Baixo</label>
+                            <textarea name="template_estoque_baixo" class="form-control" rows="8" style="font-family: monospace;">{{ config.template_estoque_baixo }}</textarea>
+                            <small class="text-muted">Variáveis disponíveis: {nome}, {codigo}, {localizacao}, {departamento}, {quantidade}, {minimo}, {unidade}, {sugestao}</small>
+                        </div>
+                        
+                        <div class="form-group mb-4">
+                            <label class="fw-bold">🔴 Template - Estoque Zerado</label>
+                            <textarea name="template_estoque_zerado" class="form-control" rows="8" style="font-family: monospace;">{{ config.template_estoque_zerado }}</textarea>
+                            <small class="text-muted">Variáveis disponíveis: {nome}, {codigo}, {localizacao}, {departamento}, {minimo}, {unidade}</small>
+                        </div>
+                        
+                        <div class="form-group mb-4">
+                            <label class="fw-bold">✅ Template - Reposição</label>
+                            <textarea name="template_reposicao" class="form-control" rows="8" style="font-family: monospace;">{{ config.template_reposicao }}</textarea>
+                            <small class="text-muted">Variáveis disponíveis: {nome}, {codigo}, {localizacao}, {departamento}, {nova_quantidade}, {adicionado}, {unidade}, {status}</small>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success">💾 Salvar Configurações</button>
+                            <button type="button" class="btn btn-warning" onclick="testarNotificacao()">📨 Testar Envio</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Histórico recente -->
+    <div class="card-wa mt-4">
+        <div class="card-wa-header">
+            <i class="fas fa-history me-2"></i> Últimas Notificações
+        </div>
+        <div class="card-body p-0">
+            <div class="table-wrapper-modern">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Data/Hora</th>
+                            <th>Item</th>
+                            <th>Tipo</th>
+                            <th>Destinatário</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for notif in historico_recente %}
+                        <tr>
+                            <td>{{ notif.criado_em|date:"d/m/Y H:i:s" }}</td>
+                            <td><a href="{% url 'almoxarifado:detalhe_item' notif.item.id %}">{{ notif.item.nome }}</a></td>
+                            <td>{{ notif.get_tipo_display }}</td>
+                            <td>{{ notif.destinatario }}</td>
+                            <td>
+                                {% if notif.status == 'enviado' %}
+                                    <span class="badge bg-success">✅ Enviado</span>
+                                {% elif notif.status == 'pendente' %}
+                                    <span class="badge bg-warning">⏳ Pendente</span>
+                                {% else %}
+                                    <span class="badge bg-danger">❌ Erro</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center py-4">Nenhuma notificação enviada ainda</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function testarConexao() {
+    const numero = prompt('Digite o número de WhatsApp para teste (com DDD):', '5511999999999');
+    if (!numero) return;
+    
+    fetch('{% url "almoxarifado:testar_notificacao" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify({numero_teste: numero})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Mensagem de teste enviada! Verifique o WhatsApp.');
+        } else {
+            alert('❌ Erro: ' + data.error);
+        }
+    })
+    .catch(e => alert('Erro ao testar conexão'));
+}
+
+function testarNotificacao() {
+    alert('Para testar notificações, edite um item e coloque quantidade abaixo do estoque mínimo.');
+}
+</script>
+{% endblock %}

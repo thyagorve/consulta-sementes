@@ -5,52 +5,329 @@
 {% block content %}
 <div class="almox-container">
 
-
-
-
-    <!-- MODAL DE CONFIRMAÇÃO PARA IMPORTAR DANFE/XML NF-e -->
-<div class="modal-overlay" id="modal-nfe-overlay" onclick="fecharModalNFE()"></div>
-<div class="modal-container" id="modal-nfe-container" style="display:none;">
-    <div class="modal-header modal-header-info">
-        <div class="modal-header-icon">📄</div>
-        <div class="modal-header-title">
-            <h3>Confirmar Importação de Nota Fiscal</h3>
-            <p>Revise os dados antes de importar</p>
+    <!-- MODAL NFE -->
+    <div class="modal-overlay" id="modal-nfe-overlay" onclick="fecharModalNFE()"></div>
+    <div class="modal-container" id="modal-nfe-container" style="display:none;">
+        <div class="modal-header modal-header-info">
+            <div class="modal-header-icon">📄</div>
+            <div class="modal-header-title">
+                <h3>Confirmar Importação de Nota Fiscal</h3>
+                <p>Revise os dados antes de importar</p>
+            </div>
+            <button class="modal-close" onclick="fecharModalNFE()">✕</button>
         </div>
-        <button class="modal-close" onclick="fecharModalNFE()">✕</button>
-    </div>
-    <div class="modal-body" id="modal-nfe-body">
-        <div class="loading-spinner">⏳ Carregando dados da Nota Fiscal...</div>
-    </div>
-    <div class="modal-footer">
-        <button class="btn-secondary" onclick="fecharModalNFE()">Cancelar</button>
-        <button class="btn-primary" id="btn-confirmar-nfe" onclick="confirmarImportacaoNFE()">✅ Confirmar Importação</button>
-    </div>
-</div>
-
-<!-- MODAL DE RESULTADO DA IMPORTAÇÃO -->
-<div class="modal-overlay" id="modal-resultado-overlay" onclick="fecharModalResultado()"></div>
-<div class="modal-container modal-resultado" id="modal-resultado-container" style="display:none;">
-    <div class="modal-header" id="modal-resultado-header">
-        <div class="modal-header-icon" id="resultado-icon">✅</div>
-        <div class="modal-header-title">
-            <h3 id="resultado-titulo">Importação Concluída</h3>
-            <p id="resultado-mensagem"></p>
+        <div class="modal-body" id="modal-nfe-body">
+            <div class="loading-spinner">⏳ Carregando dados da Nota Fiscal...</div>
         </div>
-        <button class="modal-close" onclick="fecharModalResultado()">✕</button>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="fecharModalNFE()">Cancelar</button>
+            <button class="btn-primary" id="btn-confirmar-nfe" onclick="confirmarImportacaoNFE()">✅ Confirmar Importação</button>
+        </div>
     </div>
-    <div class="modal-body" id="modal-resultado-body">
-        <div id="resultado-detalhes"></div>
+
+    <!-- MODAL RESULTADO NFE -->
+    <div class="modal-overlay" id="modal-resultado-overlay" onclick="fecharModalResultado()"></div>
+    <div class="modal-container modal-resultado" id="modal-resultado-container" style="display:none;">
+        <div class="modal-header" id="modal-resultado-header">
+            <div class="modal-header-icon" id="resultado-icon">✅</div>
+            <div class="modal-header-title">
+                <h3 id="resultado-titulo">Importação Concluída</h3>
+                <p id="resultado-mensagem"></p>
+            </div>
+            <button class="modal-close" onclick="fecharModalResultado()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-resultado-body">
+            <div id="resultado-detalhes"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-primary" onclick="fecharModalResultado(); location.reload();">OK</button>
+        </div>
     </div>
-    <div class="modal-footer">
-        <button class="btn-primary" onclick="fecharModalResultado(); location.reload();">OK</button>
+
+    <!-- MODAL WHATSAPP -->
+    <div class="modal-overlay" id="modal-wa-overlay" onclick="fecharModalWhatsApp()"></div>
+    <div class="modal-container modal-wa" id="modal-wa-container" style="display:none;">
+        <div class="modal-header modal-header-wa">
+            <div class="modal-header-icon">📱</div>
+            <div class="modal-header-title">
+                <h3>Configuração do WhatsApp</h3>
+                <p>Conecte sua instância e gerencie os números que receberão alertas</p>
+            </div>
+            <button class="modal-close" onclick="fecharModalWhatsApp()">✕</button>
+        </div>
+        <div class="modal-body" id="modal-wa-body">
+            <div class="wa-tabs">
+                <button class="wa-tab active" onclick="switchWATab('conexao')">🔌 Conexão</button>
+                <button class="wa-tab" onclick="switchWATab('numeros')">📞 Números</button>
+                <button class="wa-tab" onclick="switchWATab('agendamento')">⏰ Agendamento</button>
+                <button class="wa-tab" onclick="switchWATab('templates')">📝 Templates</button>
+                <button class="wa-tab" id="qr-code-tab" onclick="switchWATab('qrcode')" style="display:none;">📱 Conectar</button>
+            </div>
+
+            <!-- ABA CONEXÃO -->
+            <div id="wa-tab-conexao" class="wa-tab-content active">
+                <div class="form-group">
+                    <label>🌐 Status do Sistema</label>
+                    <div class="status-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="wa-ativo" onchange="toggleSistema()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span id="status-label" style="margin-left: 10px;">Desativado</span>
+                    </div>
+                </div>
+                <hr style="margin: 20px 0;">
+                <div class="form-group">
+                    <label>🔌 URL da Evolution API</label>
+                    <input type="url" id="wa-api-url" class="form-control" placeholder="https://evolutionapi.tlsnettop.com.br">
+                    <small>URL da sua instalação da Evolution API</small>
+                </div>
+                <div class="form-group">
+                    <label>🔑 API Key (Global)</label>
+                    <input type="text" id="wa-api-key" class="form-control" placeholder="Sua chave global">
+                    <small>Configure na Evolution API → Configurações → API Key</small>
+                </div>
+                <hr style="margin: 20px 0;">
+                <div class="form-group">
+                    <label>📱 Gerenciar Instâncias</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" id="nova-instancia" class="form-control" placeholder="Nome da nova instância" style="flex: 1;">
+                        <button class="btn-primary" onclick="criarInstancia()" style="white-space: nowrap;">➕ Criar</button>
+                    </div>
+                    <div id="lista-instancias" class="instancias-list">
+                        <div class="loading-small">Carregando instâncias...</div>
+                    </div>
+                    <small>Selecione uma instância para usar. Clique em "Conectar" para obter o código de pareamento.</small>
+                </div>
+                <div class="form-group" id="instancia-selecionada-group" style="display: none;">
+                    <label>✅ Instância Selecionada</label>
+                    <select id="wa-instance" class="form-control">
+                        <option value="">Selecione uma instância</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- ABA QR CODE -->
+            <div id="wa-tab-qrcode" class="wa-tab-content">
+                <div style="text-align: center; padding: 20px;">
+                    <div id="qr-code-instance-info" style="margin-bottom: 15px;">
+                        <strong>Instância: </strong> <span id="qr-instance-name">Nenhuma selecionada</span>
+                    </div>
+                    <div id="pairing-code-area" style="display: none;">
+                        <div style="background: linear-gradient(135deg, #075E54, #128C7E); padding: 30px; border-radius: 20px; color: white;">
+                            <div style="font-size: 20px; margin-bottom: 10px;">🔐 Conexão WhatsApp</div>
+                            <div id="pairing-code-display" style="font-size: 48px; font-weight: bold; letter-spacing: 5px; background: white; color: #075E54; padding: 20px; border-radius: 15px; margin: 15px 0; font-family: monospace;"></div>
+                            <p style="font-size: 14px; margin-top: 10px;">
+                                1. Abra o WhatsApp no seu celular<br>
+                                2. Toque nos três pontos ⋮ → <strong>Dispositivos vinculados</strong><br>
+                                3. Toque em <strong>Vincular um dispositivo</strong><br>
+                                4. Digite o código acima ou escaneie o QR Code<br>
+                                5. Pronto! WhatsApp conectado automaticamente
+                            </p>
+                        </div>
+                        <button class="btn-secondary" onclick="gerarPairingCode()" style="margin-top: 15px;">🔄 Gerar Novo Código</button>
+                    </div>
+                    <div id="qr-connected-info" style="display: none; padding: 30px; background: #d1fae5; border-radius: 12px;">
+                        <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                        <h3 style="color: #065f46;">WhatsApp Conectado!</h3>
+                        <p>A instância está pronta para enviar mensagens</p>
+                    </div>
+                    <div id="pairing-loading" class="loading-small" style="display: none;">⏳ Gerando código de conexão...</div>
+                </div>
+            </div>
+
+            <!-- ABA NÚMEROS POR DEPARTAMENTO -->
+            <div id="wa-tab-numeros" class="wa-tab-content">
+                <div style="margin-bottom: 20px;">
+                    <label>📞 Números Padrão (todos departamentos)</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <input type="text" id="novo-numero-padrao" class="form-control" placeholder="5511999999999" style="flex: 1;">
+                        <button class="btn-primary" onclick="adicionarNumeroPadrao()">➕ Adicionar</button>
+                    </div>
+                    <div id="lista-numeros-padrao" class="numeros-list" style="margin-bottom: 10px;"></div>
+                    <small>Números que recebem notificações de TODOS os departamentos</small>
+                </div>
+                <hr style="margin: 20px 0;">
+                <div style="margin-bottom: 15px;">
+                    <label>🏢 Números por Departamento</label>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <select id="dept-select" class="filter-select" style="flex: 1;">
+                            <option value="">Selecione o departamento</option>
+                            {% for key, name in departamentos %}
+                                <option value="{{ key }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" id="novo-numero-dept" class="form-control" placeholder="5511999999999" style="flex: 1;">
+                        <button class="btn-primary" onclick="adicionarNumeroDepartamento()">➕ Adicionar</button>
+                    </div>
+                    <div id="lista-numeros-departamento" class="numeros-list"></div>
+                    <small>Notificações de um departamento específico vão apenas para os números cadastrados aqui</small>
+                </div>
+                <div class="alert-info" style="margin-top: 15px;">
+                    💡 <strong>Como funciona:</strong><br>
+                    • Se um departamento tem números específicos, apenas eles recebem as notificações<br>
+                    • Se não houver números específicos, os números padrão recebem<br>
+                    • Cada número pode estar em vários departamentos
+                </div>
+            </div>
+
+            <!-- ABA AGENDAMENTO -->
+            <div id="wa-tab-agendamento" class="wa-tab-content">
+                <div class="form-group">
+                    <label>⏰ Tipo de Envio</label>
+                    <select id="tipo-envio" class="form-control" onchange="toggleOpcoesEnvio()">
+                        <option value="tempo-real">🚀 Tempo Real (Assim que detectar)</option>
+                        <option value="agendado">📅 Agendado (Horário específico)</option>
+                        <option value="ambos">🔄 Ambos (Tempo Real + Agendado)</option>
+                    </select>
+                </div>
+
+                <div id="opcoes-agendamento" style="display: none;">
+                    <div class="form-group">
+                        <label>🕐 Horário do Envio Agendado</label>
+                        <input type="time" id="horario-agendado" class="form-control" value="08:00">
+                        <small>Horário em que as notificações agendadas serão enviadas</small>
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Dias da Semana</label>
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                            <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="1"> Segunda</label>
+                            <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="2"> Terça</label>
+                            <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="3"> Quarta</label>
+                            <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="4"> Quinta</label>
+                            <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="5"> Sexta</label>
+                            <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="6"> Sábado</label>
+                            <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="0"> Domingo</label>
+                        </div>
+                        <small>Selecione os dias que as notificações agendadas serão enviadas</small>
+                    </div>
+                </div>
+
+                <hr style="margin: 20px 0;">
+
+                <div class="form-group">
+                    <label>📋 Tipos de Notificação a Enviar</label>
+                    <div style="margin-top: 10px;">
+                        <label class="checkbox-label"><input type="checkbox" id="notif-baixo" checked> 🔴 Estoque Baixo (abaixo do mínimo)</label><br>
+                        <label class="checkbox-label"><input type="checkbox" id="notif-zerado" checked> 🔴 Estoque Zerado</label><br>
+                        <label class="checkbox-label"><input type="checkbox" id="notif-reposicao" checked> ✅ Reposição (entrada de estoque)</label>
+                    </div>
+                </div>
+
+                <hr style="margin: 20px 0;">
+
+                <div class="form-group">
+                    <label>🔄 Repetir Notificações</label>
+                    <div class="status-toggle">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="repetir-notificacoes">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span style="margin-left: 10px;">Repetir enquanto o estoque estiver baixo</span>
+                    </div>
+                </div>
+
+                <div id="opcoes-repeticao" style="display: none;">
+                    <div class="form-group">
+                        <label>⏱️ Intervalo de Repetição (horas)</label>
+                        <input type="number" id="intervalo-repeticao" class="form-control" value="24" min="1" max="168">
+                        <small>Intervalo entre repetições da mesma notificação</small>
+                    </div>
+                </div>
+
+                <hr style="margin: 20px 0;">
+
+                <div class="form-group">
+                    <label>📊 Notificações por Departamento</label>
+                    <div id="departamentos-notificacao" class="departamentos-list">
+                        {% for key, name in departamentos %}
+                        <label class="checkbox-label">
+                            <input type="checkbox" class="dept-notif" value="{{ key }}" checked> {{ name }}
+                        </label><br>
+                        {% endfor %}
+                    </div>
+                    <small>Selecione quais departamentos devem receber notificações</small>
+                </div>
+
+                <div class="alert-info" style="margin-top: 15px;">
+                    💡 <strong>Como funciona o agendamento:</strong><br>
+                    • <strong>Tempo Real:</strong> Notifica assim que o estoque muda<br>
+                    • <strong>Agendado:</strong> Acumula notificações e envia no horário escolhido<br>
+                    • <strong>Ambos:</strong> Envia em tempo real E também envia um resumo agendado
+                </div>
+            </div>
+
+            <!-- ABA TEMPLATES -->
+            <div id="wa-tab-templates" class="wa-tab-content">
+                <div class="form-group">
+                    <label>🔴 Estoque Baixo</label>
+                    <div class="template-preview">
+                        <button type="button" class="template-preview-btn" onclick="previewTemplate('baixo')">👁️ Preview</button>
+                        <textarea id="wa-template-baixo" rows="6" class="form-control" style="font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
+                    <small>Variáveis: {nome}, {codigo}, {quantidade}, {minimo}, {unidade}, {localizacao}, {departamento}</small>
+                </div>
+                <div class="form-group">
+                    <label>🔴 Estoque Zerado</label>
+                    <div class="template-preview">
+                        <button type="button" class="template-preview-btn" onclick="previewTemplate('zerado')">👁️ Preview</button>
+                        <textarea id="wa-template-zerado" rows="6" class="form-control" style="font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
+                    <small>Variáveis: {nome}, {codigo}, {minimo}, {unidade}, {localizacao}</small>
+                </div>
+                <div class="form-group">
+                    <label>✅ Reposição</label>
+                    <div class="template-preview">
+                        <button type="button" class="template-preview-btn" onclick="previewTemplate('reposicao')">👁️ Preview</button>
+                        <textarea id="wa-template-reposicao" rows="6" class="form-control" style="font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
+                    <small>Variáveis: {nome}, {codigo}, {nova_quantidade}, {adicionado}, {unidade}</small>
+                </div>
+                <div class="form-group">
+                    <label>📊 Resumo Agendado</label>
+                    <div class="template-preview">
+                        <button type="button" class="template-preview-btn" onclick="previewTemplate('resumo')">👁️ Preview</button>
+                        <textarea id="wa-template-resumo" rows="8" class="form-control" style="font-family: monospace; font-size: 12px;">📊 *RESUMO DIÁRIO DE ESTOQUE*
+
+📅 Data: {data}
+🏢 Departamento: {departamento}
+
+📦 *ITENS COM ESTOQUE BAIXO:* ({total_baixo})
+{lista_baixo}
+
+⚠️ *ITENS ZERADOS:* ({total_zerado})
+{lista_zerado}
+
+🔔 Este é um resumo automático do sistema de Almoxarifado.</textarea>
+                    </div>
+                    <small>Variáveis: {data}, {departamento}, {total_baixo}, {total_zerado}, {lista_baixo}, {lista_zerado}</small>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="fecharModalWhatsApp()">Cancelar</button>
+            <button class="btn-primary" onclick="salvarConfiguracaoWhatsApp()">💾 Salvar Configurações</button>
+        </div>
     </div>
-</div>
 
+    <!-- MODAL PREVIEW TEMPLATE -->
+    <div class="modal-overlay" id="modal-preview-overlay" onclick="fecharPreview()"></div>
+    <div class="modal-container modal-preview" id="modal-preview-container" style="display:none;">
+        <div class="modal-header">
+            <div class="modal-header-icon">📱</div>
+            <div class="modal-header-title">
+                <h3>Preview da Mensagem</h3>
+                <p>Visualize como a mensagem será enviada</p>
+            </div>
+            <button class="modal-close" onclick="fecharPreview()">✕</button>
+        </div>
+        <div class="modal-body" id="preview-content" style="background: #e5ddd5; font-family: system-ui;"></div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="fecharPreview()">Fechar</button>
+        </div>
+    </div>
 
-
-
-    <!-- HEADER MODERNO -->
+    <!-- HEADER -->
     <div class="dashboard-header">
         <div class="header-title">
             <div class="title-icon">📦</div>
@@ -60,36 +337,27 @@
             </div>
         </div>
         <div class="header-actions">
-
-           <!-- BOTÃO PARA IMPORTAR XML DA NOTA FISCAL -->
             <button class="action-chip" onclick="document.getElementById('import-nfe-file').click()">📄 Importar XML NF-e</button>
             <input type="file" id="import-nfe-file" accept=".xml" style="display:none;" onchange="visualizarXMLNFE(this)">
+            <button class="action-chip" onclick="document.getElementById('import-file').click()">📊 Importar Excel</button>
             <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="importarExcel(this)">
-            <a href="{% url 'almoxarifado:exportar_excel' %}" class="action-chip">
-                <span>📥</span> Exportar
-            </a>
-            <a href="{% url 'almoxarifado:baixar_modelo_excel' %}" class="action-chip">
-                <span>📋</span> Modelo
-            </a>
-            <button class="action-chip cart-badge" id="carrinho-badge" onclick="abrirCarrinho()" style="display:{% if carrinho_count > 0 %}flex{% else %}none{% endif %};">
-                <span>🛒</span> Carrinho <span id="carrinho-count-badge">{{ carrinho_count }}</span>
-            </button>
-            <a href="{% url 'almoxarifado:saidas_list' %}" class="action-chip">
-                <span>📋</span> Histórico
-            </a>
+            <a href="{% url 'almoxarifado:exportar_excel' %}" class="action-chip">📥 Exportar</a>
+            <a href="{% url 'almoxarifado:baixar_modelo_excel' %}" class="action-chip">📋 Modelo</a>
+            <button class="action-chip cart-badge" id="carrinho-badge" onclick="abrirCarrinho()" style="display:{% if carrinho_count > 0 %}flex{% else %}none{% endif %};">🛒 Carrinho <span id="carrinho-count-badge">{{ carrinho_count }}</span></button>
+            <button class="action-chip" onclick="abrirModalWhatsApp()">📱 WhatsApp</button>
+
+            <a href="{% url 'almoxarifado:saidas_list' %}" class="action-chip">📋 Histórico</a>
         </div>
     </div>
 
-    <!-- STATS CARDS MODERNOS -->
+    <!-- STATS CARDS -->
     <div class="stats-grid">
         <div class="stat-card stat-card-primary">
             <div class="stat-card-icon">💰</div>
             <div class="stat-card-content">
                 <span class="stat-card-label">Valor Total</span>
                 <span class="stat-card-value">R$ {{ valor_total_estoque|floatformat:2|default:"0,00" }}</span>
-                <div class="stat-progress">
-                    <div class="stat-progress-bar" style="width: 75%;"></div>
-                </div>
+                <div class="stat-progress"><div class="stat-progress-bar" style="width: 75%;"></div></div>
             </div>
         </div>
         <div class="stat-card stat-card-success">
@@ -149,7 +417,6 @@
         </div>
     </div>
 
-    <!-- FILTROS ATIVOS (BADGES) -->
     <div id="filtros-ativos-container" class="active-filters"></div>
 
     <!-- TABELA PRINCIPAL -->
@@ -177,11 +444,7 @@
                         <td class="col-lote hide-md">{{ item.lote|default:"—" }}</td>
                         <td class="col-tamanho"><span class="item-size">{{ item.tamanho|default:"—" }}</span></td>
                         <td class="col-ca hide-md">{{ item.ca|default:"—" }}</td>
-                        <td class="col-estoque">
-                            <span class="stock-badge stock-{{ item.status_estoque }}">
-                                {{ item.quantidade|floatformat:"-3" }}
-                            </span>
-                        </td>
+                        <td class="col-estoque"><span class="stock-badge stock-{{ item.status_estoque }}">{{ item.quantidade|floatformat:"-3" }}</span></td>
                         <td class="col-unidade hide-sm">{{ item.get_unidade_display }}</td>
                         <td class="col-local">{{ item.localizacao|default:"—"|truncatechars:12 }}</td>
                         <td class="col-dept hide-sm">{{ item.get_departamento_display|truncatechars:8 }}</td>
@@ -201,15 +464,13 @@
     </div>
 </div>
 
-<!-- BOTÃO FLUTUANTE MODERNO -->
-<button class="fab-modern" onclick="abrirPanelAdicionar()" title="Adicionar item">
-    <span>+</span>
-</button>
+<!-- BOTÃO FLUTUANTE -->
+<button class="fab-modern" onclick="abrirPanelAdicionar()" title="Adicionar item">+</button>
 
 <!-- OVERLAY -->
 <div class="side-panel-overlay" id="panel-overlay" onclick="fecharTodosPanels()"></div>
 
-<!-- PAINEL FILTRO POR COLUNA -->
+<!-- PAINEL FILTRO COLUNA -->
 <div class="filter-panel" id="filtro-coluna-panel" style="display:none;">
     <div class="filter-panel-header">
         <span>Filtrar por <span id="filtro-coluna-nome"></span></span>
@@ -232,7 +493,7 @@
     </div>
 </div>
 
-<!-- PAINEL ADICIONAR/EDITAR -->
+<!-- PAINEL FORM -->
 <div class="side-panel" id="panel-form">
     <div class="side-panel-header">
         <h3 id="panel-form-titulo">➕ Novo Item</h3>
@@ -279,6 +540,7 @@
                         <option value="L">Litro</option>
                         <option value="ML">ml</option>
                         <option value="M">Metro</option>
+                        <option value="CM">cm</option>
                         <option value="PAR">Par</option>
                         <option value="DZ">Dúzia</option>
                         <option value="RL">Rolo</option>
@@ -388,7 +650,7 @@
     </div>
 </div>
 
-<!-- PAINEL BAIXA ESTILIZADO -->
+<!-- PAINEL BAIXA -->
 <div class="side-panel" id="panel-baixa">
     <div class="side-panel-header panel-header-danger">
         <h3>➖ Dar Baixa</h3>
@@ -438,7 +700,7 @@
     </div>
 </div>
 
-<!-- PAINEL CARRINHO ESTILIZADO -->
+<!-- PAINEL CARRINHO -->
 <div class="side-panel" id="panel-carrinho">
     <div class="side-panel-header panel-header-warning">
         <h3>🛒 Carrinho de Solicitações</h3>
@@ -453,7 +715,7 @@
     </div>
 </div>
 
-<!-- PAINEL FINALIZAR CARRINHO ESTILIZADO -->
+<!-- PAINEL FINALIZAR CARRINHO -->
 <div class="side-panel" id="panel-finalizar-carrinho">
     <div class="side-panel-header panel-header-success">
         <h3>✅ Finalizar Solicitação</h3>
@@ -485,1312 +747,233 @@
     </div>
 </div>
 
-<!-- TOAST MODERNO -->
+<!-- TOAST -->
 <div id="toast" class="toast-modern"></div>
 
-<!-- CSS COMPLETO MODERNO -->
 <style>
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-:root {
-    --primary: #059669;
-    --primary-dark: #047857;
-    --primary-light: #10b981;
-    --secondary: #6366f1;
-    --danger: #ef4444;
-    --warning: #f59e0b;
-    --info: #3b82f6;
-    --success: #10b981;
-    --dark: #1f2937;
-    --gray: #6b7280;
-    --light: #f3f4f6;
-    --border: #e5e7eb;
-    --white: #ffffff;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    --radius: 12px;
-    --radius-sm: 8px;
-}
-
-body {
-    background: #f9fafb;
-}
-
-.almox-container {
-    max-width: 1600px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-/* HEADER MODERNO */
-.dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 2px solid var(--border);
-}
-
-.header-title {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.title-icon {
-    font-size: 2rem;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    width: 52px;
-    height: 52px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
-}
-
-.dashboard-header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--dark);
-    margin: 0;
-}
-
-.header-subtitle {
-    font-size: 0.8rem;
-    color: var(--gray);
-    margin: 2px 0 0;
-}
-
-.header-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.action-chip {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 40px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--dark);
-    cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: none;
-}
-
-.action-chip:hover {
-    background: var(--light);
-    border-color: var(--primary);
-    transform: translateY(-1px);
-}
-
-.action-chip span:first-child {
-    font-size: 1rem;
-}
-
-.cart-badge {
-    background: var(--warning);
-    border-color: var(--warning);
-    color: var(--white);
-}
-
-.cart-badge:hover {
-    background: #d97706;
-    border-color: #d97706;
-}
-
-/* STATS CARDS MODERNOS */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-}
-
-.stat-card {
-    background: var(--white);
-    border-radius: var(--radius);
-    padding: 18px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: var(--shadow-sm);
-    transition: all 0.3s;
-    border: 1px solid var(--border);
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-}
-
-.stat-card-icon {
-    width: 52px;
-    height: 52px;
-    background: rgba(5, 150, 105, 0.1);
-    border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.8rem;
-}
-
-.stat-card-content {
-    flex: 1;
-}
-
-.stat-card-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    font-weight: 600;
-    color: var(--gray);
-    display: block;
-}
-
-.stat-card-value {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--dark);
-    line-height: 1.2;
-}
-
-.stat-progress {
-    margin-top: 8px;
-    height: 4px;
-    background: #e5e7eb;
-    border-radius: 10px;
-    overflow: hidden;
-}
-
-.stat-progress-bar {
-    height: 100%;
-    background: var(--primary);
-    border-radius: 10px;
-}
-
-.stat-card-primary .stat-card-icon { background: rgba(99, 102, 241, 0.1); }
-.stat-card-success .stat-card-icon { background: rgba(5, 150, 105, 0.1); }
-.stat-card-info .stat-card-icon { background: rgba(59, 130, 246, 0.1); }
-.stat-card-warning .stat-card-icon { background: rgba(245, 158, 11, 0.1); }
-.stat-card-danger .stat-card-icon { background: rgba(239, 68, 68, 0.1); }
-
-/* SEARCH FILTERS */
-.search-filters {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-}
-
-.search-wrapper {
-    flex: 1;
-    min-width: 250px;
-    position: relative;
-}
-
-.search-icon {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 1rem;
-    opacity: 0.6;
-}
-
-.search-input-modern {
-    width: 100%;
-    padding: 12px 16px 12px 40px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    background: var(--white);
-}
-
-.search-input-modern:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
-}
-
-.filters-group {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-.filter-select {
-    padding: 10px 16px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--white);
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.filter-select:focus {
-    outline: none;
-    border-color: var(--primary);
-}
-
-.checkbox-filter-modern {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: all 0.2s;
-}
-
-.checkbox-filter-modern:hover {
-    background: var(--light);
-}
-
-.checkbox-filter-modern input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-.btn-clear-filters {
-    padding: 8px 16px;
-    background: var(--danger);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: all 0.2s;
-}
-
-.btn-clear-filters:hover {
-    background: #dc2626;
-}
-
-/* ACTIVE FILTERS BADGES */
-.active-filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-.filter-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: #eff6ff;
-    color: #1e40af;
-    padding: 6px 12px;
-    border-radius: 40px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.filter-badge button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.9rem;
-    color: #1e40af;
-    padding: 0 4px;
-}
-
-.filter-badge button:hover {
-    color: var(--danger);
-}
-
-/* TABELA MODERNA */
-.table-wrapper-modern {
-    background: var(--white);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
-    border: 1px solid var(--border);
-}
-
-.table-scroll {
-    overflow-x: auto;
-    max-height: calc(100vh - 420px);
-    overflow-y: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 900px;
-}
-
-.data-table thead {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-.data-table th {
-    background: #f8fafc;
-    padding: 14px 12px;
-    text-align: left;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--gray);
-    border-bottom: 2px solid var(--border);
-}
-
-.data-table td {
-    padding: 14px 12px;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.85rem;
-    color: var(--dark);
-}
-
-.data-row {
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.data-row:hover {
-    background: #f0fdf4;
-}
-
-.item-code {
-    font-weight: 600;
-    color: var(--primary);
-    font-size: 0.8rem;
-    background: rgba(5, 150, 105, 0.1);
-    padding: 4px 8px;
-    border-radius: 20px;
-}
-
-.item-name {
-    font-weight: 500;
-}
-
-.item-size {
-    background: var(--light);
-    padding: 4px 8px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-}
-
-.stock-badge {
-    display: inline-block;
-    padding: 5px 12px;
-    border-radius: 40px;
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-
-.stock-alto { background: #d1fae5; color: #065f46; }
-.stock-medio { background: #dbeafe; color: #1e40af; }
-.stock-baixo { background: #fef3c7; color: #92400e; }
-.stock-zerado { background: #fee2e2; color: #991b1b; }
-
-.filter-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    margin-left: 6px;
-    background: rgba(0,0,0,0.05);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.7rem;
-    transition: all 0.2s;
-}
-
-.filter-icon:hover {
-    background: var(--primary);
-    color: white;
-}
-
-.filter-icon.active {
-    background: var(--primary);
-    color: white;
-}
-
-/* FILTER PANEL */
-.filter-panel {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 360px;
-    max-width: 90%;
-    max-height: 80vh;
-    background: var(--white);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
-    z-index: 1100;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.filter-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    background: var(--primary);
-    color: white;
-    font-weight: 600;
-}
-
-.filter-panel-close {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.2rem;
-    cursor: pointer;
-}
-
-.filter-panel-body {
-    flex: 1;
-    padding: 16px;
-    overflow-y: auto;
-}
-
-.filter-panel-search {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    margin-bottom: 12px;
-}
-
-.filter-actions {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-
-.filter-action-btn {
-    flex: 1;
-    padding: 8px;
-    background: var(--light);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: all 0.2s;
-}
-
-.filter-action-btn:hover {
-    background: var(--border);
-}
-
-.filter-values-list {
-    max-height: 250px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-}
-
-.filter-value-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-}
-
-.filter-value-item:hover {
-    background: var(--light);
-}
-
-.filter-value-item input {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-.filter-value-item label {
-    flex: 1;
-    cursor: pointer;
-    font-size: 0.85rem;
-}
-
-.filter-panel-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    border-top: 1px solid var(--border);
-    background: #f8fafc;
-}
-
-.filter-footer-buttons {
-    display: flex;
-    gap: 8px;
-}
-
-.btn-filter-cancel {
-    padding: 6px 16px;
-    background: var(--light);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-}
-
-.btn-filter-apply {
-    padding: 6px 16px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-}
-
-/* SIDE PANELS */
-.side-panel {
-    position: fixed;
-    top: 0;
-    right: -100%;
-    width: 95%;
-    max-width: 550px;
-    height: 100vh;
-    background: var(--white);
-    box-shadow: -4px 0 30px rgba(0,0,0,0.15);
-    z-index: 1050;
-    transition: right 0.3s ease;
-    display: flex;
-    flex-direction: column;
-}
-
-.side-panel.open {
-    right: 0;
-}
-
-.side-panel-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    z-index: 1040;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s;
-}
-
-.side-panel-overlay.active {
-    opacity: 1;
-    visibility: visible;
-}
-
-.side-panel-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: var(--white);
-}
-
-.side-panel-header h3 {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin: 0;
-}
-
-.panel-header-danger {
-    background: linear-gradient(135deg, var(--danger), #dc2626);
-    color: white;
-}
-.panel-header-danger h3 { color: white; }
-.panel-header-danger .btn-close-panel { color: white; }
-
-.panel-header-warning {
-    background: linear-gradient(135deg, var(--warning), #d97706);
-    color: white;
-}
-.panel-header-warning h3 { color: white; }
-.panel-header-warning .btn-close-panel { color: white; }
-
-.panel-header-success {
-    background: linear-gradient(135deg, var(--success), #059669);
-    color: white;
-}
-.panel-header-success h3 { color: white; }
-.panel-header-success .btn-close-panel { color: white; }
-
-.side-panel-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px 24px;
-}
-
-.side-panel-footer {
-    padding: 16px 24px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 12px;
-    background: var(--white);
-}
-
-.btn-close-panel {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: var(--gray);
-    padding: 4px 8px;
-    border-radius: 8px;
-}
-
-.btn-close-panel:hover {
-    background: rgba(0,0,0,0.1);
-}
-
-/* FORM MODERNO */
-.modern-form .form-group {
-    margin-bottom: 16px;
-}
-
-.modern-form label {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--gray);
-    margin-bottom: 6px;
-}
-
-.modern-form input,
-.modern-form select,
-.modern-form textarea {
-    width: 100%;
-    padding: 10px 14px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.9rem;
-    transition: all 0.2s;
-}
-
-.modern-form input:focus,
-.modern-form select:focus,
-.modern-form textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
-}
-
-.input-group {
-    display: flex;
-    gap: 8px;
-}
-
-.input-group-btn {
-    padding: 0 16px;
-    background: var(--light);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: 1rem;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-}
-
-.form-feedback {
-    display: block;
-    margin-top: 4px;
-    font-size: 0.75rem;
-}
-
-.feedback-existente {
-    color: var(--warning);
-}
-
-.feedback-disponivel {
-    color: var(--success);
-}
-
-/* PHOTO UPLOAD */
-.photo-upload {
-    border: 2px dashed var(--border);
-    border-radius: var(--radius);
-    padding: 20px;
-    text-align: center;
-    transition: all 0.2s;
-}
-
-.photo-upload:hover {
-    border-color: var(--primary);
-    background: var(--light);
-}
-
-.photo-actions {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-}
-
-.photo-btn {
-    padding: 8px 20px;
-    background: var(--white);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    font-size: 0.85rem;
-    transition: all 0.2s;
-}
-
-.photo-btn:hover {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-}
-
-.photo-preview {
-    position: relative;
-    margin-top: 12px;
-}
-
-.photo-preview img {
-    max-width: 100%;
-    max-height: 200px;
-    border-radius: var(--radius);
-}
-
-.photo-remove {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--danger);
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 0.8rem;
-}
-
-/* BUTTONS */
-.btn-primary {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-primary:hover {
-    background: var(--primary-dark);
-    transform: translateY(-1px);
-}
-
-.btn-secondary {
-    background: var(--white);
-    color: var(--dark);
-    border: 1px solid var(--border);
-    padding: 10px 20px;
-    border-radius: var(--radius-sm);
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-    background: var(--light);
-}
-
-.btn-danger {
-    background: var(--danger);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: var(--radius-sm);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-danger:hover {
-    background: #dc2626;
-}
-
-.btn-block {
-    width: 100%;
-}
-
-/* INFO BOXES */
-.info-box {
-    padding: 14px 16px;
-    border-radius: var(--radius);
-    margin-bottom: 20px;
-    border-left: 4px solid;
-}
-
-.info-box-warning {
-    background: #fef3c7;
-    border-left-color: var(--warning);
-}
-
-.info-box-success {
-    background: #d1fae5;
-    border-left-color: var(--success);
-}
-
-/* FAB BUTTON */
-.fab-modern {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    color: white;
-    border: none;
-    font-size: 28px;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4);
-    transition: all 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-}
-
-.fab-modern:hover {
-    transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.5);
-}
-
-/* TOAST MODERNO */
-.toast-modern {
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    padding: 14px 24px;
-    background: var(--dark);
-    color: white;
-    border-radius: var(--radius);
-    font-size: 0.85rem;
-    font-weight: 500;
-    z-index: 2000;
-    opacity: 0;
-    transform: translateY(20px);
-    transition: all 0.3s;
-    pointer-events: none;
-}
-
-.toast-modern.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.toast-modern.success { background: var(--success); }
-.toast-modern.error { background: var(--danger); }
-.toast-modern.info { background: var(--info); }
-.toast-modern.warning { background: var(--warning); }
-
-/* DETAILS PANEL STYLES */
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
-    margin: 20px 0;
-}
-
-.info-item {
-    padding: 12px;
-    background: var(--light);
-    border-radius: var(--radius-sm);
-}
-
-.info-item span {
-    display: block;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    color: var(--gray);
-    margin-bottom: 4px;
-}
-
-.info-item strong {
-    font-size: 0.95rem;
-    color: var(--dark);
-}
-
-.detail-actions {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-top: 20px;
-}
-
-.detail-actions .btn-danger,
-.detail-actions .btn-secondary {
-    flex: 1;
-    justify-content: center;
-    text-align: center;
-}
-
-.empty-state-row {
-    text-align: center;
-    padding: 60px 20px !important;
-}
-
-.empty-state {
-    font-size: 3.5rem;
-    margin-bottom: 12px;
-    opacity: 0.5;
-}
-
-.empty-state-text {
-    font-size: 1rem;
-    color: var(--gray);
-    margin-bottom: 6px;
-}
-
-.empty-state-hint {
-    font-size: 0.85rem;
-    color: var(--gray);
-}
-
-.detail-loading, .cart-loading {
-    text-align: center;
-    padding: 40px;
-    color: var(--gray);
-}
-
-/* RESPONSIVE */
-@media (max-width: 992px) {
-    .hide-md { display: none !important; }
-    .stats-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
-}
-
-@media (max-width: 768px) {
-    .almox-container { padding: 12px; }
-    .hide-sm { display: none !important; }
-    .dashboard-header { flex-direction: column; align-items: stretch; }
-    .header-actions { overflow-x: auto; padding-bottom: 4px; }
-    .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .stat-card-value { font-size: 1.2rem; }
-    .search-filters { flex-direction: column; }
-    .filters-group { justify-content: flex-start; }
-    .table-scroll { max-height: calc(100vh - 480px); }
-    .fab-modern {
-        bottom: 20px;
-        right: 20px;
-        width: 48px;
-        height: 48px;
-        font-size: 24px;
-    }
-    .side-panel { max-width: 100%; }
-    .form-row { grid-template-columns: 1fr; }
-}
-
-@media (max-width: 480px) {
-    .stats-grid { grid-template-columns: 1fr; }
-    .filter-panel { width: 95%; }
-}
-
-
-
-
-
-
-
-
-/* MODAIS MODERNOS */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(3px);
-    z-index: 1200;
-    display: none;
-}
-
-.modal-overlay.active {
-    display: block;
-}
-
-.modal-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 90%;
-    max-width: 700px;
-    max-height: 85vh;
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    z-index: 1201;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -48%);
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, -50%);
-    }
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 20px 24px;
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-    border-bottom: 1px solid var(--border);
-}
-
-.modal-header-info {
-    background: linear-gradient(135deg, #059669, #10b981);
-    color: white;
-}
-
-.modal-header-info .modal-header-title p {
-    color: rgba(255, 255, 255, 0.8);
-}
-
-.modal-header-icon {
-    width: 48px;
-    height: 48px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.6rem;
-}
-
-.modal-header-title {
-    flex: 1;
-}
-
-.modal-header-title h3 {
-    margin: 0;
-    font-size: 1.2rem;
-    font-weight: 600;
-}
-
-.modal-header-title p {
-    margin: 4px 0 0;
-    font-size: 0.8rem;
-    opacity: 0.8;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: #666;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-
-.modal-close:hover {
-    background: rgba(0, 0, 0, 0.1);
-}
-
-.modal-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-}
-
-.modal-footer {
-    padding: 16px 24px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-    background: white;
-}
-
-/* Info da Nota no Modal */
-.nfe-info-card {
-    background: #f0fdf4;
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 20px;
-    border: 1px solid #d1fae5;
-}
-
-.nfe-info-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #d1fae5;
-}
-
-.nfe-info-row:last-child {
-    border-bottom: none;
-}
-
-.nfe-info-label {
-    font-weight: 600;
-    color: #065f46;
-}
-
-.nfe-info-value {
-    color: #1f2937;
-    font-family: monospace;
-}
-
-.itens-lista {
-    max-height: 300px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-}
-
-.item-nfe-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.item-nfe-row:hover {
-    background: #f8fafc;
-}
-
-.item-nfe-codigo {
-    font-family: monospace;
-    font-size: 0.8rem;
-    color: var(--primary);
-    background: rgba(5, 150, 105, 0.1);
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-
-.item-nfe-nome {
-    flex: 1;
-    font-size: 0.85rem;
-    font-weight: 500;
-    margin-left: 12px;
-}
-
-.item-nfe-qtd {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--primary);
-    margin-right: 16px;
-}
-
-.alert-warning {
-    background: #fef3c7;
-    border-left: 4px solid var(--warning);
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 16px;
-    font-size: 0.85rem;
-}
-
-.loading-spinner {
-    text-align: center;
-    padding: 40px;
-    color: var(--gray);
-}
-
-.modal-resultado {
-    max-width: 500px;
-}
-
-.resultado-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0;
-    border-bottom: 1px solid #f1f5f9;
-}
-
-.resultado-item:last-child {
-    border-bottom: none;
-}
-
-.resultado-item .status {
-    font-weight: 600;
-}
-
-.status-success { color: var(--success); }
-.status-warning { color: var(--warning); }
-.status-error { color: var(--danger); }
-
-/* Responsivo modal */
-@media (max-width: 768px) {
-    .modal-container {
-        width: 95%;
-        max-height: 90vh;
-    }
-    .modal-header {
-        padding: 16px;
-    }
-    .modal-body {
-        padding: 16px;
-    }
-    .item-nfe-row {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-    .item-nfe-nome {
-        width: 100%;
-        margin-left: 0;
-    }
-}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#059669;--primary-dark:#047857;--primary-light:#10b981;--secondary:#6366f1;--danger:#ef4444;--warning:#f59e0b;--info:#3b82f6;--success:#10b981;--dark:#1f2937;--gray:#6b7280;--light:#f3f4f6;--border:#e5e7eb;--white:#fff;--shadow-sm:0 1px 2px 0 rgb(0 0 0 / 0.05);--shadow-md:0 4px 6px -1px rgb(0 0 0 / 0.1);--shadow-lg:0 10px 15px -3px rgb(0 0 0 / 0.1);--radius:12px;--radius-sm:8px}
+body{background:#f9fafb}
+.almox-container{max-width:1600px;margin:0 auto;padding:20px}
+.dashboard-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid var(--border)}
+.header-title{display:flex;align-items:center;gap:12px}
+.title-icon{font-size:2rem;background:linear-gradient(135deg,var(--primary),var(--primary-light));width:52px;height:52px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius);box-shadow:var(--shadow-md)}
+.dashboard-header h1{font-size:1.5rem;font-weight:700;color:var(--dark);margin:0}
+.header-subtitle{font-size:0.8rem;color:var(--gray);margin:2px 0 0}
+.header-actions{display:flex;gap:10px;flex-wrap:wrap}
+.action-chip{display:flex;align-items:center;gap:6px;padding:8px 16px;background:var(--white);border:1px solid var(--border);border-radius:40px;font-size:0.85rem;font-weight:500;color:var(--dark);cursor:pointer;transition:all 0.2s;text-decoration:none}
+.action-chip:hover{background:var(--light);border-color:var(--primary);transform:translateY(-1px)}
+.cart-badge{background:var(--warning);border-color:var(--warning);color:var(--white)}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--white);border-radius:var(--radius);padding:18px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow-sm);transition:all 0.3s;border:1px solid var(--border)}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.stat-card-icon{width:52px;height:52px;background:rgba(5,150,105,0.1);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:1.8rem}
+.stat-card-content{flex:1}
+.stat-card-label{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;color:var(--gray);display:block}
+.stat-card-value{font-size:1.6rem;font-weight:700;color:var(--dark);line-height:1.2}
+.stat-progress{margin-top:8px;height:4px;background:#e5e7eb;border-radius:10px;overflow:hidden}
+.stat-progress-bar{height:100%;background:var(--primary);border-radius:10px}
+.search-filters{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.search-wrapper{flex:1;min-width:250px;position:relative}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1rem;opacity:0.6}
+.search-input-modern{width:100%;padding:12px 16px 12px 40px;border:1px solid var(--border);border-radius:var(--radius);font-size:0.9rem;transition:all 0.2s;background:var(--white)}
+.search-input-modern:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(5,150,105,0.1)}
+.filters-group{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filter-select{padding:10px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--white);font-size:0.85rem;cursor:pointer}
+.filter-select:focus{outline:none;border-color:var(--primary)}
+.checkbox-filter-modern{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;font-size:0.85rem;transition:all 0.2s}
+.checkbox-filter-modern:hover{background:var(--light)}
+.btn-clear-filters{padding:8px 16px;background:var(--danger);color:white;border:none;border-radius:var(--radius);cursor:pointer;transition:all 0.2s}
+.btn-clear-filters:hover{background:#dc2626}
+.active-filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px}
+.filter-badge{display:inline-flex;align-items:center;gap:8px;background:#eff6ff;color:#1e40af;padding:6px 12px;border-radius:40px;font-size:0.75rem;font-weight:500}
+.filter-badge button{background:none;border:none;cursor:pointer;font-size:0.9rem;color:#1e40af;padding:0 4px}
+.filter-badge button:hover{color:var(--danger)}
+.table-wrapper-modern{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;border:1px solid var(--border)}
+.table-scroll{overflow-x:auto;max-height:calc(100vh - 420px);overflow-y:auto}
+.data-table{width:100%;border-collapse:collapse;min-width:900px}
+.data-table thead{position:sticky;top:0;z-index:10}
+.data-table th{background:#f8fafc;padding:14px 12px;text-align:left;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray);border-bottom:2px solid var(--border)}
+.data-table td{padding:14px 12px;border-bottom:1px solid var(--border);font-size:0.85rem;color:var(--dark)}
+.data-row{cursor:pointer;transition:background 0.2s}
+.data-row:hover{background:#f0fdf4}
+.item-code{font-weight:600;color:var(--primary);font-size:0.8rem;background:rgba(5,150,105,0.1);padding:4px 8px;border-radius:20px}
+.item-name{font-weight:500}
+.item-size{background:var(--light);padding:4px 8px;border-radius:20px;font-size:0.75rem}
+.stock-badge{display:inline-block;padding:5px 12px;border-radius:40px;font-size:0.75rem;font-weight:600}
+.stock-alto{background:#d1fae5;color:#065f46}
+.stock-medio{background:#dbeafe;color:#1e40af}
+.stock-baixo{background:#fef3c7;color:#92400e}
+.stock-zerado{background:#fee2e2;color:#991b1b}
+.filter-icon{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-left:6px;background:rgba(0,0,0,0.05);border-radius:6px;cursor:pointer;font-size:0.7rem;transition:all 0.2s}
+.filter-icon:hover{background:var(--primary);color:white}
+.filter-icon.active{background:var(--primary);color:white}
+.filter-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:360px;max-width:90%;max-height:80vh;background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:1100;display:flex;flex-direction:column;overflow:hidden}
+.filter-panel-header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:var(--primary);color:white;font-weight:600}
+.filter-panel-close{background:none;border:none;color:white;font-size:1.2rem;cursor:pointer}
+.filter-panel-body{flex:1;padding:16px;overflow-y:auto}
+.filter-panel-search{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:12px}
+.filter-actions{display:flex;gap:8px;margin-bottom:16px}
+.filter-action-btn{flex:1;padding:8px;background:var(--light);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:0.75rem}
+.filter-values-list{max-height:250px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm)}
+.filter-value-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer}
+.filter-value-item:hover{background:var(--light)}
+.filter-value-item input{width:16px;height:16px;cursor:pointer}
+.filter-value-item label{flex:1;cursor:pointer;font-size:0.85rem}
+.filter-panel-footer{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--border);background:#f8fafc}
+.filter-footer-buttons{display:flex;gap:8px}
+.btn-filter-cancel{padding:6px 16px;background:var(--light);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer}
+.btn-filter-apply{padding:6px 16px;background:var(--primary);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer}
+.side-panel{position:fixed;top:0;right:-100%;width:95%;max-width:550px;height:100vh;background:var(--white);box-shadow:-4px 0 30px rgba(0,0,0,0.15);z-index:1050;transition:right 0.3s ease;display:flex;flex-direction:column}
+.side-panel.open{right:0}
+.side-panel-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1040;opacity:0;visibility:hidden;transition:all 0.3s}
+.side-panel-overlay.active{opacity:1;visibility:visible}
+.side-panel-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--white)}
+.side-panel-header h3{font-size:1.2rem;font-weight:600;margin:0}
+.panel-header-danger{background:linear-gradient(135deg,var(--danger),#dc2626);color:white}
+.panel-header-warning{background:linear-gradient(135deg,var(--warning),#d97706);color:white}
+.panel-header-success{background:linear-gradient(135deg,var(--success),#059669);color:white}
+.side-panel-body{flex:1;overflow-y:auto;padding:20px 24px}
+.side-panel-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:12px;background:var(--white)}
+.btn-close-panel{background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--gray);padding:4px 8px;border-radius:8px}
+.btn-close-panel:hover{background:rgba(0,0,0,0.1)}
+.modern-form .form-group{margin-bottom:16px}
+.modern-form label{display:block;font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--gray);margin-bottom:6px}
+.modern-form input,.modern-form select,.modern-form textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.9rem;transition:all 0.2s;background:var(--white)}
+.modern-form input:focus,.modern-form select:focus,.modern-form textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(5,150,105,0.1)}
+.input-group{display:flex;gap:8px}
+.input-group-btn{padding:0 16px;background:var(--light);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:1rem}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.form-feedback{display:block;margin-top:4px;font-size:0.75rem}
+.feedback-existente{color:var(--warning)}
+.feedback-disponivel{color:var(--success)}
+.photo-upload{border:2px dashed var(--border);border-radius:var(--radius);padding:20px;text-align:center;transition:all 0.2s}
+.photo-upload:hover{border-color:var(--primary);background:var(--light)}
+.photo-actions{display:flex;gap:10px;justify-content:center}
+.photo-btn{padding:8px 20px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:0.85rem;transition:all 0.2s}
+.photo-btn:hover{background:var(--primary);color:white;border-color:var(--primary)}
+.photo-preview{position:relative;margin-top:12px}
+.photo-preview img{max-width:100%;max-height:200px;border-radius:var(--radius)}
+.photo-remove{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:var(--danger);color:white;border:none;cursor:pointer;font-size:0.8rem}
+.btn-primary{background:var(--primary);color:white;border:none;padding:10px 20px;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;transition:all 0.2s}
+.btn-primary:hover{background:var(--primary-dark);transform:translateY(-1px)}
+.btn-secondary{background:var(--white);color:var(--dark);border:1px solid var(--border);padding:10px 20px;border-radius:var(--radius-sm);font-weight:500;cursor:pointer;transition:all 0.2s}
+.btn-secondary:hover{background:var(--light)}
+.btn-danger{background:var(--danger);color:white;border:none;padding:10px 20px;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;transition:all 0.2s}
+.btn-danger:hover{background:#dc2626}
+.btn-block{width:100%}
+.info-box{padding:14px 16px;border-radius:var(--radius);margin-bottom:20px;border-left:4px solid}
+.info-box-warning{background:#fef3c7;border-left-color:var(--warning)}
+.info-box-success{background:#d1fae5;border-left-color:var(--success)}
+.fab-modern{position:fixed;bottom:30px;right:30px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));color:white;border:none;font-size:28px;cursor:pointer;box-shadow:0 4px 15px rgba(5,150,105,0.4);transition:all 0.3s;display:flex;align-items:center;justify-content:center;z-index:100}
+.fab-modern:hover{transform:scale(1.1);box-shadow:0 6px 20px rgba(5,150,105,0.5)}
+.toast-modern{position:fixed;bottom:30px;right:30px;padding:14px 24px;background:var(--dark);color:white;border-radius:var(--radius);font-size:0.85rem;font-weight:500;z-index:2000;opacity:0;transform:translateY(20px);transition:all 0.3s;pointer-events:none}
+.toast-modern.show{opacity:1;transform:translateY(0)}
+.toast-modern.success{background:var(--success)}
+.toast-modern.error{background:var(--danger)}
+.toast-modern.info{background:var(--info)}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:20px 0}
+.info-item{padding:12px;background:var(--light);border-radius:var(--radius-sm)}
+.info-item span{display:block;font-size:0.7rem;text-transform:uppercase;color:var(--gray);margin-bottom:4px}
+.info-item strong{font-size:0.95rem;color:var(--dark)}
+.detail-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.detail-actions .btn-danger,.detail-actions .btn-secondary{flex:1;justify-content:center;text-align:center}
+.empty-state-row{text-align:center;padding:60px 20px !important}
+.empty-state{font-size:3.5rem;margin-bottom:12px;opacity:0.5}
+.empty-state-text{font-size:1rem;color:var(--gray);margin-bottom:6px}
+.empty-state-hint{font-size:0.85rem;color:var(--gray)}
+.detail-loading,.cart-loading{text-align:center;padding:40px;color:var(--gray)}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);backdrop-filter:blur(3px);z-index:1200;display:none}
+.modal-overlay.active{display:block}
+.modal-container{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:700px;max-height:85vh;background:white;border-radius:20px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);z-index:1201;display:flex;flex-direction:column;overflow:hidden;animation:modalSlideIn 0.3s ease}
+@keyframes modalSlideIn{from{opacity:0;transform:translate(-50%,-48%)}to{opacity:1;transform:translate(-50%,-50%)}}
+.modal-header{display:flex;align-items:center;gap:16px;padding:20px 24px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-bottom:1px solid var(--border)}
+.modal-header-info{background:linear-gradient(135deg,#059669,#10b981);color:white}
+.modal-header-wa{background:linear-gradient(135deg,#25D366,#128C7E);color:white}
+.modal-header-icon{width:48px;height:48px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.6rem}
+.modal-header-title{flex:1}
+.modal-header-title h3{margin:0;font-size:1.2rem;font-weight:600}
+.modal-header-title p{margin:4px 0 0;font-size:0.8rem;opacity:0.8}
+.modal-close{background:none;border:none;font-size:1.2rem;cursor:pointer;color:#666;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+.modal-close:hover{background:rgba(0,0,0,0.1)}
+.modal-body{flex:1;overflow-y:auto;padding:24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end;background:white}
+.nfe-info-card{background:#f0fdf4;border-radius:16px;padding:16px;margin-bottom:20px;border:1px solid #d1fae5}
+.nfe-info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #d1fae5}
+.nfe-info-row:last-child{border-bottom:none}
+.nfe-info-label{font-weight:600;color:#065f46}
+.nfe-info-value{color:#1f2937;font-family:monospace}
+.itens-lista{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:12px}
+.item-nfe-row{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #f1f5f9}
+.item-nfe-row:hover{background:#f8fafc}
+.item-nfe-codigo{font-family:monospace;font-size:0.8rem;color:var(--primary);background:rgba(5,150,105,0.1);padding:2px 6px;border-radius:4px}
+.item-nfe-nome{flex:1;font-size:0.85rem;font-weight:500;margin-left:12px}
+.item-nfe-qtd{font-size:0.85rem;font-weight:600;color:var(--primary);margin-right:16px}
+.alert-warning{background:#fef3c7;border-left:4px solid var(--warning);padding:12px;border-radius:8px;margin-bottom:16px;font-size:0.85rem}
+.loading-spinner{text-align:center;padding:40px;color:var(--gray)}
+.modal-resultado{max-width:500px}
+.resultado-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9}
+.resultado-item:last-child{border-bottom:none}
+.resultado-item .status{font-weight:600}
+.status-success{color:var(--success)}
+.status-warning{color:var(--warning)}
+.status-error{color:var(--danger)}
+.modal-wa{max-width:750px}
+.wa-tabs{display:flex;gap:5px;border-bottom:2px solid var(--border);margin-bottom:20px;flex-wrap:wrap}
+.wa-tab{padding:10px 20px;background:none;border:none;cursor:pointer;font-size:14px;font-weight:500;color:var(--gray);transition:all 0.2s}
+.wa-tab:hover{color:var(--primary)}
+.wa-tab.active{color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px}
+.wa-tab-content{display:none;min-height:400px;max-height:500px;overflow-y:auto}
+.wa-tab-content.active{display:block}
+.instancias-list{border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto}
+.instancia-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s}
+.instancia-item:hover{background:var(--light)}
+.instancia-item.selected{background:#d1fae5;border-left:3px solid var(--primary)}
+.instancia-nome{font-weight:500;display:flex;align-items:center;gap:8px}
+.instancia-status{font-size:12px;padding:2px 8px;border-radius:20px}
+.status-connected{background:#d1fae5;color:#065f46}
+.status-disconnected{background:#fee2e2;color:#991b1b}
+.instancia-actions button{background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:14px}
+.instancia-actions button:hover{background:var(--light)}
+.qr-code-box{background:white;padding:20px;border-radius:12px;text-align:center;border:1px solid var(--border)}
+.qr-code-box img{max-width:250px;margin:0 auto}
+.numeros-list{border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto}
+.numero-item{display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border)}
+.numero-item:last-child{border-bottom:none}
+.numero-info{display:flex;align-items:center;gap:10px}
+.numero-info .numero{font-weight:500;font-family:monospace}
+.numero-info .badge{font-size:10px;padding:2px 6px;border-radius:20px;background:#d1fae5;color:#065f46}
+.btn-remove-numero{background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;color:var(--danger);font-size:16px}
+.btn-remove-numero:hover{background:#fee2e2}
+.template-preview{position:relative}
+.template-preview-btn{position:absolute;right:8px;top:8px;background:var(--primary);color:white;border:none;border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;z-index:1}
+.template-preview-btn:hover{background:var(--primary-dark)}
+.loading-small{text-align:center;padding:20px;color:var(--gray)}
+.alert-info{background:#eff6ff;border-left:3px solid var(--info);padding:12px;border-radius:8px;font-size:13px}
+.modal-preview{max-width:450px}
+.modal-preview .modal-body{background:#e5ddd5}
+.whatsapp-message{background:white;padding:12px;border-radius:12px;max-width:90%;margin:0 auto;box-shadow:0 1px 2px rgba(0,0,0,0.1)}
+.whatsapp-message pre{white-space:pre-wrap;font-family:inherit;margin:0;font-size:13px}
+.toggle-switch{position:relative;display:inline-block;width:52px;height:26px}
+.toggle-switch input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:#ccc;transition:0.3s;border-radius:34px}
+.toggle-slider:before{position:absolute;content:"";height:20px;width:20px;left:3px;bottom:3px;background-color:white;transition:0.3s;border-radius:50%}
+.toggle-switch input:checked+.toggle-slider{background-color:#25D366}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(26px)}
+.status-toggle{display:flex;align-items:center}
+.checkbox-label{display:inline-flex;align-items:center;gap:8px;margin-right:15px;margin-bottom:10px;cursor:pointer}
+.departamentos-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+@media (max-width:992px){.hide-md{display:none !important}.stats-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}}
+@media (max-width:768px){.almox-container{padding:12px}.hide-sm{display:none !important}.dashboard-header{flex-direction:column;align-items:stretch}.header-actions{overflow-x:auto;padding-bottom:4px}.stats-grid{grid-template-columns:repeat(2,1fr)}.stat-card-value{font-size:1.2rem}.search-filters{flex-direction:column}.filters-group{justify-content:flex-start}.table-scroll{max-height:calc(100vh - 480px)}.fab-modern{bottom:20px;right:20px;width:48px;height:48px;font-size:24px}.side-panel{max-width:100%}.form-row{grid-template-columns:1fr}.wa-tabs{overflow-x:auto;flex-wrap:nowrap}.wa-tab{white-space:nowrap}}
+@media (max-width:480px){.stats-grid{grid-template-columns:1fr}.filter-panel{width:95%}.departamentos-list{grid-template-columns:1fr}}
 </style>
 
 <script>
 const CSRF_TOKEN = '{{ csrf_token }}';
 
-// ===== Toast Moderno =====
+// ============================================
+// UTILITÁRIOS
+// ============================================
 function mostrarToast(msg, tipo = 'success') {
     const toast = document.getElementById('toast');
     toast.textContent = msg;
@@ -1799,13 +982,6 @@ function mostrarToast(msg, tipo = 'success') {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-// ===== Variáveis Globais =====
-var filtrosPorColuna = {};
-var colunaFiltroAtual = null;
-var buscaTimeout;
-var isUpdating = false;
-
-// ===== Utilitários =====
 function fecharTodosPanels() {
     document.querySelectorAll('.side-panel').forEach(p => p.classList.remove('open'));
     document.getElementById('panel-overlay').classList.remove('active');
@@ -1838,21 +1014,25 @@ function formatNumber(num) {
     return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 }
 
-// ===== Filtros por Coluna =====
+// ============================================
+// FILTROS POR COLUNA
+// ============================================
+let filtrosPorColuna = {};
+let colunaFiltroAtual = null;
+
 function getColunaIndex(coluna) {
-    const mapa = {
-        'codigo': 0, 'nome': 1, 'lote': 2, 'tamanho': 3,
-        'ca': 4, 'quantidade': 5, 'unidade': 6, 'localizacao': 7, 'departamento': 8
-    };
+    const mapa = { 'codigo': 0, 'nome': 1, 'lote': 2, 'tamanho': 3, 'ca': 4, 'quantidade': 5, 'unidade': 6, 'localizacao': 7, 'departamento': 8 };
     return mapa[coluna] || 0;
 }
 
-function obterValoresUnicos(coluna) {
-    const valores = new Set();
-    const colIndex = getColunaIndex(coluna);
-    const linhas = document.querySelectorAll('#tabela-body tr');
+function abrirFiltroColuna(elemento, coluna) {
+    event.stopPropagation();
+    colunaFiltroAtual = coluna;
+    document.getElementById('filtro-coluna-nome').textContent = elemento.parentElement.textContent.replace('🔽', '').trim();
     
-    linhas.forEach(linha => {
+    const colIndex = getColunaIndex(coluna);
+    const valores = new Set();
+    document.querySelectorAll('#tabela-body tr').forEach(linha => {
         const celula = linha.querySelectorAll('td')[colIndex];
         if (celula) {
             const texto = celula.textContent.trim();
@@ -1860,42 +1040,14 @@ function obterValoresUnicos(coluna) {
         }
     });
     
-    return Array.from(valores).sort();
-}
-
-function abrirFiltroColuna(elemento, coluna) {
-    event.stopPropagation();
-    colunaFiltroAtual = coluna;
-    
-    document.getElementById('filtro-coluna-nome').textContent = elemento.parentElement.textContent.replace('🔽', '').trim();
-    
-    const valores = obterValoresUnicos(coluna);
     const selecionados = filtrosPorColuna[coluna] || [];
-    
     let listaHtml = '';
-    valores.forEach(valor => {
+    Array.from(valores).sort().forEach(valor => {
         const checked = selecionados.includes(valor) ? 'checked' : '';
-        const idSanitizado = 'filtro_' + coluna + '_' + valor.replace(/[^a-zA-Z0-9]/g, '_');
-        listaHtml += `<div class="filter-value-item">
-            <input type="checkbox" value="${escapeHtml(valor).replace(/"/g, '&quot;')}" id="${idSanitizado}" ${checked}>
-            <label for="${idSanitizado}">${escapeHtml(valor)}</label>
-        </div>`;
+        listaHtml += `<div class="filter-value-item"><input type="checkbox" value="${escapeHtml(valor)}" ${checked}><label>${escapeHtml(valor)}</label></div>`;
     });
     
     document.getElementById('filtro-coluna-lista').innerHTML = listaHtml || '<div style="padding:20px;text-align:center;">Nenhum valor</div>';
-    atualizarContadorSelecionados();
-    
-    const buscaInput = document.getElementById('filtro-coluna-busca');
-    buscaInput.value = '';
-    buscaInput.oninput = function() {
-        const termo = this.value.toLowerCase();
-        const itens = document.querySelectorAll('#filtro-coluna-lista .filter-value-item');
-        itens.forEach(item => {
-            const label = item.querySelector('label');
-            item.style.display = label && label.textContent.toLowerCase().includes(termo) ? 'flex' : 'none';
-        });
-    };
-    
     document.getElementById('filtro-coluna-panel').style.display = 'flex';
 }
 
@@ -1905,35 +1057,19 @@ function fecharFiltroColuna() {
 }
 
 function marcarTodosFiltro() {
-    document.querySelectorAll('#filtro-coluna-lista input[type="checkbox"]').forEach(cb => cb.checked = true);
-    atualizarContadorSelecionados();
+    document.querySelectorAll('#filtro-coluna-lista input').forEach(cb => cb.checked = true);
 }
 
 function desmarcarTodosFiltro() {
-    document.querySelectorAll('#filtro-coluna-lista input[type="checkbox"]').forEach(cb => cb.checked = false);
-    atualizarContadorSelecionados();
-}
-
-function atualizarContadorSelecionados() {
-    const selecionados = document.querySelectorAll('#filtro-coluna-lista input[type="checkbox"]:checked').length;
-    const total = document.querySelectorAll('#filtro-coluna-lista input[type="checkbox"]').length;
-    document.getElementById('filtro-selecionados-count').textContent = `${selecionados} de ${total} selecionados`;
+    document.querySelectorAll('#filtro-coluna-lista input').forEach(cb => cb.checked = false);
 }
 
 function aplicarFiltroColuna() {
     if (!colunaFiltroAtual) return;
-    
     const selecionados = [];
-    document.querySelectorAll('#filtro-coluna-lista input[type="checkbox"]:checked').forEach(cb => {
-        selecionados.push(cb.value);
-    });
-    
-    if (selecionados.length > 0) {
-        filtrosPorColuna[colunaFiltroAtual] = selecionados;
-    } else {
-        delete filtrosPorColuna[colunaFiltroAtual];
-    }
-    
+    document.querySelectorAll('#filtro-coluna-lista input:checked').forEach(cb => selecionados.push(cb.value));
+    if (selecionados.length) filtrosPorColuna[colunaFiltroAtual] = selecionados;
+    else delete filtrosPorColuna[colunaFiltroAtual];
     aplicarTodosFiltros();
     atualizarIndicadoresFiltro();
     fecharFiltroColuna();
@@ -1955,20 +1091,15 @@ function limparTodosFiltros() {
 
 function aplicarTodosFiltros() {
     const linhas = document.querySelectorAll('#tabela-body tr');
-    if (linhas.length === 0) return;
-    
+    if (!linhas.length) return;
     const colunasComFiltro = Object.keys(filtrosPorColuna);
-    
     linhas.forEach(linha => {
         let visivel = true;
-        
-        for (let i = 0; i < colunasComFiltro.length; i++) {
-            const coluna = colunasComFiltro[i];
+        for (const coluna of colunasComFiltro) {
             const valoresPermitidos = filtrosPorColuna[coluna];
             const colIndex = getColunaIndex(coluna);
             const celula = linha.querySelectorAll('td')[colIndex];
-            
-            if (celula && valoresPermitidos && valoresPermitidos.length > 0) {
+            if (celula && valoresPermitidos && valoresPermitidos.length) {
                 const texto = celula.textContent.trim();
                 if (!valoresPermitidos.includes(texto)) {
                     visivel = false;
@@ -1976,7 +1107,6 @@ function aplicarTodosFiltros() {
                 }
             }
         }
-        
         linha.style.display = visivel ? '' : 'none';
     });
 }
@@ -1984,62 +1114,50 @@ function aplicarTodosFiltros() {
 function atualizarIndicadoresFiltro() {
     const container = document.getElementById('filtros-ativos-container');
     const btnLimpar = document.getElementById('btn-limpar-filtros');
-    
     const colunas = ['codigo', 'nome', 'lote', 'tamanho', 'ca', 'quantidade', 'unidade', 'localizacao', 'departamento'];
     colunas.forEach(coluna => {
         const icone = document.querySelector(`.filter-icon[data-coluna="${coluna}"]`);
-        if (icone) {
-            if (filtrosPorColuna[coluna]) icone.classList.add('active');
-            else icone.classList.remove('active');
-        }
+        if (icone) icone.classList.toggle('active', !!filtrosPorColuna[coluna]);
     });
-    
     const colunasAtivas = Object.keys(filtrosPorColuna);
-    if (colunasAtivas.length === 0) {
+    if (!colunasAtivas.length) {
         container.innerHTML = '';
         btnLimpar.style.display = 'none';
         return;
     }
-    
     btnLimpar.style.display = 'inline-flex';
     let html = '';
     colunasAtivas.forEach(coluna => {
         const valores = filtrosPorColuna[coluna];
-        const displayColuna = coluna.charAt(0).toUpperCase() + coluna.slice(1);
         const valoresStr = valores.length > 2 ? valores.slice(0, 2).join(', ') + ` +${valores.length - 2}` : valores.join(', ');
-        html += `<div class="filter-badge">
-            🔽 ${displayColuna}: ${escapeHtml(valoresStr)}
-            <button onclick="limparFiltroColunaEspecifico('${coluna}')">✕</button>
-        </div>`;
+        html += `<div class="filter-badge">🔽 ${coluna}: ${escapeHtml(valoresStr)}<button onclick="limparFiltroColunaEspecifico('${coluna}')">✕</button></div>`;
     });
     container.innerHTML = html;
 }
 
-// ===== Busca AJAX =====
+// ============================================
+// BUSCA AJAX
+// ============================================
+let buscaTimeout;
+let isUpdating = false;
+
 function atualizarTabela() {
     if (isUpdating) return;
     isUpdating = true;
-    
     const busca = document.getElementById('busca').value;
     const departamento = document.getElementById('filtro-departamento').value;
     const ordenar = document.getElementById('filtro-ordenar').value;
     const mostrarTodos = document.getElementById('mostrar-todos').checked;
-    
     const params = new URLSearchParams({ busca, departamento, ordenar, todos: mostrarTodos ? '1' : '0' });
-    
     fetch('/almoxarifado/buscar/?' + params.toString())
         .then(resp => resp.json())
         .then(data => {
             const tbody = document.getElementById('tabela-body');
-            if (!data.itens || data.itens.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="9" class="empty-state-row">
-                    <div class="empty-state">📦</div>
-                    <div class="empty-state-text">Nenhum item encontrado</div>
-                </td></tr>`;
+            if (!data.itens || !data.itens.length) {
+                tbody.innerHTML = `<tr><td colspan="9" class="empty-state-row"><div class="empty-state">📦</div><div class="empty-state-text">Nenhum item encontrado</div></td></tr>`;
             } else {
                 let html = '';
-                for (let i = 0; i < data.itens.length; i++) {
-                    const item = data.itens[i];
+                data.itens.forEach(item => {
                     html += `<tr class="data-row" onclick="abrirDetalhe(${item.id})">
                         <td class="col-codigo"><span class="item-code">${escapeHtml(item.codigo)}</span></td>
                         <td class="col-nome"><span class="item-name">${escapeHtml(item.nome)}</span></td>
@@ -2051,66 +1169,45 @@ function atualizarTabela() {
                         <td class="col-local">${escapeHtml((item.localizacao || '—').substring(0, 12))}</td>
                         <td class="col-dept hide-sm">${escapeHtml((item.departamento || '—').substring(0, 8))}</td>
                     </tr>`;
-                }
+                });
                 tbody.innerHTML = html;
                 aplicarTodosFiltros();
             }
-            
             let baixo = 0, zerado = 0;
-            for (let j = 0; j < data.itens.length; j++) {
-                if (data.itens[j].status_estoque === 'baixo') baixo++;
-                if (data.itens[j].status_estoque === 'zerado') zerado++;
-            }
+            data.itens.forEach(item => {
+                if (item.status_estoque === 'baixo') baixo++;
+                if (item.status_estoque === 'zerado') zerado++;
+            });
             document.getElementById('stats-baixo').textContent = baixo;
             document.getElementById('stats-zerado').textContent = zerado;
-            
             isUpdating = false;
         })
         .catch(e => { console.error(e); isUpdating = false; });
 }
 
-// ===== Eventos =====
-document.getElementById('busca')?.addEventListener('input', function() {
-    clearTimeout(buscaTimeout);
-    buscaTimeout = setTimeout(atualizarTabela, 500);
-});
+document.getElementById('busca')?.addEventListener('input', () => { clearTimeout(buscaTimeout); buscaTimeout = setTimeout(atualizarTabela, 500); });
 document.getElementById('filtro-departamento')?.addEventListener('change', () => atualizarTabela());
 document.getElementById('filtro-ordenar')?.addEventListener('change', () => atualizarTabela());
 
-// ===== Buscar Código - CORRIGIDO =====
-// ===== Buscar Código - CORRIGIDO (NÃO LIMPA CAMPOS PREENCHIDOS) =====
+// ============================================
+// BUSCAR POR CÓDIGO
+// ============================================
 async function buscarPorCodigo() {
     const codigo = document.getElementById('form-codigo').value.trim();
     const feedback = document.getElementById('codigo-feedback');
     const modo = document.getElementById('form-modo').value;
-    
-    // Se está editando um item, não faz busca
-    if (modo === 'editar') { 
-        feedback.style.display = 'none'; 
-        return; 
-    }
-    
-    // Se não tem código, não faz nada
-    if (!codigo) {
-        feedback.style.display = 'none';
-        return;
-    }
-    
+    if (modo === 'editar') { feedback.style.display = 'none'; return; }
+    if (!codigo) { feedback.style.display = 'none'; return; }
     try {
         const resp = await fetch('/almoxarifado/item/buscar-codigo/?codigo=' + encodeURIComponent(codigo));
         const data = await resp.json();
-        
         if (data.encontrado) {
-            // CÓDIGO EXISTE - Pré-preenche o formulário
             const item = data.item;
             feedback.style.display = 'block';
             feedback.className = 'form-feedback feedback-existente';
-            feedback.innerHTML = '⚠️ Código já existe: ' + escapeHtml(item.nome) + ' - Quantidade atual: ' + formatNumber(item.quantidade);
-            
-            // Pré-preenche o formulário com os dados do item existente
+            feedback.innerHTML = '⚠️ Código já existe: ' + escapeHtml(item.nome);
             document.getElementById('form-item-id').value = item.id;
             document.getElementById('form-nome').value = item.nome;
-            document.getElementById('form-descricao').value = item.descricao || '';
             document.getElementById('form-departamento').value = item.departamento;
             document.getElementById('form-unidade').value = item.unidade;
             document.getElementById('form-localizacao').value = item.localizacao || '';
@@ -2120,22 +1217,13 @@ async function buscarPorCodigo() {
             document.getElementById('form-lote').value = item.lote || '';
             document.getElementById('form-tamanho').value = item.tamanho || '';
             document.getElementById('form-ca').value = item.ca || '';
-            document.getElementById('form-categoria').value = item.categoria || '';
-            document.getElementById('form-marca').value = item.marca || '';
-            
-            // Muda o modo para "somar" (adicionar quantidade ao existente)
             document.getElementById('form-modo').value = 'somar';
             document.getElementById('panel-form-titulo').textContent = '📦 Somar ao Estoque';
             document.getElementById('btn-salvar').textContent = '➕ Somar Quantidade';
-            
         } else {
-            // CÓDIGO NÃO EXISTE - APENAS MOSTRA MENSAGEM, NÃO LIMPA OS CAMPOS!
             feedback.style.display = 'block';
             feedback.className = 'form-feedback feedback-disponivel';
-            feedback.innerHTML = '✅ Código disponível para cadastro. Preencha os dados normalmente.';
-            
-            // NÃO LIMPA OS CAMPOS - Mantém o que o usuário já preencheu
-            // Apenas garante que o modo seja "adicionar" (criar novo item)
+            feedback.innerHTML = '✅ Código disponível para cadastro.';
             if (document.getElementById('form-modo').value !== 'editar') {
                 document.getElementById('form-modo').value = 'adicionar';
                 document.getElementById('panel-form-titulo').textContent = '➕ Novo Item';
@@ -2143,19 +1231,14 @@ async function buscarPorCodigo() {
                 document.getElementById('form-item-id').value = '';
             }
         }
-    } catch(e) { 
-        console.error(e);
-        mostrarToast('Erro ao verificar código', 'error');
-    }
+    } catch(e) { mostrarToast('Erro ao verificar código', 'error'); }
 }
 
-// ===== Foto =====
+// ============================================
+// FOTO
+// ============================================
 function isMobileDevice() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); }
-function abrirCamera() {
-    const cameraInput = document.getElementById('camera-input');
-    if (isMobileDevice() && cameraInput) cameraInput.click();
-    else document.getElementById('foto-input').click();
-}
+function abrirCamera() { if (isMobileDevice()) document.getElementById('camera-input').click(); else document.getElementById('foto-input').click(); }
 function handleFotoSelecionada(input) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
@@ -2174,7 +1257,9 @@ function removerFoto() {
     document.getElementById('foto-actions').style.display = 'flex';
 }
 
-// ===== Abrir Painéis =====
+// ============================================
+// CRUD ITEM
+// ============================================
 function abrirPanelAdicionar() {
     document.getElementById('form-item').reset();
     document.getElementById('form-item-id').value = '';
@@ -2187,71 +1272,46 @@ function abrirPanelAdicionar() {
     document.getElementById('panel-overlay').classList.add('active');
 }
 
-function abrirBaixa(id, nome, estoque, codigo) {
-    document.getElementById('baixa-item-id').value = id;
-    document.getElementById('baixa-item-info').innerHTML = `<strong>${escapeHtml(codigo)} - ${escapeHtml(nome)}</strong><br>Estoque disponível: <strong>${formatNumber(estoque)}</strong>`;
-    const qtdField = document.getElementById('baixa-quantidade');
-    if (qtdField) qtdField.setAttribute('data-max', estoque);
-    const agora = new Date();
-    document.getElementById('baixa-data').value = agora.toISOString().split('T')[0];
-    document.getElementById('baixa-hora').value = agora.toTimeString().slice(0,5);
-    fecharTodosPanels();
-    document.getElementById('panel-baixa').classList.add('open');
-    document.getElementById('panel-overlay').classList.add('active');
+async function salvarItem() {
+    const modo = document.getElementById('form-modo').value;
+    const itemId = document.getElementById('form-item-id').value;
+    const nome = document.getElementById('form-nome').value.trim();
+    if (!nome) { mostrarToast('Nome obrigatório!', 'error'); return; }
+    const formData = new FormData(document.getElementById('form-item'));
+    let url = '/almoxarifado/item/adicionar/';
+    if (modo === 'editar' && itemId) url = '/almoxarifado/item/' + itemId + '/editar/';
+    else if (modo === 'somar' && itemId) formData.append('somar', 'true');
+    try {
+        const resp = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }, body: formData });
+        const data = await resp.json();
+        if (data.success) { mostrarToast(data.message); fecharTodosPanels(); setTimeout(atualizarTabela, 500); }
+        else mostrarToast(data.error || 'Erro ao salvar', 'error');
+    } catch(e) { mostrarToast('Erro de conexão', 'error'); }
 }
 
 async function abrirDetalhe(id) {
     document.getElementById('panel-detalhe').classList.add('open');
     document.getElementById('panel-overlay').classList.add('active');
     document.getElementById('detalhe-conteudo').innerHTML = '<div class="detail-loading">⏳ Carregando...</div>';
-    
     try {
         const resp = await fetch('/almoxarifado/item/' + id + '/detalhe/');
         const d = await resp.json();
         let html = '';
-        
-        if (d.foto_url && d.foto_url !== 'null') {
-            html += `<div style="text-align:center;margin-bottom:20px;">
-                <img src="${d.foto_url}" alt="${escapeHtml(d.nome)}" style="max-width:100%;max-height:200px;border-radius:12px;object-fit:contain;">
-            </div>`;
-        } else {
-            html += `<div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;text-align:center;border-radius:12px;margin-bottom:20px;">
-                <span style="font-size:4rem;">📦</span>
-            </div>`;
-        }
-        
-        html += `<div class="info-grid">
-            <div class="info-item"><span>Código</span><strong>${escapeHtml(d.codigo)}</strong></div>
-            <div class="info-item"><span>Nome</span><strong>${escapeHtml(d.nome)}</strong></div>
-            <div class="info-item"><span>Estoque</span><strong>${formatNumber(d.quantidade)} ${escapeHtml(d.unidade)}</strong></div>
-            <div class="info-item"><span>Mínimo</span><strong>${formatNumber(d.estoque_minimo)}</strong></div>
-            <div class="info-item"><span>Departamento</span><strong>${escapeHtml(d.departamento)}</strong></div>
-            <div class="info-item"><span>Localização</span><strong>${escapeHtml(d.localizacao || '—')}</strong></div>`;
-        
+        if (d.foto_url && d.foto_url !== 'null') html += `<div style="text-align:center;margin-bottom:20px;"><img src="${d.foto_url}" style="max-width:100%;max-height:200px;border-radius:12px;"></div>`;
+        else html += `<div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;text-align:center;border-radius:12px;"><span style="font-size:4rem;">📦</span></div>`;
+        html += `<div class="info-grid"><div class="info-item"><span>Código</span><strong>${escapeHtml(d.codigo)}</strong></div><div class="info-item"><span>Nome</span><strong>${escapeHtml(d.nome)}</strong></div><div class="info-item"><span>Estoque</span><strong>${formatNumber(d.quantidade)} ${escapeHtml(d.unidade)}</strong></div><div class="info-item"><span>Mínimo</span><strong>${formatNumber(d.estoque_minimo)}</strong></div><div class="info-item"><span>Local</span><strong>${escapeHtml(d.localizacao || '—')}</strong></div>`;
         if (d.lote && d.lote !== '—') html += `<div class="info-item"><span>Lote</span><strong>${escapeHtml(d.lote)}</strong></div>`;
         if (d.tamanho && d.tamanho !== '—') html += `<div class="info-item"><span>Tamanho</span><strong>${escapeHtml(d.tamanho)}</strong></div>`;
         if (d.ca && d.ca !== '—') html += `<div class="info-item"><span>CA</span><strong>${escapeHtml(d.ca)}</strong></div>`;
-        if (d.fornecedor && d.fornecedor !== '—') html += `<div class="info-item"><span>Fornecedor</span><strong>${escapeHtml(d.fornecedor)}</strong></div>`;
-        html += `</div>`;
-        
-        html += `<div class="detail-actions">
-            <button class="btn-danger" onclick="abrirBaixa(${d.id}, '${d.nome.replace(/'/g, "\\'")}', ${d.quantidade}, '${d.codigo.replace(/'/g, "\\'")}')">➖ Dar Baixa</button>
-            <button class="btn-secondary" onclick="adicionarAoCarrinho(${d.id}, '${d.nome.replace(/'/g, "\\'")}', ${d.quantidade})">🛒 Carrinho</button>
-            <button class="btn-secondary" onclick="abrirEditar(${d.id})">✏️ Editar</button>
-            <button class="btn-secondary" onclick="if(confirm('Desativar este item?')) excluirItem(${d.id})">🗑️ Desativar</button>
-        </div>`;
-        
+        html += `</div><div class="detail-actions"><button class="btn-danger" onclick="abrirBaixa(${d.id}, '${d.nome.replace(/'/g, "\\'")}', ${d.quantidade}, '${d.codigo.replace(/'/g, "\\'")}')">➖ Dar Baixa</button><button class="btn-secondary" onclick="adicionarAoCarrinho(${d.id}, '${d.nome.replace(/'/g, "\\'")}', ${d.quantidade})">🛒 Carrinho</button><button class="btn-secondary" onclick="abrirEditar(${d.id})">✏️ Editar</button><button class="btn-secondary" onclick="if(confirm('Desativar este item?')) excluirItem(${d.id})">🗑️ Desativar</button></div>`;
         document.getElementById('detalhe-conteudo').innerHTML = html;
-    } catch(e) { 
-        document.getElementById('detalhe-conteudo').innerHTML = '<div class="detail-loading" style="color:red;">Erro ao carregar detalhes</div>';
-    }
+    } catch(e) { document.getElementById('detalhe-conteudo').innerHTML = '<div class="detail-loading" style="color:red;">Erro ao carregar</div>'; }
 }
 
 async function abrirEditar(id) {
     try {
         const resp = await fetch('/almoxarifado/item/' + id + '/detalhe/');
         const item = await resp.json();
-        
         document.getElementById('form-item-id').value = item.id;
         document.getElementById('form-codigo').value = item.codigo;
         document.getElementById('form-nome').value = item.nome;
@@ -2265,42 +1325,27 @@ async function abrirEditar(id) {
         document.getElementById('form-lote').value = item.lote || '';
         document.getElementById('form-tamanho').value = item.tamanho || '';
         document.getElementById('form-ca').value = item.ca || '';
-        document.getElementById('form-categoria').value = item.categoria || '';
-        document.getElementById('form-marca').value = item.marca || '';
         document.getElementById('form-departamento').value = item.departamento;
-        
         document.getElementById('form-modo').value = 'editar';
         document.getElementById('panel-form-titulo').textContent = '✏️ Editar Item';
         document.getElementById('btn-salvar').textContent = '💾 Atualizar';
         document.getElementById('codigo-feedback').style.display = 'none';
         removerFoto();
         fecharTodosPanels();
-        setTimeout(() => {
-            document.getElementById('panel-form').classList.add('open');
-            document.getElementById('panel-overlay').classList.add('active');
-        }, 300);
+        setTimeout(() => { document.getElementById('panel-form').classList.add('open'); document.getElementById('panel-overlay').classList.add('active'); }, 300);
     } catch(e) { mostrarToast('Erro ao carregar dados', 'error'); }
 }
 
-// ===== Salvar, Baixa, Excluir =====
-async function salvarItem() {
-    const modo = document.getElementById('form-modo').value;
-    const itemId = document.getElementById('form-item-id').value;
-    const nome = document.getElementById('form-nome').value.trim();
-    
-    if (!nome) { mostrarToast('Nome obrigatório!', 'error'); return; }
-    
-    const formData = new FormData(document.getElementById('form-item'));
-    let url = '/almoxarifado/item/adicionar/';
-    if (modo === 'editar' && itemId) url = '/almoxarifado/item/' + itemId + '/editar/';
-    else if (modo === 'somar' && itemId) formData.append('somar', 'true');
-    
-    try {
-        const resp = await fetch(url, { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: formData });
-        const data = await resp.json();
-        if (data.success) { mostrarToast(data.message); fecharTodosPanels(); setTimeout(atualizarTabela, 500); }
-        else mostrarToast(data.error || 'Erro ao salvar', 'error');
-    } catch(e) { mostrarToast('Erro de conexão', 'error'); }
+function abrirBaixa(id, nome, estoque, codigo) {
+    document.getElementById('baixa-item-id').value = id;
+    document.getElementById('baixa-item-info').innerHTML = `<strong>${escapeHtml(codigo)} - ${escapeHtml(nome)}</strong><br>Estoque disponível: <strong>${formatNumber(estoque)}</strong>`;
+    document.getElementById('baixa-quantidade').setAttribute('data-max', estoque);
+    const agora = new Date();
+    document.getElementById('baixa-data').value = agora.toISOString().split('T')[0];
+    document.getElementById('baixa-hora').value = agora.toTimeString().slice(0, 5);
+    fecharTodosPanels();
+    document.getElementById('panel-baixa').classList.add('open');
+    document.getElementById('panel-overlay').classList.add('active');
 }
 
 async function confirmarBaixa() {
@@ -2308,22 +1353,14 @@ async function confirmarBaixa() {
     const solicitante = document.getElementById('baixa-solicitante').value.trim();
     const quantidade = parseDecimalVal(document.getElementById('baixa-quantidade').value);
     const max = parseFloat(document.getElementById('baixa-quantidade').getAttribute('data-max') || 0);
-    
     if (!solicitante) { mostrarToast('Solicitante obrigatório!', 'error'); return; }
     if (!quantidade || quantidade <= 0) { mostrarToast('Quantidade inválida!', 'error'); return; }
     if (quantidade > max) { mostrarToast('Estoque insuficiente!', 'error'); return; }
-    
     try {
         const resp = await fetch('/almoxarifado/item/' + itemId + '/baixa/', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
-            body: JSON.stringify({
-                solicitante, quantidade,
-                data: document.getElementById('baixa-data').value,
-                hora: document.getElementById('baixa-hora').value,
-                departamento: document.getElementById('baixa-departamento').value,
-                observacao: document.getElementById('baixa-observacao').value
-            })
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ solicitante, quantidade, data: document.getElementById('baixa-data').value, hora: document.getElementById('baixa-hora').value, departamento: document.getElementById('baixa-departamento').value, observacao: document.getElementById('baixa-observacao').value })
         });
         const data = await resp.json();
         if (data.success) { mostrarToast(data.message); fecharTodosPanels(); setTimeout(atualizarTabela, 500); }
@@ -2333,25 +1370,25 @@ async function confirmarBaixa() {
 
 async function excluirItem(id) {
     try {
-        const resp = await fetch('/almoxarifado/item/' + id + '/excluir/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN} });
+        const resp = await fetch('/almoxarifado/item/' + id + '/excluir/', { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN } });
         const data = await resp.json();
         if (data.success) { mostrarToast(data.message); fecharTodosPanels(); setTimeout(atualizarTabela, 500); }
     } catch(e) { mostrarToast('Erro ao excluir', 'error'); }
 }
 
-// ===== Carrinho =====
+// ============================================
+// CARRINHO
+// ============================================
 async function adicionarAoCarrinho(itemId, nome, quantidade) {
     const qtd = prompt(`Quantidade de "${nome}":`, '1');
     if (!qtd) return;
     const qtdNum = parseDecimalVal(qtd);
     if (isNaN(qtdNum) || qtdNum <= 0) { mostrarToast('Quantidade inválida!', 'error'); return; }
-    
     const formData = new FormData();
     formData.append('item_id', itemId);
     formData.append('quantidade', String(qtdNum).replace('.', ','));
-    
     try {
-        const resp = await fetch('/almoxarifado/carrinho/adicionar/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: formData });
+        const resp = await fetch('/almoxarifado/carrinho/adicionar/', { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }, body: formData });
         const data = await resp.json();
         if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(data.carrinho_count); }
         else mostrarToast(data.error, 'error');
@@ -2362,31 +1399,26 @@ async function abrirCarrinho() {
     document.getElementById('panel-carrinho').classList.add('open');
     document.getElementById('panel-overlay').classList.add('active');
     document.getElementById('carrinho-conteudo').innerHTML = '<div class="cart-loading">⏳ Carregando...</div>';
-    
     try {
         const resp = await fetch('/almoxarifado/carrinho/');
         const data = await resp.json();
-        if (!data.itens || data.itens.length === 0) {
+        if (!data.itens || !data.itens.length) {
             document.getElementById('carrinho-conteudo').innerHTML = '<div class="empty-state-text" style="text-align:center;padding:40px;">🛒 Carrinho vazio</div>';
             document.getElementById('carrinho-footer').style.display = 'none';
         } else {
             let html = '';
-            for (let i = 0; i < data.itens.length; i++) {
-                const item = data.itens[i];
-                html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border);">
-                    <div><strong>${escapeHtml(item.codigo)} - ${escapeHtml(item.nome)}</strong><br><small>${formatNumber(item.quantidade)} ${escapeHtml(item.unidade)} | Estoque: ${formatNumber(item.estoque)}</small></div>
-                    <button class="btn-secondary" style="padding:6px 12px;" onclick="removerDoCarrinho(${item.id})">🗑️</button>
-                </div>`;
-            }
+            data.itens.forEach(item => {
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border);"><div><strong>${escapeHtml(item.codigo)} - ${escapeHtml(item.nome)}</strong><br><small>${formatNumber(item.quantidade)} ${escapeHtml(item.unidade)} | Estoque: ${formatNumber(item.estoque)}</small></div><button class="btn-secondary" style="padding:6px 12px;" onclick="removerDoCarrinho(${item.id})">🗑️</button></div>`;
+            });
             document.getElementById('carrinho-conteudo').innerHTML = html;
             document.getElementById('carrinho-footer').style.display = 'flex';
         }
-    } catch(e) { document.getElementById('carrinho-conteudo').innerHTML = '<div class="empty-state-text" style="color:red;text-align:center;">Erro ao carregar</div>'; }
+    } catch(e) { document.getElementById('carrinho-conteudo').innerHTML = '<div style="color:red;text-align:center;">Erro ao carregar</div>'; }
 }
 
 async function removerDoCarrinho(id) {
     try {
-        const resp = await fetch('/almoxarifado/carrinho/' + id + '/remover/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN} });
+        const resp = await fetch('/almoxarifado/carrinho/' + id + '/remover/', { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN } });
         const data = await resp.json();
         if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(data.carrinho_count); abrirCarrinho(); }
     } catch(e) { mostrarToast('Erro ao remover', 'error'); }
@@ -2395,7 +1427,7 @@ async function removerDoCarrinho(id) {
 async function limparCarrinho() {
     if (!confirm('Limpar todo o carrinho?')) return;
     try {
-        const resp = await fetch('/almoxarifado/carrinho/limpar/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN} });
+        const resp = await fetch('/almoxarifado/carrinho/limpar/', { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN } });
         const data = await resp.json();
         if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(0); fecharTodosPanels(); }
     } catch(e) { mostrarToast('Erro ao limpar', 'error'); }
@@ -2406,31 +1438,21 @@ async function abrirFinalizarCarrinho() {
         const resp = await fetch('/almoxarifado/carrinho/');
         const data = await resp.json();
         let resumo = '<strong>Itens a serem retirados:</strong>';
-        for (let i = 0; i < data.itens.length; i++) {
-            resumo += `<div style="margin:6px 0;">• ${escapeHtml(data.itens[i].codigo)} - ${escapeHtml(data.itens[i].nome)}: ${formatNumber(data.itens[i].quantidade)}</div>`;
-        }
+        data.itens.forEach(item => { resumo += `<div style="margin:6px 0;">• ${escapeHtml(item.codigo)} - ${escapeHtml(item.nome)}: ${formatNumber(item.quantidade)}</div>`; });
         document.getElementById('resumo-carrinho').innerHTML = resumo;
         fecharTodosPanels();
-        setTimeout(() => {
-            document.getElementById('panel-finalizar-carrinho').classList.add('open');
-            document.getElementById('panel-overlay').classList.add('active');
-        }, 300);
+        setTimeout(() => { document.getElementById('panel-finalizar-carrinho').classList.add('open'); document.getElementById('panel-overlay').classList.add('active'); }, 300);
     } catch(e) { mostrarToast('Erro ao carregar resumo', 'error'); }
 }
 
 async function finalizarCarrinho() {
     const solicitante = document.getElementById('carrinho-solicitante').value.trim();
     if (!solicitante) { mostrarToast('Solicitante obrigatório!', 'error'); return; }
-    
     try {
         const resp = await fetch('/almoxarifado/carrinho/finalizar/', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
-            body: JSON.stringify({
-                solicitante,
-                departamento: document.getElementById('carrinho-departamento').value,
-                observacao: document.getElementById('carrinho-observacao').value
-            })
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ solicitante, departamento: document.getElementById('carrinho-departamento').value, observacao: document.getElementById('carrinho-observacao').value })
         });
         const data = await resp.json();
         if (data.success) { mostrarToast(data.message); atualizarBadgeCarrinho(0); fecharTodosPanels(); setTimeout(atualizarTabela, 500); }
@@ -2441,23 +1463,21 @@ async function finalizarCarrinho() {
 function atualizarBadgeCarrinho(count) {
     const badge = document.getElementById('carrinho-badge');
     if (badge) {
-        if (count > 0) { 
-            badge.style.display = 'flex'; 
-            document.getElementById('carrinho-count-badge').textContent = count;
-        } else {
-            badge.style.display = 'none';
-        }
+        if (count > 0) { badge.style.display = 'flex'; document.getElementById('carrinho-count-badge').textContent = count; }
+        else badge.style.display = 'none';
     }
 }
 
-// ===== Importações =====
+// ============================================
+// IMPORTAÇÕES
+// ============================================
 async function importarExcel(input) {
     if (!input.files || !input.files[0]) return;
     const formData = new FormData();
     formData.append('arquivo', input.files[0]);
     try {
         mostrarToast('📤 Importando arquivo...', 'info');
-        const resp = await fetch('/almoxarifado/importar/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: formData });
+        const resp = await fetch('/almoxarifado/importar/', { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }, body: formData });
         const data = await resp.json();
         if (data.success) { mostrarToast(data.message); setTimeout(atualizarTabela, 1000); }
         else mostrarToast(data.error, 'error');
@@ -2465,29 +1485,671 @@ async function importarExcel(input) {
     input.value = '';
 }
 
-async function importarXMLNFE(input) {
+// ============================================
+// NFE
+// ============================================
+let dadosNFE = null;
+let arquivoXML = null;
+
+function abrirModalNFE() { document.getElementById('modal-nfe-overlay').classList.add('active'); document.getElementById('modal-nfe-container').style.display = 'flex'; }
+function fecharModalNFE() { document.getElementById('modal-nfe-overlay').classList.remove('active'); document.getElementById('modal-nfe-container').style.display = 'none'; dadosNFE = null; arquivoXML = null; }
+
+async function visualizarXMLNFE(input) {
     if (!input.files || !input.files[0]) return;
+    arquivoXML = input.files[0];
     const formData = new FormData();
-    formData.append('xml_file', input.files[0]);
+    formData.append('xml_file', arquivoXML);
+    document.getElementById('modal-nfe-body').innerHTML = '<div class="loading-spinner">⏳ Analisando XML...</div>';
+    abrirModalNFE();
     try {
-        mostrarToast('📄 Processando XML da Nota Fiscal...', 'info');
-        const resp = await fetch('/almoxarifado/importar-xml-nfe/', { method: 'POST', headers: {'X-CSRFToken': CSRF_TOKEN}, body: formData });
+        const resp = await fetch('/almoxarifado/visualizar-xml-nfe/', { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }, body: formData });
         const data = await resp.json();
-        if (data.success) { 
-            mostrarToast('✅ ' + data.message, 'success'); 
-            setTimeout(() => { atualizarTabela(); location.reload(); }, 2000);
-        } else {
-            mostrarToast('❌ ' + data.error, 'error');
-        }
-    } catch(e) { mostrarToast('Erro na importação do XML', 'error'); }
+        if (data.success) {
+            dadosNFE = data;
+            let itensHtml = '';
+            if (data.itens && data.itens.length) {
+                itensHtml = '<div class="itens-lista">';
+                data.itens.forEach(item => { itensHtml += `<div class="item-nfe-row"><span class="item-nfe-codigo">${escapeHtml(item.codigo)}</span><span class="item-nfe-nome">${escapeHtml(item.nome)}</span><span class="item-nfe-qtd">${formatNumber(item.quantidade)}</span></div>`; });
+                itensHtml += '</div>';
+            }
+            let alertasHtml = '';
+            if (data.itens_existentes && data.itens_existentes.length) alertasHtml = '<div class="alert-warning">⚠️ Itens existentes terão quantidades somadas</div>';
+            document.getElementById('modal-nfe-body').innerHTML = `<div class="nfe-info-card"><div class="nfe-info-row"><span class="nfe-info-label">📄 Número:</span><span>${escapeHtml(data.numero_nota)}</span></div><div class="nfe-info-row"><span class="nfe-info-label">🏢 Fornecedor:</span><span>${escapeHtml(data.fornecedor_nome)}</span></div><div class="nfe-info-row"><span class="nfe-info-label">💰 Valor:</span><span>R$ ${formatNumber(data.valor_total)}</span></div></div>${alertasHtml}${itensHtml}`;
+        } else { fecharModalNFE(); mostrarToast('Erro: ' + data.error, 'error'); }
+    } catch(e) { fecharModalNFE(); mostrarToast('Erro ao processar XML', 'error'); }
     input.value = '';
 }
 
-// ===== Inicialização =====
-document.addEventListener('DOMContentLoaded', function() {
+async function confirmarImportacaoNFE() {
+    if (!dadosNFE || !arquivoXML) { mostrarToast('Nenhum dado para importar', 'error'); fecharModalNFE(); return; }
+    const btnConfirmar = document.getElementById('btn-confirmar-nfe');
+    btnConfirmar.disabled = true;
+    btnConfirmar.textContent = '⏳ Importando...';
+    document.getElementById('modal-nfe-body').innerHTML = '<div class="loading-spinner">🔄 Importando...</div>';
+    try {
+        const formData = new FormData();
+        formData.append('xml_file', arquivoXML);
+        const resp = await fetch('/almoxarifado/importar-xml-nfe/', { method: 'POST', headers: { 'X-CSRFToken': CSRF_TOKEN }, body: formData });
+        const data = await resp.json();
+        fecharModalNFE();
+        if (data.success) { mostrarToast('✅ ' + data.message, 'success'); setTimeout(() => { atualizarTabela(); location.reload(); }, 1500); }
+        else mostrarToast('❌ ' + data.error, 'error');
+    } catch(e) { fecharModalNFE(); mostrarToast('Erro na importação', 'error'); }
+    btnConfirmar.disabled = false;
+    btnConfirmar.textContent = '✅ Confirmar Importação';
+    arquivoXML = null;
+    dadosNFE = null;
+}
+
+// ============================================
+// WHATSAPP - FUNÇÕES DE AGENDAMENTO
+// ============================================
+let instanciasList = [];
+let numerosPadrao = [];
+let numerosPorDepartamento = {};
+let qrCodeCheckInterval = null;
+
+function toggleOpcoesEnvio() {
+    const tipo = document.getElementById('tipo-envio').value;
+    const opcoesAgendamento = document.getElementById('opcoes-agendamento');
+    const opcoesRepeticao = document.getElementById('opcoes-repeticao');
+    const repetirCheck = document.getElementById('repetir-notificacoes');
+    
+    opcoesAgendamento.style.display = (tipo === 'agendado' || tipo === 'ambos') ? 'block' : 'none';
+    opcoesRepeticao.style.display = repetirCheck.checked ? 'block' : 'none';
+}
+
+document.getElementById('repetir-notificacoes')?.addEventListener('change', toggleOpcoesEnvio);
+
+function switchWATab(tab) {
+    document.querySelectorAll('.wa-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.wa-tab-content').forEach(c => c.classList.remove('active'));
+    
+    const tabs = ['conexao', 'numeros', 'agendamento', 'templates', 'qrcode'];
+    const index = tabs.indexOf(tab);
+    
+    if (index >= 0) {
+        document.querySelectorAll('.wa-tab')[index].classList.add('active');
+        document.getElementById(`wa-tab-${tab}`).classList.add('active');
+    }
+    
+    if (tab === 'agendamento') {
+        carregarConfigAgendamento();
+    }
+}
+
+function carregarConfigAgendamento() {
+    // Carregar configurações de agendamento salvas
+    fetch('/almoxarifado/api/config-whatsapp/')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.config) {
+                const config = data.config;
+                document.getElementById('tipo-envio').value = config.tipo_envio || 'tempo-real';
+                document.getElementById('horario-agendado').value = config.horario_agendado || '08:00';
+                document.getElementById('notif-baixo').checked = config.notificar_baixo !== false;
+                document.getElementById('notif-zerado').checked = config.notificar_zerado !== false;
+                document.getElementById('notif-reposicao').checked = config.notificar_reposicao !== false;
+                document.getElementById('repetir-notificacoes').checked = config.repetir_notificacoes || false;
+                document.getElementById('intervalo-repeticao').value = config.intervalo_repeticao || 24;
+                
+                // Carregar dias da semana
+                const dias = config.dias_semana || [1,2,3,4,5];
+                document.querySelectorAll('.dia-semana').forEach(cb => {
+                    cb.checked = dias.includes(parseInt(cb.value));
+                });
+                
+                // Carregar departamentos ativos
+                const deptsAtivos = config.departamentos_ativos || [];
+                document.querySelectorAll('.dept-notif').forEach(cb => {
+                    cb.checked = deptsAtivos.length === 0 || deptsAtivos.includes(cb.value);
+                });
+                
+                toggleOpcoesEnvio();
+            }
+        })
+        .catch(e => console.error(e));
+}
+
+
+
+function obterDepartamentosSelecionados() {
+    const selecionados = [];
+    document.querySelectorAll('.dept-notif:checked').forEach(cb => {
+        selecionados.push(cb.value);
+    });
+    return selecionados;
+}
+
+// ============================================
+// WHATSAPP - FUNÇÕES PRINCIPAIS
+// ============================================
+async function abrirModalWhatsApp() {
+    document.getElementById('modal-wa-overlay').classList.add('active');
+    document.getElementById('modal-wa-container').style.display = 'flex';
+    await carregarConfigWhatsApp();
+    await carregarInstancias();
+    switchWATab('conexao');
+}
+
+function fecharModalWhatsApp() { 
+    document.getElementById('modal-wa-overlay').classList.remove('active'); 
+    document.getElementById('modal-wa-container').style.display = 'none';
+    if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+}
+
+async function carregarConfigWhatsApp() {
+    try {
+        const resp = await fetch('/almoxarifado/api/config-whatsapp/');
+        const data = await resp.json();
+        if (data.success) {
+            const config = data.config;
+            
+            console.log('📱 Configuração carregada:', {
+                instance_name: config.instance_name,
+                api_url: config.api_url,
+                ativo: config.ativo
+            });
+            
+            document.getElementById('wa-ativo').checked = config.ativo;
+            document.getElementById('wa-api-url').value = config.api_url || '';
+            document.getElementById('wa-api-key').value = config.api_key || '';
+            document.getElementById('wa-instance').value = config.instance_name || '';
+            
+            // Se tem instância salva, mostrar o grupo selecionado
+            if (config.instance_name) {
+                document.getElementById('instancia-selecionada-group').style.display = 'block';
+                // Destacar na lista
+                setTimeout(() => {
+                    document.querySelectorAll('.instancia-item').forEach(item => {
+                        item.classList.remove('selected');
+                        if (item.getAttribute('data-instance') === config.instance_name) {
+                            item.classList.add('selected');
+                        }
+                    });
+                }, 500);
+            }
+            
+            console.log('📱 Configuração carregada:', {
+                instance_name: config.instance_name,
+                api_url: config.api_url,
+                ativo: config.ativo,
+                tipo_envio: config.tipo_envio
+            });
+            
+        }
+    } catch(e) { 
+        console.error('Erro ao carregar configurações:', e); 
+        mostrarToast('Erro ao carregar configurações', 'error'); 
+    }
+}
+
+function toggleSistema() {
+    const isAtivo = document.getElementById('wa-ativo').checked;
+    const statusLabel = document.getElementById('status-label');
+    if (isAtivo) { statusLabel.innerHTML = '✅ Sistema ativo'; statusLabel.style.color = '#25D366'; }
+    else { statusLabel.innerHTML = '⭕ Sistema desativado'; statusLabel.style.color = '#999'; }
+}
+
+async function carregarInstancias() {
+    let apiUrl = document.getElementById('wa-api-url').value.trim();
+    const apiKey = document.getElementById('wa-api-key').value;
+    if (!apiUrl) { document.getElementById('lista-instancias').innerHTML = '<div class="loading-small">Configure a URL da API primeiro</div>'; return; }
+    if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+    document.getElementById('lista-instancias').innerHTML = '<div class="loading-small">🔄 Carregando instâncias...</div>';
+    try {
+        const resp = await fetch('/almoxarifado/api/listar-instancias/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN }, body: JSON.stringify({ api_url: apiUrl, api_key: apiKey }) });
+        const data = await resp.json();
+        if (data.success && data.instancias) {
+            instanciasList = data.instancias;
+            let html = '';
+            instanciasList.forEach(inst => {
+                const nome = inst.name || inst.instanceName;
+                const status = inst.connectionStatus || 'close';
+                const statusClass = status === 'open' ? 'status-connected' : 'status-disconnected';
+                const statusText = status === 'open' ? '✅ Conectado' : '❌ Desconectado';
+                html += `<div class="instancia-item" data-instance="${nome}" onclick="selecionarInstancia('${nome}')">
+                    <div class="instancia-nome">📱 ${nome}</div>
+                    <div class="instancia-status ${statusClass}">${statusText}</div>
+                    <div class="instancia-actions">
+                        <button onclick="event.stopPropagation(); conectarInstancia('${nome}')" title="Conectar">🔌 Conectar</button>
+                        <button onclick="event.stopPropagation(); deletarInstancia('${nome}')" title="Excluir">🗑️</button>
+                    </div>
+                </div>`;
+            });
+            document.getElementById('lista-instancias').innerHTML = html || '<div class="loading-small">Nenhuma instância</div>';
+            const select = document.getElementById('wa-instance');
+            select.innerHTML = '<option value="">Selecione uma instância</option>';
+            instanciasList.forEach(inst => { const nome = inst.name || inst.instanceName; select.innerHTML += `<option value="${nome}">${nome}</option>`; });
+        } else { document.getElementById('lista-instancias').innerHTML = '<div class="loading-small">❌ Erro ao carregar</div>'; }
+    } catch(e) { document.getElementById('lista-instancias').innerHTML = '<div class="loading-small">❌ Erro de conexão</div>'; }
+}
+
+async function conectarInstancia(instanceName) {
+    selecionarInstancia(instanceName);
+    switchWATab('qrcode');
+    await gerarPairingCode();
+}
+
+async function gerarPairingCode() {
+    const instanceName = document.getElementById('wa-instance').value;
+    if (!instanceName) {
+        mostrarToast('Selecione uma instância primeiro', 'error');
+        return;
+    }
+    
+    let apiUrl = document.getElementById('wa-api-url').value.trim();
+    const apiKey = document.getElementById('wa-api-key').value;
+    if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+    
+    const loadingDiv = document.getElementById('pairing-loading');
+    const pairingCodeDisplay = document.getElementById('pairing-code-display');
+    const pairingArea = document.getElementById('pairing-code-area');
+    
+    loadingDiv.style.display = 'block';
+    pairingCodeDisplay.innerHTML = '';
+    pairingArea.style.display = 'block';
+    
+    try {
+        const resp = await fetch('/almoxarifado/api/qrcode-instancia/', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN }, 
+            body: JSON.stringify({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey }) 
+        });
+        const data = await resp.json();
+        
+        loadingDiv.style.display = 'none';
+        
+        if (data.success && data.pairingCode && data.pairingCode !== 'null') {
+            pairingCodeDisplay.innerHTML = `
+                <div style="background: #075E54; color: white; padding: 20px; border-radius: 12px;">
+                    <div style="font-size: 32px; letter-spacing: 5px; font-family: monospace; background: white; color: #075E54; padding: 15px; border-radius: 10px;">
+                        ${data.pairingCode}
+                    </div>
+                </div>
+            `;
+            mostrarToast('✅ Código de pareamento gerado!', 'success');
+        } 
+        else if (data.success && data.qrcode) {
+            let qrImageSrc = data.qrcode;
+            if (qrImageSrc && !qrImageSrc.startsWith('data:image')) {
+                qrImageSrc = `data:image/png;base64,${qrImageSrc}`;
+            }
+            pairingCodeDisplay.innerHTML = `
+                <div style="text-align: center;">
+                    <img src="${qrImageSrc}" style="max-width: 250px; margin: 10px auto; border: 3px solid #25D366; border-radius: 12px;">
+                    <p style="margin-top: 10px; color: #666;">Escaneie o QR Code com o WhatsApp</p>
+                </div>
+            `;
+            mostrarToast('✅ QR Code gerado! Escaneie com o WhatsApp', 'success');
+        } 
+        else {
+            pairingCodeDisplay.innerHTML = `<div style="color: red;">❌ ${data.error || 'Erro ao gerar código'}</div>`;
+            mostrarToast('❌ ' + (data.error || 'Erro ao gerar código'), 'error');
+        }
+        
+        iniciarVerificacaoConexao(instanceName);
+        
+    } catch(e) {
+        loadingDiv.style.display = 'none';
+        pairingCodeDisplay.innerHTML = `<div style="color: red;">❌ Erro de conexão: ${e.message}</div>`;
+        mostrarToast('Erro ao gerar código: ' + e.message, 'error');
+    }
+}
+
+function iniciarVerificacaoConexao(instanceName) {
+    if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+    
+    let apiUrl = document.getElementById('wa-api-url').value.trim();
+    const apiKey = document.getElementById('wa-api-key').value;
+    if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+    
+    let tentativas = 0;
+    const maxTentativas = 40;
+    
+    qrCodeCheckInterval = setInterval(async () => {
+        tentativas++;
+        
+        try {
+            const resp = await fetch('/almoxarifado/api/status-instancia/', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN }, 
+                body: JSON.stringify({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey }) 
+            });
+            const data = await resp.json();
+            
+            if (data.success && data.status === 'connected') {
+                clearInterval(qrCodeCheckInterval);
+                mostrarToast('✅ WhatsApp conectado com sucesso!', 'success');
+                document.getElementById('pairing-code-area').style.display = 'none';
+                document.getElementById('qr-connected-info').style.display = 'block';
+                document.getElementById('qr-code-tab').style.display = 'none';
+                carregarInstancias();
+            } else if (tentativas >= maxTentativas) {
+                clearInterval(qrCodeCheckInterval);
+                mostrarToast('⏰ Tempo esgotado. Gere um novo código.', 'warning');
+            }
+        } catch(e) {
+            if (tentativas >= maxTentativas) {
+                clearInterval(qrCodeCheckInterval);
+            }
+        }
+    }, 3000);
+}
+
+async function criarInstancia() {
+    const instanceName = document.getElementById('nova-instancia').value.trim();
+    let apiUrl = document.getElementById('wa-api-url').value.trim();
+    const apiKey = document.getElementById('wa-api-key').value;
+    if (!instanceName) { mostrarToast('Digite um nome para a instância', 'error'); return; }
+    if (!apiUrl) { mostrarToast('Configure a URL da API primeiro', 'error'); return; }
+    if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+    mostrarToast('🔄 Criando instância...', 'info');
+    try {
+        const resp = await fetch('/almoxarifado/api/criar-instancia/', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN }, body: JSON.stringify({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey }) });
+        const data = await resp.json();
+        if (data.success) {
+            mostrarToast('✅ Instância criada!', 'success');
+            document.getElementById('nova-instancia').value = '';
+            await carregarInstancias();
+            setTimeout(() => {
+                selecionarInstancia(instanceName);
+                conectarInstancia(instanceName);
+            }, 1000);
+        } else { mostrarToast('❌ ' + data.error, 'error'); }
+    } catch(e) { mostrarToast('Erro ao criar instância', 'error'); }
+}
+
+function selecionarInstancia(instanceName) {
+    document.getElementById('wa-instance').value = instanceName;
+    document.getElementById('instancia-selecionada-group').style.display = 'block';
+    
+    // Destacar item selecionado
+    document.querySelectorAll('.instancia-item').forEach(item => {
+        item.classList.remove('selected');
+        if (item.getAttribute('data-instance') === instanceName) {
+            item.classList.add('selected');
+        }
+    });
+    
+    mostrarToast(`Instância "${instanceName}" selecionada`, 'success');
+    
+    // Já salvar automaticamente a instância selecionada
+    salvarInstanciaSelecionada(instanceName);
+}
+
+async function salvarInstanciaSelecionada(instanceName) {
+    try {
+        // Buscar configuração atual primeiro
+        const resp = await fetch('/almoxarifado/api/config-whatsapp/');
+        const data = await resp.json();
+        
+        if (data.success) {
+            const configAtual = data.config;
+            
+            // Atualizar apenas o nome da instância
+            const updateData = {
+                ...configAtual,
+                instance_name: instanceName
+            };
+            
+            const saveResp = await fetch('/almoxarifado/api/config-whatsapp/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+                body: JSON.stringify(updateData)
+            });
+            
+            const result = await saveResp.json();
+            if (result.success) {
+                console.log(`✅ Instância "${instanceName}" salva com sucesso!`);
+            }
+        }
+    } catch(e) {
+        console.error('Erro ao salvar instância:', e);
+    }
+}
+
+async function deletarInstancia(instanceName) {
+    if (!confirm(`⚠️ Tem certeza que deseja deletar a instância "${instanceName}"?\n\nEsta ação não pode ser desfeita e removerá todos os dados da instância.`)) {
+        return;
+    }
+    
+    let apiUrl = document.getElementById('wa-api-url').value.trim();
+    const apiKey = document.getElementById('wa-api-key').value;
+    
+    if (!apiUrl) {
+        mostrarToast('Configure a URL da API primeiro', 'error');
+        return;
+    }
+    
+    if (!apiUrl.startsWith('http')) {
+        apiUrl = 'https://' + apiUrl;
+    }
+    
+    mostrarToast('🔄 Deletando instância...', 'info');
+    
+    try {
+        const resp = await fetch('/almoxarifado/api/deletar-instancia/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: JSON.stringify({
+                instance_name: instanceName,
+                api_url: apiUrl,
+                api_key: apiKey
+            })
+        });
+        
+        const data = await resp.json();
+        
+        if (data.success) {
+            mostrarToast(`✅ Instância "${instanceName}" deletada com sucesso!`, 'success');
+            // Recarregar a lista de instâncias
+            await carregarInstancias();
+            
+            // Se a instância deletada era a selecionada, limpar seleção
+            if (document.getElementById('wa-instance').value === instanceName) {
+                document.getElementById('wa-instance').value = '';
+                document.getElementById('instancia-selecionada-group').style.display = 'none';
+            }
+        } else {
+            mostrarToast(`❌ Erro ao deletar: ${data.error || 'Tente novamente'}`, 'error');
+        }
+    } catch(e) {
+        console.error('Erro na requisição:', e);
+        mostrarToast('❌ Erro ao conectar com o servidor', 'error');
+    }
+}
+
+// ============================================
+// WHATSAPP - NÚMEROS POR DEPARTAMENTO
+// ============================================
+function renderNumerosPadrao() {
+    const container = document.getElementById('lista-numeros-padrao');
+    if (!numerosPadrao.length) { container.innerHTML = '<div class="loading-small">📭 Nenhum número padrão cadastrado</div>'; return; }
+    let html = '';
+    numerosPadrao.forEach((numero, index) => { html += `<div class="numero-item"><div><span class="numero">${numero}</span> <span class="badge">Padrão</span></div><button class="btn-remove-numero" onclick="removerNumeroPadrao(${index})">🗑️</button></div>`; });
+    container.innerHTML = html;
+}
+
+function renderNumerosDepartamento() {
+    const select = document.getElementById('dept-select');
+    const container = document.getElementById('lista-numeros-departamento');
+    const deptSelecionado = select.value;
+    if (!deptSelecionado) { container.innerHTML = '<div class="loading-small">Selecione um departamento</div>'; return; }
+    const numeros = numerosPorDepartamento[deptSelecionado] || [];
+    const deptName = select.options[select.selectedIndex]?.text || deptSelecionado;
+    if (!numeros.length) { container.innerHTML = `<div class="loading-small">📭 Nenhum número para ${deptName}</div>`; return; }
+    let html = `<div style="padding: 8px; background: var(--light); font-weight: bold;">${deptName}:</div>`;
+    numeros.forEach((numero, index) => { html += `<div class="numero-item"><div><span class="numero">${numero}</span></div><button class="btn-remove-numero" onclick="removerNumeroDepartamento('${deptSelecionado}', ${index})">🗑️</button></div>`; });
+    container.innerHTML = html;
+}
+
+function adicionarNumeroPadrao() {
+    const numero = document.getElementById('novo-numero-padrao').value.trim();
+    if (!numero) { mostrarToast('Digite um número', 'error'); return; }
+    if (!/^\d+$/.test(numero)) { mostrarToast('Use apenas números (ex: 5511999999999)', 'error'); return; }
+    if (numerosPadrao.includes(numero)) { mostrarToast('Número já cadastrado', 'error'); return; }
+    numerosPadrao.push(numero);
+    renderNumerosPadrao();
+    document.getElementById('novo-numero-padrao').value = '';
+    mostrarToast('✅ Número padrão adicionado', 'success');
+}
+
+function removerNumeroPadrao(index) { if (confirm('Remover?')) { numerosPadrao.splice(index, 1); renderNumerosPadrao(); mostrarToast('Número removido', 'info'); } }
+
+function adicionarNumeroDepartamento() {
+    const dept = document.getElementById('dept-select').value;
+    const numero = document.getElementById('novo-numero-dept').value.trim();
+    if (!dept) { mostrarToast('Selecione um departamento', 'error'); return; }
+    if (!numero) { mostrarToast('Digite um número', 'error'); return; }
+    if (!/^\d+$/.test(numero)) { mostrarToast('Use apenas números', 'error'); return; }
+    if (!numerosPorDepartamento[dept]) numerosPorDepartamento[dept] = [];
+    if (numerosPorDepartamento[dept].includes(numero)) { mostrarToast('Número já cadastrado', 'error'); return; }
+    numerosPorDepartamento[dept].push(numero);
+    renderNumerosDepartamento();
+    document.getElementById('novo-numero-dept').value = '';
+    mostrarToast('✅ Número adicionado ao departamento', 'success');
+}
+
+function removerNumeroDepartamento(dept, index) { if (confirm('Remover?')) { numerosPorDepartamento[dept].splice(index, 1); if (numerosPorDepartamento[dept].length === 0) delete numerosPorDepartamento[dept]; renderNumerosDepartamento(); mostrarToast('Número removido', 'info'); } }
+
+document.getElementById('dept-select')?.addEventListener('change', () => renderNumerosDepartamento());
+
+// ============================================
+// WHATSAPP - TEMPLATES E SALVAR
+// ============================================
+function previewTemplate(tipo) {
+    let template = '';
+    const previewData = { 
+        nome: 'Produto Exemplo', 
+        codigo: '001', 
+        quantidade: '5', 
+        minimo: '10', 
+        unidade: 'UN', 
+        localizacao: 'Prateleira A2', 
+        departamento: 'Produção', 
+        nova_quantidade: '25', 
+        adicionado: '20',
+        data: new Date().toLocaleDateString('pt-BR'),
+        total_baixo: '3',
+        total_zerado: '2',
+        lista_baixo: '• Produto A - 5 unidades\n• Produto B - 8 unidades',
+        lista_zerado: '• Produto C - 0 unidades'
+    };
+    
+    if (tipo === 'baixo') template = document.getElementById('wa-template-baixo').value;
+    else if (tipo === 'zerado') template = document.getElementById('wa-template-zerado').value;
+    else if (tipo === 'reposicao') template = document.getElementById('wa-template-reposicao').value;
+    else template = document.getElementById('wa-template-resumo').value;
+    
+    let preview = template;
+    for (const [key, value] of Object.entries(previewData)) {
+        preview = preview.replace(new RegExp(`{${key}}`, 'g'), value);
+    }
+    
+    document.getElementById('preview-content').innerHTML = `<div class="whatsapp-message"><pre style="white-space:pre-wrap">${escapeHtml(preview)}</pre></div>`;
+    document.getElementById('modal-preview-overlay').classList.add('active');
+    document.getElementById('modal-preview-container').style.display = 'flex';
+}
+
+function fecharPreview() { 
+    document.getElementById('modal-preview-overlay').classList.remove('active'); 
+    document.getElementById('modal-preview-container').style.display = 'none'; 
+}
+
+async function salvarConfiguracaoWhatsApp() {
+    // IMPORTANTE: Pegar o valor do select, não de outro lugar!
+    const selectInstancia = document.getElementById('wa-instance');
+    const instanceName = selectInstancia ? selectInstancia.value : '';
+    
+    console.log('📱 Instância selecionada no SELECT:', instanceName);
+    
+    if (!instanceName) {
+        mostrarToast('❌ Selecione uma instância WhatsApp na lista acima!', 'error');
+        // Destacar o select para o usuário ver
+        if (selectInstancia) selectInstancia.style.border = '2px solid red';
+        setTimeout(() => {
+            if (selectInstancia) selectInstancia.style.border = '';
+        }, 3000);
+        return;
+    }
+    
+    const diasSemana = [];
+    document.querySelectorAll('.dia-semana:checked').forEach(cb => diasSemana.push(parseInt(cb.value)));
+    
+    const deptsAtivos = [];
+    document.querySelectorAll('.dept-notif:checked').forEach(cb => deptsAtivos.push(cb.value));
+    
+    // Corrigir URL - garantir https://
+    let apiUrl = document.getElementById('wa-api-url').value.trim();
+    if (apiUrl && !apiUrl.startsWith('http')) {
+        apiUrl = 'https://' + apiUrl;
+        document.getElementById('wa-api-url').value = apiUrl;
+    }
+    
+    const data = {
+        ativo: document.getElementById('wa-ativo').checked,
+        api_url: apiUrl,
+        api_key: document.getElementById('wa-api-key').value,
+        instance_name: instanceName,  // <-- USANDO A VARIÁVEL CORRETA
+        numeros_padrao: numerosPadrao.join(','),
+        numeros_por_departamento: numerosPorDepartamento,
+        tipo_envio: document.getElementById('tipo-envio').value,
+        horario_agendado: document.getElementById('horario-agendado').value,
+        dias_semana: diasSemana,
+        notificar_baixo: document.getElementById('notif-baixo').checked,
+        notificar_zerado: document.getElementById('notif-zerado').checked,
+        notificar_reposicao: document.getElementById('notif-reposicao').checked,
+        repetir_notificacoes: document.getElementById('repetir-notificacoes').checked,
+        intervalo_repeticao: parseInt(document.getElementById('intervalo-repeticao').value) || 24,
+        departamentos_ativos: deptsAtivos,
+        template_estoque_baixo: document.getElementById('wa-template-baixo').value,
+        template_estoque_zerado: document.getElementById('wa-template-zerado').value,
+        template_reposicao: document.getElementById('wa-template-reposicao').value,
+        template_resumo: document.getElementById('wa-template-resumo').value
+    };
+    
+    console.log('💾 Salvando configuração:', {
+        instance_name: data.instance_name,
+        api_url: data.api_url,
+        ativo: data.ativo
+    });
+    
+    mostrarToast('💾 Salvando configurações...', 'info');
+    
+    try {
+        const resp = await fetch('/almoxarifado/api/config-whatsapp/', { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN }, 
+            body: JSON.stringify(data) 
+        });
+        const result = await resp.json();
+        
+        if (result.success) { 
+            mostrarToast('✅ Configurações salvas com sucesso!', 'success'); 
+            fecharModalWhatsApp();
+        } else { 
+            mostrarToast('❌ ' + result.error, 'error'); 
+        }
+    } catch(e) { 
+        console.error('Erro ao salvar:', e);
+        mostrarToast('Erro ao salvar configurações', 'error'); 
+    }
+}
+function carregarNumeros() {
+    renderNumerosPadrao();
+    renderNumerosDepartamento();
+}
+
+// ============================================
+// INICIALIZAÇÃO
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
     const btnCamera = document.getElementById('btn-camera');
     if (btnCamera && !isMobileDevice()) btnCamera.innerHTML = '📁 Upload';
-    
     let baixo = 0, zerado = 0;
     {% for item in itens %}
         {% if item.status_estoque == 'baixo' %}baixo++;{% endif %}
@@ -2495,266 +2157,38 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endfor %}
     document.getElementById('stats-baixo').textContent = baixo;
     document.getElementById('stats-zerado').textContent = zerado;
+    
+    // Inicializar agendamento se configurado
+    setInterval(() => {
+        const now = new Date();
+        const horaAtual = now.toTimeString().slice(0,5);
+        const diaAtual = now.getDay();
+        
+        fetch('/almoxarifado/api/config-whatsapp/')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.config.ativo && data.config.tipo_envio !== 'tempo-real') {
+                    const config = data.config;
+                    if (config.horario_agendado === horaAtual && config.dias_semana.includes(diaAtual)) {
+                        enviarNotificacaoAgendada();
+                    }
+                }
+            })
+            .catch(e => console.error(e));
+    }, 60000);
 });
 
-
-// ===== VARIÁVEIS PARA O MODAL NFE =====
-var dadosNFE = null;
-var arquivoXML = null;
-
-// ===== FUNÇÕES DO MODAL NFE =====
-function abrirModalNFE() {
-    document.getElementById('modal-nfe-overlay').classList.add('active');
-    document.getElementById('modal-nfe-container').style.display = 'flex';
-}
-
-function fecharModalNFE() {
-    document.getElementById('modal-nfe-overlay').classList.remove('active');
-    document.getElementById('modal-nfe-container').style.display = 'none';
-    dadosNFE = null;
-    arquivoXML = null;
-}
-
-function abrirModalResultado(titulo, mensagem, detalhes, tipo) {
-    const header = document.getElementById('modal-resultado-header');
-    const icon = document.getElementById('resultado-icon');
-    const tituloEl = document.getElementById('resultado-titulo');
-    const mensagemEl = document.getElementById('resultado-mensagem');
-    const body = document.getElementById('modal-resultado-body');
-    
-    if (tipo === 'success') {
-        header.className = 'modal-header';
-        header.style.background = 'linear-gradient(135deg, #059669, #10b981)';
-        header.style.color = 'white';
-        icon.textContent = '✅';
-    } else if (tipo === 'error') {
-        header.className = 'modal-header';
-        header.style.background = 'linear-gradient(135deg, #dc2626, #ef4444)';
-        header.style.color = 'white';
-        icon.textContent = '❌';
-    } else {
-        header.className = 'modal-header';
-        header.style.background = 'linear-gradient(135deg, #f59e0b, #f97316)';
-        header.style.color = '#1f2937';
-        icon.textContent = '⚠️';
-    }
-    
-    tituloEl.textContent = titulo;
-    mensagemEl.textContent = mensagem;
-    body.innerHTML = detalhes;
-    
-    document.getElementById('modal-resultado-overlay').classList.add('active');
-    document.getElementById('modal-resultado-container').style.display = 'flex';
-}
-
-function fecharModalResultado() {
-    document.getElementById('modal-resultado-overlay').classList.remove('active');
-    document.getElementById('modal-resultado-container').style.display = 'none';
-}
-
-// ===== FUNÇÃO PARA VISUALIZAR NOTA ANTES DE IMPORTAR =====
-async function visualizarXMLNFE(input) {
-    if (!input.files || !input.files[0]) return;
-    
-    arquivoXML = input.files[0];
-    const formData = new FormData();
-    formData.append('xml_file', arquivoXML);
-    
-    // Abrir modal de loading
-    document.getElementById('modal-nfe-body').innerHTML = `
-        <div class="loading-spinner">
-            <div style="font-size: 2rem; margin-bottom: 12px;">⏳</div>
-            <strong>Analisando XML da Nota Fiscal...</strong>
-            <p style="font-size: 0.8rem; margin-top: 8px;">Aguarde enquanto processamos os dados</p>
-        </div>
-    `;
-    abrirModalNFE();
-    
-    try {
-        const resp = await fetch('/almoxarifado/visualizar-xml-nfe/', { 
-            method: 'POST', 
-            headers: {'X-CSRFToken': CSRF_TOKEN}, 
-            body: formData 
-        });
-        const data = await resp.json();
-        
-        if (data.success) {
-            dadosNFE = data;
-            
-            // Construir HTML do resumo da nota
-            let itensHtml = '';
-            if (data.itens && data.itens.length > 0) {
-                itensHtml = '<div class="itens-lista">';
-                for (let i = 0; i < data.itens.length; i++) {
-                    const item = data.itens[i];
-                    itensHtml += `
-                        <div class="item-nfe-row">
-                            <span class="item-nfe-codigo">${escapeHtml(item.codigo)}</span>
-                            <span class="item-nfe-nome">${escapeHtml(item.nome)}</span>
-                            <span class="item-nfe-qtd">${formatNumber(item.quantidade)} ${escapeHtml(item.unidade)}</span>
-                            <span class="item-nfe-preco">R$ ${formatNumber(item.preco_unitario)}</span>
-                        </div>
-                    `;
-                }
-                itensHtml += '</div>';
-            } else {
-                itensHtml = '<div class="alert-warning">⚠️ Nenhum item identificado na nota fiscal</div>';
-            }
-            
-            // Verificar itens que já existem no estoque
-            let alertasHtml = '';
-            if (data.itens_existentes && data.itens_existentes.length > 0) {
-                alertasHtml = `
-                    <div class="alert-warning">
-                        <strong>⚠️ Atenção!</strong><br>
-                        Os seguintes itens já existem no estoque e terão suas QUANTIDADES SOMADAS:
-                        <ul style="margin-top: 8px; margin-left: 20px;">
-                            ${data.itens_existentes.map(item => `<li>${escapeHtml(item.codigo)} - ${escapeHtml(item.nome)} (Estoque atual: ${formatNumber(item.estoque_atual)})</li>`).join('')}
-                        </ul>
-                    </div>
-                `;
-            }
-            
-            const nfeHtml = `
-                <div class="nfe-info-card">
-                    <div class="nfe-info-row">
-                        <span class="nfe-info-label">📄 Número da Nota:</span>
-                        <span class="nfe-info-value">${escapeHtml(data.numero_nota)}</span>
-                    </div>
-                    <div class="nfe-info-row">
-                        <span class="nfe-info-label">🏢 Fornecedor:</span>
-                        <span class="nfe-info-value">${escapeHtml(data.fornecedor_nome)}</span>
-                    </div>
-                    <div class="nfe-info-row">
-                        <span class="nfe-info-label">📅 Data de Emissão:</span>
-                        <span class="nfe-info-value">${escapeHtml(data.data_emissao)}</span>
-                    </div>
-                    <div class="nfe-info-row">
-                        <span class="nfe-info-label">💰 Valor Total:</span>
-                        <span class="nfe-info-value">R$ ${formatNumber(data.valor_total)}</span>
-                    </div>
-                    <div class="nfe-info-row">
-                        <span class="nfe-info-label">🆔 Chave de Acesso:</span>
-                        <span class="nfe-info-value" style="font-size: 0.7rem;">${escapeHtml(data.chave_acesso)}</span>
-                    </div>
-                </div>
-                
-                ${alertasHtml}
-                
-                <div style="margin-top: 16px;">
-                    <strong>📦 Itens da Nota (${data.itens ? data.itens.length : 0} produtos):</strong>
-                </div>
-                ${itensHtml}
-            `;
-            
-            document.getElementById('modal-nfe-body').innerHTML = nfeHtml;
-            
-        } else {
-            fecharModalNFE();
-            mostrarToast('Erro ao analisar XML: ' + data.error, 'error');
-        }
-        
-    } catch(e) {
-        fecharModalNFE();
-        console.error(e);
-        mostrarToast('Erro ao processar XML', 'error');
-    }
-    
-    input.value = '';
-}
-
-// ===== FUNÇÃO PARA CONFIRMAR E IMPORTAR =====
-async function confirmarImportacaoNFE() {
-    if (!dadosNFE || !arquivoXML) {
-        mostrarToast('Nenhum dado para importar', 'error');
-        fecharModalNFE();
-        return;
-    }
-    
-    // Botão de confirmação desabilitado
-    const btnConfirmar = document.getElementById('btn-confirmar-nfe');
-    btnConfirmar.disabled = true;
-    btnConfirmar.textContent = '⏳ Importando...';
-    
-    // Mostrar loading no modal
-    document.getElementById('modal-nfe-body').innerHTML = `
-        <div class="loading-spinner">
-            <div style="font-size: 2rem; margin-bottom: 12px;">🔄</div>
-            <strong>Importando para o estoque...</strong>
-            <p style="font-size: 0.8rem; margin-top: 8px;">Atualizando os itens e registrando a nota fiscal</p>
-        </div>
-    `;
-    
-    try {
-        const formData = new FormData();
-        formData.append('xml_file', arquivoXML);
-        
-        const resp = await fetch('/almoxarifado/importar-xml-nfe/', { 
-            method: 'POST', 
-            headers: {'X-CSRFToken': CSRF_TOKEN}, 
-            body: formData 
-        });
-        const data = await resp.json();
-        
-        fecharModalNFE();
-        
-        if (data.success) {
-            // Construir detalhes do resultado
-            let detalhesHtml = `
-                <div class="resultado-item">
-                    <span>Nota Fiscal:</span>
-                    <span class="status status-success">${escapeHtml(data.numero_nota || dadosNFE.numero_nota)}</span>
-                </div>
-                <div class="resultado-item">
-                    <span>Fornecedor:</span>
-                    <span>${escapeHtml(data.fornecedor_nome || dadosNFE.fornecedor_nome)}</span>
-                </div>
-                <div class="resultado-item">
-                    <span>Itens processados:</span>
-                    <span class="status status-success">${data.itens || dadosNFE.itens?.length || 0} itens</span>
-                </div>
-            `;
-            
-            if (data.novos_itens > 0) {
-                detalhesHtml += `<div class="resultado-item"><span>📦 Itens criados:</span><span class="status status-success">${data.novos_itens}</span></div>`;
-            }
-            if (data.itens_atualizados > 0) {
-                detalhesHtml += `<div class="resultado-item"><span>📈 Itens somados:</span><span class="status status-warning">${data.itens_atualizados}</span></div>`;
-            }
-            
-            abrirModalResultado(
-                '✅ Importação Concluída!',
-                data.message,
-                detalhesHtml,
-                'success'
-            );
-        } else {
-            // Construir erro detalhado
-            let errosHtml = `<div class="resultado-item"><span>❌ Erro:</span><span class="status status-error">${escapeHtml(data.error)}</span></div>`;
-            
-            abrirModalResultado(
-                '❌ Falha na Importação',
-                'Ocorreu um erro ao processar a nota fiscal',
-                errosHtml,
-                'error'
-            );
-        }
-        
-    } catch(e) {
-        fecharModalNFE();
-        console.error(e);
-        abrirModalResultado(
-            '❌ Erro de Conexão',
-            'Não foi possível conectar ao servidor',
-            `<div class="resultado-item"><span>Detalhe:</span><span class="status status-error">${escapeHtml(e.message)}</span></div>`,
-            'error'
-        );
-    }
-    
-    btnConfirmar.disabled = false;
-    btnConfirmar.textContent = '✅ Confirmar Importação';
-    arquivoXML = null;
-    dadosNFE = null;
+function enviarNotificacaoAgendada() {
+    fetch('/almoxarifado/api/enviar-notificacao-agora/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ tipo: 'agendado' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) console.log('Notificações agendadas enviadas');
+    })
+    .catch(e => console.error(e));
 }
 </script>
 {% endblock %}
