@@ -2,7 +2,8 @@ from . import views
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.static import serve
 
 app_name = 'sapp'
 
@@ -33,7 +34,7 @@ urlpatterns = [
     path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
-    path('salvar-config-dashboard/', views.salvar_config_dashboard, name='salvar_config_dashboard'),  # APENAS UMA VEZ
+    path('salvar-config-dashboard/', views.salvar_config_dashboard, name='salvar_config_dashboard'),
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
     path('api/buscar-dados-lote/', views.api_buscar_dados_lote, name='api_buscar_dados_lote'),
     path('api/autocomplete-entrada/', views.api_autocomplete_nova_entrada, name='api_autocomplete_entrada'),
@@ -52,10 +53,6 @@ urlpatterns = [
     path('api/importar-mapa/<int:armazem_numero>/', views.importar_mapa_json, name='importar_mapa_json'),
     path('api/criar-armazens-automaticos/', views.criar_armazens_automaticos, name='criar_armazens_automaticos'),
     path('armazem/novo/', views.criar_armazem, name='criar_armazem'),
-    path('editor-mapa/', views.editor_avancado, {'armazem_numero': 1}, name='editor_avancado_default'),
-    path('api/atualizar-status-sistemico/', views.api_atualizar_status_sistemico, name='api_atualizar_status_sistemico'),
-    path('api/estoque/<int:id>/detalhes/', views.detalhes_estoque_api, name='detalhes_estoque_api'),
-    path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
     path('editor-mapa/<int:armazem_numero>/', views.editor_avancado, name='editor_avancado'),
     path('armazem/editar-config/<int:armazem_id>/', views.editar_config_armazem, name='editar_config_armazem'),
     path('ficha-rastreabilidade/', views.ficha_rastreabilidade, name='ficha_rastreabilidade'),
@@ -63,26 +60,28 @@ urlpatterns = [
     path('ficha-rastreabilidade/multipla/', views.ficha_rastreabilidade_multipla, name='ficha_rastreabilidade_multipla'),
     path('api/validar-endereco/', views.validar_endereco, name='validar_endereco'),
     path('api/buscar-origens/', views.buscar_origens, name='buscar_origens'),
+    path('api/buscar-enderecos/', views.api_buscar_enderecos, name='api_buscar_enderecos'),
+    path('api/listar-enderecos/', views.api_listar_enderecos, name='api_listar_enderecos'),
     path('marcar-ultimo-lote/<int:estoque_id>/', views.marcar_ultimo_lote_linha, name='marcar_ultimo_lote'),
     path('get-marcacoes-linha/<str:rua>/<str:ln>/', views.get_marcacoes_linha, name='get_marcacoes_linha'),   
     path('api/mapa-dados/<int:armazem_numero>/', views.api_mapa_dados, name='api_mapa_dados'),
     path('api/marcacoes-ultimo-lote/', views.api_marcacoes_ultimo_lote, name='api_marcacoes_ultimo_lote'),
-
-    path('api/buscar-origens/', views.buscar_origens, name='buscar_origens'),  # já existente
-    path('api/buscar-enderecos/', views.api_buscar_enderecos, name='api_buscar_enderecos'),  # NOVA
-    path('api/listar-enderecos/', views.api_listar_enderecos, name='api_listar_enderecos'),  # NOVA
-    path('dashboard-data/', views.dashboard_data, name='dashboard_data'),
-    path('configuracoes/', views.configuracoes, name='configuracoes'),
     path('api/user-permissions/<int:user_id>/', views.api_user_permissions, name='api_user_permissions'),
-
 ]
 
 # ============================================================================
 # CONFIGURAÇÃO DE ARQUIVOS ESTÁTICOS E MÍDIA
 # ============================================================================
-if settings.DEBUG or not settings.DEBUG: # Ou apenas remova o IF durante o teste
-    from django.views.static import serve
-    from django.urls import re_path
+# Servir arquivos de mídia (uploads)
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
+
+# Servir arquivos estáticos (sempre, para debugging)
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+else:
+    # Fallback: servir estáticos via Django se Nginx não estiver configurado
     urlpatterns += [
-        re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+        re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
     ]
