@@ -1,0 +1,147 @@
+{% for item in itens %}
+<tr class="row-item" data-id="{{ item.id }}" onclick="abrirDetalhe({{ item.id }})">
+    <!-- Código com fonte mono para aspecto técnico -->
+    <td class="col-codigo">
+        <code class="code-badge">{{ item.codigo|default:"---" }}</code>
+    </td>
+
+    <!-- Nome e Descrição rápida -->
+    <td class="col-info">
+        <div class="item-main-info">
+            <span class="item-name">{{ item.nome }}</span>
+            {% if item.lote %}
+                <span class="item-sub">Lote: {{ item.lote }}</span>
+            {% endif %}
+        </div>
+    </td>
+
+    <!-- Localização com ícone discreto -->
+    <td class="col-local">
+        <span class="location-tag">
+            <span class="pin">📍</span> {{ item.localizacao|default:"Não definido" }}
+        </span>
+    </td>
+
+    <!-- Estoque com Badges de Status dinâmicos -->
+    <td class="col-estoque text-center">
+        {% if item.quantidade <= 0 %}
+            <span class="badge-status critical">0 {{ item.get_unidade_display }}</span>
+        {% elif item.quantidade <= item.estoque_minimo %}
+            <span class="badge-status warning">{{ item.quantidade|floatformat:"-3" }} {{ item.get_unidade_display }}</span>
+        {% else %}
+            <span class="badge-status success">{{ item.quantidade|floatformat:"-3" }} {{ item.get_unidade_display }}</span>
+        {% endif %}
+    </td>
+
+    <!-- Unidade Medida -->
+    <td class="col-un text-muted">
+        {{ item.get_unidade_display }}
+    </td>
+
+    <!-- Departamento -->
+    <td class="col-dept">
+        <span class="dept-label">{{ item.get_departamento_display }}</span>
+    </td>
+
+    <!-- Ações Rápidas -->
+    <td class="col-acoes text-right">
+        <div class="action-buttons">
+            <button class="btn-icon add-cart" title="Adicionar ao Carrinho" 
+                    onclick="event.stopPropagation(); Almox.adicionarCarrinho({{ item.id }})">
+                🛒
+            </button>
+            <button class="btn-icon edit-item" title="Editar Item" 
+                    onclick="event.stopPropagation(); abrirEditar({{ item.id }})">
+                ✏️
+            </button>
+        </div>
+    </td>
+</tr>
+{% empty %}
+<tr>
+    <td colspan="7" class="empty-state">
+        <div class="empty-content">
+            <span class="empty-icon">📦</span>
+            <p>Nenhum item encontrado no estoque.</p>
+            <small>Tente mudar os filtros ou cadastrar um novo material.</small>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+
+<style>
+    /* Estilos específicos para as células da tabela partial */
+    .code-badge {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+        font-family: 'Fira Code', monospace;
+        font-size: 0.85rem;
+        border: 1px solid var(--border);
+    }
+
+    .item-main-info { display: flex; flex-direction: column; }
+    .item-name { font-weight: 600; color: var(--text-main); font-size: 0.95rem; }
+    .item-sub { font-size: 0.75rem; color: var(--text-muted); }
+
+    .location-tag {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Badges de Status do Estoque */
+    .badge-status {
+        display: inline-block;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        min-width: 80px;
+    }
+    .badge-status.success { background: #d1fae5; color: #065f46; }
+    .badge-status.warning { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b50; }
+    .badge-status.critical { background: #fee2e2; color: #991b1b; animation: pulse-red 2s infinite; }
+
+    @keyframes pulse-red {
+        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .dept-label {
+        background: #eff6ff;
+        color: #1e40af;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    /* Botões de Ação na Linha */
+    .action-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+    .btn-icon {
+        background: white;
+        border: 1px solid var(--border);
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: 0.2s;
+        font-size: 1rem;
+    }
+    .btn-icon:hover { border-color: var(--primary); transform: scale(1.1); background: #f0fdf4; }
+    .btn-icon.add-cart:hover { border-color: #f59e0b; background: #fffbeb; }
+
+    /* Empty State Customizado */
+    .empty-state { padding: 4rem 0 !important; }
+    .empty-content { text-align: center; color: var(--text-muted); }
+    .empty-icon { font-size: 3rem; display: block; margin-bottom: 1rem; opacity: 0.5; }
+    .empty-content p { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.2rem; }
+</style>

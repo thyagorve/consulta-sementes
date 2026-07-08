@@ -27,10 +27,10 @@
             position: relative; display: flex; flex-direction: column;
         }
 
-        /* ===== CABEÇALHO (FIXO NO LAYOUT) ===== */
         .cabecalho-superior {
             display: grid; grid-template-columns: 40% 30% 30%;
-            border: 2px solid #000; margin-bottom: 8px; height: 130px;
+            border: 2px solid #000; margin-bottom: 8px;
+            /* SEM altura fixa - ajusta automaticamente */
         }
 
         .cabecalho-bloco {
@@ -39,7 +39,7 @@
         }
         .cabecalho-bloco:last-child { border-right: none; }
         
-        .valor-estatico { font-weight: bold; color: #000; } /* Conteúdo fixo (Ex: FOR.017) */
+        .valor-estatico { font-weight: bold; color: #000; }
 
         .titulo-central {
             width: 100%; text-align: center; font-size: 20px; font-weight: 900;
@@ -60,7 +60,7 @@
             color: white !important; font-weight: 800; text-transform: uppercase;
         }
 
-        /* DADOS VARIÁVEIS (O que vem do banco de dados) */
+        /* DADOS VARIÁVEIS */
         .valor-variavel { font-weight: 700; color: #000; font-size: 13px; }
 
         .qrcode-area {
@@ -82,27 +82,23 @@
         }
         .tabela-movimentacao td { border: 1px solid #888; height: 26px; }
 
-        /* ===== LÓGICA DE IMPRESSÃO REVISADA ===== */
-
+        /* ===== LÓGICA DE IMPRESSÃO ===== */
         @media print {
             body { background: white; padding: 0; }
 
-            /* MODO 1: LAYOUT (Colorida) */
             body.print-layout-mode .valor-variavel,
             body.print-layout-mode #qrcode img,
             body.print-layout-mode #qrcode canvas {
-                visibility: hidden !important; /* Esconde os dados do banco */
+                visibility: hidden !important;
             }
-            /* O cabeçalho, logo, código FOR.017 e quadrado branco do QR aparecem aqui */
 
-            /* MODO 2: DADOS (Preto e Branco) */
             body.print-data-mode .ficha-a4,
             body.print-data-mode .cabecalho-superior,
             body.print-data-mode .dados-lote-container,
             body.print-data-mode .tabela-movimentacao {
                 border-color: transparent !important; background: none !important;
             }
-            body.print-data-mode img:not(.qr-pixels), /* Esconde logo */
+            body.print-data-mode img:not(.qr-pixels),
             body.print-data-mode .cabecalho-bloco,
             body.print-data-mode .titulo-central,
             body.print-data-mode .celula-fundo,
@@ -111,7 +107,7 @@
             body.print-data-mode td {
                 border-color: transparent !important; background: none !important;
             }
-            body.print-data-mode span:not(.valor-variavel), /* Esconde "Código:", "Revisão:", etc */
+            body.print-data-mode span:not(.valor-variavel),
             body.print-data-mode p,
             body.print-data-mode div:not(#qrcode):not(.valor-variavel):not(.ficha-a4):not(.dados-lote-container) {
                 visibility: hidden !important;
@@ -119,7 +115,7 @@
             body.print-data-mode .valor-variavel,
             body.print-data-mode #qrcode img,
             body.print-data-mode #qrcode canvas {
-                visibility: visible !important; /* Mostra apenas os dados variáveis */
+                visibility: visible !important;
                 color: #000 !important;
             }
             body.print-data-mode #qrcode { background: transparent !important; }
@@ -137,7 +133,7 @@
         }
         .btn-print.active { background: #FF8C00; color: white; }
 
-                .propaganda-app {
+        .propaganda-app {
             text-align: right;
             border-top: 1px solid #FF8C00;
             padding-top: 8px;
@@ -153,29 +149,24 @@
             color: #FF8C00;
             font-style: normal;
         }
-
-
-
-
-        
     </style>
 </head>
 <body class="print-full-mode">
     <div class="ficha-a4">
         <header class="cabecalho-superior">
-            <div class="cabecalho-bloco">
+            <div class="cabecalho-bloco" style="display: flex; align-items: center; justify-content: center; padding: 5px 0;">
                 {% if config_logo and config_logo.logo %}
-                    <img src="{{ config_logo.logo.url }}" style="max-height: 100px;">
+                    <img src="{{ config_logo.logo.url }}" style="max-height: 150px; width: auto; max-width: 90%; object-fit: contain;">
                 {% else %}
                     <span style="font-weight:900; color:#FF8C00;">GRUPO CONCEITO</span>
                 {% endif %}
             </div>
             <div class="cabecalho-bloco">
-                <p>CÓDIGO: <span class="valor-estatico">FOR.017</span></p>
+                <p>CÓDIGO: <span class="valor-estatico">FOR.001</span></p>
                 <p>REVISÃO: <span class="valor-estatico">01</span></p>
             </div>
             <div class="cabecalho-bloco">
-                <p>EMISSÃO: <span class="valor-estatico">{% now "d/m/Y" %}</span></p>
+                <p>EMISSÃO: <span class="valor-estatico">01/06/2026</span></p>
                 <p>APROVAÇÃO: <span class="valor-estatico">________</span></p>
             </div>
         </header>
@@ -235,11 +226,10 @@
                 {% endfor %}
             </tbody>
         </table>
-             <div class="propaganda-app">
+        <div class="propaganda-app">
             Rastreável eletronicamente via sistema <span>SEMENTES APP</span>
         </div>  
     </div>
-
 
     <!-- Modal -->
     <div id="printModal">
@@ -251,8 +241,6 @@
             <button onclick="$('#printModal').hide()" style="border:none; color:red; cursor:pointer; background:none; margin-top:15px;">Cancelar</button>
         </div>
     </div>
-
-    
 
     <script>
         function imprimir(modo) {
@@ -272,7 +260,6 @@
                 width: 80, height: 80,
                 colorDark: "#000000", colorLight: "#ffffff"
             });
-            // Adiciona uma classe nas imagens do QR para facilitar a seleção
             $('#qrcode img, #qrcode canvas').addClass('qr-pixels');
         });
     </script>

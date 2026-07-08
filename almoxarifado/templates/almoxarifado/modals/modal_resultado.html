@@ -1,0 +1,87 @@
+{# templates/almoxarifado/modals/modal_resultado.html #}
+
+<style>
+/* CSS do Modal Resultado */
+.modal-resultado {
+    max-width: 500px;
+}
+.resultado-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+.resultado-item:last-child {
+    border-bottom: none;
+}
+.resultado-item .status {
+    font-weight: 600;
+}
+.status-success {
+    color: #10b981;
+}
+.status-warning {
+    color: #f59e0b;
+}
+.status-error {
+    color: #ef4444;
+}
+</style>
+
+<!-- HTML do Modal Resultado -->
+<div class="modal-overlay" id="modal-resultado-overlay" onclick="fecharModalResultado()"></div>
+<div class="modal-container modal-resultado" id="modal-resultado-container" style="display:none;">
+    <div class="modal-header" id="modal-resultado-header">
+        <div class="modal-header-icon" id="resultado-icon">✅</div>
+        <div class="modal-header-title">
+            <h3 id="resultado-titulo">Importação Concluída</h3>
+            <p id="resultado-mensagem"></p>
+        </div>
+        <button class="modal-close" onclick="fecharModalResultado()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-resultado-body">
+        <div id="resultado-detalhes"></div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn-primary" onclick="fecharModalResultado(); location.reload();">OK</button>
+    </div>
+</div>
+
+<script>
+// JavaScript do Modal Resultado
+(function() {
+    window.fecharModalResultado = function() {
+        const overlay = document.getElementById('modal-resultado-overlay');
+        const container = document.getElementById('modal-resultado-container');
+        if (overlay) overlay.classList.remove('active');
+        if (container) container.style.display = 'none';
+    }
+
+    window.mostrarResultadoImportacao = function(titulo, mensagem, detalhes, tipo = 'success') {
+        const overlay = document.getElementById('modal-resultado-overlay');
+        const container = document.getElementById('modal-resultado-container');
+        const header = document.getElementById('modal-resultado-header');
+        const icon = document.getElementById('resultado-icon');
+        const tituloEl = document.getElementById('resultado-titulo');
+        const mensagemEl = document.getElementById('resultado-mensagem');
+        const detalhesEl = document.getElementById('resultado-detalhes');
+        
+        if (tipo === 'success') {
+            if (icon) icon.textContent = '✅';
+            if (header) header.className = 'modal-header modal-header-info';
+        } else {
+            if (icon) icon.textContent = '❌';
+            if (header) header.className = 'modal-header';
+        }
+        
+        if (tituloEl) tituloEl.textContent = titulo;
+        if (mensagemEl) mensagemEl.textContent = mensagem;
+        if (detalhesEl) {
+            detalhesEl.innerHTML = detalhes || '';
+        }
+        
+        if (overlay) overlay.classList.add('active');
+        if (container) container.style.display = 'flex';
+    }
+})();
+</script>

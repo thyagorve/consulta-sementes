@@ -1,0 +1,1372 @@
+{# templates/almoxarifado/modals/modal_whatsapp.html #}
+
+<style>
+/* ============================================ */
+/* CSS DO MODAL WHATSAPP */
+/* ============================================ */
+
+.modal-wa {
+    max-width: 750px;
+}
+
+.wa-tabs {
+    display: flex;
+    gap: 5px;
+    border-bottom: 2px solid var(--border, #e5e7eb);
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.wa-tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray, #6b7280);
+    transition: all 0.2s;
+}
+
+.wa-tab:hover {
+    color: var(--primary, #059669);
+}
+
+.wa-tab.active {
+    color: var(--primary, #059669);
+    border-bottom: 2px solid var(--primary, #059669);
+    margin-bottom: -2px;
+}
+
+.wa-tab-content {
+    display: none;
+    min-height: 400px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.wa-tab-content.active {
+    display: block;
+}
+
+.instancias-list {
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.instancia-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid var(--border, #e5e7eb);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.instancia-item:hover {
+    background: var(--light, #f3f4f6);
+}
+
+.instancia-item.selected {
+    background: #d1fae5;
+    border-left: 3px solid var(--primary, #059669);
+}
+
+.instancia-nome {
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.instancia-status {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+.status-connected {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-disconnected {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.instancia-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.instancia-actions button:hover {
+    background: var(--light, #f3f4f6);
+}
+
+.numeros-list {
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.numero-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.numero-item:last-child {
+    border-bottom: none;
+}
+
+.numero-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.numero-info .numero {
+    font-weight: 500;
+    font-family: monospace;
+}
+
+.numero-info .badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 20px;
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.btn-remove-numero {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--danger, #ef4444);
+    font-size: 16px;
+}
+
+.btn-remove-numero:hover {
+    background: #fee2e2;
+}
+
+.template-preview {
+    position: relative;
+}
+
+.template-preview-btn {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    background: var(--primary, #059669);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    z-index: 1;
+}
+
+.template-preview-btn:hover {
+    background: var(--primary-dark, #047857);
+}
+
+.loading-small {
+    text-align: center;
+    padding: 20px;
+    color: var(--gray, #6b7280);
+}
+
+.alert-info {
+    background: #eff6ff;
+    border-left: 3px solid var(--info, #3b82f6);
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 26px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #25D366;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+.status-toggle {
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 15px;
+    margin-bottom: 10px;
+    cursor: pointer;
+}
+
+.departamentos-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary, #059669);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray, #6b7280);
+    margin-bottom: 6px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+textarea.form-control {
+    resize: vertical;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+hr {
+    margin: 20px 0;
+    border: none;
+    border-top: 1px solid var(--border, #e5e7eb);
+}
+
+small {
+    font-size: 0.7rem;
+    color: var(--gray, #6b7280);
+    display: block;
+    margin-top: 4px;
+}
+
+.btn-primary {
+    background: var(--primary, #059669);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background: var(--primary-dark, #047857);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: var(--white, #fff);
+    color: var(--dark, #1f2937);
+    border: 1px solid var(--border, #e5e7eb);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: var(--light, #f3f4f6);
+}
+
+.modal-header-wa {
+    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .wa-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+    .wa-tab {
+        white-space: nowrap;
+    }
+    .departamentos-list {
+        grid-template-columns: 1fr;
+    }
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<!-- ============================================ -->
+<!-- HTML DO MODAL WHATSAPP -->
+<!-- ============================================ -->
+
+<div class="modal-overlay" id="modal-wa-overlay" onclick="fecharModalWhatsApp()"></div>
+<div class="modal-container modal-wa" id="modal-wa-container" style="display:none;">
+    <div class="modal-header modal-header-wa">
+        <div class="modal-header-icon">📱</div>
+        <div class="modal-header-title">
+            <h3>Configuração do WhatsApp</h3>
+            <p>Conecte sua instância e gerencie os números que receberão alertas</p>
+        </div>
+        <button class="modal-close" onclick="fecharModalWhatsApp()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-wa-body">
+        <div class="wa-tabs">
+            <button class="wa-tab active" onclick="switchWATab('conexao')">🔌 Conexão</button>
+            <button class="wa-tab" onclick="switchWATab('numeros')">📞 Números</button>
+            <button class="wa-tab" onclick="switchWATab('agendamento')">⏰ Agendamento</button>
+            <button class="wa-tab" onclick="switchWATab('templates')">📝 Templates</button>
+            <button class="wa-tab" id="qr-code-tab" onclick="switchWATab('qrcode')" style="display:none;">📱 Conectar</button>
+        </div>
+
+        <!-- ABA CONEXÃO -->
+        <div id="wa-tab-conexao" class="wa-tab-content active">
+            <div class="form-group">
+                <label>🌐 Status do Sistema</label>
+                <div class="status-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="wa-ativo" onchange="toggleSistema()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span id="status-label" style="margin-left: 10px;">Desativado</span>
+                </div>
+            </div>
+            <hr>
+            <div class="form-group">
+                <label>🔌 URL da Evolution API</label>
+                <input type="url" id="wa-api-url" class="form-control" placeholder="https://evolutionapi.tlsnettop.com.br">
+                <small>URL da sua instalação da Evolution API</small>
+            </div>
+            <div class="form-group">
+                <label>🔑 API Key (Global)</label>
+                <input type="text" id="wa-api-key" class="form-control" placeholder="Sua chave global">
+                <small>Configure na Evolution API → Configurações → API Key</small>
+            </div>
+            <hr>
+            <div class="form-group">
+                <label>📱 Gerenciar Instâncias</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="nova-instancia" class="form-control" placeholder="Nome da nova instância" style="flex: 1;">
+                    <button class="btn-primary" onclick="criarInstancia()" style="white-space: nowrap;">➕ Criar</button>
+                </div>
+                <div id="lista-instancias" class="instancias-list">
+                    <div class="loading-small">Carregando instâncias...</div>
+                </div>
+                <small>Selecione uma instância para usar. Clique em "Conectar" para obter o código de pareamento.</small>
+            </div>
+            <div class="form-group" id="instancia-selecionada-group" style="display: none;">
+                <label>✅ Instância Selecionada</label>
+                <select id="wa-instance" class="form-control">
+                    <option value="">Selecione uma instância</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ABA QR CODE -->
+        <div id="wa-tab-qrcode" class="wa-tab-content">
+            <div style="text-align: center; padding: 20px;">
+                <div id="qr-code-instance-info" style="margin-bottom: 15px;">
+                    <strong>Instância: </strong> <span id="qr-instance-name">Nenhuma selecionada</span>
+                </div>
+                <div id="pairing-code-area" style="display: none;">
+                    <div style="background: linear-gradient(135deg, #075E54, #128C7E); padding: 30px; border-radius: 20px; color: white;">
+                        <div style="font-size: 20px; margin-bottom: 10px;">🔐 Conexão WhatsApp</div>
+                        <div id="pairing-code-display" style="font-size: 48px; font-weight: bold; letter-spacing: 5px; background: white; color: #075E54; padding: 20px; border-radius: 15px; margin: 15px 0; font-family: monospace;"></div>
+                        <p style="font-size: 14px; margin-top: 10px;">
+                            1. Abra o WhatsApp no seu celular<br>
+                            2. Toque nos três pontos ⋮ → <strong>Dispositivos vinculados</strong><br>
+                            3. Toque em <strong>Vincular um dispositivo</strong><br>
+                            4. Digite o código acima ou escaneie o QR Code<br>
+                            5. Pronto! WhatsApp conectado automaticamente
+                        </p>
+                    </div>
+                    <button class="btn-secondary" onclick="gerarPairingCode()" style="margin-top: 15px;">🔄 Gerar Novo Código</button>
+                </div>
+                <div id="qr-connected-info" style="display: none; padding: 30px; background: #d1fae5; border-radius: 12px;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+                    <h3 style="color: #065f46;">WhatsApp Conectado!</h3>
+                    <p>A instância está pronta para enviar mensagens</p>
+                </div>
+                <div id="pairing-loading" class="loading-small" style="display: none;">⏳ Gerando código de conexão...</div>
+            </div>
+        </div>
+
+        <!-- ABA NÚMEROS POR DEPARTAMENTO -->
+        <div id="wa-tab-numeros" class="wa-tab-content">
+            <div style="margin-bottom: 20px;">
+                <label>📞 Números Padrão (todos departamentos)</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="novo-numero-padrao" class="form-control" placeholder="5511999999999" style="flex: 1;">
+                    <button class="btn-primary" onclick="adicionarNumeroPadrao()">➕ Adicionar</button>
+                </div>
+                <div id="lista-numeros-padrao" class="numeros-list" style="margin-bottom: 10px;"></div>
+                <small>Números que recebem notificações de TODOS os departamentos</small>
+            </div>
+            <hr>
+            <div style="margin-bottom: 15px;">
+                <label>🏢 Números por Departamento</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <select id="dept-select" class="filter-select" style="flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
+                        <option value="">Selecione o departamento</option>
+                        {% for key, name in departamentos %}
+                            <option value="{{ key }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" id="novo-numero-dept" class="form-control" placeholder="5511999999999" style="flex: 1;">
+                    <button class="btn-primary" onclick="adicionarNumeroDepartamento()">➕ Adicionar</button>
+                </div>
+                <div id="lista-numeros-departamento" class="numeros-list"></div>
+                <small>Notificações de um departamento específico vão apenas para os números cadastrados aqui</small>
+            </div>
+            <div class="alert-info" style="margin-top: 15px;">
+                💡 <strong>Como funciona:</strong><br>
+                • Se um departamento tem números específicos, apenas eles recebem as notificações<br>
+                • Se não houver números específicos, os números padrão recebem<br>
+                • Cada número pode estar em vários departamentos
+            </div>
+        </div>
+
+        <!-- ABA AGENDAMENTO -->
+        <div id="wa-tab-agendamento" class="wa-tab-content">
+            <div class="form-group">
+                <label>⏰ Tipo de Envio</label>
+                <select id="tipo-envio" class="form-control" onchange="toggleOpcoesEnvio()">
+                    <option value="tempo-real">🚀 Tempo Real (Assim que detectar)</option>
+                    <option value="agendado">📅 Agendado (Horário específico)</option>
+                    <option value="ambos">🔄 Ambos (Tempo Real + Agendado)</option>
+                </select>
+            </div>
+
+            <div id="opcoes-agendamento" style="display: none;">
+                <div class="form-group">
+                    <label>🕐 Horário do Envio Agendado</label>
+                    <input type="time" id="horario-agendado" class="form-control" value="08:00">
+                    <small>Horário em que as notificações agendadas serão enviadas</small>
+                </div>
+                <div class="form-group">
+                    <label>📅 Dias da Semana</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                        <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="1"> Segunda</label>
+                        <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="2"> Terça</label>
+                        <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="3"> Quarta</label>
+                        <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="4"> Quinta</label>
+                        <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="5"> Sexta</label>
+                        <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="6"> Sábado</label>
+                        <label class="checkbox-label"><input type="checkbox" class="dia-semana" value="0"> Domingo</label>
+                    </div>
+                    <small>Selecione os dias que as notificações agendadas serão enviadas</small>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="form-group">
+                <label>📋 Tipos de Notificação a Enviar</label>
+                <div style="margin-top: 10px;">
+                    <label class="checkbox-label"><input type="checkbox" id="notif-baixo" checked> 🔴 Estoque Baixo (abaixo do mínimo)</label><br>
+                    <label class="checkbox-label"><input type="checkbox" id="notif-zerado" checked> 🔴 Estoque Zerado</label><br>
+                    <label class="checkbox-label"><input type="checkbox" id="notif-reposicao" checked> ✅ Reposição (entrada de estoque)</label>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="form-group">
+                <label>🔄 Repetir Notificações</label>
+                <div class="status-toggle">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="repetir-notificacoes">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span style="margin-left: 10px;">Repetir enquanto o estoque estiver baixo</span>
+                </div>
+            </div>
+
+            <div id="opcoes-repeticao" style="display: none;">
+                <div class="form-group">
+                    <label>⏱️ Intervalo de Repetição (horas)</label>
+                    <input type="number" id="intervalo-repeticao" class="form-control" value="24" min="1" max="168">
+                    <small>Intervalo entre repetições da mesma notificação</small>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="form-group">
+                <label>📊 Notificações por Departamento</label>
+                <div id="departamentos-notificacao" class="departamentos-list">
+                    {% for key, name in departamentos %}
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="dept-notif" value="{{ key }}" checked> {{ name }}
+                    </label>
+                    {% endfor %}
+                </div>
+                <small>Selecione quais departamentos devem receber notificações</small>
+            </div>
+
+            <div class="alert-info" style="margin-top: 15px;">
+                💡 <strong>Como funciona o agendamento:</strong><br>
+                • <strong>Tempo Real:</strong> Notifica assim que o estoque muda<br>
+                • <strong>Agendado:</strong> Acumula notificações e envia no horário escolhido<br>
+                • <strong>Ambos:</strong> Envia em tempo real E também envia um resumo agendado
+            </div>
+        </div>
+
+        <!-- ABA TEMPLATES -->
+        <div id="wa-tab-templates" class="wa-tab-content">
+            <div class="form-group">
+                <label>🔴 Estoque Baixo</label>
+                <div class="template-preview">
+                    <button type="button" class="template-preview-btn" onclick="previewTemplate('baixo')">👁️ Preview</button>
+                    <textarea id="wa-template-baixo" rows="6" class="form-control" style="font-family: monospace; font-size: 12px;">🔴 *ALERTA DE ESTOQUE BAIXO*
+
+📦 *Produto:* {nome}
+📌 *Código:* {codigo}
+📊 *Quantidade atual:* {quantidade} {unidade}
+⚠️ *Estoque mínimo:* {minimo} {unidade}
+📍 *Localização:* {localizacao}
+🏢 *Departamento:* {departamento}
+
+⚠️ *Necessário repor estoque em breve!*</textarea>
+                </div>
+                <small>Variáveis: {nome}, {codigo}, {quantidade}, {minimo}, {unidade}, {localizacao}, {departamento}</small>
+            </div>
+            <div class="form-group">
+                <label>🔴 Estoque Zerado</label>
+                <div class="template-preview">
+                    <button type="button" class="template-preview-btn" onclick="previewTemplate('zerado')">👁️ Preview</button>
+                    <textarea id="wa-template-zerado" rows="6" class="form-control" style="font-family: monospace; font-size: 12px;">⛔ *ESTOQUE ZERADO!*
+
+📦 *Produto:* {nome}
+📌 *Código:* {codigo}
+⚠️ *Estoque mínimo:* {minimo} {unidade}
+📍 *Localização:* {localizacao}
+
+🚨 *URGENTE! Produto sem estoque disponível!*</textarea>
+                </div>
+                <small>Variáveis: {nome}, {codigo}, {minimo}, {unidade}, {localizacao}</small>
+            </div>
+            <div class="form-group">
+                <label>✅ Reposição</label>
+                <div class="template-preview">
+                    <button type="button" class="template-preview-btn" onclick="previewTemplate('reposicao')">👁️ Preview</button>
+                    <textarea id="wa-template-reposicao" rows="6" class="form-control" style="font-family: monospace; font-size: 12px;">✅ *REPOSIÇÃO DE ESTOQUE*
+
+📦 *Produto:* {nome}
+📌 *Código:* {codigo}
+📊 *Nova quantidade:* {nova_quantidade} {unidade}
+➕ *Adicionado:* +{adicionado} {unidade}
+
+📦 *Estoque atualizado com sucesso!*</textarea>
+                </div>
+                <small>Variáveis: {nome}, {codigo}, {nova_quantidade}, {adicionado}, {unidade}</small>
+            </div>
+            <div class="form-group">
+                <label>📊 Resumo Agendado</label>
+                <div class="template-preview">
+                    <button type="button" class="template-preview-btn" onclick="previewTemplate('resumo')">👁️ Preview</button>
+                    <textarea id="wa-template-resumo" rows="8" class="form-control" style="font-family: monospace; font-size: 12px;">📊 *RESUMO DIÁRIO DE ESTOQUE*
+
+📅 Data: {data}
+🏢 Departamento: {departamento}
+
+📦 *ITENS COM ESTOQUE BAIXO:* ({total_baixo})
+{lista_baixo}
+
+⚠️ *ITENS ZERADOS:* ({total_zerado})
+{lista_zerado}
+
+🔔 Este é um resumo automático do sistema de Almoxarifado.</textarea>
+                </div>
+                <small>Variáveis: {data}, {departamento}, {total_baixo}, {total_zerado}, {lista_baixo}, {lista_zerado}</small>
+            </div>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button class="btn-secondary" onclick="fecharModalWhatsApp()">Cancelar</button>
+        <button class="btn-primary" onclick="salvarConfiguracaoWhatsApp()">💾 Salvar Configurações</button>
+    </div>
+</div>
+
+<script>
+// ============================================
+// JAVASCRIPT DO MODAL WHATSAPP
+// ============================================
+
+(function() {
+    // Variáveis do modal
+    let instanciasList = [];
+    let numerosPadrao = [];
+    let numerosPorDepartamento = {};
+    let qrCodeCheckInterval = null;
+
+    // CSRF Token - tenta pegar de diferentes lugares
+    function getCSRFToken() {
+        const token = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (token) return token;
+        return '{{ csrf_token }}';
+    }
+
+    // ============================================
+    // FUNÇÕES PRINCIPAIS DO MODAL
+    // ============================================
+    
+    window.abrirModalWhatsApp = function() {
+        const overlay = document.getElementById('modal-wa-overlay');
+        const container = document.getElementById('modal-wa-container');
+        if (overlay) overlay.classList.add('active');
+        if (container) container.style.display = 'flex';
+        carregarConfigWhatsApp();
+        carregarInstancias();
+        switchWATab('conexao');
+    }
+
+    window.fecharModalWhatsApp = function() { 
+        const overlay = document.getElementById('modal-wa-overlay');
+        const container = document.getElementById('modal-wa-container');
+        if (overlay) overlay.classList.remove('active'); 
+        if (container) container.style.display = 'none';
+        if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+    }
+
+    // ============================================
+    // CONFIGURAÇÕES
+    // ============================================
+    
+    async function carregarConfigWhatsApp() {
+        try {
+            const resp = await fetch('/almoxarifado/api/config-whatsapp/');
+            const data = await resp.json();
+            if (data.success) {
+                const config = data.config;
+                
+                const ativoCheck = document.getElementById('wa-ativo');
+                const apiUrlInput = document.getElementById('wa-api-url');
+                const apiKeyInput = document.getElementById('wa-api-key');
+                const instanceSelect = document.getElementById('wa-instance');
+                const statusLabel = document.getElementById('status-label');
+                
+                if (ativoCheck) ativoCheck.checked = config.ativo;
+                if (apiUrlInput) apiUrlInput.value = config.api_url || '';
+                if (apiKeyInput) apiKeyInput.value = config.api_key || '';
+                if (instanceSelect) instanceSelect.value = config.instance_name || '';
+                
+                if (config.instance_name) {
+                    const group = document.getElementById('instancia-selecionada-group');
+                    if (group) group.style.display = 'block';
+                }
+                
+                if (ativoCheck && statusLabel) {
+                    if (ativoCheck.checked) {
+                        statusLabel.innerHTML = '✅ Sistema ativo';
+                        statusLabel.style.color = '#25D366';
+                    } else {
+                        statusLabel.innerHTML = '⭕ Sistema desativado';
+                        statusLabel.style.color = '#999';
+                    }
+                }
+
+                // Carregar números se houver
+                if (config.numeros_padrao) {
+                    numerosPadrao = config.numeros_padrao.split(',').filter(n => n);
+                    renderNumerosPadrao();
+                }
+                if (config.numeros_por_departamento) {
+                    numerosPorDepartamento = config.numeros_por_departamento;
+                    renderNumerosDepartamento();
+                }
+
+                // Carregar templates
+                const templateBaixo = document.getElementById('wa-template-baixo');
+                const templateZerado = document.getElementById('wa-template-zerado');
+                const templateReposicao = document.getElementById('wa-template-reposicao');
+                const templateResumo = document.getElementById('wa-template-resumo');
+                
+                if (templateBaixo && config.template_estoque_baixo) templateBaixo.value = config.template_estoque_baixo;
+                if (templateZerado && config.template_estoque_zerado) templateZerado.value = config.template_estoque_zerado;
+                if (templateReposicao && config.template_reposicao) templateReposicao.value = config.template_reposicao;
+                if (templateResumo && config.template_resumo) templateResumo.value = config.template_resumo;
+
+                // Carregar configurações de agendamento
+                const tipoEnvio = document.getElementById('tipo-envio');
+                const horarioAgendado = document.getElementById('horario-agendado');
+                const notifBaixo = document.getElementById('notif-baixo');
+                const notifZerado = document.getElementById('notif-zerado');
+                const notifReposicao = document.getElementById('notif-reposicao');
+                const repetirNotificacoes = document.getElementById('repetir-notificacoes');
+                const intervaloRepeticao = document.getElementById('intervalo-repeticao');
+                
+                if (tipoEnvio) tipoEnvio.value = config.tipo_envio || 'tempo-real';
+                if (horarioAgendado) horarioAgendado.value = config.horario_agendado || '08:00';
+                if (notifBaixo) notifBaixo.checked = config.notificar_baixo !== false;
+                if (notifZerado) notifZerado.checked = config.notificar_zerado !== false;
+                if (notifReposicao) notifReposicao.checked = config.notificar_reposicao !== false;
+                if (repetirNotificacoes) repetirNotificacoes.checked = config.repetir_notificacoes || false;
+                if (intervaloRepeticao) intervaloRepeticao.value = config.intervalo_repeticao || 24;
+                
+                const dias = config.dias_semana || [1,2,3,4,5];
+                document.querySelectorAll('.dia-semana').forEach(cb => {
+                    cb.checked = dias.includes(parseInt(cb.value));
+                });
+                
+                const deptsAtivos = config.departamentos_ativos || [];
+                document.querySelectorAll('.dept-notif').forEach(cb => {
+                    cb.checked = deptsAtivos.length === 0 || deptsAtivos.includes(cb.value);
+                });
+                
+                toggleOpcoesEnvio();
+            }
+        } catch(e) { 
+            console.error('Erro ao carregar configurações:', e); 
+        }
+    }
+
+    window.toggleSistema = function() {
+        const isAtivo = document.getElementById('wa-ativo')?.checked;
+        const statusLabel = document.getElementById('status-label');
+        if (isAtivo && statusLabel) { 
+            statusLabel.innerHTML = '✅ Sistema ativo'; 
+            statusLabel.style.color = '#25D366'; 
+        } else if (statusLabel) { 
+            statusLabel.innerHTML = '⭕ Sistema desativado'; 
+            statusLabel.style.color = '#999'; 
+        }
+    }
+
+    // ============================================
+    // INSTÂNCIAS
+    // ============================================
+    
+    async function carregarInstancias() {
+        let apiUrl = document.getElementById('wa-api-url')?.value.trim() || '';
+        const apiKey = document.getElementById('wa-api-key')?.value || '';
+        const listaInstancias = document.getElementById('lista-instancias');
+        
+        if (!apiUrl) { 
+            if (listaInstancias) listaInstancias.innerHTML = '<div class="loading-small">Configure a URL da API primeiro</div>'; 
+            return; 
+        }
+        if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+        if (listaInstancias) listaInstancias.innerHTML = '<div class="loading-small">🔄 Carregando instâncias...</div>';
+        
+        try {
+            const resp = await fetch('/almoxarifado/api/listar-instancias/', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }, 
+                body: JSON.stringify({ api_url: apiUrl, api_key: apiKey }) 
+            });
+            const data = await resp.json();
+            
+            if (data.success && data.instancias) {
+                instanciasList = data.instancias;
+                let html = '';
+                instanciasList.forEach(inst => {
+                    const nome = inst.name || inst.instanceName;
+                    const status = inst.connectionStatus || 'close';
+                    const statusClass = status === 'open' ? 'status-connected' : 'status-disconnected';
+                    const statusText = status === 'open' ? '✅ Conectado' : '❌ Desconectado';
+                    html += `<div class="instancia-item" data-instance="${nome}" onclick="selecionarInstancia('${nome}')">
+                        <div class="instancia-nome">📱 ${nome}</div>
+                        <div class="instancia-status ${statusClass}">${statusText}</div>
+                        <div class="instancia-actions">
+                            <button onclick="event.stopPropagation(); conectarInstancia('${nome}')" title="Conectar">🔌 Conectar</button>
+                            <button onclick="event.stopPropagation(); deletarInstancia('${nome}')" title="Excluir">🗑️</button>
+                        </div>
+                    </div>`;
+                });
+                if (listaInstancias) listaInstancias.innerHTML = html || '<div class="loading-small">Nenhuma instância</div>';
+                
+                const select = document.getElementById('wa-instance');
+                if (select) {
+                    select.innerHTML = '<option value="">Selecione uma instância</option>';
+                    instanciasList.forEach(inst => { 
+                        const nome = inst.name || inst.instanceName; 
+                        select.innerHTML += `<option value="${nome}">${nome}</option>`; 
+                    });
+                }
+            } else { 
+                if (listaInstancias) listaInstancias.innerHTML = '<div class="loading-small">❌ Erro ao carregar</div>'; 
+            }
+        } catch(e) { 
+            if (listaInstancias) listaInstancias.innerHTML = '<div class="loading-small">❌ Erro de conexão</div>'; 
+        }
+    }
+
+    window.conectarInstancia = function(instanceName) {
+        selecionarInstancia(instanceName);
+        switchWATab('qrcode');
+        gerarPairingCode();
+    }
+
+    window.gerarPairingCode = async function() {
+        const instanceName = document.getElementById('wa-instance')?.value;
+        if (!instanceName) {
+            mostrarToast('Selecione uma instância primeiro', 'error');
+            return;
+        }
+        
+        let apiUrl = document.getElementById('wa-api-url')?.value.trim() || '';
+        const apiKey = document.getElementById('wa-api-key')?.value || '';
+        if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+        
+        const loadingDiv = document.getElementById('pairing-loading');
+        const pairingCodeDisplay = document.getElementById('pairing-code-display');
+        const pairingArea = document.getElementById('pairing-code-area');
+        const qrConnectedInfo = document.getElementById('qr-connected-info');
+        
+        if (loadingDiv) loadingDiv.style.display = 'block';
+        if (pairingCodeDisplay) pairingCodeDisplay.innerHTML = '';
+        if (pairingArea) pairingArea.style.display = 'block';
+        if (qrConnectedInfo) qrConnectedInfo.style.display = 'none';
+        
+        try {
+            const resp = await fetch('/almoxarifado/api/qrcode-instancia/', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }, 
+                body: JSON.stringify({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey }) 
+            });
+            const data = await resp.json();
+            
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            
+            if (data.success && data.pairingCode && data.pairingCode !== 'null') {
+                if (pairingCodeDisplay) {
+                    pairingCodeDisplay.innerHTML = data.pairingCode;
+                }
+                mostrarToast('✅ Código de pareamento gerado!', 'success');
+            } 
+            else if (data.success && data.qrcode) {
+                let qrImageSrc = data.qrcode;
+                if (qrImageSrc && !qrImageSrc.startsWith('data:image')) {
+                    qrImageSrc = `data:image/png;base64,${qrImageSrc}`;
+                }
+                if (pairingCodeDisplay) {
+                    pairingCodeDisplay.innerHTML = `<img src="${qrImageSrc}" style="max-width: 250px; margin: 10px auto; border: 3px solid #25D366; border-radius: 12px;">`;
+                }
+                mostrarToast('✅ QR Code gerado! Escaneie com o WhatsApp', 'success');
+            } 
+            else {
+                if (pairingCodeDisplay) pairingCodeDisplay.innerHTML = `<div style="color: red;">❌ ${data.error || 'Erro ao gerar código'}</div>`;
+                mostrarToast('❌ ' + (data.error || 'Erro ao gerar código'), 'error');
+            }
+            
+            iniciarVerificacaoConexao(instanceName);
+            
+        } catch(e) {
+            if (loadingDiv) loadingDiv.style.display = 'none';
+            if (pairingCodeDisplay) pairingCodeDisplay.innerHTML = `<div style="color: red;">❌ Erro de conexão: ${e.message}</div>`;
+            mostrarToast('Erro ao gerar código: ' + e.message, 'error');
+        }
+    }
+
+    function iniciarVerificacaoConexao(instanceName) {
+        if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+        
+        let apiUrl = document.getElementById('wa-api-url')?.value.trim() || '';
+        const apiKey = document.getElementById('wa-api-key')?.value || '';
+        if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+        
+        let tentativas = 0;
+        const maxTentativas = 40;
+        
+        qrCodeCheckInterval = setInterval(async () => {
+            tentativas++;
+            
+            try {
+                const resp = await fetch('/almoxarifado/api/status-instancia/', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }, 
+                    body: JSON.stringify({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey }) 
+                });
+                const data = await resp.json();
+                
+                if (data.success && data.status === 'connected') {
+                    clearInterval(qrCodeCheckInterval);
+                    mostrarToast('✅ WhatsApp conectado com sucesso!', 'success');
+                    
+                    const pairingArea = document.getElementById('pairing-code-area');
+                    const qrConnectedInfo = document.getElementById('qr-connected-info');
+                    const qrCodeTab = document.getElementById('qr-code-tab');
+                    
+                    if (pairingArea) pairingArea.style.display = 'none';
+                    if (qrConnectedInfo) qrConnectedInfo.style.display = 'block';
+                    if (qrCodeTab) qrCodeTab.style.display = 'none';
+                    carregarInstancias();
+                } else if (tentativas >= maxTentativas) {
+                    clearInterval(qrCodeCheckInterval);
+                    mostrarToast('⏰ Tempo esgotado. Gere um novo código.', 'warning');
+                }
+            } catch(e) {
+                if (tentativas >= maxTentativas) {
+                    clearInterval(qrCodeCheckInterval);
+                }
+            }
+        }, 3000);
+    }
+
+    window.criarInstancia = async function() {
+        const instanceName = document.getElementById('nova-instancia')?.value.trim();
+        let apiUrl = document.getElementById('wa-api-url')?.value.trim() || '';
+        const apiKey = document.getElementById('wa-api-key')?.value || '';
+        
+        if (!instanceName) { mostrarToast('Digite um nome para a instância', 'error'); return; }
+        if (!apiUrl) { mostrarToast('Configure a URL da API primeiro', 'error'); return; }
+        if (!apiUrl.startsWith('http')) apiUrl = 'https://' + apiUrl;
+        
+        mostrarToast('🔄 Criando instância...', 'info');
+        try {
+            const resp = await fetch('/almoxarifado/api/criar-instancia/', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }, 
+                body: JSON.stringify({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey }) 
+            });
+            const data = await resp.json();
+            if (data.success) {
+                mostrarToast('✅ Instância criada!', 'success');
+                const novaInstanciaInput = document.getElementById('nova-instancia');
+                if (novaInstanciaInput) novaInstanciaInput.value = '';
+                await carregarInstancias();
+                setTimeout(() => {
+                    selecionarInstancia(instanceName);
+                    conectarInstancia(instanceName);
+                }, 1000);
+            } else { 
+                mostrarToast('❌ ' + data.error, 'error'); 
+            }
+        } catch(e) { 
+            mostrarToast('Erro ao criar instância', 'error'); 
+        }
+    }
+
+    window.selecionarInstancia = function(instanceName) {
+        const instanceSelect = document.getElementById('wa-instance');
+        const group = document.getElementById('instancia-selecionada-group');
+        if (instanceSelect) instanceSelect.value = instanceName;
+        if (group) group.style.display = 'block';
+        
+        document.querySelectorAll('.instancia-item').forEach(item => {
+            item.classList.remove('selected');
+            if (item.getAttribute('data-instance') === instanceName) {
+                item.classList.add('selected');
+            }
+        });
+        
+        mostrarToast(`Instância "${instanceName}" selecionada`, 'success');
+        salvarInstanciaSelecionada(instanceName);
+    }
+
+    async function salvarInstanciaSelecionada(instanceName) {
+        try {
+            const resp = await fetch('/almoxarifado/api/config-whatsapp/');
+            const data = await resp.json();
+            
+            if (data.success) {
+                const configAtual = data.config;
+                const updateData = {
+                    ...configAtual,
+                    instance_name: instanceName
+                };
+                
+                await fetch('/almoxarifado/api/config-whatsapp/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                    body: JSON.stringify(updateData)
+                });
+            }
+        } catch(e) {
+            console.error('Erro ao salvar instância:', e);
+        }
+    }
+
+    window.deletarInstancia = async function(instanceName) {
+        if (!confirm(`⚠️ Tem certeza que deseja deletar a instância "${instanceName}"?\n\nEsta ação não pode ser desfeita e removerá todos os dados da instância.`)) {
+            return;
+        }
+        
+        let apiUrl = document.getElementById('wa-api-url')?.value.trim() || '';
+        const apiKey = document.getElementById('wa-api-key')?.value || '';
+        
+        if (!apiUrl) {
+            mostrarToast('Configure a URL da API primeiro', 'error');
+            return;
+        }
+        
+        if (!apiUrl.startsWith('http')) {
+            apiUrl = 'https://' + apiUrl;
+        }
+        
+        mostrarToast('🔄 Deletando instância...', 'info');
+        
+        try {
+            const resp = await fetch('/almoxarifado/api/deletar-instancia/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+                body: JSON.stringify({ instance_name: instanceName, api_url: apiUrl, api_key: apiKey })
+            });
+            
+            const data = await resp.json();
+            
+            if (data.success) {
+                mostrarToast(`✅ Instância "${instanceName}" deletada com sucesso!`, 'success');
+                await carregarInstancias();
+                
+                const instanceSelect = document.getElementById('wa-instance');
+                const group = document.getElementById('instancia-selecionada-group');
+                if (instanceSelect && instanceSelect.value === instanceName) {
+                    instanceSelect.value = '';
+                    if (group) group.style.display = 'none';
+                }
+            } else {
+                mostrarToast(`❌ Erro ao deletar: ${data.error || 'Tente novamente'}`, 'error');
+            }
+        } catch(e) {
+            mostrarToast('❌ Erro ao conectar com o servidor', 'error');
+        }
+    }
+
+    // ============================================
+    // ABAS
+    // ============================================
+    
+    window.switchWATab = function(tab) {
+        document.querySelectorAll('.wa-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.wa-tab-content').forEach(c => c.classList.remove('active'));
+        
+        const tabs = ['conexao', 'numeros', 'agendamento', 'templates', 'qrcode'];
+        const index = tabs.indexOf(tab);
+        
+        if (index >= 0) {
+            const tabButtons = document.querySelectorAll('.wa-tab');
+            const tabContents = document.querySelectorAll('.wa-tab-content');
+            if (tabButtons[index]) tabButtons[index].classList.add('active');
+            if (tabContents[index]) tabContents[index].classList.add('active');
+        }
+    }
+
+    window.toggleOpcoesEnvio = function() {
+        const tipo = document.getElementById('tipo-envio')?.value;
+        const opcoesAgendamento = document.getElementById('opcoes-agendamento');
+        const opcoesRepeticao = document.getElementById('opcoes-repeticao');
+        const repetirCheck = document.getElementById('repetir-notificacoes');
+        
+        if (opcoesAgendamento) opcoesAgendamento.style.display = (tipo === 'agendado' || tipo === 'ambos') ? 'block' : 'none';
+        if (opcoesRepeticao && repetirCheck) opcoesRepeticao.style.display = repetirCheck.checked ? 'block' : 'none';
+    }
+
+    // ============================================
+    // NÚMEROS
+    // ============================================
+    
+    function renderNumerosPadrao() {
+        const container = document.getElementById('lista-numeros-padrao');
+        if (!container) return;
+        if (!numerosPadrao.length) { 
+            container.innerHTML = '<div class="loading-small">📭 Nenhum número padrão cadastrado</div>'; 
+            return; 
+        }
+        let html = '';
+        numerosPadrao.forEach((numero, index) => { 
+            html += `<div class="numero-item">
+                <div class="numero-info"><span class="numero">${numero}</span> <span class="badge">Padrão</span></div>
+                <button class="btn-remove-numero" onclick="removerNumeroPadrao(${index})">🗑️</button>
+            </div>`; 
+        });
+        container.innerHTML = html;
+    }
+
+    function renderNumerosDepartamento() {
+        const select = document.getElementById('dept-select');
+        const container = document.getElementById('lista-numeros-departamento');
+        if (!select || !container) return;
+        const deptSelecionado = select.value;
+        if (!deptSelecionado) { 
+            container.innerHTML = '<div class="loading-small">Selecione um departamento</div>'; 
+            return; 
+        }
+        const numeros = numerosPorDepartamento[deptSelecionado] || [];
+        const deptName = select.options[select.selectedIndex]?.text || deptSelecionado;
+        if (!numeros.length) { 
+            container.innerHTML = `<div class="loading-small">📭 Nenhum número para ${deptName}</div>`; 
+            return; 
+        }
+        let html = `<div style="padding: 8px; background: var(--light, #f3f4f6); font-weight: bold;">${deptName}:</div>`;
+        numeros.forEach((numero, index) => { 
+            html += `<div class="numero-item">
+                <div class="numero-info"><span class="numero">${numero}</span></div>
+                <button class="btn-remove-numero" onclick="removerNumeroDepartamento('${deptSelecionado}', ${index})">🗑️</button>
+            </div>`; 
+        });
+        container.innerHTML = html;
+    }
+
+    window.adicionarNumeroPadrao = function() {
+        const numero = document.getElementById('novo-numero-padrao')?.value.trim();
+        if (!numero) { mostrarToast('Digite um número', 'error'); return; }
+        if (!/^\d+$/.test(numero)) { mostrarToast('Use apenas números (ex: 5511999999999)', 'error'); return; }
+        if (numerosPadrao.includes(numero)) { mostrarToast('Número já cadastrado', 'error'); return; }
+        numerosPadrao.push(numero);
+        renderNumerosPadrao();
+        const input = document.getElementById('novo-numero-padrao');
+        if (input) input.value = '';
+        mostrarToast('✅ Número padrão adicionado', 'success');
+    }
+
+    window.removerNumeroPadrao = function(index) { 
+        if (confirm('Remover?')) { 
+            numerosPadrao.splice(index, 1); 
+            renderNumerosPadrao(); 
+            mostrarToast('Número removido', 'info'); 
+        } 
+    }
+
+    window.adicionarNumeroDepartamento = function() {
+        const dept = document.getElementById('dept-select')?.value;
+        const numero = document.getElementById('novo-numero-dept')?.value.trim();
+        if (!dept) { mostrarToast('Selecione um departamento', 'error'); return; }
+        if (!numero) { mostrarToast('Digite um número', 'error'); return; }
+        if (!/^\d+$/.test(numero)) { mostrarToast('Use apenas números', 'error'); return; }
+        if (!numerosPorDepartamento[dept]) numerosPorDepartamento[dept] = [];
+        if (numerosPorDepartamento[dept].includes(numero)) { mostrarToast('Número já cadastrado', 'error'); return; }
+        numerosPorDepartamento[dept].push(numero);
+        renderNumerosDepartamento();
+        const input = document.getElementById('novo-numero-dept');
+        if (input) input.value = '';
+        mostrarToast('✅ Número adicionado ao departamento', 'success');
+    }
+
+    window.removerNumeroDepartamento = function(dept, index) { 
+        if (confirm('Remover?')) { 
+            numerosPorDepartamento[dept].splice(index, 1); 
+            if (numerosPorDepartamento[dept].length === 0) delete numerosPorDepartamento[dept]; 
+            renderNumerosDepartamento(); 
+            mostrarToast('Número removido', 'info'); 
+        } 
+    }
+
+    // ============================================
+    // TEMPLATES E PREVIEW
+    // ============================================
+    
+    window.previewTemplate = function(tipo) {
+        let template = '';
+        const previewData = { 
+            nome: 'Produto Exemplo', 
+            codigo: '001', 
+            quantidade: '5', 
+            minimo: '10', 
+            unidade: 'UN', 
+            localizacao: 'Prateleira A2', 
+            departamento: 'Produção', 
+            nova_quantidade: '25', 
+            adicionado: '20',
+            data: new Date().toLocaleDateString('pt-BR'),
+            total_baixo: '3',
+            total_zerado: '2',
+            lista_baixo: '• Produto A - 5 unidades\n• Produto B - 8 unidades',
+            lista_zerado: '• Produto C - 0 unidades'
+        };
+        
+        const templateBaixo = document.getElementById('wa-template-baixo');
+        const templateZerado = document.getElementById('wa-template-zerado');
+        const templateReposicao = document.getElementById('wa-template-reposicao');
+        const templateResumo = document.getElementById('wa-template-resumo');
+        
+        if (tipo === 'baixo' && templateBaixo) template = templateBaixo.value;
+        else if (tipo === 'zerado' && templateZerado) template = templateZerado.value;
+        else if (tipo === 'reposicao' && templateReposicao) template = templateReposicao.value;
+        else if (templateResumo) template = templateResumo.value;
+        
+        let preview = template;
+        for (const [key, value] of Object.entries(previewData)) {
+            preview = preview.replace(new RegExp(`{${key}}`, 'g'), value);
+        }
+        
+        // Abrir modal de preview
+        if (typeof abrirPreview === 'function') {
+            abrirPreview(preview);
+        } else {
+            // Fallback: alert
+            alert(preview);
+        }
+    }
+
+    // ============================================
+    // SALVAR CONFIGURAÇÕES
+    // ============================================
+    
+    window.salvarConfiguracaoWhatsApp = async function() {
+        const selectInstancia = document.getElementById('wa-instance');
+        const instanceName = selectInstancia ? selectInstancia.value : '';
+        
+        if (!instanceName) {
+            mostrarToast('❌ Selecione uma instância WhatsApp na lista acima!', 'error');
+            if (selectInstancia) selectInstancia.style.border = '2px solid red';
+            setTimeout(() => {
+                if (selectInstancia) selectInstancia.style.border = '';
+            }, 3000);
+            return;
+        }
+        
+        const diasSemana = [];
+        document.querySelectorAll('.dia-semana:checked').forEach(cb => diasSemana.push(parseInt(cb.value)));
+        
+        const deptsAtivos = [];
+        document.querySelectorAll('.dept-notif:checked').forEach(cb => deptsAtivos.push(cb.value));
+        
+        let apiUrl = document.getElementById('wa-api-url')?.value.trim() || '';
+        if (apiUrl && !apiUrl.startsWith('http')) {
+            apiUrl = 'https://' + apiUrl;
+            const apiUrlInput = document.getElementById('wa-api-url');
+            if (apiUrlInput) apiUrlInput.value = apiUrl;
+        }
+        
+        const data = {
+            ativo: document.getElementById('wa-ativo')?.checked || false,
+            api_url: apiUrl,
+            api_key: document.getElementById('wa-api-key')?.value || '',
+            instance_name: instanceName,
+            numeros_padrao: numerosPadrao.join(','),
+            numeros_por_departamento: numerosPorDepartamento,
+            tipo_envio: document.getElementById('tipo-envio')?.value || 'tempo-real',
+            horario_agendado: document.getElementById('horario-agendado')?.value || '08:00',
+            dias_semana: diasSemana,
+            notificar_baixo: document.getElementById('notif-baixo')?.checked || false,
+            notificar_zerado: document.getElementById('notif-zerado')?.checked || false,
+            notificar_reposicao: document.getElementById('notif-reposicao')?.checked || false,
+            repetir_notificacoes: document.getElementById('repetir-notificacoes')?.checked || false,
+            intervalo_repeticao: parseInt(document.getElementById('intervalo-repeticao')?.value) || 24,
+            departamentos_ativos: deptsAtivos,
+            template_estoque_baixo: document.getElementById('wa-template-baixo')?.value || '',
+            template_estoque_zerado: document.getElementById('wa-template-zerado')?.value || '',
+            template_reposicao: document.getElementById('wa-template-reposicao')?.value || '',
+            template_resumo: document.getElementById('wa-template-resumo')?.value || ''
+        };
+        
+        mostrarToast('💾 Salvando configurações...', 'info');
+        
+        try {
+            const resp = await fetch('/almoxarifado/api/config-whatsapp/', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }, 
+                body: JSON.stringify(data) 
+            });
+            const result = await resp.json();
+            
+            if (result.success) { 
+                mostrarToast('✅ Configurações salvas com sucesso!', 'success'); 
+                window.fecharModalWhatsApp();
+            } else { 
+                mostrarToast('❌ ' + result.error, 'error'); 
+            }
+        } catch(e) { 
+            console.error('Erro ao salvar:', e);
+            mostrarToast('Erro ao salvar configurações', 'error'); 
+        }
+    }
+
+    // ============================================
+    // UTILITÁRIOS
+    // ============================================
+    
+    function mostrarToast(msg, tipo) {
+        const toast = document.getElementById('toast');
+        if (toast) {
+            toast.textContent = msg;
+            toast.className = 'toast-modern ' + tipo;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        } else {
+            console.log(msg);
+        }
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+        const deptSelect = document.getElementById('dept-select');
+        if (deptSelect) deptSelect.addEventListener('change', () => renderNumerosDepartamento());
+        
+        const repetirCheck = document.getElementById('repetir-notificacoes');
+        if (repetirCheck) repetirCheck.addEventListener('change', window.toggleOpcoesEnvio);
+        
+        const tipoEnvio = document.getElementById('tipo-envio');
+        if (tipoEnvio) tipoEnvio.addEventListener('change', window.toggleOpcoesEnvio);
+    });
+
+})();
+</script>

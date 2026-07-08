@@ -1,0 +1,72 @@
+{# templates/almoxarifado/modals/modal_preview.html #}
+
+<style>
+/* CSS do Modal Preview */
+.modal-preview {
+    max-width: 450px;
+}
+.modal-preview .modal-body {
+    background: #e5ddd5;
+}
+.whatsapp-message {
+    background: white;
+    padding: 12px;
+    border-radius: 12px;
+    max-width: 90%;
+    margin: 0 auto;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+.whatsapp-message pre {
+    white-space: pre-wrap;
+    font-family: inherit;
+    margin: 0;
+    font-size: 13px;
+}
+</style>
+
+<!-- HTML do Modal Preview -->
+<div class="modal-overlay" id="modal-preview-overlay" onclick="fecharPreview()"></div>
+<div class="modal-container modal-preview" id="modal-preview-container" style="display:none;">
+    <div class="modal-header">
+        <div class="modal-header-icon">📱</div>
+        <div class="modal-header-title">
+            <h3>Preview da Mensagem</h3>
+            <p>Visualize como a mensagem será enviada</p>
+        </div>
+        <button class="modal-close" onclick="fecharPreview()">✕</button>
+    </div>
+    <div class="modal-body" id="preview-content" style="background: #e5ddd5; font-family: system-ui;"></div>
+    <div class="modal-footer">
+        <button class="btn-secondary" onclick="fecharPreview()">Fechar</button>
+    </div>
+</div>
+
+<script>
+// JavaScript do Modal Preview
+(function() {
+    window.fecharPreview = function() { 
+        const overlay = document.getElementById('modal-preview-overlay');
+        const container = document.getElementById('modal-preview-container');
+        if (overlay) overlay.classList.remove('active'); 
+        if (container) container.style.display = 'none'; 
+    }
+
+    window.abrirPreview = function(conteudo) {
+        const previewContent = document.getElementById('preview-content');
+        if (previewContent) {
+            previewContent.innerHTML = `<div class="whatsapp-message"><pre style="white-space:pre-wrap">${escapeHtml(conteudo)}</pre></div>`;
+        }
+        const overlay = document.getElementById('modal-preview-overlay');
+        const container = document.getElementById('modal-preview-container');
+        if (overlay) overlay.classList.add('active');
+        if (container) container.style.display = 'flex';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+})();
+</script>

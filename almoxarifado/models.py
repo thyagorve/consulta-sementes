@@ -1,4 +1,3 @@
-# Adicione no topo do arquivo
 import re
 from django.db import models
 from django.core.validators import MinValueValidator
@@ -33,7 +32,6 @@ class UnidadeMedida(models.TextChoices):
 
 
 class Item(models.Model):
-    # ... (mantenha seu modelo Item existente)
     codigo = models.CharField(max_length=20, blank=True, null=True, verbose_name='Código')
     tamanho = models.CharField(max_length=50, blank=True, null=True, verbose_name='Tamanho/Medida')
     nome = models.CharField(max_length=200)
@@ -47,7 +45,6 @@ class Item(models.Model):
     unidade = models.CharField(max_length=3, choices=UnidadeMedida.choices, default=UnidadeMedida.UNIDADE)
     localizacao = models.CharField(max_length=100, blank=True, null=True)
     estoque_minimo = models.DecimalField(max_digits=12, decimal_places=3, default=5, validators=[MinValueValidator(0)])
-    valor_unitario = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     fornecedor = models.CharField(max_length=200, blank=True, null=True)
     marca = models.CharField(max_length=100, blank=True, null=True)
     foto = models.ImageField(upload_to='itens_fotos/', blank=True, null=True)
@@ -97,32 +94,63 @@ class Item(models.Model):
         elif self.quantidade <= self.estoque_minimo * 3:
             return 'medio'
         return 'alto'
-    
-    @property
-    def valor_total(self):
-        if self.valor_unitario:
-            return float(self.quantidade) * float(self.valor_unitario)
-        return None
 
+
+# ============================================
+# MODELOS DE NOTA FISCAL
+# ============================================
+
+class EntradaNotaFiscal(models.Model):
+    """Registro de notas fiscais importadas"""
+    chave_acesso = models.CharField(max_length=44, unique=True, verbose_name='Chave de Acesso')
+    numero_nota = models.CharField(max_length=20, verbose_name='Número da Nota')
+    fornecedor_nome = models.CharField(max_length=200, verbose_name='Fornecedor')
+    cnpj_fornecedor = models.CharField(max_length=18, blank=True, null=True, verbose_name='CNPJ')
+    data_emissao = models.DateField(blank=True, null=True, verbose_name='Data de Emissão')
+    data_recebimento = models.DateTimeField(auto_now_add=True, verbose_name='Data de Recebimento')
+    valor_total = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name='Valor Total')
+    xml_arquivo = models.FileField(upload_to='nfe_xmls/', blank=True, null=True, verbose_name='XML da Nota')
+
+    class Meta:
+        verbose_name = 'Entrada de Nota Fiscal'
+        verbose_name_plural = 'Entradas de Notas Fiscais'
+        ordering = ['-data_recebimento']
+
+    def __str__(self):
+        return f"NF {self.numero_nota} - {self.fornecedor_nome}"
+
+
+class ItemEntrada(models.Model):
+    """Itens de uma nota fiscal importada"""
+    nota_fiscal = models.ForeignKey(EntradaNotaFiscal, on_delete=models.CASCADE, related_name='itens_nota', verbose_name='Nota Fiscal')
+    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='entradas_nota', verbose_name='Item')
+    quantidade_nota = models.DecimalField(max_digits=12, decimal_places=3, verbose_name='Quantidade na Nota')
+    preco_unitario = models.DecimalField(max_digits=12, decimal_places=2, verbose_name='Preço Unitário')
+
+    class Meta:
+        verbose_name = 'Item da Nota Fiscal'
+        verbose_name_plural = 'Itens da Nota Fiscal'
+
+    def __str__(self):
+        return f"{self.nota_fiscal.numero_nota} - {self.item.nome} - {self.quantidade_nota}"
+
+
+# ============================================
+# MODELOS WHATSAPP
+# ============================================
 
 class ConfiguracaoWhatsApp(models.Model):
-    # Configuração da API
     api_url = models.CharField(max_length=255, default='', blank=True, null=True)
     api_key = models.CharField(max_length=255, blank=True, null=True)
     instance_name = models.CharField(max_length=100, blank=True, null=True)
     
-    # Números por departamento (formato JSON)
     numeros_por_departamento = models.JSONField(default=dict, blank=True, null=True)
-    
-    # Números padrão (caso o departamento não tenha específico)
     numeros_padrao = models.TextField(blank=True, null=True, help_text="Números padrão separados por vírgula")
     
-    # Notificações
     notificar_estoque_baixo = models.BooleanField(default=True)
     notificar_estoque_zerado = models.BooleanField(default=True)
     notificar_reposicao = models.BooleanField(default=True)
     
-    # ========== NOVOS CAMPOS DE AGENDAMENTO ==========
     tipo_envio = models.CharField(
         max_length=20, 
         default='tempo-real',
@@ -133,25 +161,25 @@ class ConfiguracaoWhatsApp(models.Model):
         ],
         verbose_name='Tipo de Envio'
     )
-    horario_agendado = models.TimeField(default='08:00', verbose_name='Horário do Envio Agendado')
-    dias_semana = models.JSONField(default=list, blank=True, null=True, verbose_name='Dias da Semana')
+    
     notificar_baixo = models.BooleanField(default=True, verbose_name='Notificar Estoque Baixo')
     notificar_zerado = models.BooleanField(default=True, verbose_name='Notificar Estoque Zerado')
     notificar_reposicao = models.BooleanField(default=True, verbose_name='Notificar Reposição')
     repetir_notificacoes = models.BooleanField(default=False, verbose_name='Repetir Notificações')
     intervalo_repeticao = models.IntegerField(default=24, verbose_name='Intervalo de Repetição (horas)')
     departamentos_ativos = models.JSONField(default=list, blank=True, null=True, verbose_name='Departamentos Ativos')
-    # Adicione no final dos campos
-    ultima_notificacao_agendada = models.DateTimeField(blank=True, null=True, verbose_name='Última Notificação Agendada')
-    
-    # ========== TEMPLATE DE RESUMO ==========
+    horario_agendado = models.TimeField(null=True, blank=True, default='08:00')
+    dias_semana = models.JSONField(default=list, blank=True, null=True)
+    ultima_verificacao = models.DateTimeField(blank=True, null=True)
+
+
     template_resumo = models.TextField(
-        default="""📊 *RESUMO DIÁRIO*
+        default="""📊 *RESUMO DIÁRIO DE ESTOQUE*
 
 📅 Data: {data}
 🏢 Departamento: {departamento}
 
-📦 *ESTOQUE BAIXO:* ({total_baixo})
+📦 *ITENS COM ESTOQUE BAIXO:* ({total_baixo})
 {lista_baixo}
 
 ⚠️ *ITENS ZERADOS:* ({total_zerado})
@@ -161,7 +189,6 @@ class ConfiguracaoWhatsApp(models.Model):
         verbose_name='Template de Resumo'
     )
     
-    # Templates individuais
     template_estoque_baixo = models.TextField(default="""🔴 *ESTOQUE BAIXO!*
 
 📦 *Item:* {nome}
@@ -181,7 +208,7 @@ class ConfiguracaoWhatsApp(models.Model):
 📍 *Localização:* {localizacao}
 🏢 *Departamento:* {departamento}
 
-⚠️ *URGENTE - Necessário compra imediata!*""")
+⚠️ *URGENTE - Necessário compra imediata!""")
 
     template_reposicao = models.TextField(default="""✅ *ITEM REPOSTO!*
 
@@ -193,10 +220,9 @@ class ConfiguracaoWhatsApp(models.Model):
 ➕ *Quantidade adicionada:* {adicionado} {unidade}
 📈 *Status:* {status}""")
     
-    # Controle
     ativo = models.BooleanField(default=False)
     criado_em = models.DateTimeField(auto_now_add=True)
-    atualizado_em = models.DateTimeField(auto_now=True)
+    atualizado_em = models.DateTimeField(auto_now_add=True)
     
     class Meta:
         verbose_name = 'Configuração WhatsApp'
@@ -212,8 +238,10 @@ class ConfiguracaoWhatsApp(models.Model):
             config = cls.objects.create()
         return config
     
+    def get_agendamentos_ativos(self):
+        return self.agendamentos.filter(ativo=True)
+    
     def get_numeros_por_departamento(self, departamento):
-        """Retorna números para um departamento específico"""
         if self.numeros_por_departamento and departamento in self.numeros_por_departamento:
             numeros = self.numeros_por_departamento[departamento]
             if isinstance(numeros, str):
@@ -222,18 +250,51 @@ class ConfiguracaoWhatsApp(models.Model):
         return []
     
     def get_numeros_padrao_lista(self):
-        """Retorna lista de números padrão"""
         if not self.numeros_padrao:
             return []
         return [n.strip() for n in self.numeros_padrao.split(',') if n.strip()]
     
     def get_numeros_destino(self, departamento=None):
-        """Retorna números para um departamento ou os padrão"""
         if departamento:
             numeros_dept = self.get_numeros_por_departamento(departamento)
             if numeros_dept:
                 return numeros_dept
         return self.get_numeros_padrao_lista()
+
+
+class AgendamentoNotificacao(models.Model):
+    """Modelo para agendamentos múltiplos de notificações"""
+    
+    config = models.ForeignKey(
+        ConfiguracaoWhatsApp, 
+        on_delete=models.CASCADE, 
+        related_name='agendamentos'
+    )
+    horario = models.TimeField(verbose_name='Horário')
+    dias_semana = models.JSONField(
+        default=list, 
+        blank=True, 
+        null=True,
+        verbose_name='Dias da Semana (0=domingo a 6=sábado)'
+    )
+    ativo = models.BooleanField(default=True, verbose_name='Ativo')
+    descricao = models.CharField(max_length=100, blank=True, null=True, verbose_name='Descrição')
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Agendamento de Notificação'
+        verbose_name_plural = 'Agendamentos de Notificações'
+        ordering = ['horario']
+    
+    def __str__(self):
+        if self.dias_semana:
+            dias_map = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+            dias_str = ', '.join([dias_map[d] for d in self.dias_semana if 0 <= d <= 6])
+        else:
+            dias_str = 'Todos os dias'
+        return f"{self.horario} - {dias_str} ({'Ativo' if self.ativo else 'Inativo'})"
+
 
 class HistoricoNotificacaoAlmoxarifado(models.Model):
     TIPO_CHOICES = [
@@ -268,7 +329,7 @@ class HistoricoNotificacaoAlmoxarifado(models.Model):
 
 
 # ============================================
-# OUTROS MODELOS (Saida, Carrinho, etc)
+# MODELOS DE SAÍDA E CARRINHO
 # ============================================
 
 class Saida(models.Model):
@@ -305,27 +366,22 @@ class CarrinhoSolicitacao(models.Model):
 
     def __str__(self):
         return f"{self.usuario} - {self.item.nome} x{self.quantidade}"
+    
 
 
-class EntradaNotaFiscal(models.Model):
-    chave_acesso = models.CharField(max_length=44, unique=True)
-    numero_nota = models.CharField(max_length=20)
-    fornecedor_nome = models.CharField(max_length=200)
-    cnpj_fornecedor = models.CharField(max_length=18, blank=True, null=True)
-    data_emissao = models.DateField()
-    data_recebimento = models.DateTimeField(auto_now_add=True)
-    valor_total = models.DecimalField(max_digits=12, decimal_places=2)
-    xml_arquivo = models.FileField(upload_to='nfe_xmls/', blank=True, null=True)
 
+class InstanciaWhatsApp(models.Model):
+    """Modelo para armazenar instâncias criadas pelo sistema"""
+    nome = models.CharField(max_length=100, unique=True, verbose_name='Nome da Instância')
+    status = models.CharField(max_length=20, default='disconnected', verbose_name='Status')
+    api_url = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Instância WhatsApp'
+        verbose_name_plural = 'Instâncias WhatsApp'
+        ordering = ['nome']
+    
     def __str__(self):
-        return f"NF {self.numero_nota} - {self.fornecedor_nome}"
-
-
-class ItemEntrada(models.Model):
-    nota_fiscal = models.ForeignKey(EntradaNotaFiscal, related_name='itens_nota', on_delete=models.CASCADE)
-    item = models.ForeignKey(Item, on_delete=models.CASCADE, related_name='entradas_nota')
-    quantidade_nota = models.DecimalField(max_digits=12, decimal_places=3)
-    preco_unitario = models.DecimalField(max_digits=12, decimal_places=2)
-
-    def __str__(self):
-        return f"{self.nota_fiscal.numero_nota} - {self.item.nome} - {self.quantidade_nota}"
+        return f"{self.nome} - {self.status}"

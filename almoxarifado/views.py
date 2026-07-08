@@ -1,44 +1,62 @@
 import json
 import csv
 import io
+import xmltodict
+import requests
+import logging
 from datetime import date, datetime
-from decimal import Decimal, InvalidOperation, ROUND_DOWN
+from decimal import Decimal, InvalidOperation
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie
-from django.db.models import Q, Sum, Count
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.db.models import Q, Sum, F
 from django.contrib import messages
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
-from .models import Item, Saida, CarrinhoSolicitacao, Departamento, UnidadeMedida
+from .models import (
+    Item, Saida, CarrinhoSolicitacao, Departamento, UnidadeMedida,
+    ConfiguracaoWhatsApp, HistoricoNotificacaoAlmoxarifado, AgendamentoNotificacao,
+    EntradaNotaFiscal, ItemEntrada
+)
 from django.contrib.auth.decorators import login_required, permission_required
+from .models import (
+    Item, Saida, CarrinhoSolicitacao, Departamento, UnidadeMedida,
+    ConfiguracaoWhatsApp, HistoricoNotificacaoAlmoxarifado, AgendamentoNotificacao,
+    EntradaNotaFiscal, ItemEntrada, InstanciaWhatsApp  # <-- ADICIONE ESTE
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 def parse_decimal(value, default=None):
-    """Converte string com vírgula para Decimal, removendo zeros à esquerda"""
     if value is None or str(value).strip() == '':
         return default
     try:
         val_str = str(value).strip().replace(',', '.')
-        # Remove zeros à esquerda desnecessários
         d = Decimal(val_str)
-        # Normaliza: 1.500 -> 1.5, 0.500 -> 0.5, 5.0 -> 5
         d = d.normalize()
-        # Se for 0.5, mantém; se for 5, mantém como 5
         return d
     except (InvalidOperation, ValueError):
         return default
 
+
 @login_required
 @permission_required('almoxarifado.pode_ver_almoxarifado', raise_exception=True)
 def lista_itens(request):
-    print(f"🔍 Usuário {request.user.username} acessando almoxarifado")
-    print(f"   Permissões: {list(request.user.get_all_permissions())}")
     mostrar_todos = request.GET.get('todos', '0') == '1'
+    filtro_status = request.GET.get('status', '')
     
     itens = Item.objects.filter(ativo=True)
+    
+    # Filtro por status (Zerados ou Estoque Baixo)
+    if filtro_status == 'zerados':
+        itens = itens.filter(quantidade__lte=0)
+    elif filtro_status == 'baixo':
+        itens = itens.filter(quantidade__gt=0, quantidade__lte=F('estoque_minimo'))
+    
     if not mostrar_todos:
         itens = itens.filter(quantidade__gt=0)
     
@@ -74,6 +92,10 @@ def lista_itens(request):
     total_itens = itens.count()
     total_quantidade = itens.aggregate(Sum('quantidade'))['quantidade__sum'] or 0
     
+    # Contagem de zerados e baixo para o filtro
+    zerados_count = Item.objects.filter(ativo=True, quantidade__lte=0).count()
+    baixo_count = Item.objects.filter(ativo=True, quantidade__gt=0, quantidade__lte=F('estoque_minimo')).count()
+    
     context = {
         'itens': itens,
         'busca': busca,
@@ -85,11 +107,13 @@ def lista_itens(request):
         'total_itens': total_itens,
         'total_quantidade': total_quantidade,
         'carrinho_count': carrinho_count,
+        'zerados_count': zerados_count,
+        'baixo_count': baixo_count,
+        'filtro_status': filtro_status,
     }
     return render(request, 'almoxarifado/lista_itens.html', context)
 
-@login_required
-@permission_required('almoxarifado.pode_ver_almoxarifado', raise_exception=True)
+
 def saidas_list(request):
     saidas = Saida.objects.select_related('item').all().order_by('-data', '-hora')
     
@@ -133,8 +157,15 @@ def buscar_itens_ajax(request):
     departamento = request.GET.get('departamento', '')
     mostrar_todos = request.GET.get('todos', '0') == '1'
     ordenar = request.GET.get('ordenar', 'nome')
+    filtro_status = request.GET.get('status', '')
     
     itens = Item.objects.filter(ativo=True)
+    
+    if filtro_status == 'zerados':
+        itens = itens.filter(quantidade__lte=0)
+    elif filtro_status == 'baixo':
+        itens = itens.filter(quantidade__gt=0, quantidade__lte=F('estoque_minimo'))
+    
     if not mostrar_todos:
         itens = itens.filter(quantidade__gt=0)
     
@@ -145,9 +176,7 @@ def buscar_itens_ajax(request):
             Q(localizacao__icontains=busca) |
             Q(fornecedor__icontains=busca) |
             Q(lote__icontains=busca) |
-            Q(ca__icontains=busca) |
-            Q(descricao__icontains=busca) |
-            Q(marca__icontains=busca)
+            Q(ca__icontains=busca)
         )
     
     if departamento:
@@ -162,10 +191,8 @@ def buscar_itens_ajax(request):
             'quantidade': float(i.quantidade), 'unidade': i.get_unidade_display(),
             'localizacao': i.localizacao or '-', 'departamento': i.get_departamento_display(),
             'status_estoque': i.status_estoque, 'lote': i.lote or '-', 'ca': i.ca or '-',
-            'tamanho': i.tamanho or '-',  # <-- ADICIONE ESTA LINHA!
+            'tamanho': i.tamanho or '-',
         } for i in itens],
-        'total_itens': itens.count(),
-        'total_quantidade': float(itens.aggregate(Sum('quantidade'))['quantidade__sum'] or 0),
     }
     return JsonResponse(data)
 
@@ -176,7 +203,6 @@ def buscar_por_codigo(request):
     if not codigo:
         return JsonResponse({'encontrado': False})
     
-    # Buscar ITEM ATIVO mais recente com este código
     try:
         item = Item.objects.filter(codigo=codigo, ativo=True).first()
         
@@ -188,30 +214,12 @@ def buscar_por_codigo(request):
                     'descricao': item.descricao, 'departamento': item.departamento,
                     'unidade': item.unidade, 'localizacao': item.localizacao,
                     'estoque_minimo': float(item.estoque_minimo),
-                    'valor_unitario': float(item.valor_unitario) if item.valor_unitario else None,
                     'fornecedor': item.fornecedor, 'quantidade': float(item.quantidade),
                     'lote': item.lote, 'ca': item.ca, 'categoria': item.categoria,
                     'marca': item.marca, 'tamanho': item.tamanho,
                 }
             })
         else:
-            # Verifica se existe desativado
-            item_inativo = Item.objects.filter(codigo=codigo, ativo=False).first()
-            if item_inativo:
-                return JsonResponse({
-                    'encontrado': True, 
-                    'reativar': True,
-                    'item': {
-                        'id': item_inativo.id, 'codigo': item_inativo.codigo, 'nome': item_inativo.nome,
-                        'descricao': item_inativo.descricao, 'departamento': item_inativo.departamento,
-                        'unidade': item_inativo.unidade, 'localizacao': item_inativo.localizacao,
-                        'estoque_minimo': float(item_inativo.estoque_minimo),
-                        'valor_unitario': float(item_inativo.valor_unitario) if item_inativo.valor_unitario else None,
-                        'fornecedor': item_inativo.fornecedor, 'quantidade': 0,
-                        'lote': item_inativo.lote, 'ca': item_inativo.ca, 'categoria': item_inativo.categoria,
-                        'marca': item_inativo.marca, 'tamanho': item.tamanho,
-                    }
-                })
             return JsonResponse({'encontrado': False})
             
     except Exception as e:
@@ -221,8 +229,6 @@ def buscar_por_codigo(request):
 @login_required
 @permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def adicionar_item(request):
-    
-    """Adiciona novo item - SÓ SOMA se código + lote + CA + localização forem iguais"""
     try:
         nome = request.POST.get('nome', '').strip()
         if not nome:
@@ -235,9 +241,6 @@ def adicionar_item(request):
         localizacao = request.POST.get('localizacao', '').strip() or None
         tamanho = request.POST.get('tamanho', '').strip() or None
         
-        # ===== BUSCAR ITEM EXATAMENTE IGUAL =====
-        # Só soma se Código + Lote + CA + Localização forem TODOS iguais
-        
         if codigo:
             item_existente = Item.objects.filter(
                 codigo=codigo,
@@ -247,18 +250,6 @@ def adicionar_item(request):
             ).first()
             
             if item_existente:
-                if not item_existente.ativo:
-                    # Reativar
-                    item_existente.ativo = True
-                    item_existente.quantidade = quantidade
-                    item_existente.nome = nome
-                    item_existente.save()
-                    return JsonResponse({
-                        'success': True,
-                        'message': f'Item {codigo} reativado com sucesso!'
-                    })
-                
-                # Item ativo - SOMAR
                 if request.POST.get('somar', 'false') == 'true':
                     item_existente.quantidade += quantidade
                     item_existente.save()
@@ -270,40 +261,9 @@ def adicionar_item(request):
                     return JsonResponse({
                         'success': False,
                         'codigo_existente': True,
-                        'error': f'Item {codigo} já existe com lote={item_existente.lote}, CA={item_existente.ca}, local={item_existente.localizacao}. Deseja somar?'
+                        'error': f'Item {codigo} já existe. Deseja somar?'
                     }, status=409)
         
-        # Verificar por nome + lote + ca + localização (sem código)
-        if not codigo:
-            item_similar = Item.objects.filter(
-                nome__iexact=nome,
-                lote=lote,
-                ca=ca,
-                localizacao=localizacao,
-                ativo=True
-            ).first()
-            
-            if item_similar:
-                if request.POST.get('somar', 'false') == 'true':
-                    item_similar.quantidade += quantidade
-                    item_similar.save()
-                    return JsonResponse({
-                        'success': True,
-                        'message': f'Quantidade somada ao item {item_similar.codigo}!'
-                    })
-                else:
-                    return JsonResponse({
-                        'success': False,
-                        'nome_existente': True,
-                        'item_id': item_similar.id,
-                        'nome': item_similar.nome,
-                        'codigo': item_similar.codigo,
-                        'quantidade': float(item_similar.quantidade),
-                        'unidade': item_similar.get_unidade_display(),
-                        'error': f'Item similar já existe ({item_similar.codigo}) com mesmo lote/CA/local. Deseja somar?'
-                    }, status=409)
-        
-        # ===== CRIAR NOVO ITEM =====
         item = Item.objects.create(
             nome=nome,
             codigo=codigo,
@@ -313,14 +273,11 @@ def adicionar_item(request):
             localizacao=localizacao,
             descricao=request.POST.get('descricao', '').strip() or None,
             estoque_minimo=parse_decimal(request.POST.get('estoque_minimo', '5'), Decimal('5')),
-            valor_unitario=parse_decimal(request.POST.get('valor_unitario', '')),
             fornecedor=request.POST.get('fornecedor', '').strip() or None,
             lote=lote,
             ca=ca,
-            validade_ca=request.POST.get('validade_ca') or None,
             categoria=request.POST.get('categoria', '').strip() or None,
             marca=request.POST.get('marca', '').strip() or None,
-            data_aquisicao=request.POST.get('data_aquisicao') or None,
             tamanho=tamanho,
         )
         
@@ -328,56 +285,42 @@ def adicionar_item(request):
             item.foto = request.FILES['foto']
             item.save()
         
-        return JsonResponse({
-            'success': True,
-            'message': f'Item {item.codigo} criado com sucesso!',
-            'item': {'id': item.id, 'codigo': item.codigo}
-        })
+        return JsonResponse({'success': True, 'message': f'Item {item.codigo} criado com sucesso!'})
         
     except Exception as e:
         import traceback
         traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
+
 @login_required
 @permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
 def editar_item(request, pk):
-    """Edita um item existente"""
     try:
         item = get_object_or_404(Item, pk=pk)
-        data = request.POST
         
-        if data.get('nome'): item.nome = str(data['nome']).strip()
-        if 'descricao' in data: item.descricao = str(data.get('descricao', '')).strip() or None
-        if data.get('departamento'): item.departamento = str(data['departamento'])[:4]
-        if data.get('unidade'): item.unidade = str(data['unidade'])[:3]
-        if 'localizacao' in data: item.localizacao = str(data.get('localizacao', '')).strip() or None
-        if data.get('estoque_minimo'): item.estoque_minimo = parse_decimal(data['estoque_minimo'], item.estoque_minimo)
-        if 'valor_unitario' in data: item.valor_unitario = parse_decimal(data.get('valor_unitario', ''))
-        if 'fornecedor' in data: item.fornecedor = str(data.get('fornecedor', '')).strip() or None
-        if 'lote' in data: item.lote = str(data.get('lote', '')).strip() or None
-        if 'ca' in data: item.ca = str(data.get('ca', '')).strip() or None
-        if data.get('validade_ca'): item.validade_ca = data['validade_ca'] or None
-        if 'categoria' in data: item.categoria = str(data.get('categoria', '')).strip() or None
-        if 'marca' in data: item.marca = str(data.get('marca', '')).strip() or None
-        if data.get('data_aquisicao'): item.data_aquisicao = data['data_aquisicao'] or None
-        if data.get('quantidade'): item.quantidade = parse_decimal(data['quantidade'], item.quantidade)
-        if 'ativo' in data: item.ativo = str(data['ativo']).lower() in ['true', '1', 'on']
-        if 'tamanho' in data: item.tamanho = str(data.get('tamanho', '')).strip() or None
+        if request.POST.get('nome'): item.nome = str(request.POST['nome']).strip()
+        if 'descricao' in request.POST: item.descricao = str(request.POST.get('descricao', '')).strip() or None
+        if request.POST.get('departamento'): item.departamento = str(request.POST['departamento'])[:4]
+        if request.POST.get('unidade'): item.unidade = str(request.POST['unidade'])[:3]
+        if 'localizacao' in request.POST: item.localizacao = str(request.POST.get('localizacao', '')).strip() or None
+        if request.POST.get('estoque_minimo'): item.estoque_minimo = parse_decimal(request.POST['estoque_minimo'], item.estoque_minimo)
+        if 'fornecedor' in request.POST: item.fornecedor = str(request.POST.get('fornecedor', '')).strip() or None
+        if 'lote' in request.POST: item.lote = str(request.POST.get('lote', '')).strip() or None
+        if 'ca' in request.POST: item.ca = str(request.POST.get('ca', '')).strip() or None
+        if 'categoria' in request.POST: item.categoria = str(request.POST.get('categoria', '')).strip() or None
+        if 'marca' in request.POST: item.marca = str(request.POST.get('marca', '')).strip() or None
+        if request.POST.get('quantidade'): item.quantidade = parse_decimal(request.POST['quantidade'], item.quantidade)
+        if 'tamanho' in request.POST: item.tamanho = str(request.POST.get('tamanho', '')).strip() or None
         
         if 'foto' in request.FILES:
             item.foto = request.FILES['foto']
         
         item.save()
         
-        return JsonResponse({
-            'success': True,
-            'message': f'Item {item.codigo} - {item.nome} atualizado com sucesso!',
-        })
+        return JsonResponse({'success': True, 'message': f'Item {item.codigo} atualizado!'})
         
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
@@ -390,16 +333,10 @@ def detalhe_item(request, pk):
         'quantidade': float(item.quantidade), 'unidade': item.get_unidade_display(),
         'departamento': item.get_departamento_display(), 'localizacao': item.localizacao or 'Não definida',
         'descricao': item.descricao or 'Sem descrição', 'estoque_minimo': float(item.estoque_minimo),
-        'valor_unitario': float(item.valor_unitario) if item.valor_unitario else None,
-        'valor_total': float(item.valor_total) if item.valor_total else None,
         'fornecedor': item.fornecedor or 'Não informado', 'marca': item.marca or '-',
         'lote': item.lote or '-', 'ca': item.ca or '-', 'categoria': item.categoria or '-',
-        'validade_ca': item.validade_ca.strftime('%d/%m/%Y') if item.validade_ca else '-',
-        'data_aquisicao': item.data_aquisicao.strftime('%d/%m/%Y') if item.data_aquisicao else '-',
         'status_estoque': item.status_estoque,
         'foto_url': item.foto.url if item.foto else None,
-        'created_at': item.created_at.strftime('%d/%m/%Y %H:%M'),
-        'updated_at': item.updated_at.strftime('%d/%m/%Y %H:%M'),
         'tamanho': item.tamanho or '-',
         'ultimas_saidas': [{
             'data': s.data.strftime('%d/%m/%Y'), 'hora': s.hora.strftime('%H:%M'),
@@ -407,6 +344,7 @@ def detalhe_item(request, pk):
             'observacao': s.observacao[:50] if s.observacao else '',
         } for s in ultimas_saidas]
     })
+
 
 @login_required
 @permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
@@ -423,9 +361,9 @@ def dar_baixa(request, pk):
         if quantidade <= 0:
             return JsonResponse({'success': False, 'error': 'Quantidade deve ser maior que zero'}, status=400)
         if quantidade > item.quantidade:
-            return JsonResponse({'success': False, 'error': f'Estoque insuficiente! Disponível: {float(item.quantidade)} {item.get_unidade_display()}'}, status=400)
+            return JsonResponse({'success': False, 'error': f'Estoque insuficiente! Disponível: {float(item.quantidade)}'}, status=400)
         
-        saida = Saida.objects.create(
+        Saida.objects.create(
             item=item, item_nome=item.nome, item_codigo=item.codigo,
             solicitante=solicitante,
             departamento=data.get('departamento') or None,
@@ -440,6 +378,19 @@ def dar_baixa(request, pk):
         
         return JsonResponse({'success': True, 'message': f'Baixa de {float(quantidade)} {item.get_unidade_display()} realizada!'})
         
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
+def excluir_item(request, pk):
+    """Desativa um item (soft delete)"""
+    try:
+        item = get_object_or_404(Item, pk=pk)
+        item.ativo = False
+        item.save()
+        return JsonResponse({'success': True, 'message': f'Item {item.codigo} desativado com sucesso!'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -515,7 +466,6 @@ def finalizar_carrinho(request):
         
         hoje = date.today()
         agora = datetime.now().strftime('%H:%M')
-        total_itens = itens_carrinho.count()
         
         for ci in itens_carrinho:
             if ci.quantidade > ci.item.quantidade:
@@ -533,7 +483,7 @@ def finalizar_carrinho(request):
             ci.item.save()
             ci.delete()
         
-        return JsonResponse({'success': True, 'message': f'Baixa de {total_itens} itens realizada com sucesso!'})
+        return JsonResponse({'success': True, 'message': 'Baixa concluída com sucesso!'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
@@ -541,14 +491,13 @@ def finalizar_carrinho(request):
 @require_http_methods(["POST"])
 def limpar_carrinho(request):
     usuario = request.session.get('usuario_carrinho', 'anonimo')
-    count = CarrinhoSolicitacao.objects.filter(usuario=usuario).delete()[0]
-    return JsonResponse({'success': True, 'message': f'{count} itens removidos do carrinho!'})
+    CarrinhoSolicitacao.objects.filter(usuario=usuario).delete()
+    return JsonResponse({'success': True, 'message': 'Carrinho limpo!'})
 
 
 # ===== EXPORTAÇÃO =====
 
 def exportar_excel(request):
-    """Exporta itens para Excel"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Estoque"
@@ -556,27 +505,21 @@ def exportar_excel(request):
     cabecalhos = [
         'Código', 'Nome', 'Descrição', 'Departamento', 'Categoria',
         'Quantidade', 'Unidade', 'Localização', 'Estoque Mínimo',
-        'Valor Unitário', 'Fornecedor', 'Marca',
-        'Lote', 'CA', 'Validade CA', 'Data Aquisição', 'Status'
+        'Fornecedor', 'Marca', 'Lote', 'CA', 'Tamanho'
     ]
     
     header_font = Font(bold=True, color='FFFFFF', size=11, name='Arial')
-    header_fill = PatternFill(start_color='1a202c', end_color='1a202c', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    thin_border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
+    header_fill = PatternFill(start_color='059669', end_color='059669', fill_type='solid')
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
     
     for col, header in enumerate(cabecalhos, 1):
         cell = ws.cell(row=1, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = header_alignment
+        cell.alignment = Alignment(horizontal='center', vertical='center')
         cell.border = thin_border
     
     itens = Item.objects.filter(ativo=True).order_by('nome')
-    status_map = {'zerado': 'Zerado', 'baixo': 'Baixo', 'medio': 'Médio', 'alto': 'Alto'}
     
     for row, item in enumerate(itens, 2):
         dados = [
@@ -589,31 +532,17 @@ def exportar_excel(request):
             item.get_unidade_display(),
             item.localizacao or '',
             float(item.estoque_minimo),
-            float(item.valor_unitario) if item.valor_unitario else '',
             item.fornecedor or '',
             item.marca or '',
             item.lote or '',
             item.ca or '',
-            item.validade_ca.strftime('%d/%m/%Y') if item.validade_ca else '',
-            item.data_aquisicao.strftime('%d/%m/%Y') if item.data_aquisicao else '',
-            status_map.get(item.status_estoque, ''),
+            item.tamanho or '',
         ]
         
         for col, valor in enumerate(dados, 1):
             cell = ws.cell(row=row, column=col, value=valor)
             cell.border = thin_border
             cell.alignment = Alignment(vertical='center')
-            if col in [6, 9]:
-                cell.number_format = '#,##0.###'
-            elif col == 10:
-                cell.number_format = '#,##0.00'
-    
-    larguras = [8, 30, 25, 18, 15, 10, 8, 15, 12, 12, 20, 15, 15, 15, 12, 12, 10]
-    for col, largura in enumerate(larguras, 1):
-        ws.column_dimensions[get_column_letter(col)].width = largura
-    
-    ws.freeze_panes = 'A2'
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(cabecalhos))}{itens.count() + 1}"
     
     output = io.BytesIO()
     wb.save(output)
@@ -625,7 +554,6 @@ def exportar_excel(request):
 
 
 def baixar_modelo_excel(request):
-    """Baixa o modelo Excel para importação"""
     wb = Workbook()
     ws = wb.active
     ws.title = "Modelo Importação"
@@ -633,83 +561,29 @@ def baixar_modelo_excel(request):
     cabecalhos = [
         'Código', 'Nome', 'Descrição', 'Departamento', 'Categoria',
         'Quantidade', 'Unidade', 'Localização', 'Estoque Mínimo',
-        'Valor Unitário', 'Fornecedor', 'Marca',
-        'Lote', 'CA', 'Validade CA', 'Data Aquisição'
+        'Fornecedor', 'Marca', 'Lote', 'CA', 'Tamanho'
     ]
     
     header_font = Font(bold=True, color='FFFFFF', size=11, name='Arial')
     header_fill = PatternFill(start_color='2f8f4e', end_color='2f8f4e', fill_type='solid')
-    header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    thin_border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
     
     for col, header in enumerate(cabecalhos, 1):
         cell = ws.cell(row=1, column=col, value=header)
         cell.font = header_font
         cell.fill = header_fill
-        cell.alignment = header_alignment
         cell.border = thin_border
     
     exemplos = [
-        ['001', 'Parafuso 10mm', 'Parafuso sextavado zincado', 'Administrativo', 'Ferragens',
-         100, 'Unidade', 'Prateleira A2', 10, 1.50, 'Fornecedor ABC', 'Tramontina',
-         'LOTE-2024-001', 'CA-12345', '31/12/2025', '15/06/2024'],
-        ['', 'Luva de Proteção', 'Luva de segurança tamanho M', 'Produção', 'EPI',
-         50, 'Par', 'Armário 3', 20, 12.90, 'Fornecedor XYZ', '3M',
-         'LOTE-2024-050', 'CA-67890', '30/06/2025', '10/01/2024'],
-        ['', 'Óleo Lubrificante', 'Óleo sintético 5W30', 'Manutenção', 'Lubrificantes',
-         25.5, 'Litro', 'Prateleira B1', 5, 45.00, 'Fornecedor LM', 'Shell',
-         'LOTE-2024-100', '', '', ''],
-        ['', 'Papel A4', 'Resma de papel sulfite', 'Administrativo', 'Material Escritório',
-         200, 'Unidade', 'Almoxarifado Adm', 50, 0.35, 'Fornecedor Office', 'Report',
-         '', '', '', '01/03/2024'],
+        ['001', 'Parafuso 10mm', 'Parafuso sextavado', 'Administrativo', 'Ferragens',
+         100, 'Unidade', 'Prateleira A2', 10, 'Fornecedor ABC', 'Tramontina',
+         'LOTE-001', 'CA-12345', 'Pequeno'],
     ]
     
     for row, exemplo in enumerate(exemplos, 2):
         for col, valor in enumerate(exemplo, 1):
             cell = ws.cell(row=row, column=col, value=valor)
             cell.border = thin_border
-            cell.alignment = Alignment(vertical='center')
-            if col in [6, 9]:
-                cell.number_format = '#,##0.###'
-            elif col == 10:
-                cell.number_format = '#,##0.00'
-    
-    ws2 = wb.create_sheet("Instruções")
-    instrucoes = [
-        ['INSTRUÇÕES PARA IMPORTAÇÃO'],
-        [''],
-        ['1. Apenas a coluna "Nome" é obrigatória'],
-        ['2. Se o Código for deixado em branco, será gerado automaticamente'],
-        ['3. Se o Código já existir no sistema, a quantidade será SOMADA ao item existente'],
-        ['4. Se o item estiver DESATIVADO, ele será REATIVADO ao importar'],
-        ['5. Mesmo código + mesmo lote + mesmo CA + mesma localização = SOMA'],
-        ['6. Itens com código/lote/CA/localização diferentes são criados separadamente'],
-        ['7. Quantidades aceitam decimais (use ponto ou vírgula)'],
-        ['8. Datas devem estar no formato DD/MM/AAAA'],
-        ['9. Departamentos aceitos: Administrativo, Produção, Manutenção, TI, Marketing, Vendas, RH, Financeiro, Jurídico, Logística, Qualidade, Pesquisa, Outros'],
-        ['10. Unidades aceitas: Unidade, Caixa, Pacote, Quilograma, Grama, Litro, Mililitro, Metro, Centímetro, Par, Dúzia, Rolo, Folha'],
-        ['11. Após preencher, salve como .xlsx e importe no sistema'],
-        ['12. O arquivo exportado pelo sistema tem o mesmo formato - use como referência!'],
-    ]
-    
-    for row, linha in enumerate(instrucoes, 1):
-        cell = ws2.cell(row=row, column=1, value=linha[0])
-        if row == 1:
-            cell.font = Font(bold=True, size=14, color='2f8f4e')
-        else:
-            cell.font = Font(size=11)
-    
-    ws2.column_dimensions['A'].width = 80
-    
-    larguras = [8, 30, 25, 18, 15, 10, 8, 15, 12, 12, 20, 15, 15, 15, 12, 12]
-    for col, largura in enumerate(larguras, 1):
-        ws.column_dimensions[get_column_letter(col)].width = largura
-    
-    ws.freeze_panes = 'A2'
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(cabecalhos))}{len(exemplos) + 1}"
     
     output = io.BytesIO()
     wb.save(output)
@@ -719,254 +593,6 @@ def baixar_modelo_excel(request):
     response['Content-Disposition'] = 'attachment; filename=modelo_importacao_almoxarifado.xlsx'
     return response
 
-
-@require_http_methods(["POST"])
-def importar_excel(request):
-    """Importa itens de arquivo Excel - CORRIGIDO"""
-    try:
-        arquivo = request.FILES.get('arquivo')
-        if not arquivo:
-            return JsonResponse({'success': False, 'error': 'Nenhum arquivo enviado'}, status=400)
-        
-        from openpyxl import load_workbook
-        wb = load_workbook(arquivo)
-        ws = wb.active
-        
-        importados = 0
-        somados = 0
-        reativados = 0
-        erros = []
-        
-        for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-            try:
-                if not row or not any(cell for cell in row):
-                    continue
-                
-                # Extrair dados de TODAS as colunas
-                codigo = str(row[0]).strip() if row[0] else None
-                nome = str(row[1]).strip() if len(row) > 1 and row[1] else None
-                
-                if not nome:
-                    erros.append(f'Linha {row_idx}: Nome obrigatório - ignorada')
-                    continue
-                
-                # Quantidade
-                quantidade = Decimal('0')
-                if len(row) > 5 and row[5] is not None:
-                    qtd_str = str(row[5]).strip().replace(',', '.')
-                    try:
-                        quantidade = Decimal(qtd_str).normalize()
-                    except:
-                        pass
-                
-                # Estoque mínimo
-                estoque_minimo = Decimal('5')
-                if len(row) > 8 and row[8] is not None:
-                    try:
-                        estoque_minimo = Decimal(str(row[8]).strip().replace(',', '.')).normalize()
-                    except:
-                        pass
-                
-                # Valor unitário
-                valor_unitario = None
-                if len(row) > 9 and row[9] is not None and str(row[9]).strip():
-                    try:
-                        valor_unitario = Decimal(str(row[9]).strip().replace(',', '.'))
-                    except:
-                        pass
-                
-                # Mapear departamento
-                departamento = 'OUT'
-                if len(row) > 3 and row[3]:
-                    dept_str = str(row[3]).strip().upper()
-                    dept_map = {
-                        'ADM': 'ADM', 'ADMINISTRATIVO': 'ADM',
-                        'PROD': 'PROD', 'PRODUÇÃO': 'PROD', 'PRODUCAO': 'PROD',
-                        'MAN': 'MAN', 'MANUTENÇÃO': 'MAN', 'MANUTENCAO': 'MAN',
-                        'TI': 'TI', 'TECNOLOGIA': 'TI',
-                        'MKT': 'MKT', 'MARKETING': 'MKT',
-                        'VEND': 'VEND', 'VENDAS': 'VEND',
-                        'RH': 'RH', 'RECURSOS HUMANOS': 'RH',
-                        'FIN': 'FIN', 'FINANCEIRO': 'FIN',
-                        'JUR': 'JUR', 'JURÍDICO': 'JUR', 'JURIDICO': 'JUR',
-                        'LOG': 'LOG', 'LOGÍSTICA': 'LOG', 'LOGISTICA': 'LOG',
-                        'QUAL': 'QUAL', 'QUALIDADE': 'QUAL',
-                        'PESQ': 'PESQ', 'PESQUISA': 'PESQ',
-                        'OUT': 'OUT', 'OUTROS': 'OUT',
-                    }
-                    departamento = dept_map.get(dept_str, 'OUT')
-                
-                # Mapear unidade
-                unidade = 'UN'
-                if len(row) > 6 and row[6]:
-                    un_str = str(row[6]).strip().upper()
-                    un_map = {
-                        'UN': 'UN', 'UNIDADE': 'UN', 'UND': 'UN',
-                        'CX': 'CX', 'CAIXA': 'CX',
-                        'PCT': 'PCT', 'PACOTE': 'PCT',
-                        'KG': 'KG', 'KILO': 'KG', 'QUILOGRAMA': 'KG',
-                        'G': 'G', 'GRAMA': 'G',
-                        'L': 'L', 'LITRO': 'L',
-                        'ML': 'ML', 'MILILITRO': 'ML',
-                        'M': 'M', 'METRO': 'M',
-                        'CM': 'CM', 'CENTIMETRO': 'CM', 'CENTÍMETRO': 'CM',
-                        'PAR': 'PAR',
-                        'DZ': 'DZ', 'DUZIA': 'DZ', 'DÚZIA': 'DZ',
-                        'RL': 'RL', 'ROLO': 'RL',
-                        'FL': 'FL', 'FOLHA': 'FL',
-                    }
-                    unidade = un_map.get(un_str, 'UN')
-                
-                # Demais campos
-                descricao = str(row[2]).strip() if len(row) > 2 and row[2] else None
-                categoria = str(row[4]).strip() if len(row) > 4 and row[4] else None
-                localizacao = str(row[7]).strip() if len(row) > 7 and row[7] else None
-                fornecedor = str(row[10]).strip() if len(row) > 10 and row[10] else None
-                marca = str(row[11]).strip() if len(row) > 11 and row[11] else None
-                lote = str(row[12]).strip() if len(row) > 12 and row[12] else None
-                ca = str(row[13]).strip() if len(row) > 13 and row[13] else None
-                
-                # Datas
-                validade_ca = None
-                if len(row) > 14 and row[14]:
-                    try:
-                        if isinstance(row[14], str):
-                            from datetime import datetime as dt
-                            for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y']:
-                                try:
-                                    validade_ca = dt.strptime(row[14].strip(), fmt).date()
-                                    break
-                                except:
-                                    pass
-                        elif hasattr(row[14], 'date'):
-                            validade_ca = row[14].date() if callable(row[14].date) else row[14]
-                    except:
-                        pass
-                
-                data_aquisicao = None
-                if len(row) > 15 and row[15]:
-                    try:
-                        if isinstance(row[15], str):
-                            from datetime import datetime as dt
-                            for fmt in ['%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y']:
-                                try:
-                                    data_aquisicao = dt.strptime(row[15].strip(), fmt).date()
-                                    break
-                                except:
-                                    pass
-                        elif hasattr(row[15], 'date'):
-                            data_aquisicao = row[15].date() if callable(row[15].date) else row[15]
-                    except:
-                        pass
-                
-                # ===== LÓGICA DE IMPORTAÇÃO CORRIGIDA =====
-                # SÓ SOMA SE: Código + Lote + CA + Localização forem TODOS IGUAIS
-                # Caso contrário, cria NOVO registro
-                
-                item_alvo = None
-                
-                # Buscar item EXATAMENTE igual (todos os campos coincidem)
-                item_alvo = Item.objects.filter(
-                    codigo=codigo if codigo else None,
-                    lote=lote if lote else None,
-                    ca=ca if ca else None,
-                    localizacao=localizacao if localizacao else None
-                ).first()
-                
-                # Se não encontrou com todos os campos, verifica um por um
-                if not item_alvo and codigo:
-                    # Se tem código, busca APENAS por código + lote + ca + local
-                    item_alvo = Item.objects.filter(
-                        codigo=codigo,
-                        lote=lote if lote else None,
-                        ca=ca if ca else None,
-                        localizacao=localizacao if localizacao else None
-                    ).first()
-                
-                if item_alvo:
-                    # ===== ITEM ENCONTRADO - MESMO CÓDIGO/LOTE/CA/LOCAL = SOMAR =====
-                    
-                    if not item_alvo.ativo:
-                        # REATIVAR
-                        item_alvo.ativo = True
-                        item_alvo.quantidade = quantidade
-                        item_alvo.nome = nome
-                        item_alvo.descricao = descricao if descricao else item_alvo.descricao
-                        item_alvo.departamento = departamento if departamento != 'OUT' else item_alvo.departamento
-                        item_alvo.categoria = categoria if categoria else item_alvo.categoria
-                        item_alvo.unidade = unidade
-                        item_alvo.estoque_minimo = estoque_minimo
-                        item_alvo.valor_unitario = valor_unitario if valor_unitario else item_alvo.valor_unitario
-                        item_alvo.fornecedor = fornecedor if fornecedor else item_alvo.fornecedor
-                        item_alvo.marca = marca if marca else item_alvo.marca
-                        item_alvo.validade_ca = validade_ca if validade_ca else item_alvo.validade_ca
-                        item_alvo.data_aquisicao = data_aquisicao if data_aquisicao else item_alvo.data_aquisicao
-                        item_alvo.save()
-                        reativados += 1
-                    else:
-                        # SOMAR quantidade
-                        item_alvo.quantidade += quantidade
-                        # Atualiza campos se informados
-                        if descricao: item_alvo.descricao = descricao
-                        if departamento != 'OUT': item_alvo.departamento = departamento
-                        if categoria: item_alvo.categoria = categoria
-                        if fornecedor: item_alvo.fornecedor = fornecedor
-                        if marca: item_alvo.marca = marca
-                        if validade_ca: item_alvo.validade_ca = validade_ca
-                        if data_aquisicao: item_alvo.data_aquisicao = data_aquisicao
-                        if valor_unitario: item_alvo.valor_unitario = valor_unitario
-                        item_alvo.save()
-                        somados += 1
-                else:
-                    # ===== NENHUM ITEM IGUAL - CRIAR NOVO =====
-                    Item.objects.create(
-                        codigo=codigo,
-                        nome=nome,
-                        descricao=descricao,
-                        departamento=departamento,
-                        categoria=categoria,
-                        quantidade=quantidade,
-                        unidade=unidade,
-                        localizacao=localizacao,
-                        estoque_minimo=estoque_minimo,
-                        valor_unitario=valor_unitario,
-                        fornecedor=fornecedor,
-                        marca=marca,
-                        lote=lote,
-                        ca=ca,
-                        validade_ca=validade_ca,
-                        data_aquisicao=data_aquisicao,
-                        ativo=True
-                    )
-                    importados += 1
-                    
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                erros.append(f'Linha {row_idx}: {str(e)}')
-        
-        # Montar mensagem
-        partes = []
-        if importados > 0: partes.append(f'{importados} novos')
-        if somados > 0: partes.append(f'{somados} somados')
-        if reativados > 0: partes.append(f'{reativados} reativados')
-        
-        mensagem = 'Importação concluída!'
-        if partes:
-            mensagem += ' ' + ', '.join(partes) + '.'
-        if erros:
-            mensagem += f' ({len(erros)} erros)'
-        
-        return JsonResponse({
-            'success': True,
-            'message': mensagem,
-            'erros': erros[:20]
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 def exportar_saidas_excel(request):
     wb = Workbook()
@@ -1003,386 +629,11 @@ def exportar_saidas_excel(request):
     return response
 
 
-@require_http_methods(["POST"])
-@login_required
-@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
-def excluir_item(request, pk):
-    try:
-        item = get_object_or_404(Item, pk=pk)
-        item.ativo = False
-        item.save()
-        return JsonResponse({'success': True, 'message': f'Item {item.codigo} desativado!'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
-    
-
-
-import xmltodict
-from decimal import Decimal
-from django.db import transaction
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from .models import Item, EntradaNotaFiscal, ItemEntrada
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def importar_xml_nfe(request):
-    """Importa XML de Nota Fiscal e atualiza o estoque automaticamente"""
-    
-    if not request.FILES.get('xml_file'):
-        return JsonResponse({'success': False, 'error': 'Nenhum arquivo XML enviado'}, status=400)
-    
-    xml_file = request.FILES['xml_file']
-    
-    # Verificar extensão
-    if not xml_file.name.endswith('.xml'):
-        return JsonResponse({'success': False, 'error': 'Arquivo deve ser XML'}, status=400)
-    
-    try:
-        # Converte o arquivo para dicionário
-        content = xml_file.read()
-        data_dict = xmltodict.parse(content)
-        
-        # Navega até a parte dos itens (suporta diferentes estruturas de XML)
-        if 'nfeProc' in data_dict:
-            infNFe = data_dict['nfeProc']['NFe']['infNFe']
-        elif 'NFe' in data_dict:
-            infNFe = data_dict['NFe']['infNFe']
-        else:
-            return JsonResponse({'success': False, 'error': 'Estrutura XML não reconhecida'}, status=400)
-        
-        # Extrair chave da nota (remover prefixo 'NFe')
-        chave = infNFe.get('@Id', '')
-        if chave.startswith('NFe'):
-            chave = chave[3:]
-        
-        if not chave:
-            return JsonResponse({'success': False, 'error': 'Chave de acesso não encontrada'}, status=400)
-        
-        with transaction.atomic():
-            # Verificar se nota já foi importada
-            if EntradaNotaFiscal.objects.filter(chave_acesso=chave).exists():
-                return JsonResponse({'success': False, 'error': 'Esta nota fiscal já foi importada!'}, status=400)
-            
-            # Extrair CNPJ do fornecedor
-            emitente = infNFe.get('emit', {})
-            cnpj = emitente.get('CNPJ', '')
-            if not cnpj and 'CPF' in emitente:
-                cnpj = emitente.get('CPF', '')
-            
-            # 1. Registrar a Nota no Banco
-            nota = EntradaNotaFiscal.objects.create(
-                chave_acesso=chave,
-                numero_nota=infNFe.get('ide', {}).get('nNF', ''),
-                fornecedor_nome=emitente.get('xNome', 'Fornecedor não identificado'),
-                cnpj_fornecedor=cnpj,
-                data_emissao=infNFe.get('ide', {}).get('dhEmi', '')[:10] if infNFe.get('ide', {}).get('dhEmi') else None,
-                valor_total=Decimal(infNFe.get('total', {}).get('ICMSTot', {}).get('vNF', '0')),
-                xml_arquivo=xml_file
-            )
-            
-            # 2. Processa os itens da nota
-            detalhes = infNFe.get('det', [])
-            if not detalhes:
-                return JsonResponse({'success': False, 'error': 'Nenhum item encontrado na nota'}, status=400)
-            
-            if not isinstance(detalhes, list):
-                detalhes = [detalhes]
-            
-            itens_importados = 0
-            
-            for item_nfe in detalhes:
-                produto = item_nfe.get('prod', {})
-                
-                if not produto:
-                    continue
-                
-                # Dados do produto
-                codigo_produto = produto.get('cProd', '').strip()
-                nome_produto = produto.get('xProd', 'Sem nome')[:200]
-                unidade = produto.get('uCom', 'UN')[:3].upper()
-                quantidade = Decimal(str(produto.get('qCom', '0')).replace(',', '.'))
-                valor_unitario = Decimal(str(produto.get('vUnCom', '0')).replace(',', '.'))
-                
-                if quantidade <= 0:
-                    continue
-                
-                # Tenta encontrar o item pelo código
-                item_estoque = None
-                
-                if codigo_produto:
-                    item_estoque = Item.objects.filter(codigo=codigo_produto).first()
-                
-                # Se não encontrou pelo código, tenta pelo nome exato
-                if not item_estoque:
-                    item_estoque = Item.objects.filter(nome__iexact=nome_produto).first()
-                
-                if item_estoque:
-                    # Item existe - somar quantidade
-                    item_estoque.quantidade += quantidade
-                    
-                    # Atualizar valor unitário se não tiver ou se o novo for maior
-                    if not item_estoque.valor_unitario or valor_unitario > item_estoque.valor_unitario:
-                        item_estoque.valor_unitario = valor_unitario
-                    
-                    # Atualizar fornecedor se não tiver
-                    if not item_estoque.fornecedor:
-                        item_estoque.fornecedor = nota.fornecedor_nome
-                    
-                    item_estoque.save()
-                    mensagem_acao = f"quantidade somada (+{quantidade})"
-                else:
-                    # Criar novo item
-                    item_estoque = Item.objects.create(
-                        codigo=codigo_produto if codigo_produto else None,
-                        nome=nome_produto,
-                        quantidade=quantidade,
-                        unidade=unidade if unidade in dict(UnidadeMedida.choices) else 'UN',
-                        valor_unitario=valor_unitario,
-                        fornecedor=nota.fornecedor_nome,
-                        departamento='OUT',
-                        ativo=True
-                    )
-                    mensagem_acao = "criado"
-                
-                # Registrar entrada do item
-                ItemEntrada.objects.create(
-                    nota_fiscal=nota,
-                    item=item_estoque,
-                    quantidade_nota=quantidade,
-                    preco_unitario=valor_unitario
-                )
-                
-                itens_importados += 1
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'Nota fiscal {nota.numero_nota} importada com sucesso!\n{itens_importados} itens processados.',
-                'nota_id': nota.id,
-                'itens': itens_importados
-            })
-            
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'success': False, 'error': f'Erro ao processar XML: {str(e)}'}, status=500)
-    
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def visualizar_xml_nfe(request):
-    """Visualiza dados do XML antes de importar"""
-    
-    if not request.FILES.get('xml_file'):
-        return JsonResponse({'success': False, 'error': 'Nenhum arquivo XML enviado'}, status=400)
-    
-    xml_file = request.FILES['xml_file']
-    
-    if not xml_file.name.endswith('.xml'):
-        return JsonResponse({'success': False, 'error': 'Arquivo deve ser XML'}, status=400)
-    
-    try:
-        content = xml_file.read()
-        data_dict = xmltodict.parse(content)
-        
-        if 'nfeProc' in data_dict:
-            infNFe = data_dict['nfeProc']['NFe']['infNFe']
-        elif 'NFe' in data_dict:
-            infNFe = data_dict['NFe']['infNFe']
-        else:
-            return JsonResponse({'success': False, 'error': 'Estrutura XML não reconhecida'}, status=400)
-        
-        chave = infNFe.get('@Id', '')
-        if chave.startswith('NFe'):
-            chave = chave[3:]
-        
-        emitente = infNFe.get('emit', {})
-        cnpj = emitente.get('CNPJ', '')
-        if not cnpj and 'CPF' in emitente:
-            cnpj = emitente.get('CPF', '')
-        
-        # Processar itens da nota
-        detalhes = infNFe.get('det', [])
-        if not isinstance(detalhes, list):
-            detalhes = [detalhes]
-        
-        itens = []
-        itens_existentes = []
-        
-        for item_nfe in detalhes:
-            produto = item_nfe.get('prod', {})
-            if not produto:
-                continue
-            
-            codigo_produto = produto.get('cProd', '').strip()
-            nome_produto = produto.get('xProd', 'Sem nome')[:200]
-            unidade = produto.get('uCom', 'UN')[:3].upper()
-            quantidade = Decimal(str(produto.get('qCom', '0')).replace(',', '.'))
-            valor_unitario = Decimal(str(produto.get('vUnCom', '0')).replace(',', '.'))
-            
-            if quantidade <= 0:
-                continue
-            
-            item_data = {
-                'codigo': codigo_produto,
-                'nome': nome_produto,
-                'unidade': unidade,
-                'quantidade': float(quantidade),
-                'preco_unitario': float(valor_unitario)
-            }
-            itens.append(item_data)
-            
-            # Verificar se item já existe
-            item_existente = Item.objects.filter(codigo=codigo_produto, ativo=True).first()
-            if item_existente:
-                itens_existentes.append({
-                    'codigo': codigo_produto,
-                    'nome': nome_produto,
-                    'estoque_atual': float(item_existente.quantidade)
-                })
-        
-        return JsonResponse({
-            'success': True,
-            'chave_acesso': chave,
-            'numero_nota': infNFe.get('ide', {}).get('nNF', ''),
-            'fornecedor_nome': emitente.get('xNome', 'Fornecedor não identificado'),
-            'cnpj_fornecedor': cnpj,
-            'data_emissao': infNFe.get('ide', {}).get('dhEmi', '')[:10] if infNFe.get('ide', {}).get('dhEmi') else '',
-            'valor_total': float(infNFe.get('total', {}).get('ICMSTot', {}).get('vNF', '0')),
-            'itens': itens,
-            'itens_existentes': itens_existentes,
-            'total_itens': len(itens)
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
-    
-
-
-
-
-
-
-# ============================================
-# VIEWS DE NOTIFICAÇÃO WHATSAPP
-# ============================================
-
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required, permission_required
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from .models import ConfiguracaoWhatsApp, HistoricoNotificacaoAlmoxarifado, Item
-from .services import get_notificacao_service
-import json
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-@login_required
-@permission_required('almoxarifado.pode_gerenciar_almoxarifado', raise_exception=True)
-def configurar_notificacoes(request):
-    """Configurações de notificações WhatsApp"""
-    
-    config = ConfiguracaoWhatsApp.get_config()
-    historico = HistoricoNotificacaoAlmoxarifado.objects.all()[:50]
-    
-    # Lista de instâncias disponíveis (mock - você pode buscar da API)
-    instancias = []
-    
-    if request.method == 'POST':
-        if 'salvar_templates' in request.POST:
-            # Salvar templates
-            config.template_estoque_baixo = request.POST.get('template_estoque_baixo', config.template_estoque_baixo)
-            config.template_estoque_zerado = request.POST.get('template_estoque_zerado', config.template_estoque_zerado)
-            config.template_reposicao = request.POST.get('template_reposicao', config.template_reposicao)
-            config.save()
-            messages.success(request, 'Templates salvos com sucesso!')
-        else:
-            # Salvar configurações gerais
-            config.api_url = request.POST.get('api_url', config.api_url)
-            config.api_key = request.POST.get('api_key', config.api_key)
-            config.instance_name = request.POST.get('instance_name', config.instance_name)
-            config.numeros_destino = request.POST.get('numeros_destino', config.numeros_destino)
-            config.notificar_estoque_baixo = request.POST.get('notificar_estoque_baixo') == 'on'
-            config.notificar_estoque_zerado = request.POST.get('notificar_estoque_zerado') == 'on'
-            config.notificar_reposicao = request.POST.get('notificar_reposicao') == 'on'
-            config.ativo = request.POST.get('ativo') == 'on'
-            config.save()
-            messages.success(request, 'Configurações salvas com sucesso!')
-        
-        return redirect('almoxarifado:configurar_notificacoes')
-    
-    context = {
-        'config': config,
-        'historico_recente': historico,
-        'instancias': instancias,
-    }
-    return render(request, 'almoxarifado/configurar_notificacoes.html', context)
-
-
-@login_required
-@require_http_methods(["POST"])
-@csrf_exempt
-def testar_notificacao(request):
-    """Testa o envio de notificação"""
-    try:
-        data = json.loads(request.body)
-        numero_teste = data.get('numero_teste')
-        
-        if not numero_teste:
-            return JsonResponse({'success': False, 'error': 'Número não informado'})
-        
-        service = get_notificacao_service()
-        success, response = service.testar_conexao(numero_teste)
-        
-        if success:
-            return JsonResponse({'success': True, 'message': 'Mensagem de teste enviada!'})
-        else:
-            return JsonResponse({'success': False, 'error': str(response)})
-            
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-
-
-@login_required
-def historico_notificacoes(request):
-    """Histórico de notificações"""
-    notificacoes = HistoricoNotificacaoAlmoxarifado.objects.all().select_related('item')[:100]
-    
-    return render(request, 'almoxarifado/historico_notificacoes.html', {
-        'notificacoes': notificacoes
-    })
-
-
-
-
-
-# ============================================
-# WHATSAPP API VIEWS
-# ============================================
-
-import json
-import requests
-import logging
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-from django.contrib.auth.decorators import login_required
-
-logger = logging.getLogger(__name__)
-
+# ===== WHATSAPP API VIEWS =====
 
 @login_required
 @require_http_methods(["GET", "POST"])
 def api_config_whatsapp(request):
-    from .models import ConfiguracaoWhatsApp
-    
     if request.method == "GET":
         config = ConfiguracaoWhatsApp.get_config()
         return JsonResponse({
@@ -1400,16 +651,14 @@ def api_config_whatsapp(request):
                 'template_estoque_baixo': config.template_estoque_baixo,
                 'template_estoque_zerado': config.template_estoque_zerado,
                 'template_reposicao': config.template_reposicao,
-                'tipo_envio': getattr(config, 'tipo_envio', 'tempo-real'),
-                'horario_agendado': config.horario_agendado.strftime('%H:%M') if hasattr(config, 'horario_agendado') and config.horario_agendado else '08:00',
-                'dias_semana': getattr(config, 'dias_semana', [1, 2, 3, 4, 5]),
-                'notificar_baixo': getattr(config, 'notificar_baixo', True),
-                'notificar_zerado': getattr(config, 'notificar_zerado', True),
-                'notificar_reposicao': getattr(config, 'notificar_reposicao', True),
-                'repetir_notificacoes': getattr(config, 'repetir_notificacoes', False),
-                'intervalo_repeticao': getattr(config, 'intervalo_repeticao', 24),
-                'departamentos_ativos': getattr(config, 'departamentos_ativos', []),
-                'template_resumo': getattr(config, 'template_resumo', ''),
+                'tipo_envio': config.tipo_envio,
+                'notificar_baixo': config.notificar_baixo,
+                'notificar_zerado': config.notificar_zerado,
+                'notificar_reposicao': config.notificar_reposicao,
+                'repetir_notificacoes': config.repetir_notificacoes,
+                'intervalo_repeticao': config.intervalo_repeticao,
+                'departamentos_ativos': config.departamentos_ativos or [],
+                'template_resumo': config.template_resumo,
             }
         })
     
@@ -1418,7 +667,6 @@ def api_config_whatsapp(request):
             data = json.loads(request.body)
             config = ConfiguracaoWhatsApp.get_config()
             
-            # Campos básicos
             config.ativo = data.get('ativo', config.ativo)
             config.api_url = data.get('api_url', config.api_url)
             config.api_key = data.get('api_key', config.api_key)
@@ -1431,20 +679,7 @@ def api_config_whatsapp(request):
             config.template_estoque_baixo = data.get('template_estoque_baixo', config.template_estoque_baixo)
             config.template_estoque_zerado = data.get('template_estoque_zerado', config.template_estoque_zerado)
             config.template_reposicao = data.get('template_reposicao', config.template_reposicao)
-            
-            # NOVOS CAMPOS DE AGENDAMENTO
             config.tipo_envio = data.get('tipo_envio', 'tempo-real')
-            
-            # Converter horário para time object se vier como string
-            horario_str = data.get('horario_agendado', '08:00')
-            if isinstance(horario_str, str):
-                from datetime import time
-                horas, minutos = map(int, horario_str.split(':'))
-                config.horario_agendado = time(horas, minutos)
-            else:
-                config.horario_agendado = horario_str
-            
-            config.dias_semana = data.get('dias_semana', [1, 2, 3, 4, 5])
             config.notificar_baixo = data.get('notificar_baixo', True)
             config.notificar_zerado = data.get('notificar_zerado', True)
             config.notificar_reposicao = data.get('notificar_reposicao', True)
@@ -1455,87 +690,90 @@ def api_config_whatsapp(request):
             
             config.save()
             
-            print(f"✅ Configuração salva: tipo_envio={config.tipo_envio}, horario={config.horario_agendado}")
-            
             return JsonResponse({'success': True, 'message': 'Configurações salvas'})
             
         except Exception as e:
-            print(f"❌ Erro ao salvar: {e}")
             return JsonResponse({'success': False, 'error': str(e)})
-        
-
-@login_required
-@require_http_methods(["POST"])
-def api_enviar_notificacao_agora(request):
-    """Envia notificação imediatamente (via botão)"""
-    try:
-        from django.core.management import call_command
-        from io import StringIO
-        
-        out = StringIO()
-        call_command('enviar_notificacoes_almoxarifado', '--now', stdout=out)
-        
-        return JsonResponse({'success': True, 'message': 'Notificações enviadas com sucesso!'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-    
 
 
 @login_required
 @require_http_methods(["POST"])
 def api_listar_instancias(request):
-    """Lista todas as instâncias da Evolution API"""
+    """Lista apenas as instâncias criadas pelo sistema com status atualizado"""
     try:
         data = json.loads(request.body)
         api_url = data.get('api_url')
         api_key = data.get('api_key')
         
-        if not api_url:
-            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
+        # Buscar instâncias salvas no banco de dados
+        instancias_db = InstanciaWhatsApp.objects.all().order_by('nome')
         
-        # Garantir protocolo
-        if not api_url.startswith(('http://', 'https://')):
-            api_url = 'https://' + api_url
+        instancias = []
         
-        headers = {'apikey': api_key} if api_key else {}
-        url = f"{api_url.rstrip('/')}/instance/fetchInstances"
-        
-        response = requests.get(url, headers=headers, timeout=10, verify=False)
-        
-        if response.status_code == 200:
-            instancias = response.json()
-            if not isinstance(instancias, list):
-                instancias = [instancias] if instancias else []
-            return JsonResponse({'success': True, 'instancias': instancias})
-        else:
-            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}: {response.text[:100]}'})
+        for inst in instancias_db:
+            # Tentar obter status atual da Evolution API
+            status_atual = inst.status
             
-    except requests.exceptions.ConnectionError:
-        return JsonResponse({'success': False, 'error': 'Não foi possível conectar à Evolution API'})
+            if api_url:
+                try:
+                    if not api_url.startswith(('http://', 'https://')):
+                        api_url_tmp = 'https://' + api_url
+                    else:
+                        api_url_tmp = api_url
+                    
+                    headers = {'apikey': api_key} if api_key else {}
+                    url = f"{api_url_tmp.rstrip('/')}/instance/fetchInstances?instanceName={inst.nome}"
+                    
+                    response = requests.get(url, headers=headers, timeout=5, verify=False)
+                    
+                    if response.status_code == 200:
+                        inst_data = response.json()
+                        if isinstance(inst_data, list) and len(inst_data) > 0:
+                            inst_data = inst_data[0]
+                        api_status = inst_data.get('connectionStatus', 'close')
+                        status_atual = 'connected' if api_status == 'open' else 'disconnected'
+                        
+                        # Atualizar status no banco se mudou
+                        if inst.status != status_atual:
+                            inst.status = status_atual
+                            inst.save()
+                except Exception as e:
+                    print(f"Erro ao verificar status da instância {inst.nome}: {e}")
+            
+            instancias.append({
+                'name': inst.nome,
+                'instanceName': inst.nome,
+                'connectionStatus': 'open' if status_atual == 'connected' else 'close',
+                'created_by_system': True,
+                'status_text': '✅ Conectado' if status_atual == 'connected' else '❌ Desconectado'
+            })
+        
+        return JsonResponse({'success': True, 'instancias': instancias})
+        
     except Exception as e:
-        logger.error(f"Erro ao listar instâncias: {e}")
-        return JsonResponse({'success': False, 'error': str(e)})
-
+        print(f"Erro em api_listar_instancias: {e}")
+        return JsonResponse({'success': True, 'instancias': []})
 
 @login_required
 @require_http_methods(["POST"])
 def api_criar_instancia(request):
-    """Cria uma nova instância na Evolution API"""
     try:
         data = json.loads(request.body)
         api_url = data.get('api_url')
         api_key = data.get('api_key')
         instance_name = data.get('instance_name')
         
-        if not api_url:
-            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
-        
-        if not instance_name:
-            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
+        if not api_url or not instance_name:
+            return JsonResponse({'success': False, 'error': 'URL e nome da instância são obrigatórios'})
         
         if not api_url.startswith(('http://', 'https://')):
             api_url = 'https://' + api_url
         
+        # Verificar se a instância já existe no banco
+        if InstanciaWhatsApp.objects.filter(nome=instance_name).exists():
+            return JsonResponse({'success': False, 'error': f'Instância "{instance_name}" já existe!'})
+        
+        # Tentar criar na Evolution API
         headers = {'Content-Type': 'application/json'}
         if api_key:
             headers['apikey'] = api_key
@@ -1550,30 +788,31 @@ def api_criar_instancia(request):
         response = requests.post(url, json=payload, headers=headers, timeout=30, verify=False)
         
         if response.status_code in [200, 201]:
+            # Salvar no banco de dados
+            InstanciaWhatsApp.objects.create(
+                nome=instance_name,
+                status='disconnected',
+                api_url=api_url
+            )
             return JsonResponse({'success': True, 'message': f'Instância "{instance_name}" criada'})
         else:
             return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}: {response.text[:100]}'})
             
     except Exception as e:
-        logger.error(f"Erro ao criar instância: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
 
 
 @login_required
 @require_http_methods(["POST"])
 def api_qrcode_instancia(request):
-    """Obtém QR Code ou Pairing Code para conectar a instância"""
     try:
         data = json.loads(request.body)
         api_url = data.get('api_url')
         api_key = data.get('api_key')
         instance_name = data.get('instance_name')
         
-        if not api_url:
-            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
-        
-        if not instance_name:
-            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
+        if not api_url or not instance_name:
+            return JsonResponse({'success': False, 'error': 'URL e nome da instância são obrigatórios'})
         
         if not api_url.startswith(('http://', 'https://')):
             api_url = 'https://' + api_url
@@ -1586,53 +825,36 @@ def api_qrcode_instancia(request):
         if response.status_code == 200:
             qrcode_data = response.json()
             
-            # Tentar extrair pairing code
             pairing_code = qrcode_data.get('pairingCode')
+            qrcode = qrcode_data.get('base64') or qrcode_data.get('qrcode')
             
-            # Tentar extrair QR Code base64
-            qrcode = None
-            if 'base64' in qrcode_data:
-                qrcode = qrcode_data['base64']
-            elif 'qrcode' in qrcode_data:
-                if isinstance(qrcode_data['qrcode'], dict):
-                    qrcode = qrcode_data['qrcode'].get('base64')
-                else:
-                    qrcode = qrcode_data['qrcode']
-            elif 'code' in qrcode_data:
-                # Se for apenas o code sem base64, é um pairing code
-                if len(str(qrcode_data['code'])) > 20:
-                    qrcode = qrcode_data['code']
-            
-            # Retornar o que tiver disponível
             if pairing_code and pairing_code != 'null':
+                # Atualizar status para connecting
+                InstanciaWhatsApp.objects.filter(nome=instance_name).update(status='connecting')
                 return JsonResponse({'success': True, 'pairingCode': pairing_code})
             elif qrcode:
+                InstanciaWhatsApp.objects.filter(nome=instance_name).update(status='connecting')
                 return JsonResponse({'success': True, 'qrcode': qrcode})
             else:
-                return JsonResponse({'success': False, 'error': 'Nenhum código de conexão disponível'})
+                return JsonResponse({'success': False, 'error': 'Nenhum código disponível'})
         else:
-            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}: {response.text[:200]}'})
+            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}'})
             
     except Exception as e:
-        logger.error(f"Erro ao obter QR Code: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
-    
+
 
 @login_required
 @require_http_methods(["POST"])
 def api_status_instancia(request):
-    """Verifica status da instância"""
     try:
         data = json.loads(request.body)
         api_url = data.get('api_url')
         api_key = data.get('api_key')
         instance_name = data.get('instance_name')
         
-        if not api_url:
-            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
-        
-        if not instance_name:
-            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
+        if not api_url or not instance_name:
+            return JsonResponse({'success': False, 'error': 'URL e nome da instância são obrigatórios'})
         
         if not api_url.startswith(('http://', 'https://')):
             api_url = 'https://' + api_url
@@ -1642,93 +864,150 @@ def api_status_instancia(request):
         
         response = requests.get(url, headers=headers, timeout=10, verify=False)
         
+        status = 'disconnected'
         if response.status_code == 200:
             inst_data = response.json()
             if isinstance(inst_data, list) and len(inst_data) > 0:
                 inst_data = inst_data[0]
-            status = inst_data.get('connectionStatus', 'close')
-            return JsonResponse({'success': True, 'status': 'connected' if status == 'open' else 'disconnected'})
-        else:
-            return JsonResponse({'success': False, 'error': f'HTTP {response.status_code}'})
+            api_status = inst_data.get('connectionStatus', 'close')
+            status = 'connected' if api_status == 'open' else 'disconnected'
+            
+            # Atualizar status no banco
+            InstanciaWhatsApp.objects.filter(nome=instance_name).update(status=status)
+        
+        return JsonResponse({'success': True, 'status': status})
             
     except Exception as e:
-        logger.error(f"Erro ao verificar status: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
 
 
 @login_required
 @require_http_methods(["POST"])
 def api_deletar_instancia(request):
-    """Deleta uma instância da Evolution API"""
     try:
         data = json.loads(request.body)
         api_url = data.get('api_url')
         api_key = data.get('api_key')
         instance_name = data.get('instance_name')
         
-        if not api_url:
-            return JsonResponse({'success': False, 'error': 'URL da API não configurada'})
+        if not api_url or not instance_name:
+            return JsonResponse({'success': False, 'error': 'URL e nome da instância são obrigatórios'})
         
-        if not instance_name:
-            return JsonResponse({'success': False, 'error': 'Nome da instância não informado'})
-        
-        # Garantir protocolo
         if not api_url.startswith(('http://', 'https://')):
             api_url = 'https://' + api_url
         
         headers = {'apikey': api_key} if api_key else {}
         
-        # Tentar diferentes endpoints para deletar
         endpoints = [
             f"{api_url}/instance/delete/{instance_name}",
             f"{api_url}/instance/logout/{instance_name}",
         ]
         
+        api_deleted = False
         for url in endpoints:
             try:
                 response = requests.delete(url, headers=headers, timeout=10, verify=False)
                 if response.status_code in [200, 204]:
-                    logger.info(f"Instância {instance_name} deletada via {url}")
-                    return JsonResponse({'success': True, 'message': f'Instância "{instance_name}" deletada'})
+                    api_deleted = True
+                    break
             except:
                 continue
         
-        # Se nenhum endpoint funcionou
-        return JsonResponse({'success': False, 'error': 'Não foi possível deletar a instância. Tente novamente.'})
+        # Remover do banco de dados
+        InstanciaWhatsApp.objects.filter(nome=instance_name).delete()
+        
+        return JsonResponse({'success': True, 'message': f'Instância "{instance_name}" deletada'})
             
     except Exception as e:
-        logger.error(f"Erro ao deletar instância: {e}")
         return JsonResponse({'success': False, 'error': str(e)})
-    
+# ===== AGENDAMENTOS =====
+
+@login_required
+@require_http_methods(["GET"])
+def listar_agendamentos(request):
+    try:
+        config = ConfiguracaoWhatsApp.get_config()
+        agendamentos = config.agendamentos.filter(ativo=True).order_by('horario')
+        
+        agendamentos_data = []
+        for ag in agendamentos:
+            agendamentos_data.append({
+                'id': ag.id,
+                'horario': ag.horario.strftime('%H:%M'),
+                'dias_semana': ag.dias_semana or [],
+                'ativo': ag.ativo,
+                'descricao': ag.descricao or '',
+            })
+        
+        return JsonResponse({'success': True, 'agendamentos': agendamentos_data})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
 
 @login_required
 @require_http_methods(["POST"])
-def api_proxy_evolution(request):
-    """Proxy para chamadas à Evolution API (útil para depuração)"""
+def criar_agendamento(request):
     try:
         data = json.loads(request.body)
-        target_url = data.get('url')
-        api_key = data.get('api_key')
-        method = data.get('method', 'GET')
-        body = data.get('body', {})
+        config = ConfiguracaoWhatsApp.get_config()
         
-        headers = {'Content-Type': 'application/json'}
-        if api_key:
-            headers['apikey'] = api_key
+        horario = data.get('horario')
+        if not horario:
+            return JsonResponse({'success': False, 'error': 'Horário obrigatório'})
         
-        if method == 'GET':
-            response = requests.get(target_url, headers=headers, timeout=30, verify=False)
-        elif method == 'DELETE':
-            response = requests.delete(target_url, headers=headers, timeout=30, verify=False)
-        else:
-            response = requests.post(target_url, json=body, headers=headers, timeout=30, verify=False)
+        dias_semana = data.get('dias_semana', [])
+        if dias_semana:
+            dias_semana = [int(d) for d in dias_semana if 0 <= int(d) <= 6]
+        
+        # Verificar se já existe
+        for ag in config.agendamentos.filter(horario=horario):
+            return JsonResponse({'success': False, 'error': f'Horário {horario} já está agendado!'})
+        
+        agendamento = AgendamentoNotificacao.objects.create(
+            config=config,
+            horario=horario,
+            dias_semana=dias_semana if dias_semana else None,
+            descricao=data.get('descricao', ''),
+            ativo=True
+        )
         
         return JsonResponse({
-            'success': response.status_code in [200, 201, 204],
-            'status': response.status_code,
-            'data': response.json() if response.text else {},
-            'text': response.text
+            'success': True,
+            'message': f'Agendamento criado para {horario}',
+            'agendamento': {
+                'id': agendamento.id,
+                'horario': agendamento.horario.strftime('%H:%M'),
+                'dias_semana': agendamento.dias_semana or [],
+                'descricao': agendamento.descricao,
+            }
         })
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def deletar_agendamento(request, agendamento_id):
+    try:
+        agendamento = get_object_or_404(AgendamentoNotificacao, id=agendamento_id)
+        horario_str = agendamento.horario.strftime('%H:%M')
+        agendamento.delete()
         
+        return JsonResponse({'success': True, 'message': f'Agendamento {horario_str} removido'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_enviar_notificacao_agora(request):
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        
+        out = StringIO()
+        call_command('enviar_notificacoes_almoxarifado', '--now', stdout=out)
+        
+        return JsonResponse({'success': True, 'message': 'Notificações enviadas com sucesso!'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
