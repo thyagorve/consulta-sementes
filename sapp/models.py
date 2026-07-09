@@ -121,18 +121,17 @@ class Estoque(models.Model):
     cliente = models.CharField(max_length=255, blank=True, null=True, default='', verbose_name="Cliente/Dono do Bag")
     status = models.CharField(max_length=20, choices=[('ATIVO', 'Ativo'), ('ESGOTADO', 'Esgotado'), ('INATIVO', 'Inativo'), ('BLOQUEADO', 'Bloqueado')], default='ATIVO')
     
-    STATUS_SISTEMICO_CHOICES = [
-        ('ok', 'OK - Tudo certo (Verde)'),
-        ('parcial', 'Parcial - Divergência (Amarelo)'),
-        ('critico', 'Crítico - Sem saldo real (Vermelho)'),
-    ]
-    
-    status_sistemico = models.CharField(
-        max_length=20,
-        choices=STATUS_SISTEMICO_CHOICES,
-        default='critico',
+
+    status_sistemico = models.ForeignKey(
+        'StatusSistemico',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='estoques',
         verbose_name='Status Sistêmico'
     )
+    
+    # Campos de histórico (mantidos para compatibilidade)
     status_sistemico_alterado_por = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -141,7 +140,36 @@ class Estoque(models.Model):
         related_name='status_sistemico_alteracoes'
     )
     status_sistemico_alterado_em = models.DateTimeField(null=True, blank=True)
-
+    status_sistemico_observacao = models.TextField(blank=True, null=True)
+    
+    def get_status_display_completo(self):
+        """Retorna o status com ícone e cor"""
+        if self.status_sistemico:
+            return {
+                'id': self.status_sistemico.id,
+                'nome': self.status_sistemico.nome,
+                'cor': self.status_sistemico.cor,
+                'icone': self.status_sistemico.icone or '',
+                'legenda': self.status_sistemico.legenda or '',
+            }
+        return {
+            'id': None,
+            'nome': 'Indefinido',
+            'cor': '#6c757d',
+            'icone': '⚪',
+            'legenda': 'Status não definido'
+        }
+    
+    def get_status_legenda_completa(self):
+        """Retorna a legenda completa para exibição no tooltip"""
+        if self.status_sistemico:
+            texto = f"{self.status_sistemico.icone or ''} {self.status_sistemico.nome}"
+            if self.status_sistemico.legenda:
+                texto += f" - {self.status_sistemico.legenda}"
+            return texto
+        return "⚪ Indefinido"
+    
+    # NOVO: Sobrescrever save para definir status padrão
     def save(self, *args, **kwargs):
         original = None
         if self.pk:
@@ -158,13 +186,105 @@ class Estoque(models.Model):
                 self.peso_total = Decimal(str(self.saldo)) * Decimal(str(self.peso_unitario))
             except:
                 self.peso_total = Decimal('0.00')
+        else:
+            self.peso_total = Decimal('0.00')
+
+        # Se não tiver status definido, define como Crítico (padrão)
+        if not self.status_sistemico:
+            try:
+                status_critico = StatusSistemico.objects.get(nome='Crítico')
+                self.status_sistemico = status_critico
+            except StatusSistemico.DoesNotExist:
+                # Se não existir, cria os status padrão
+                StatusSistemico.get_status_padrao()
+                try:
+                    status_critico = StatusSistemico.objects.get(nome='Crítico')
+                    self.status_sistemico = status_critico
+                except:
+                    pass
 
         if original and original.endereco != self.endereco and original.ultimo_lote_linha:
             self.ultimo_lote_linha = False
 
         super().save(*args, **kwargs)
+
+# sapp/models.py - Adicione no final do arquivo
+
+class StatusSistemico(models.Model):
+    """Model para gerenciar status personalizados com cores"""
+    nome = models.CharField(max_length=50, unique=True, verbose_name="Nome do Status")
+    cor = models.CharField(max_length=20, default='#6c757d', verbose_name="Cor (Hex)")
+    legenda = models.CharField(max_length=200, blank=True, null=True, verbose_name="Legenda/Descrição")
+    icone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Ícone (emoji)")
+    ativo = models.BooleanField(default=True, verbose_name="Ativo")
+    e_padrao = models.BooleanField(default=False, verbose_name="É Status Padrão")
+    ordem = models.IntegerField(default=0, verbose_name="Ordem de Exibição")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    criado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='status_criados')
     
-    def __str__(self): return f"{self.lote} - {self.cultivar.nome} ({self.saldo} unidades)"
+    class Meta:
+        verbose_name = "Status Sistêmico"
+        verbose_name_plural = "Status Sistêmicos"
+        ordering = ['ordem', 'nome']
+    
+    def __str__(self):
+        return f"{self.icone or ''} {self.nome} ({self.cor})"
+    
+    @classmethod
+    def get_status_padrao(cls):
+        """Cria os status padrão se não existirem"""
+        status_padrao = [
+            {'nome': 'OK', 'cor': '#28a745', 'legenda': 'Tudo certo', 'icone': '✅', 'ordem': 1},
+            {'nome': 'Parcial', 'cor': '#ffc107', 'legenda': 'Divergência identificada', 'icone': '🟡', 'ordem': 2},
+            {'nome': 'Crítico', 'cor': '#dc3545', 'legenda': 'Sem saldo real', 'icone': '🔴', 'ordem': 3},
+            
+        ]
+        
+        for status_data in status_padrao:
+            status, created = cls.objects.get_or_create(
+                nome=status_data['nome'],
+                defaults={
+                    'cor': status_data['cor'],
+                    'legenda': status_data['legenda'],
+                    'icone': status_data['icone'],
+                    'e_padrao': True,
+                    'ativo': True,
+                    'ordem': status_data['ordem']
+                }
+            )
+            if created:
+                print(f"✅ Status padrão criado: {status.nome}")
+        
+        return cls.objects.filter(ativo=True)
+
+
+class HistoricoStatusSistemico(models.Model):
+    """Histórico de alterações de status"""
+    estoque = models.ForeignKey('Estoque', on_delete=models.CASCADE, related_name='historico_status')
+    status_anterior = models.ForeignKey(StatusSistemico, on_delete=models.SET_NULL, null=True, related_name='status_anterior')
+    status_novo = models.ForeignKey(StatusSistemico, on_delete=models.SET_NULL, null=True, related_name='status_novo')
+    observacao = models.TextField(blank=True, null=True)
+    alterado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    alterado_em = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Histórico de Status"
+        verbose_name_plural = "Históricos de Status"
+        ordering = ['-alterado_em']
+    
+    def __str__(self):
+        return f"{self.estoque.lote} - {self.status_anterior} → {self.status_novo} em {self.alterado_em.strftime('%d/%m/%Y %H:%M')}"
+# sapp/models.py - Adicionar método para legenda completa
+
+def get_status_legenda_completa(self):
+    """Retorna a legenda completa para exibição no tooltip"""
+    if self.status_sistemico:
+        texto = f"{self.status_sistemico.icone or ''} {self.status_sistemico.nome}"
+        if self.status_sistemico.legenda:
+            texto += f" - {self.status_sistemico.legenda}"
+        return texto
+    return "⚪ Indefinido"
+
 
 class HistoricoMovimentacao(models.Model):
     quantidade = models.IntegerField(default=0)

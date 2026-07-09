@@ -12,6 +12,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.core.serializers.json import DjangoJSONEncoder 
 from .models import HistoricoMovimentacao
 from .models import OrigemDestino
+from .models import Estoque, Cultivar, Peneira, Categoria, StatusSistemico
 
 # Adicione no topo com os outros imports
 import datetime
@@ -581,14 +582,22 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     
     # FILTRO POR STATUS SISTÊMICO
     status_filter = request.GET.getlist('status_sistemico')
+
     if status_filter:
-        if '__null__' in status_filter:
-            qs = qs.filter(
-                Q(status_sistemico__in=[s for s in status_filter if s != '__null__']) | 
-                Q(status_sistemico__isnull=True)
-            )
-        else:
-            qs = qs.filter(status_sistemico__in=status_filter)
+        status_ids = []
+
+        for status_value in status_filter:
+            try:
+                if str(status_value).isdigit():
+                    status_ids.append(int(status_value))
+                else:
+                    status_obj = StatusSistemico.objects.get(nome=status_value)
+                    status_ids.append(status_obj.id)
+            except (StatusSistemico.DoesNotExist, ValueError):
+                pass
+
+        if status_ids:
+            qs = qs.filter(status_sistemico__in=status_ids)
     
     # Busca Global
     busca = request.GET.get('busca', '').strip()
@@ -669,8 +678,25 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
             if v is not None and str(v).strip() != '':
                 options.append(str(v))
         return options
+    status_ids_em_uso = qs.exclude(
+        status_sistemico__isnull=True
+    ).values_list(
+        'status_sistemico_id',
+        flat=True
+    ).distinct()
 
-    status_options = ['ok', 'parcial', 'critico']
+    status_em_uso = StatusSistemico.objects.filter(
+        ativo=True,
+        id__in=status_ids_em_uso
+    ).order_by('ordem', 'nome')
+
+    status_options = [
+        {
+            'value': str(s.id),
+            'label': f"{s.icone or ''} {s.nome}".strip()
+        }
+        for s in status_em_uso
+    ]
     
     filter_options = {
         'status_sistemico': status_options,
@@ -730,6 +756,197 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     }
     
     return render(request, template_name, context)
+
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count, Q
+from .models import Estoque, StatusSistemico
+
+
+@login_required
+def opcoes_filtro_api(request):
+    coluna = request.GET.get('coluna')
+
+    if not coluna:
+        return JsonResponse({
+            'success': False,
+            'error': 'Coluna não especificada'
+        })
+
+    qs = Estoque.objects.filter(saldo__gt=0)
+
+    busca = request.GET.get('busca', '').strip()
+    if busca:
+        for termo in busca.split():
+            qs = qs.filter(
+                Q(lote__icontains=termo) |
+                Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) |
+                Q(especie__nome__icontains=termo) |
+                Q(endereco__icontains=termo) |
+                Q(cliente__icontains=termo)
+            )
+
+    field_map = {
+        'az': 'az',
+        'lote': 'lote',
+        'produto': 'produto',
+        'cultivar': 'cultivar__nome',
+        'peneira': 'peneira__nome',
+        'categoria': 'categoria__nome',
+        'endereco': 'endereco',
+        'saldo': 'saldo',
+        'peso_unitario': 'peso_unitario',
+        'peso_total': 'peso_total',
+        'especie': 'especie__nome',
+        'tratamento': 'tratamento__nome',
+        'embalagem': 'embalagem',
+        'cliente': 'cliente',
+        'empresa': 'empresa',
+        'conferente': 'conferente__username',
+    }
+
+    filter_map = {
+        'az': 'az__in',
+        'lote': 'lote__in',
+        'produto': 'produto__in',
+        'cultivar': 'cultivar__nome__in',
+        'peneira': 'peneira__nome__in',
+        'categoria': 'categoria__nome__in',
+        'endereco': 'endereco__in',
+        'especie': 'especie__nome__in',
+        'tratamento': 'tratamento__nome__in',
+        'embalagem': 'embalagem__in',
+        'cliente': 'cliente__in',
+        'empresa': 'empresa__in',
+        'conferente': 'conferente__username__in',
+    }
+
+    for param, lookup in filter_map.items():
+        if param == coluna:
+            continue
+
+        values = request.GET.getlist(param)
+        values = [v for v in values if v and v.strip()]
+
+        if values:
+            if '__null__' in values:
+                specific_values = [v for v in values if v != '__null__']
+                null_lookup = lookup.replace('__in', '__isnull')
+
+                if specific_values:
+                    qs = qs.filter(
+                        Q(**{lookup: specific_values}) |
+                        Q(**{null_lookup: True})
+                    )
+                else:
+                    qs = qs.filter(**{null_lookup: True})
+            else:
+                qs = qs.filter(**{lookup: values})
+
+    for field in ['saldo', 'peso_unitario', 'peso_total']:
+        if field == coluna:
+            continue
+
+        min_val = request.GET.get(f'min_{field}')
+        max_val = request.GET.get(f'max_{field}')
+
+        if min_val:
+            try:
+                qs = qs.filter(**{f'{field}__gte': float(min_val)})
+            except ValueError:
+                pass
+
+        if max_val:
+            try:
+                qs = qs.filter(**{f'{field}__lte': float(max_val)})
+            except ValueError:
+                pass
+
+    status_filter = request.GET.getlist('status_sistemico')
+    if status_filter and coluna != 'status_sistemico':
+        status_ids = []
+
+        for status_value in status_filter:
+            try:
+                if str(status_value).isdigit():
+                    status_ids.append(int(status_value))
+                else:
+                    status_obj = StatusSistemico.objects.get(nome=status_value)
+                    status_ids.append(status_obj.id)
+            except StatusSistemico.DoesNotExist:
+                pass
+
+        if status_ids:
+            qs = qs.filter(status_sistemico__in=status_ids)
+
+    if coluna == 'status_sistemico':
+        status_ids_em_uso = qs.exclude(
+            status_sistemico__isnull=True
+        ).values_list(
+            'status_sistemico_id',
+            flat=True
+        ).distinct()
+
+        status_em_uso = StatusSistemico.objects.filter(
+            ativo=True,
+            id__in=status_ids_em_uso
+        ).order_by('ordem', 'nome')
+
+        opcoes = [
+            {
+                'value': str(s.id),
+                'label': f"{s.icone or ''} {s.nome}".strip()
+            }
+            for s in status_em_uso
+        ]
+
+        return JsonResponse({
+            'success': True,
+            'opcoes': opcoes,
+            'tem_null': qs.filter(status_sistemico__isnull=True).exists()
+        })
+
+    if coluna not in field_map:
+        return JsonResponse({
+            'success': False,
+            'error': f'Coluna inválida: {coluna}'
+        })
+
+    field = field_map[coluna]
+
+    try:
+        values = qs.filter(
+            **{f'{field}__isnull': False}
+        ).exclude(
+            **{f'{field}': ''}
+        ).values_list(
+            field, flat=True
+        ).distinct().order_by(field)
+
+        values = [v for v in values if v is not None and str(v).strip() != '']
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        })
+
+    opcoes = [
+        {
+            'value': str(v),
+            'label': str(v)
+        }
+        for v in values
+    ]
+
+    tem_null = qs.filter(**{f'{field}__isnull': True}).exists()
+
+    return JsonResponse({
+        'success': True,
+        'opcoes': opcoes,
+        'tem_null': tem_null
+    })
 
 @login_required
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
@@ -3728,46 +3945,246 @@ def api_buscar_produto(request):
 
 
 
+# sapp/views.py
+
 @login_required
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def api_atualizar_status_sistemico(request):
-    """API para atualizar o status sistêmico de um lote (qualquer usuário)"""
+    """API para atualizar o status sistêmico com cores personalizadas"""
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             lote_id = data.get('lote_id')
+            status_id = data.get('status_id')
+            observacao = data.get('observacao', '').strip()
             
-            if not lote_id:
-                return JsonResponse({'success': False, 'error': 'ID do lote não fornecido'})
+            if not lote_id or not status_id:
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'ID do lote e status são obrigatórios'
+                })
             
-            lote = get_object_or_404(Estoque, id=lote_id)
+            with transaction.atomic():
+                lote = get_object_or_404(Estoque, id=lote_id)
+                status_anterior = lote.status_sistemico
+                novo_status = get_object_or_404(StatusSistemico, id=status_id)
+                
+                # Salvar histórico
+                HistoricoStatusSistemico.objects.create(
+                    estoque=lote,
+                    status_anterior=status_anterior,
+                    status_novo=novo_status,
+                    observacao=observacao or '',
+                    alterado_por=request.user
+                )
+                
+                # Atualizar o lote
+                lote.status_sistemico = novo_status
+                lote.status_sistemico_alterado_por = request.user
+                lote.status_sistemico_alterado_em = timezone.now()
+                lote.status_sistemico_observacao = observacao or ''
+                lote.save()
+                
+                # Registrar no histórico geral
+                HistoricoMovimentacao.objects.create(
+                    estoque=lote,
+                    usuario=request.user,
+                    tipo='Status Sistêmico',
+                    descricao=f'Status alterado para: {novo_status.nome} - {observacao or "Sem observação"}'
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'status': {
+                        'id': novo_status.id,
+                        'nome': novo_status.nome,
+                        'cor': novo_status.cor,
+                        'icone': novo_status.icone or '',
+                        'legenda': novo_status.legenda or '',
+                    },
+                    'alterado_por': request.user.get_full_name() or request.user.username,
+                    'alterado_em': timezone.now().strftime('%d/%m/%Y %H:%M'),
+                    'observacao': observacao or ''
+                })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método não permitido'})
+
+# sapp/views.py - Adicione esta função
+
+@login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
+def api_excluir_status(request, status_id):
+    """Exclui um status personalizado (apenas se não estiver em uso)"""
+    if request.method != 'DELETE':
+        return JsonResponse({'success': False, 'error': 'Método não permitido'})
+    
+    try:
+        status = get_object_or_404(StatusSistemico, id=status_id)
+        
+        # Verificar se é status padrão
+        if status.e_padrao:
+            return JsonResponse({
+                'success': False, 
+                'error': 'Status padrão não pode ser excluído'
+            })
+        
+        # Verificar se está em uso
+        em_uso = Estoque.objects.filter(status_sistemico=status).exists()
+        if em_uso:
+            return JsonResponse({
+                'success': False, 
+                'error': 'Status está em uso por um ou mais lotes. Remova os lotes primeiro.'
+            })
+        
+        # Excluir
+        status.delete()
+        return JsonResponse({'success': True})
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+    
+# sapp/views.py
+
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required, permission_required
+from django.views.decorators.csrf import csrf_exempt
+from django.db import transaction
+import json
+from .models import Estoque, StatusSistemico, HistoricoStatusSistemico
+
+@login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
+def api_atualizar_status_sistemico(request):
+    """API para atualizar o status sistêmico com cores personalizadas"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            lote_id = data.get('lote_id')
+            status_id = data.get('status_id')
+            observacao = data.get('observacao', '').strip()
+            nova_legenda = data.get('nova_legenda', '').strip()
             
-            # Ciclo: critico -> parcial -> ok -> critico
-            novo_status = {
-                'critico': 'parcial',
-                'parcial': 'ok',
-                'ok': 'critico'
-            }.get(lote.status_sistemico, 'critico')
+            if not lote_id or not status_id:
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'ID do lote e status são obrigatórios'
+                })
             
-            lote.status_sistemico = novo_status
-            lote.status_sistemico_alterado_por = request.user
-            lote.status_sistemico_alterado_em = timezone.now()
-            lote.save()
+            with transaction.atomic():
+                lote = get_object_or_404(Estoque, id=lote_id)
+                status_anterior = lote.status_sistemico
+                novo_status = get_object_or_404(StatusSistemico, id=status_id)
+                
+                # Atualizar legenda se fornecida
+                if nova_legenda:
+                    novo_status.legenda = nova_legenda
+                    novo_status.save(update_fields=['legenda'])
+                
+                # Salvar histórico antes de alterar
+                HistoricoStatusSistemico.objects.create(
+                    estoque=lote,
+                    status_anterior=status_anterior,
+                    status_novo=novo_status,
+                    observacao=observacao or '',
+                    alterado_por=request.user
+                )
+                
+                # Atualizar o lote
+                lote.status_sistemico = novo_status
+                lote.status_sistemico_alterado_por = request.user
+                lote.status_sistemico_alterado_em = timezone.now()
+                lote.status_sistemico_observacao = observacao or ''
+                lote.save()
+                
+                # Registrar no histórico geral
+                HistoricoMovimentacao.objects.create(
+                    estoque=lote,
+                    usuario=request.user,
+                    tipo='Status Sistêmico',
+                    descricao=f'Status alterado para: {novo_status.nome} - {observacao or "Sem observação"}'
+                )
+                
+                return JsonResponse({
+                    'success': True,
+                    'status': {
+                        'id': novo_status.id,
+                        'nome': novo_status.nome,
+                        'cor': novo_status.cor,
+                        'icone': novo_status.icone or '',
+                        'legenda': novo_status.legenda or '',
+                    },
+                    'alterado_por': request.user.get_full_name() or request.user.username,
+                    'alterado_em': timezone.now().strftime('%d/%m/%Y %H:%M'),
+                    'observacao': observacao or ''
+                })
+                
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método não permitido'})
+
+@login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
+def api_listar_status(request):
+    """Lista todos os status disponíveis"""
+    status_list = StatusSistemico.objects.filter(ativo=True).order_by('ordem', 'nome')
+    return JsonResponse({
+        'success': True,
+        'status': [{
+            'id': s.id,
+            'nome': s.nome,
+            'cor': s.cor,
+            'icone': s.icone or '',
+            'legenda': s.legenda or '',
+            'e_padrao': s.e_padrao,
+        } for s in status_list]
+    })
+
+@login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
+def api_criar_status(request):
+    """Cria um novo status personalizado"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            nome = data.get('nome', '').strip()
+            cor = data.get('cor', '#6c757d')
+            legenda = data.get('legenda', '').strip()
+            icone = data.get('icone', '')
             
-            # Registrar no histórico
-            HistoricoMovimentacao.objects.create(
-                estoque=lote,
-                usuario=request.user,
-                tipo='Status Sistêmico',
-                descricao=f'Status alterado para: {lote.get_status_sistemico_display()}'
+            if not nome:
+                return JsonResponse({'success': False, 'error': 'Nome do status é obrigatório'})
+            
+            # Verificar se já existe
+            if StatusSistemico.objects.filter(nome__iexact=nome).exists():
+                return JsonResponse({
+                    'success': False, 
+                    'error': f'Já existe um status com o nome "{nome}"'
+                })
+            
+            status = StatusSistemico.objects.create(
+                nome=nome,
+                cor=cor,
+                legenda=legenda or nome,
+                icone=icone or '🔹',
+                e_padrao=False,
+                ativo=True,
+                criado_por=request.user
             )
             
             return JsonResponse({
                 'success': True,
-                'novo_status': lote.status_sistemico,
-                'display': lote.get_status_sistemico_display(),
-                'alterado_por': request.user.get_full_name() or request.user.username,
-                'alterado_em': lote.status_sistemico_alterado_em.strftime('%d/%m/%Y %H:%M')
+                'status': {
+                    'id': status.id,
+                    'nome': status.nome,
+                    'cor': status.cor,
+                    'icone': status.icone,
+                    'legenda': status.legenda,
+                }
             })
             
         except Exception as e:
@@ -3775,6 +4192,44 @@ def api_atualizar_status_sistemico(request):
     
     return JsonResponse({'success': False, 'error': 'Método não permitido'})
 
+@login_required
+@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
+def api_editar_status(request, status_id):
+    """Edita um status existente"""
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            status = get_object_or_404(StatusSistemico, id=status_id)
+            
+            # Atualizar campos
+            if 'nome' in data:
+                status.nome = data['nome'].strip()
+            if 'cor' in data:
+                status.cor = data['cor']
+            if 'legenda' in data:
+                status.legenda = data['legenda'].strip()
+            if 'icone' in data:
+                status.icone = data['icone']
+            if 'ativo' in data:
+                status.ativo = data['ativo']
+            
+            status.save()
+            
+            return JsonResponse({
+                'success': True,
+                'status': {
+                    'id': status.id,
+                    'nome': status.nome,
+                    'cor': status.cor,
+                    'icone': status.icone,
+                    'legenda': status.legenda,
+                }
+            })
+            
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método não permitido'})
 
 
 

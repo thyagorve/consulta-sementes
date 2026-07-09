@@ -67,6 +67,12 @@ urlpatterns = [
     path('api/mapa-dados/<int:armazem_numero>/', views.api_mapa_dados, name='api_mapa_dados'),
     path('api/marcacoes-ultimo-lote/', views.api_marcacoes_ultimo_lote, name='api_marcacoes_ultimo_lote'),
     path('api/user-permissions/<int:user_id>/', views.api_user_permissions, name='api_user_permissions'),
+    path('api/atualizar-status-sistemico/', views.api_atualizar_status_sistemico, name='api_atualizar_status_sistemico'),
+    path('api/listar-status/', views.api_listar_status, name='api_listar_status'),
+    path('api/criar-status/', views.api_criar_status, name='api_criar_status'),
+    path('api/editar-status/<int:status_id>/', views.api_editar_status, name='api_editar_status'),
+    path('api/excluir-status/<int:status_id>/', views.api_excluir_status, name='api_excluir_status'),
+    path('api/estoque/opcoes-filtro/', views.opcoes_filtro_api, name='opcoes_filtro_api'),
 ]
 
 # ============================================================================
