@@ -25,7 +25,20 @@
     }
     
     * { box-sizing: border-box; }
-    .container-fluid { padding: 15px; width: 100%; max-width: 100%; overflow-x: hidden; }
+
+    /* ===== SCROLL NORMAL DA PÁGINA ===== */
+    html, body {
+        height: 100%;
+        margin: 0;
+        overflow-y: auto; /* Scroll normal da página */
+        overflow-x: hidden;
+    }
+    
+    .container-fluid {
+        padding: 15px;
+        width: 100%;
+        max-width: 100%;
+    }
     
     /* ===== CARDS ===== */
     .stats-row {
@@ -138,6 +151,17 @@
         box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
     }
     
+    .btn-columns {
+        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+        color: white;
+        box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+    }
+    .btn-columns:hover {
+        background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4);
+    }
+    
     /* ===== BUSCA ===== */
     .search-container {
         position: relative;
@@ -191,46 +215,129 @@
     }
     .clear-search:hover { background: #dc3545; color: white; }
     
-    /* ===== TABELA ===== */
-    .table-container {
+    /* ===== GERENCIADOR DE COLUNAS ===== */
+    .column-manager-container {
+        position: absolute;
         background: white;
         border-radius: 16px;
-        overflow: visible;
+        box-shadow: var(--shadow-lg);
+        z-index: 999999;
+        min-width: 280px;
+        max-width: 350px;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    .column-manager-header {
+        padding: 12px 16px;
+        background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+        color: white;
+        border-radius: 16px 16px 0 0;
+        font-weight: 700;
+        font-size: 0.95rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .column-manager-list {
+        max-height: 300px;
+        overflow-y: auto;
+        padding: 5px 0;
+    }
+    .column-manager-item {
+        padding: 8px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        transition: background 0.2s;
+        border-left: 3px solid transparent;
+        font-size: 0.85rem;
+    }
+    .column-manager-item:hover {
+        background: #f1f5f9;
+        border-left-color: #6c5ce7;
+    }
+    .column-manager-item input[type="checkbox"] {
+        margin: 0;
+        width: 16px;
+        height: 16px;
+        cursor: pointer;
+        accent-color: #6c5ce7;
+    }
+    .column-manager-item label {
+        flex: 1;
+        cursor: pointer;
+        margin: 0;
+        font-weight: 500;
+        color: #2c3e50;
+    }
+    .column-manager-footer {
+        padding: 10px 16px;
+        border-top: 1px solid #dee2e6;
+        background: #f8f9fa;
+        border-radius: 0 0 16px 16px;
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+    .column-manager-footer .btn-sm {
+        padding: 5px 12px;
+        font-size: 0.8rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+    
+    /* ===== TABELA - COM SCROLL PRÓPRIO ===== */
+    .table-wrapper {
+        background: white;
+        border-radius: 16px;
+        overflow: hidden;
         box-shadow: var(--shadow-md);
-        margin-bottom: 20px;
         border: 1px solid var(--border-color);
         width: 100%;
         position: relative;
+        margin-bottom: 20px;
     }
-    .table-responsive {
-        overflow-x: auto;
+    
+    /* Container da tabela com altura máxima e scroll */
+    .table-scroll-container {
+        max-height: 65vh; /* Altura máxima da tabela */
+        overflow-y: auto; /* Scroll vertical apenas na tabela */
+        overflow-x: auto; /* Scroll horizontal */
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
         scrollbar-color: var(--primary-dark) #f1f1f1;
-        max-width: 100%;
-        border-radius: 16px;
+        position: relative;
     }
-    .table-responsive::-webkit-scrollbar { height: 8px; }
-    .table-responsive::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-    .table-responsive::-webkit-scrollbar-thumb { background: var(--primary-dark); border-radius: 10px; }
-    .table-responsive::-webkit-scrollbar-thumb:hover { background: var(--primary-light); }
+    
+    .table-scroll-container::-webkit-scrollbar { width: 8px; height: 8px; }
+    .table-scroll-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+    .table-scroll-container::-webkit-scrollbar-thumb { background: var(--primary-dark); border-radius: 10px; }
+    .table-scroll-container::-webkit-scrollbar-thumb:hover { background: var(--primary-light); }
     
     .table-advanced {
         width: 100%;
         margin-bottom: 0;
         font-size: 0.85rem;
-        min-width: 1400px;
         border-collapse: separate;
         border-spacing: 0;
+        min-width: 1400px;
     }
-    .table-advanced th {
+    
+    /* ===== THEAD - STICKY DENTRO DO SCROLL DA TABELA ===== */
+    .table-advanced thead {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    
+    .table-advanced thead th {
         background: linear-gradient(135deg, var(--primary-dark), #1e5f34);
         color: white;
         font-weight: 600;
         padding: 12px 8px;
         position: sticky;
         top: 0;
-        z-index: 5;
+        z-index: 10;
         white-space: nowrap;
         border: none;
         cursor: pointer;
@@ -238,21 +345,23 @@
         letter-spacing: 0.3px;
         text-transform: uppercase;
         transition: background 0.2s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .table-advanced th:hover { background: linear-gradient(135deg, #1e5f34, var(--primary-dark)); }
-    .table-advanced th.filter-active {
+    .table-advanced thead th:hover { background: linear-gradient(135deg, #1e5f34, var(--primary-dark)); }
+    .table-advanced thead th.filter-active {
         background: linear-gradient(135deg, #1a4f2b, #0f3a1e);
         position: relative;
         box-shadow: inset 0 -2px 0 #ffc107;
     }
-    .table-advanced th.filter-active i { color: #ffc107; }
-    .table-advanced th i {
+    .table-advanced thead th.filter-active i { color: #ffc107; }
+    .table-advanced thead th i {
         margin-left: 4px;
         font-size: 0.65rem;
         opacity: 0.7;
         transition: opacity 0.2s;
     }
-    .table-advanced th:hover i { opacity: 1; }
+    .table-advanced thead th:hover i { opacity: 1; }
+    
     .table-advanced td {
         padding: 10px 8px;
         vertical-align: middle;
@@ -264,6 +373,41 @@
     .table-advanced tbody tr { transition: var(--transition); }
     .table-advanced tbody tr:hover { background-color: rgba(47, 143, 78, 0.05); }
     .table-advanced tbody tr:last-child td { border-bottom: none; }
+    
+    /* Rodapé da tabela */
+    .table-footer {
+        background: white;
+        border-top: 2px solid #e9ecef;
+        padding: 10px 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+    .table-footer-info {
+        font-size: 0.85rem;
+        color: #2c3e50;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .table-footer-info i { color: var(--primary-dark); }
+    .table-footer-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .btn-toggle-pagination {
+        padding: 5px 12px;
+        font-size: 0.8rem;
+        border-radius: 20px;
+        font-weight: 600;
+        transition: var(--transition);
+    }
     
     /* ===== COLUNA DE STATUS ===== */
     .status-column { text-align: center; vertical-align: middle; min-width: 60px; }
@@ -295,7 +439,7 @@
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
     
-    /* ===== TOOLTIP CORRIGIDO ===== */
+    /* ===== TOOLTIP ===== */
     .status-tooltip-custom {
         display: none;
         position: fixed;
@@ -313,7 +457,6 @@
         line-height: 1.7;
         white-space: normal;
         word-wrap: break-word;
-        word-break: break-word;
     }
     
     .status-tooltip-custom::after {
@@ -333,7 +476,6 @@
         text-align: center;
         font-size: 14px;
         white-space: normal;
-        word-wrap: break-word;
         color: #fff;
         font-weight: 700;
         line-height: 1.4;
@@ -366,7 +508,6 @@
         display: block;
         line-height: 1.7;
         white-space: normal;
-        word-wrap: break-word;
         margin-top: 2px;
     }
     
@@ -455,6 +596,23 @@
         font-weight: 600;
         color: #1e293b;
         font-size: 0.8rem;
+    }
+    
+    .badge-obs {
+        background: #fff3cd;
+        color: #856404;
+        padding: 4px 10px;
+        border-radius: 30px;
+        font-size: 0.7rem;
+        font-weight: 500;
+        border: 1px solid #ffc107;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
     
     /* ===== FILTROS ATIVOS ===== */
@@ -613,23 +771,18 @@
         border-radius: 30px;
         text-decoration: none;
     }
-    @keyframes slideDown {
-        from { opacity: 0; transform: translate(-50%, -60%); }
-        to { opacity: 1; transform: translate(-50%, -50%); }
-    }
-    @media (min-width: 992px) {
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    }
     
     /* ===== PAGINAÇÃO ===== */
     .pagination-container {
+        display: none;
+    }
+    .pagination-container.show {
+        display: block;
         background: white;
         border-radius: 16px;
         padding: 15px 20px;
-        margin-top: 20px;
+        margin-top: 0;
+        margin-bottom: 20px;
         box-shadow: var(--shadow-sm);
         border: 1px solid var(--border-color);
     }
@@ -816,9 +969,6 @@
     
     @media (max-width: 768px) {
         .container-fluid { padding: 10px; }
-        .pagination-info { text-align: center; margin-bottom: 10px; justify-content: center; }
-        .pagination-controls { margin-bottom: 10px; }
-        .pagination-items-per-page { text-align: center; }
         .action-buttons .btn span { display: none; }
         .action-buttons .btn i { margin: 0; font-size: 1.2rem; }
         .action-buttons .btn { padding: 8px 12px; font-size: 0.85rem; }
@@ -833,8 +983,8 @@
         .status-tooltip-custom strong { font-size: 12px; }
         .status-tooltip-custom .tooltip-observacao { font-size: 10px; padding: 4px 8px; max-height: 60px; }
         .status-tooltip-custom small { font-size: 9px; }
-        .table-advanced { min-width: 1000px; font-size: 0.75rem; }
-        .table-advanced th { padding: 8px 5px; font-size: 0.65rem; }
+        .table-advanced { font-size: 0.75rem; }
+        .table-advanced thead th { padding: 8px 5px; font-size: 0.65rem; }
         .table-advanced td { padding: 8px 5px; font-size: 0.7rem; }
         .status-sistemico-indicator { width: 28px; height: 28px; font-size: 12px; }
         .search-container { min-width: 150px; max-width: 100%; }
@@ -844,6 +994,8 @@
         .status-option-card .fw-bold { font-size: 0.75rem; }
         .badge-cliente, .badge-empresa { max-width: 100px; font-size: 0.65rem; }
         .text-truncate-custom { max-width: 80px; }
+        .column-manager-container { min-width: 250px; max-width: 90vw; }
+        .table-scroll-container { max-height: 55vh; }
     }
     
     @media (max-width: 480px) {
@@ -851,7 +1003,7 @@
         .stats-card .rounded-circle { width: 36px; height: 36px; }
         .stats-card h4 { font-size: 1rem; }
         .stats-card small { font-size: 0.65rem; }
-        .table-advanced { min-width: 800px; font-size: 0.65rem; }
+        .table-advanced { font-size: 0.65rem; }
         .action-buttons { gap: 6px; }
         .action-buttons .btn { padding: 6px 10px; font-size: 0.75rem; }
         .status-tooltip-custom {
@@ -944,6 +1096,9 @@
         <button class="btn btn-clear-filters" id="clearFiltersBtn" style="display: none;">
             <i class="fa-solid fa-filter-circle-xmark"></i><span>Limpar Filtros</span>
         </button>
+        <button class="btn btn-columns" id="btnColumnManager" onclick="toggleColumnManager(event)">
+            <i class="fa-solid fa-columns"></i><span></span>
+        </button>
         <div class="search-container">
             <i class="fa-solid fa-search search-icon"></i>
             <input type="text" id="searchInput" class="form-control search-input" placeholder="Buscar..." value="{{ busca }}">
@@ -953,9 +1108,29 @@
         </div>
     </div>
 
+    <!-- GERENCIADOR DE COLUNAS (oculto por padrão) -->
+    <div class="column-manager-container" id="columnManagerContainer" style="display: none;">
+        <div class="column-manager-header">
+            <span><i class="fa-solid fa-columns me-2"></i>Gerenciar Colunas</span>
+            <button class="btn-close btn-close-white" onclick="toggleColumnManager()" style="font-size: 0.7rem;"></button>
+        </div>
+        <div class="column-manager-list" id="columnManagerList">
+            <!-- Preenchido via JS -->
+        </div>
+        <div class="column-manager-footer">
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetColumns()">
+                <i class="fa-solid fa-rotate me-1"></i>Restaurar
+            </button>
+            <button class="btn btn-sm btn-primary" onclick="applyColumnVisibility()">
+                <i class="fa-solid fa-check me-1"></i>Aplicar
+            </button>
+        </div>
+    </div>
+
     <!-- TABELA DE ESTOQUE -->
-    <div class="table-container">
-        <div class="table-responsive">
+    <div class="table-wrapper">
+        <!-- Container com scroll próprio -->
+        <div class="table-scroll-container" id="tableScrollContainer">
             <table class="table table-advanced table-hover" id="estoqueTable">
                 <thead>
                     <tr>
@@ -979,12 +1154,12 @@
                         <th data-column="cliente" data-type="select" onclick="showFilter(this, 'cliente', 'select')">Cliente <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="empresa" data-type="select" onclick="showFilter(this, 'empresa', 'select')">Empresa <i class="fa-solid fa-filter filter-indicator"></i></th>
                         <th data-column="conferente" data-type="select" onclick="showFilter(this, 'conferente', 'select')">Conf. <i class="fa-solid fa-filter filter-indicator"></i></th>
+                        <th data-column="observacao" data-type="select" onclick="showFilter(this, 'observacao', 'select')">Obs. <i class="fa-solid fa-filter filter-indicator"></i></th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
                     {% for item in estoque %}
                     <tr ondblclick="window.location.href='{% url "sapp:lista_estoque" %}?busca={{ item.lote }}'" style="cursor: pointer;">
-                        <!-- COLUNA DE STATUS -->
                         <td class="status-column">
                             <div class="status-sistemico-container" onclick="abrirModalStatusSistemico(event, {{ item.id }}, this)">
                                 <div class="status-sistemico-indicator" 
@@ -1035,10 +1210,19 @@
                         <td>{% if item.cliente %}<span class="badge badge-cliente" title="{{ item.cliente }}"><i class="fas fa-user-tag"></i>{{ item.cliente|truncatechars:12 }}</span>{% else %}<span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>{% endif %}</td>
                         <td>{% if item.empresa %}<span class="badge badge-empresa" title="{{ item.empresa }}"><i class="fas fa-building"></i>{{ item.empresa|truncatechars:12 }}</span>{% else %}<span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>{% endif %}</td>
                         <td>{% if item.conferente %}<span class="badge bg-secondary text-white px-2 py-1" title="{{ item.conferente.get_full_name|default:item.conferente.username }}"><i class="fa-solid fa-user-check me-1"></i>{{ item.conferente.first_name|default:item.conferente.username|truncatechars:10 }}</span>{% else %}<span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>{% endif %}</td>
+                        <td>
+                            {% if item.observacao %}
+                            <span class="badge-obs" title="{{ item.observacao }}">
+                                <i class="fa-solid fa-comment-dots me-1"></i>{{ item.observacao|truncatechars:30 }}
+                            </span>
+                            {% else %}
+                            <span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="17" class="text-center py-5">
+                        <td colspan="18" class="text-center py-5">
                             <div class="empty-state">
                                 <i class="fa-solid fa-box-open fa-4x mb-3 text-muted opacity-50"></i>
                                 <h5 class="text-muted">Nenhum item encontrado</h5>
@@ -1050,11 +1234,24 @@
                 </tbody>
             </table>
         </div>
+        
+        <!-- Rodapé da tabela -->
+        <div class="table-footer">
+            <div class="table-footer-info">
+                <i class="fa-solid fa-list"></i>
+                <span id="tableInfo">Total: {{ estoque|length }} registros</span>
+            </div>
+            <div class="table-footer-controls">
+                <button class="btn btn-sm btn-toggle-pagination btn-outline-secondary" id="btnTogglePagination" onclick="togglePagination()" title="Ativar paginação para melhor performance">
+                    <i class="fa-solid fa-list-ol me-1"></i>Ativar Paginação
+                </button>
+            </div>
+        </div>
     </div>
 
-    <!-- PAGINAÇÃO -->
-    {% if estoque.paginator.num_pages > 1 %}
-    <div class="pagination-container">
+    <!-- PAGINAÇÃO (oculta por padrão) -->
+    {% if estoque.paginator and estoque.paginator.num_pages > 1 %}
+    <div class="pagination-container" id="paginationContainer">
         <div class="row align-items-center">
             <div class="col-lg-4 mb-2 mb-lg-0">
                 <div class="pagination-info">
@@ -1113,6 +1310,8 @@
 {{ filter_options|json_script:"filter-options-data" }}
 <input type="hidden" id="fichaRastreabilidadeUrl" value="{% url 'sapp:ficha_rastreabilidade' %}">
 
+<!-- ===== MODAIS (mantidos iguais) ===== -->
+
 <!-- ===== MODAL DE EXPORTAÇÃO ===== -->
 <div class="modal fade" id="exportModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -1124,16 +1323,22 @@
             <div class="modal-body">
                 <p>Escolha o formato para exportar:</p>
                 <div class="d-grid gap-2">
-                    <a href="{% url 'sapp:exportar_estoque_excel' %}" class="btn btn-success btn-lg">
+                    <!-- NOVO: Link com filtros atuais -->
+                    <a href="#" class="btn btn-success btn-lg" id="btnExportExcel" onclick="exportarExcel(event)">
                         <i class="fa-solid fa-file-excel me-2"></i>Excel (.xlsx)
                     </a>
                 </div>
+                <small class="text-muted mt-2 d-block">
+                    <i class="fa-solid fa-info-circle me-1"></i>
+                    A exportação incluirá os filtros atuais aplicados.
+                </small>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ===== MODAL DE STATUS SISTÊMICO (PRINCIPAL) ===== -->
+
+<!-- ===== MODAL DE STATUS SISTÊMICO ===== -->
 <div class="modal fade" id="modalStatusSistemico" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
@@ -1303,6 +1508,8 @@ let currentUrlParams = new URLSearchParams(window.location.search);
 let verificarLotesTimeout = null;
 let activeFilterContainer = null;
 let currentFilterColumn = null;
+let columnManagerContainer = null;
+let paginationActive = false; // NOVO: controle de paginação
 
 // Status
 let loteIdAtual = null;
@@ -1310,6 +1517,28 @@ let elementoAtual = null;
 let statusSelecionadoId = null;
 let listaStatus = [];
 let statusSelecionadoExcluir = null;
+
+// NOVO: Definição de colunas para o gerenciador
+const columnDefinitions = [
+    { key: 'status_sistemico', label: 'Status', alwaysVisible: true },
+    { key: 'az', label: 'AZ', alwaysVisible: false },
+    { key: 'lote', label: 'Lote', alwaysVisible: true },
+    { key: 'produto', label: 'Produto', alwaysVisible: false },
+    { key: 'cultivar', label: 'Cultivar', alwaysVisible: false },
+    { key: 'peneira', label: 'Peneira', alwaysVisible: false },
+    { key: 'categoria', label: 'Categoria', alwaysVisible: false },
+    { key: 'endereco', label: 'Endereço', alwaysVisible: false },
+    { key: 'saldo', label: 'Saldo', alwaysVisible: false },
+    { key: 'peso_unitario', label: 'Peso Unitário', alwaysVisible: false },
+    { key: 'peso_total', label: 'Peso Total', alwaysVisible: false },
+    { key: 'especie', label: 'Espécie', alwaysVisible: false },
+    { key: 'tratamento', label: 'Tratamento', alwaysVisible: false },
+    { key: 'embalagem', label: 'Embalagem', alwaysVisible: false },
+    { key: 'cliente', label: 'Cliente', alwaysVisible: false },
+    { key: 'empresa', label: 'Empresa', alwaysVisible: false },
+    { key: 'conferente', label: 'Conferente', alwaysVisible: false },
+    { key: 'observacao', label: 'Observação', alwaysVisible: false },
+];
 
 // ============================================================
 // INICIALIZAÇÃO
@@ -1330,6 +1559,8 @@ document.addEventListener('DOMContentLoaded', function() {
     updateActiveFiltersUI();
     markActiveHeaders();
     initStatusTooltips();
+    initColumnVisibility();
+    updateTableInfo();
     
     document.getElementById('btnAbrirFicha').addEventListener('click', abrirFichaLoteUnico);
     
@@ -1360,6 +1591,265 @@ document.addEventListener('DOMContentLoaded', function() {
         const preview = document.getElementById('previewObservacao');
         preview.textContent = this.value.trim() ? `📝 ${this.value.trim()}` : '';
     });
+    
+    // NOVO: Verificar se já existem mais de 500 registros para sugerir paginação
+    const totalRegistros = document.querySelectorAll('#tableBody tr:not([data-empty])').length;
+    if (totalRegistros > 500) {
+        mostrarNotificacao(`⚠️ ${totalRegistros} registros carregados. Considere ativar a paginação para melhor performance.`, 'warning');
+    }
+});
+
+// ============================================================
+// NOVO: GERENCIADOR DE COLUNAS
+// ============================================================
+function initColumnVisibility() {
+    // Carregar visibilidade salva no localStorage
+    const savedVisibility = localStorage.getItem('tableColumnVisibility');
+    if (savedVisibility) {
+        try {
+            const visibility = JSON.parse(savedVisibility);
+            applyVisibility(visibility);
+        } catch (e) {
+            console.error('Erro ao carregar visibilidade das colunas:', e);
+        }
+    }
+    
+    buildColumnManager();
+}
+
+function buildColumnManager() {
+    const list = document.getElementById('columnManagerList');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    
+    columnDefinitions.forEach(def => {
+        const th = document.querySelector(`th[data-column="${def.key}"]`);
+        if (!th) return;
+        
+        const isVisible = th.style.display !== 'none';
+        
+        const item = document.createElement('div');
+        item.className = 'column-manager-item';
+        item.innerHTML = `
+            <input type="checkbox" id="col-vis-${def.key}" ${isVisible ? 'checked' : ''} ${def.alwaysVisible ? 'disabled' : ''}>
+            <label for="col-vis-${def.key}">${def.label}</label>
+            ${def.alwaysVisible ? '<i class="fa-solid fa-lock text-muted" style="font-size: 0.7rem;" title="Coluna obrigatória"></i>' : ''}
+        `;
+        list.appendChild(item);
+    });
+}
+
+function toggleColumnManager(event) {
+    if (event) event.stopPropagation();
+    
+    const container = document.getElementById('columnManagerContainer');
+    const overlay = document.getElementById('columnManagerOverlay');
+    
+    if (!container) return;
+    
+    if (container.style.display === 'none' || !container.style.display) {
+        // Mostrar
+        container.style.display = 'block';
+        
+        // Centralizar na tela
+        if (window.innerWidth <= 768) {
+            // Mobile: centralizado
+            container.style.position = 'fixed';
+            container.style.top = '50%';
+            container.style.left = '50%';
+            container.style.transform = 'translate(-50%, -50%)';
+        } else {
+            // Desktop: próximo ao botão
+            const btn = document.getElementById('btnColumnManager');
+            if (btn) {
+                const rect = btn.getBoundingClientRect();
+                
+                container.style.position = 'fixed';
+                
+                // Verifica se cabe abaixo do botão
+                if (rect.bottom + 350 > window.innerHeight) {
+                    // Mostra acima
+                    container.style.top = `${rect.top - 10}px`;
+                    container.style.transform = 'translateY(-100%)';
+                } else {
+                    // Mostra abaixo
+                    container.style.top = `${rect.bottom + 8}px`;
+                    container.style.transform = 'none';
+                }
+                
+                // Centraliza horizontalmente ou alinha com o botão
+                if (rect.left + 350 > window.innerWidth) {
+                    container.style.right = '10px';
+                    container.style.left = 'auto';
+                } else {
+                    container.style.left = `${rect.left}px`;
+                    container.style.right = 'auto';
+                }
+            }
+        }
+        
+        container.style.zIndex = '999999';
+        
+        // Mostrar overlay no mobile
+        if (overlay && window.innerWidth <= 768) {
+            overlay.classList.add('show');
+        }
+        
+        // Reconstruir lista
+        buildColumnManager();
+        
+        columnManagerContainer = container;
+    } else {
+        // Esconder
+        container.style.display = 'none';
+        columnManagerContainer = null;
+        
+        // Esconder overlay
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+    }
+}
+
+// Fechar gerenciador de colunas ao clicar fora ou no overlay
+document.addEventListener('click', function(e) {
+    if (columnManagerContainer && columnManagerContainer.style.display !== 'none') {
+        const isInside = columnManagerContainer.contains(e.target);
+        const isBtn = e.target.closest('#btnColumnManager');
+        const isOverlay = e.target.closest('#columnManagerOverlay');
+        
+        if (!isInside && !isBtn) {
+            columnManagerContainer.style.display = 'none';
+            columnManagerContainer = null;
+            
+            const overlay = document.getElementById('columnManagerOverlay');
+            if (overlay) overlay.classList.remove('show');
+        }
+    }
+});
+
+// Fechar ao redimensionar a tela
+window.addEventListener('resize', function() {
+    if (columnManagerContainer && columnManagerContainer.style.display !== 'none') {
+        // Recalcula posição
+        if (window.innerWidth <= 768) {
+            columnManagerContainer.style.position = 'fixed';
+            columnManagerContainer.style.top = '50%';
+            columnManagerContainer.style.left = '50%';
+            columnManagerContainer.style.transform = 'translate(-50%, -50%)';
+        }
+    }
+});
+
+function applyColumnVisibility() {
+    const visibility = {};
+    
+    columnDefinitions.forEach(def => {
+        const checkbox = document.getElementById(`col-vis-${def.key}`);
+        if (checkbox) {
+            visibility[def.key] = checkbox.checked;
+        }
+    });
+    
+    // Salvar no localStorage
+    localStorage.setItem('tableColumnVisibility', JSON.stringify(visibility));
+    
+    // Aplicar
+    applyVisibility(visibility);
+    
+    // Fechar o gerenciador
+    const container = document.getElementById('columnManagerContainer');
+    if (container) container.style.display = 'none';
+    columnManagerContainer = null;
+}
+
+function applyVisibility(visibility) {
+    // Aplicar visibilidade nas colunas da tabela
+    const thElements = document.querySelectorAll('#estoqueTable th');
+    const colCount = thElements.length;
+    
+    columnDefinitions.forEach((def, index) => {
+        const isVisible = visibility[def.key] !== undefined ? visibility[def.key] : true;
+        
+        // Cabeçalho
+        const th = document.querySelector(`th[data-column="${def.key}"]`);
+        if (th && !def.alwaysVisible) {
+            th.style.display = isVisible ? '' : 'none';
+        }
+        
+        // Células do corpo
+        const rows = document.querySelectorAll('#tableBody tr');
+        rows.forEach(row => {
+            const cell = row.cells[index];
+            if (cell && !def.alwaysVisible) {
+                cell.style.display = isVisible ? '' : 'none';
+            }
+        });
+    });
+}
+
+function resetColumns() {
+    // Restaurar todas as colunas
+    const visibility = {};
+    columnDefinitions.forEach(def => {
+        visibility[def.key] = true;
+    });
+    
+    localStorage.setItem('tableColumnVisibility', JSON.stringify(visibility));
+    applyVisibility(visibility);
+    buildColumnManager();
+    
+    mostrarNotificacao('✅ Colunas restauradas', 'success');
+}
+
+// NOVO: Alternar paginação
+function togglePagination() {
+    paginationActive = !paginationActive;
+    const btn = document.getElementById('btnTogglePagination');
+    const pagContainer = document.getElementById('paginationContainer');
+    const tableWrapper = document.getElementById('tableWrapper');
+    
+    if (paginationActive) {
+        // Ativar paginação
+        btn.innerHTML = '<i class="fa-solid fa-list-ol me-1"></i>Desativar Paginação';
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-warning');
+        
+        if (pagContainer) pagContainer.classList.add('show');
+        tableWrapper.style.maxHeight = 'none';
+        
+        mostrarNotificacao('📄 Paginação ativada', 'info');
+    } else {
+        // Desativar paginação (tabela fixa com scroll)
+        btn.innerHTML = '<i class="fa-solid fa-list-ol me-1"></i>Ativar Paginação';
+        btn.classList.remove('btn-warning');
+        btn.classList.add('btn-outline-secondary');
+        
+        if (pagContainer) pagContainer.classList.remove('show');
+        tableWrapper.style.maxHeight = '70vh';
+        
+        mostrarNotificacao('📋 Tabela fixa com scroll ativada', 'info');
+    }
+}
+
+function updateTableInfo() {
+    const totalRows = document.querySelectorAll('#tableBody tr:not([data-empty])').length;
+    document.getElementById('tableInfo').innerHTML = `
+        <i class="fa-solid fa-list"></i>
+        Total: ${totalRows} registros
+    `;
+}
+
+// Fechar gerenciador de colunas ao clicar fora
+document.addEventListener('click', function(e) {
+    if (columnManagerContainer && !columnManagerContainer.contains(e.target)) {
+        const isBtn = e.target.closest('#btnColumnManager');
+        if (!isBtn) {
+            columnManagerContainer.style.display = 'none';
+            columnManagerContainer = null;
+        }
+    }
 });
 
 // ============================================================
@@ -1372,7 +1862,6 @@ function initStatusTooltips() {
 
         if (!tooltip || !indicator) return;
 
-        // Mover tooltip para o body para evitar cortes
         document.body.appendChild(tooltip);
 
         container.addEventListener('mouseenter', () => {
@@ -1386,16 +1875,9 @@ function initStatusTooltips() {
             let top = rect.top - tooltipRect.height - 12;
             let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
 
-            // Ajustar se sair da tela
-            if (top < 10) {
-                top = rect.bottom + 12;
-            }
-            if (left < 10) {
-                left = 10;
-            }
-            if (left + tooltipRect.width > window.innerWidth - 10) {
-                left = window.innerWidth - tooltipRect.width - 10;
-            }
+            if (top < 10) top = rect.bottom + 12;
+            if (left < 10) left = 10;
+            if (left + tooltipRect.width > window.innerWidth - 10) left = window.innerWidth - tooltipRect.width - 10;
 
             tooltip.style.top = `${top}px`;
             tooltip.style.left = `${left}px`;
@@ -1471,9 +1953,15 @@ function desabilitarBotaoFicha(btn, msg) {
 function observarMudancasTabela() {
     const body = document.getElementById('tableBody');
     if (!body) return;
-    new MutationObserver(() => verificarQtdLotes()).observe(body, { childList: true, subtree: false });
+    new MutationObserver(() => {
+        verificarQtdLotes();
+        updateTableInfo();
+    }).observe(body, { childList: true, subtree: false });
 }
 
+// ============================================================
+// FILTROS (mantidos do código original)
+// ============================================================
 window.showFilter = function(thElement, columnName, columnType) {
     if (activeFilterContainer) {
         activeFilterContainer.remove();
@@ -1497,8 +1985,8 @@ window.showFilter = function(thElement, columnName, columnType) {
     document.body.appendChild(container);
     document.getElementById('filterOverlay').classList.add('show');
 
-    const tableContainer = document.querySelector('.table-container');
-    const tableRect = tableContainer.getBoundingClientRect();
+    const tableWrapper = document.querySelector('.table-wrapper');
+    const tableRect = tableWrapper.getBoundingClientRect();
 
     const larguraFiltro = 380;
     const alturaFiltro = 420;
@@ -1564,9 +2052,6 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// ============================================================
-// BUSCAR OPÇÕES DE FILTRO - CORRIGIDO
-// ============================================================
 async function buscarOpcoesFiltro(columnName) {
     console.log(`🔍 Buscando opções para: ${columnName}`);
 
@@ -1585,8 +2070,6 @@ async function buscarOpcoesFiltro(columnName) {
 
         const data = await response.json();
 
-        console.log(`📊 Dados recebidos para ${columnName}:`, data);
-
         if (data && data.success === true) {
             const opcoes = Array.isArray(data.opcoes)
                 ? data.opcoes.map(o => {
@@ -1596,7 +2079,6 @@ async function buscarOpcoesFiltro(columnName) {
                             label: String(o.label ?? o.value ?? '')
                         };
                     }
-
                     return {
                         value: String(o),
                         label: String(o)
@@ -1604,23 +2086,17 @@ async function buscarOpcoesFiltro(columnName) {
                 }).filter(o => o.value !== '')
                 : [];
 
-            console.log(`✅ ${columnName}: ${opcoes.length} opções encontradas`);
-
             return {
                 opcoes: opcoes,
                 temNull: data.tem_null === true || data.temNull === true
             };
         }
 
-        console.warn(`⚠️ API retornou erro para ${columnName}:`, data);
-
         if (columnName === 'status_sistemico' && Array.isArray(listaStatus)) {
             const opcoesStatus = listaStatus.map(s => ({
                 value: String(s.nome ?? s.id ?? ''),
                 label: `${s.icone ?? ''} ${s.nome ?? ''}`.trim()
             })).filter(o => o.value !== '');
-
-            console.log(`🔄 Usando lista de status: ${opcoesStatus.length} status`);
 
             return {
                 opcoes: opcoesStatus,
@@ -1655,9 +2131,6 @@ async function buscarOpcoesFiltro(columnName) {
     }
 }
 
-// ============================================================
-// CRIAR FILTROS HTML
-// ============================================================
 function createNumericFilterHTML(col) {
     const min = currentUrlParams.get(`min_${col}`) || '';
     const max = currentUrlParams.get(`max_${col}`) || '';
@@ -1757,9 +2230,6 @@ window.filterOptionsList = function(input) {
     });
 };
 
-// ============================================================
-// APLICAR FILTROS
-// ============================================================
 window.applyNumericFilter = function(col) {
     const min = document.getElementById(`${col}-min`)?.value;
     const max = document.getElementById(`${col}-max`)?.value;
@@ -1813,9 +2283,6 @@ function reloadPage() {
     window.location.search = currentUrlParams.toString();
 }
 
-// ============================================================
-// UI DE FILTROS
-// ============================================================
 function markActiveHeaders() {
     const keys = Array.from(currentUrlParams.keys());
     document.querySelectorAll('th[data-column]').forEach(th => {
@@ -1843,7 +2310,6 @@ function updateActiveFiltersUI() {
             const display = vals.map(v => {
                 if (v === '__null__') return 'vazio';
                 if (key === 'status_sistemico') {
-                    // Mapear para nomes bonitos
                     if (v === 'OK') return '✅ OK';
                     if (v === 'Parcial') return '🟡 Parcial';
                     if (v === 'Crítico') return '🔴 Crítico';
@@ -1862,9 +2328,6 @@ function updateActiveFiltersUI() {
     document.getElementById('clearFiltersBtn').style.display = count > 0 ? 'inline-flex' : 'none';
 }
 
-// ============================================================
-// BUSCA
-// ============================================================
 function setupSearch() {
     const input = document.getElementById('searchInput');
     const btn = document.getElementById('clearSearchBtn');
@@ -1910,7 +2373,6 @@ async function carregarStatus() {
             listaStatus = data.status;
             renderizarStatus(listaStatus);
             
-            // Atualizar backendOptions
             if (!backendOptions.status_sistemico) {
                 backendOptions.status_sistemico = listaStatus.map(s => s.nome);
             }
@@ -1955,9 +2417,6 @@ function renderizarStatus(statusList) {
     });
 }
 
-// ============================================================
-// STATUS SISTÊMICO - MODAL
-// ============================================================
 function abrirModalStatusSistemico(event, loteId, elemento) {
     event.stopPropagation();
     const indicator = elemento.querySelector('.status-sistemico-indicator');
@@ -2016,9 +2475,6 @@ function selecionarStatus(statusId) {
     document.getElementById('btnExcluirStatus').disabled = status.e_padrao || false;
 }
 
-// ============================================================
-// EXCLUIR STATUS
-// ============================================================
 function abrirModalExcluirStatus() {
     if (!statusSelecionadoId) {
         mostrarNotificacao('Selecione um status primeiro', 'warning');
@@ -2060,8 +2516,7 @@ function validarExclusao() {
         btn.disabled = true;
         if (input.value.length > 0) {
             erroDiv.classList.remove('d-none');
-            document.getElementById('mensagemErroExclusao').textContent = 
-                'Digite exatamente "EXCLUIR" em maiúsculas';
+            document.getElementById('mensagemErroExclusao').textContent = 'Digite exatamente "EXCLUIR" em maiúsculas';
         } else {
             erroDiv.classList.add('d-none');
         }
@@ -2101,9 +2556,6 @@ async function confirmarExcluirStatus() {
     }
 }
 
-// ============================================================
-// CRIAR NOVO STATUS
-// ============================================================
 function abrirModalNovoStatus() {
     document.getElementById('formNovoStatus').reset();
     document.getElementById('novoStatusCor').value = '#ff69b4';
@@ -2141,9 +2593,6 @@ async function criarNovoStatus() {
     }
 }
 
-// ============================================================
-// CONFIRMAR ALTERAÇÃO - COM RECARREGAMENTO
-// ============================================================
 document.getElementById('confirmarStatusBtn').addEventListener('click', confirmarAlteracaoStatus);
 
 async function confirmarAlteracaoStatus() {
@@ -2179,9 +2628,7 @@ async function confirmarAlteracaoStatus() {
             })
         });
         
-        if (!response.ok) {
-            throw new Error('Erro na requisição');
-        }
+        if (!response.ok) throw new Error('Erro na requisição');
         
         const data = await response.json();
         
@@ -2194,7 +2641,6 @@ async function confirmarAlteracaoStatus() {
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
-            
         } else {
             mostrarNotificacao('Erro: ' + (data.error || 'Erro desconhecido'), 'danger');
             btn.innerHTML = originalText;
@@ -2208,9 +2654,6 @@ async function confirmarAlteracaoStatus() {
     }
 }
 
-// ============================================================
-// NOTIFICAÇÕES
-// ============================================================
 function mostrarNotificacao(mensagem, tipo) {
     document.querySelectorAll('.notificacao-flutuante').forEach(n => n.remove());
     const n = document.createElement('div');
@@ -2234,9 +2677,6 @@ function mostrarNotificacao(mensagem, tipo) {
     setTimeout(() => { if (n.parentNode) n.remove(); }, 4000);
 }
 
-// ============================================================
-// UTILITÁRIOS
-// ============================================================
 function getCookie(name) {
     let v = null;
     if (document.cookie && document.cookie !== '') {
@@ -2250,9 +2690,37 @@ function getCookie(name) {
     return v;
 }
 
-// ============================================================
-// EVENTOS GLOBAIS
-// ============================================================
+// NOVO: Função para exportar Excel com filtros atuais
+function exportarExcel(event) {
+    event.preventDefault();
+    
+    // Pega os parâmetros atuais da URL (filtros, busca, etc.)
+    const params = new URLSearchParams(window.location.search);
+    
+    // Adiciona o parâmetro de exportação
+    params.set('export', 'excel');
+    
+    // Constrói a URL de exportação
+    const baseUrl = "{% url 'sapp:exportar_estoque_excel' %}";
+    const exportUrl = `${baseUrl}?${params.toString()}`;
+    
+    // Mostra notificação de carregamento
+    mostrarNotificacao('📥 Preparando download do Excel...', 'info');
+    
+    // Fecha o modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+    if (modal) modal.hide();
+    
+    // Força o download
+    window.location.href = exportUrl;
+    
+    // Notificação de sucesso após um breve delay
+    setTimeout(() => {
+        mostrarNotificacao('✅ Download iniciado! Verifique sua pasta de downloads.', 'success');
+    }, 1500);
+}
+
+
 window.addEventListener('popstate', function() {
     currentUrlParams = new URLSearchParams(window.location.search);
     updateActiveFiltersUI();

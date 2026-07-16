@@ -5546,3 +5546,244 @@ def redirecionar_usuario(request):
     messages.error(request, "❌ Você não tem permissão para acessar nenhuma página do sistema!")
     logout(request)
     return redirect('sapp:login')
+
+
+
+# sapp/views.py - Exportação SEM saldo 0
+
+from django.http import HttpResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from .models import Estoque
+from datetime import datetime
+from django.db.models import Q
+
+def exportar_estoque_excel(request):
+    """Exporta o estoque para Excel com os filtros aplicados (apenas saldo > 0)"""
+    
+    try:
+        # Cria o workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Estoque"
+        
+        # Estilos
+        header_font = Font(name='Arial', size=11, bold=True, color='FFFFFF')
+        header_fill = PatternFill(start_color='2F8F4E', end_color='2F8F4E', fill_type='solid')
+        header_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        
+        cell_font = Font(name='Arial', size=10)
+        cell_alignment = Alignment(vertical='center')
+        
+        thin_border = Border(
+            left=Side(style='thin', color='D3D3D3'),
+            right=Side(style='thin', color='D3D3D3'),
+            top=Side(style='thin', color='D3D3D3'),
+            bottom=Side(style='thin', color='D3D3D3')
+        )
+        
+        # Cabeçalhos
+        headers = [
+            'Status', 'AZ', 'Lote', 'Produto', 'Cultivar', 'Peneira', 
+            'Categoria', 'Endereço', 'Saldo', 'Peso Unit.', 'Peso Total',
+            'Espécie', 'Tratamento', 'Embalagem', 'Cliente', 'Empresa', 
+            'Conferente', 'Observação'
+        ]
+        
+        # Aplica estilos nos cabeçalhos
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+        
+        # Query base - FILTRA APENAS SALDO > 0
+        queryset = Estoque.objects.select_related(
+            'cultivar', 'peneira', 'categoria', 'tratamento', 
+            'especie', 'status_sistemico', 'conferente'
+        ).filter(saldo__gt=0)  # 🔥 AQUI: Apenas itens com saldo maior que 0
+        
+        # Aplica busca
+        busca = request.GET.get('busca', '')
+        if busca:
+            queryset = queryset.filter(
+                Q(lote__icontains=busca) |
+                Q(produto__icontains=busca) |
+                Q(endereco__icontains=busca) |
+                Q(cliente__icontains=busca) |
+                Q(empresa__icontains=busca) |
+                Q(az__icontains=busca) |
+                Q(observacao__icontains=busca) |
+                Q(conferente__username__icontains=busca) |
+                Q(conferente__first_name__icontains=busca) |
+                Q(conferente__last_name__icontains=busca)
+            )
+        
+        # Aplica filtros de coluna (exceto page, page_size, busca, export)
+        for key, values in request.GET.lists():
+            if key in ['page', 'page_size', 'busca', 'export']:
+                continue
+            
+            # Filtros numéricos
+            if key.startswith('min_'):
+                campo = key.replace('min_', '')
+                for val in values:
+                    if val:
+                        try:
+                            queryset = queryset.filter(**{f"{campo}__gte": float(val)})
+                        except (ValueError, TypeError):
+                            pass
+                continue
+            
+            if key.startswith('max_'):
+                campo = key.replace('max_', '')
+                for val in values:
+                    if val:
+                        try:
+                            queryset = queryset.filter(**{f"{campo}__lte": float(val)})
+                        except (ValueError, TypeError):
+                            pass
+                continue
+            
+            # Filtros de seleção múltipla
+            if values and values != ['']:
+                filtro_q = Q()
+                for valor in values:
+                    if valor == '__null__':
+                        # Filtra por valores vazios/nulos
+                        if key in ['cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'status_sistemico']:
+                            filtro_q |= Q(**{f"{key}__isnull": True})
+                        else:
+                            filtro_q |= Q(**{f"{key}__exact": ''}) | Q(**{f"{key}__isnull": True})
+                    else:
+                        # Mapeia campos relacionados
+                        if key == 'cultivar':
+                            filtro_q |= Q(cultivar__nome=valor)
+                        elif key == 'peneira':
+                            filtro_q |= Q(peneira__nome=valor)
+                        elif key == 'categoria':
+                            filtro_q |= Q(categoria__nome=valor)
+                        elif key == 'tratamento':
+                            filtro_q |= Q(tratamento__nome=valor)
+                        elif key == 'especie':
+                            filtro_q |= Q(especie__nome=valor)
+                        elif key == 'status_sistemico':
+                            filtro_q |= Q(status_sistemico__nome=valor)
+                        elif key == 'conferente':
+                            filtro_q |= Q(conferente__username=valor)
+                        else:
+                            filtro_q |= Q(**{key: valor})
+                
+                queryset = queryset.filter(filtro_q)
+        
+        # Ordena
+        queryset = queryset.order_by('lote')
+        
+        total_registros = queryset.count()
+        print(f"📊 Exportando {total_registros} registros (apenas saldo > 0)")
+        
+        # Preenche os dados
+        for row_idx, item in enumerate(queryset, 2):
+            # Nome do conferente
+            nome_conferente = ''
+            if item.conferente:
+                nome_conferente = item.conferente.get_full_name().strip()
+                if not nome_conferente:
+                    nome_conferente = item.conferente.first_name.strip()
+                if not nome_conferente:
+                    nome_conferente = item.conferente.username
+            
+            # Nome do status
+            nome_status = item.status_sistemico.nome if item.status_sistemico else 'Indefinido'
+            
+            data_row = [
+                nome_status,
+                item.az or '',
+                item.lote or '',
+                item.produto or '',
+                item.cultivar.nome if item.cultivar else '',
+                item.peneira.nome if item.peneira else '',
+                item.categoria.nome if item.categoria else '',
+                item.endereco or '',
+                item.saldo if item.saldo is not None else 0,
+                float(item.peso_unitario) if item.peso_unitario else 0.0,
+                float(item.peso_total) if item.peso_total else 0.0,
+                item.especie.nome if item.especie else '',
+                item.tratamento.nome if item.tratamento else '',
+                item.get_embalagem_display() if item.embalagem else '',
+                item.cliente or '',
+                item.empresa or '',
+                nome_conferente,
+                item.observacao or '',
+            ]
+            
+            for col, value in enumerate(data_row, 1):
+                cell = ws.cell(row=row_idx, column=col, value=value)
+                cell.font = cell_font
+                cell.alignment = cell_alignment
+                cell.border = thin_border
+        
+        # Ajusta largura das colunas
+        column_widths = {
+            1: 15,   # Status
+            2: 8,    # AZ
+            3: 20,   # Lote
+            4: 30,   # Produto
+            5: 15,   # Cultivar
+            6: 10,   # Peneira
+            7: 12,   # Categoria
+            8: 18,   # Endereço
+            9: 10,   # Saldo
+            10: 12,  # Peso Unit.
+            11: 12,  # Peso Total
+            12: 12,  # Espécie
+            13: 15,  # Tratamento
+            14: 12,  # Embalagem
+            15: 25,  # Cliente
+            16: 25,  # Empresa
+            17: 25,  # Conferente
+            18: 30,  # Observação
+        }
+        
+        for col, width in column_widths.items():
+            ws.column_dimensions[get_column_letter(col)].width = width
+        
+        # Congela o cabeçalho
+        ws.freeze_panes = 'A2'
+        
+        # Filtro automático
+        if total_registros > 0:
+            ultima_linha = total_registros + 1
+            ws.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{ultima_linha}"
+        
+        # Altura das linhas
+        ws.row_dimensions[1].height = 30
+        
+        # Prepara resposta
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'estoque_{timestamp}.xlsx'
+        
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        
+        wb.save(response)
+        
+        print(f"✅ Arquivo Excel gerado: {filename} com {total_registros} registros")
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        print(f"❌ Erro na exportação Excel: {e}")
+        print(traceback.format_exc())
+        
+        return HttpResponse(
+            f"Erro ao gerar arquivo Excel: {str(e)}",
+            content_type='text/plain',
+            status=500
+        )

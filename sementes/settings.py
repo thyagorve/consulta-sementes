@@ -28,8 +28,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.humanize',
-    
-    # Apps de terceiros
     'django_filters',
     'widget_tweaks',
     
@@ -39,6 +37,7 @@ INSTALLED_APPS = [
     # Nossa aplicação
     'sapp',
     'almoxarifado',
+    
 ]
 
 

@@ -73,6 +73,7 @@ urlpatterns = [
     path('api/editar-status/<int:status_id>/', views.api_editar_status, name='api_editar_status'),
     path('api/excluir-status/<int:status_id>/', views.api_excluir_status, name='api_excluir_status'),
     path('api/estoque/opcoes-filtro/', views.opcoes_filtro_api, name='opcoes_filtro_api'),
+    path('exportar-estoque-excel/', views.exportar_estoque_excel, name='exportar_estoque_excel'),
 ]
 
 # ============================================================================
