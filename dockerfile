@@ -56,15 +56,49 @@ RUN echo '/var/log/cron/notificacoes.log {\n\
     notifempty\n\
 }' > /etc/logrotate.d/almoxarifado-cron
 
+# ============================================
+# SCRIPT DE INICIALIZAÇÃO (ENTRYPOINT)
+# ============================================
+
+# Criar script de entrypoint
+RUN echo '#!/bin/bash\n\
+set -e\n\
+\n\
+echo "========================================="\n\
+echo "🚀 Iniciando aplicação..."\n\
+echo "========================================="\n\
+\n\
+# Coletar arquivos estáticos\n\
+echo "📦 Coletando arquivos estáticos..."\n\
+python manage.py collectstatic --noinput --clear\n\
+echo "✅ Arquivos estáticos coletados!"\n\
+\n\
+# Aplicar migrações\n\
+echo "🔄 Aplicando migrações..."\n\
+python manage.py migrate --noinput\n\
+echo "✅ Migrações aplicadas!"\n\
+\n\
+# Iniciar cron\n\
+echo "⏰ Iniciando serviço cron..."\n\
+service cron start\n\
+echo "✅ Cron iniciado!"\n\
+\n\
+echo "========================================="\n\
+echo "🌟 Aplicação pronta!"\n\
+echo "========================================="\n\
+\n\
+# Iniciar gunicorn\n\
+exec gunicorn --bind 0.0.0.0:8001 \\\n\
+             --workers 3 \\\n\
+             --timeout 120 \\\n\
+             --max-requests 1000 \\\n\
+             --max-requests-jitter 50 \\\n\
+             --access-logfile - \\\n\
+             --error-logfile - \\\n\
+             sementes.wsgi:application' \
+> /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
 EXPOSE 8001
 
-# Iniciar cron e gunicorn juntos
-CMD service cron start && \
-    gunicorn --bind 0.0.0.0:8001 \
-             --workers 3 \
-             --timeout 120 \
-             --max-requests 1000 \
-             --max-requests-jitter 50 \
-             --access-logfile - \
-             --error-logfile - \
-             sementes.wsgi:application
+# Usar o entrypoint
+ENTRYPOINT ["/app/entrypoint.sh"]
