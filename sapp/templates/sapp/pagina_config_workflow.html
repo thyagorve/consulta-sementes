@@ -1,0 +1,184 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .config-section { background: white; border-radius: 14px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    .coluna-card { border: 2px solid #e2e8f0; border-radius: 10px; padding: 14px; margin-bottom: 10px; }
+    .coluna-card:hover { border-color: #2f8f4e; }
+    .regra-card { background: #f8f9fa; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+    .btn-xs { padding: 3px 8px; font-size: 0.65rem; border-radius: 4px; }
+</style>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="fas fa-cogs text-primary me-2"></i>Configuração do Workflow</h5>
+        <div>
+            <a href="{% url 'sapp:pagina_kanban' %}" class="btn btn-sm btn-outline-secondary me-1"><i class="fas fa-columns me-1"></i> Ver Kanban</a>
+            <button class="btn btn-success btn-sm" onclick="salvarTudo()"><i class="fas fa-save me-1"></i> Salvar Tudo</button>
+        </div>
+    </div>
+
+    <!-- COLUNAS -->
+    <div class="config-section">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0"><i class="fas fa-columns me-2"></i>Colunas do Kanban</h6>
+            <button class="btn btn-sm btn-outline-primary" onclick="novaColuna()"><i class="fas fa-plus me-1"></i> Nova Coluna</button>
+        </div>
+        <div id="colunasContainer"></div>
+    </div>
+
+    <!-- REGRAS -->
+    <div class="config-section">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0"><i class="fas fa-magic me-2"></i>Regras Automáticas</h6>
+            <button class="btn btn-sm btn-outline-primary" onclick="novaRegra()"><i class="fas fa-plus me-1"></i> Nova Regra</button>
+        </div>
+        <div id="regrasContainer"></div>
+    </div>
+</div>
+
+<script>
+let workflow = { colunas: [], regras: [], eventos_disponiveis: [], status_disponiveis: [] };
+let colunasExcluir = [];
+
+document.addEventListener('DOMContentLoaded', carregar);
+
+async function carregar() {
+    try {
+        const r = await fetch('/api/workflow/config/');
+        const d = await r.json();
+        if (d.success) { workflow = d.workflow; renderColunas(); renderRegras(); }
+    } catch(e) { console.error(e); }
+}
+
+function renderColunas() {
+    document.getElementById('colunasContainer').innerHTML = workflow.colunas.map(c => `
+        <div class="coluna-card" data-id="${c.id}">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-3"><input type="text" class="form-control form-control-sm" value="${c.nome}" data-field="nome" data-id="${c.id}"></div>
+                <div class="col-md-2"><input type="color" class="form-control form-control-sm" value="${c.cor}" data-field="cor" data-id="${c.id}"></div>
+                <div class="col-md-2"><input type="number" class="form-control form-control-sm" value="${c.ordem}" data-field="ordem" data-id="${c.id}" min="1"></div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm" data-field="ativa" data-id="${c.id}">
+                        <option value="true" ${c.ativa?'selected':''}>Ativa</option>
+                        <option value="false" ${!c.ativa?'selected':''}>Inativa</option>
+                    </select>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button class="btn btn-sm btn-outline-danger" onclick="excluirColuna(${c.id})" ${workflow.colunas.length<=3?'disabled':''}><i class="fas fa-trash"></i></button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function novaColuna() {
+    const id = -Date.now();
+    workflow.colunas.push({ id, nome: 'Nova Coluna', cor: '#6c757d', ordem: workflow.colunas.length + 1, ativa: true });
+    renderColunas();
+}
+
+function excluirColuna(id) {
+    if (!confirm('Excluir esta coluna?')) return;
+    if (id > 0) colunasExcluir.push(id);
+    workflow.colunas = workflow.colunas.filter(c => c.id !== id);
+    renderColunas();
+}
+
+function renderRegras() {
+    const eventos = workflow.eventos_disponiveis || [];
+    const status = workflow.status_disponiveis || [];
+    
+    document.getElementById('regrasContainer').innerHTML = workflow.regras.map(r => `
+        <div class="regra-card" data-id="${r.id}">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <select class="form-select form-select-sm" style="width:auto;" data-field="coluna_id" data-id="${r.id}">
+                    ${workflow.colunas.map(c => `<option value="${c.id}" ${c.id===r.coluna_id?'selected':''}>${c.nome}</option>`).join('')}
+                </select>
+                <span class="small">quando</span>
+                <select class="form-select form-select-sm" style="width:auto;" data-field="evento" data-id="${r.id}">
+                    ${eventos.map(e => `<option value="${e.value}" ${e.value===r.evento?'selected':''}>${e.label}</option>`).join('')}
+                </select>
+                <span class="small">→ status:</span>
+                <select class="form-select form-select-sm" style="width:auto;" data-field="status_resultante" data-id="${r.id}">
+                    ${status.map(s => `<option value="${s}" ${s===r.status_resultante?'selected':''}>${s}</option>`).join('')}
+                </select>
+                <label class="small mb-0"><input type="checkbox" ${r.movimentacao_automatica?'checked':''} data-field="movimentacao_automatica" data-id="${r.id}"> Auto</label>
+            </div>
+            <button class="btn btn-sm btn-outline-danger btn-xs" onclick="excluirRegra(${r.id})"><i class="fas fa-times"></i></button>
+        </div>
+    `).join('');
+}
+
+function novaRegra() {
+    if (!workflow.colunas.length) { alert('Crie uma coluna primeiro!'); return; }
+    const id = -Date.now();
+    workflow.regras.push({ id, coluna_id: workflow.colunas[0].id, evento: 'CRIACAO', status_resultante: 'AGUARDANDO_EMPENHO', movimentacao_automatica: true });
+    renderRegras();
+}
+
+function excluirRegra(id) {
+    workflow.regras = workflow.regras.filter(r => r.id !== id);
+    renderRegras();
+}
+
+async function salvarTudo() {
+    // Coletar colunas
+    const colunas = [];
+    document.querySelectorAll('.coluna-card').forEach(card => {
+        const col = { id: parseInt(card.dataset.id) };
+        card.querySelectorAll('[data-field]').forEach(el => {
+            let val = el.type === 'checkbox' ? el.checked : el.value;
+            if (el.dataset.field === 'ativa') val = val === 'true' || val === true;
+            if (el.dataset.field === 'ordem') val = parseInt(val) || 1;
+            col[el.dataset.field] = val;
+        });
+        colunas.push(col);
+    });
+    
+    // Coletar regras
+    const regras = [];
+    document.querySelectorAll('.regra-card').forEach(card => {
+        const regra = { id: parseInt(card.dataset.id) };
+        card.querySelectorAll('[data-field]').forEach(el => {
+            let val = el.type === 'checkbox' ? el.checked : el.value;
+            if (el.dataset.field === 'coluna_id') val = parseInt(val);
+            regra[el.dataset.field] = val;
+        });
+        regras.push(regra);
+    });
+    
+    const btn = document.querySelector('.btn-success');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Salvando...';
+    
+    try {
+        const r = await fetch('/api/workflow/config/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ colunas, regras, colunas_excluir: colunasExcluir })
+        });
+        const d = await r.json();
+        if (d.success) { 
+            alert('✅ Workflow salvo!'); 
+            colunasExcluir = []; 
+            await carregar(); 
+        } else {
+            alert('❌ ' + (d.error || 'Erro ao salvar'));
+        }
+    } catch(e) { 
+        alert('Erro: ' + e.message); 
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save me-1"></i> Salvar Tudo';
+    }
+}
+
+function getCookie(n) {
+    let v = null;
+    document.cookie.split(';').forEach(c => { c = c.trim(); if (c.startsWith(n + '=')) v = decodeURIComponent(c.substring(n.length + 1)); });
+    return v;
+}
+</script>
+{% endblock %}

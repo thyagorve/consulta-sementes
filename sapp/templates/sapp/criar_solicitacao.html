@@ -1,0 +1,336 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    :root {
+        --verde-suave: #2f8f4e;
+        --cinza-fundo: #f8fafc;
+        --cinza-claro: #e9ecef;
+        --texto: #2c3e50;
+        --texto-muted: #6c757d;
+        --borda: #dee2e6;
+        --sombra: 0 2px 12px rgba(0,0,0,0.06);
+        --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    .pagina-criar {
+        max-width: 700px;
+        margin: 0 auto;
+        padding: 24px 16px 40px;
+    }
+
+    .cabecalho-pagina {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 28px;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .cabecalho-pagina h4 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--texto);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .cabecalho-pagina h4 i {
+        color: var(--verde-suave);
+        font-size: 1.4rem;
+    }
+
+    .card-form {
+        background: white;
+        border-radius: var(--radius);
+        box-shadow: var(--sombra);
+        border: 1px solid var(--cinza-claro);
+        overflow: hidden;
+    }
+
+    .card-form-body {
+        padding: 24px 28px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group:last-child { margin-bottom: 0; }
+
+    .form-label-custom {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--texto);
+        margin-bottom: 6px;
+        display: block;
+        letter-spacing: 0.2px;
+    }
+
+    .form-control-custom,
+    .form-select-custom {
+        width: 100%;
+        padding: 10px 14px;
+        font-size: 0.9rem;
+        border: 1.5px solid var(--borda);
+        border-radius: 8px;
+        background: white;
+        transition: all 0.2s ease;
+        color: var(--texto);
+        font-family: inherit;
+    }
+    .form-control-custom:focus,
+    .form-select-custom:focus {
+        outline: none;
+        border-color: var(--verde-suave);
+        box-shadow: 0 0 0 3px rgba(47, 143, 78, 0.08);
+    }
+    .form-control-custom::placeholder {
+        color: #adb5bd;
+        font-style: italic;
+    }
+
+    textarea.form-control-custom {
+        resize: vertical;
+        min-height: 80px;
+    }
+
+    .divider {
+        border: none;
+        border-top: 1px solid var(--cinza-claro);
+        margin: 24px 0;
+    }
+
+    .section-title {
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--texto-muted);
+        margin-bottom: 16px;
+    }
+
+    .info-text {
+        font-size: 0.78rem;
+        color: var(--texto-muted);
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .info-text i {
+        color: var(--verde-suave);
+    }
+
+    .btn-row {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        padding: 16px 28px;
+        background: #f8fafc;
+        border-top: 1px solid var(--cinza-claro);
+    }
+
+    .btn-cancelar {
+        padding: 8px 18px;
+        border: 1.5px solid var(--borda);
+        background: white;
+        color: var(--texto-muted);
+        border-radius: 8px;
+        font-weight: 500;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-cancelar:hover {
+        background: #f1f3f5;
+        border-color: #c1c9d2;
+    }
+
+    .btn-salvar {
+        padding: 8px 22px;
+        background: var(--verde-suave);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .btn-salvar:hover {
+        background: #267a41;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(47, 143, 78, 0.2);
+    }
+
+    .unidade-hint {
+        font-size: 0.75rem;
+        color: var(--texto-muted);
+        margin-top: 4px;
+    }
+
+    @media (max-width: 768px) {
+        .pagina-criar {
+            padding: 16px 12px 32px;
+        }
+        .card-form-body {
+            padding: 18px 16px;
+        }
+        .btn-row {
+            padding: 12px 16px;
+            flex-direction: column-reverse;
+            gap: 8px;
+        }
+        .btn-cancelar,
+        .btn-salvar {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="pagina-criar">
+    <!-- Cabeçalho -->
+    <div class="cabecalho-pagina">
+        <h4>
+            <i class="fas fa-plus-circle"></i>
+            Nova Solicitação
+        </h4>
+        <a href="{% url 'sapp:pagina_solicitacoes' %}" class="btn-cancelar">
+            <i class="fas fa-arrow-left"></i> Voltar
+        </a>
+    </div>
+
+    <!-- Formulário -->
+    <div class="card-form">
+        <form method="POST" id="formSolicitacao">
+            {% csrf_token %}
+            
+            <div class="card-form-body">
+                
+                <!-- DADOS BÁSICOS -->
+                <div class="section-title">📋 Dados Básicos</div>
+                
+                <div class="form-group">
+                    <label class="form-label-custom">Título *</label>
+                    <input type="text" name="titulo" class="form-control-custom" 
+                           placeholder="Ex: CARGA CLIENTE X - OUTUBRO" 
+                           required maxlength="100" autofocus>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6 form-group">
+                        <label class="form-label-custom">Prioridade</label>
+                        <select name="prioridade" class="form-select-custom">
+                            <option value="MEDIA">🟡 Média</option>
+                            <option value="BAIXA">🟢 Baixa</option>
+                            <option value="ALTA">🟠 Alta</option>
+                            <option value="URGENTE">🔴 Urgente</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="form-label-custom">Unidade de Controle *</label>
+                        <select name="unidade_controle" class="form-select-custom" required>
+                            <option value="EMBALAGEM">📦 Embalagem (BAG/SC)</option>
+                            <option value="QUILOGRAMA">⚖️ Quilograma (KG)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <hr class="divider">
+
+                <!-- CRITÉRIOS -->
+                <div class="section-title">🎯 Critérios da Solicitação</div>
+                <div class="info-text">
+                    <i class="fas fa-info-circle"></i>
+                    Preencha os campos para limitar os lotes disponíveis. Campos vazios não limitam.
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6 form-group">
+                        <label class="form-label-custom">Armazém</label>
+                        <select name="armazem" class="form-select-custom">
+                            <option value="">-- Todos --</option>
+                            {% for a in armazens %}
+                            <option value="{{ a.id }}">{{ a.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="form-label-custom">Produto</label>
+                        <input type="text" name="produto" class="form-control-custom" 
+                               placeholder="Código do produto">
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="form-label-custom">Espécie</label>
+                        <select name="especie" class="form-select-custom">
+                            <option value="">-- Todas --</option>
+                            {% for e in especies %}
+                            <option value="{{ e.id }}">{{ e.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6 form-group">
+                        <label class="form-label-custom">Cliente</label>
+                        <input type="text" name="cliente" class="form-control-custom" 
+                               placeholder="Nome do cliente">
+                    </div>
+                </div>
+
+                <hr class="divider">
+
+                <!-- QUANTIDADE -->
+                <div class="section-title">📊 Quantidade</div>
+
+                <div class="form-group">
+                    <label class="form-label-custom">Quantidade Solicitada *</label>
+                    <input type="number" name="quantidade_solicitada" class="form-control-custom" 
+                           placeholder="Ex: 10" min="0.01" step="0.01" required>
+                    <div class="unidade-hint" id="unidadeLabel">Em BAGs/SC</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label-custom">Observação</label>
+                    <textarea name="observacao" class="form-control-custom" rows="3" 
+                              placeholder="Detalhes adicionais..."></textarea>
+                </div>
+
+            </div>
+
+            <!-- Botões -->
+            <div class="btn-row">
+                <a href="{% url 'sapp:pagina_solicitacoes' %}" class="btn-cancelar">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+                <button type="submit" class="btn-salvar">
+                    <i class="fas fa-save"></i> Criar Solicitação
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var unidadeSelect = document.querySelector('select[name="unidade_controle"]');
+    var unidadeLabel = document.getElementById('unidadeLabel');
+    
+    if (unidadeSelect && unidadeLabel) {
+        unidadeSelect.addEventListener('change', function() {
+            unidadeLabel.textContent = this.value === 'EMBALAGEM' ? 'Em BAGs/SC' : 'Em Quilogramas (KG)';
+        });
+    }
+});
+</script>
+{% endblock %}

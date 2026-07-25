@@ -99,13 +99,12 @@ class Estoque(models.Model):
     tratamento = models.ForeignKey(Tratamento, on_delete=models.SET_NULL, null=True, blank=True)
     especie = models.ForeignKey(Especie, on_delete=models.PROTECT, null=True, blank=True)
     
-    endereco = models.CharField(max_length=50, verbose_name="Endereço")  # Texto simples ou FK
-    # Se quiser usar FK (recomendado):
-    # endereco = models.ForeignKey(Endereco, on_delete=models.PROTECT, related_name='estoques')
+    endereco = models.CharField(max_length=50, verbose_name="Endereço")
     
     entrada = models.IntegerField(default=0)
     saida = models.IntegerField(default=0)
     saldo = models.IntegerField(default=0)
+    empenhado = models.IntegerField(default=0, verbose_name="Quantidade Empenhada")  # ← ADICIONAR ESTA LINHA
     conferente = models.ForeignKey(User, on_delete=models.PROTECT)
     origem_destino = models.CharField(max_length=255, blank=True, null=True, default='')
     data_entrada = models.DateTimeField(auto_now_add=True)
@@ -121,7 +120,6 @@ class Estoque(models.Model):
     cliente = models.CharField(max_length=255, blank=True, null=True, default='', verbose_name="Cliente/Dono do Bag")
     status = models.CharField(max_length=20, choices=[('ATIVO', 'Ativo'), ('ESGOTADO', 'Esgotado'), ('INATIVO', 'Inativo'), ('BLOQUEADO', 'Bloqueado')], default='ATIVO')
     
-
     status_sistemico = models.ForeignKey(
         'StatusSistemico',
         on_delete=models.SET_NULL,
@@ -131,7 +129,6 @@ class Estoque(models.Model):
         verbose_name='Status Sistêmico'
     )
     
-    # Campos de histórico (mantidos para compatibilidade)
     status_sistemico_alterado_por = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -169,6 +166,12 @@ class Estoque(models.Model):
             return texto
         return "⚪ Indefinido"
     
+    # ← ADICIONAR ESTE MÉTODO
+    @property
+    def disponivel(self):
+        """Saldo físico menos total empenhado ativo"""
+        return self.saldo - self.empenhado
+    
     # NOVO: Sobrescrever save para definir status padrão
     def save(self, *args, **kwargs):
         original = None
@@ -195,7 +198,6 @@ class Estoque(models.Model):
                 status_critico = StatusSistemico.objects.get(nome='Crítico')
                 self.status_sistemico = status_critico
             except StatusSistemico.DoesNotExist:
-                # Se não existir, cria os status padrão
                 StatusSistemico.get_status_padrao()
                 try:
                     status_critico = StatusSistemico.objects.get(nome='Crítico')
@@ -416,24 +418,282 @@ class ItemEmpenho(models.Model):
 
     def __str__(self): return f"{self.lote} - {self.quantidade} unidades"
     
+    # ← SUBSTITUIR ESTE MÉTODO
     def save(self, *args, **kwargs):
-        if self.estoque and not self.lote:
-            self.lote = self.estoque.lote
-            self.cultivar = self.estoque.cultivar.nome if self.estoque.cultivar else ''
-            self.peneira = self.estoque.peneira.nome if self.estoque.peneira else ''
-            self.categoria = self.estoque.categoria.nome if self.estoque.categoria else ''
-            self.saldo_anterior = self.estoque.saldo
-            self.endereco_origem = self.estoque.endereco
-        super().save(*args, **kwargs)
+        from django.db import transaction
+        
+        is_new = self.pk is None
+        old_quantidade = 0
+        
+        if not is_new:
+            try:
+                old = ItemEmpenho.objects.get(pk=self.pk)
+                old_quantidade = old.quantidade
+            except ItemEmpenho.DoesNotExist:
+                pass
+        
+        # Preencher dados do estoque se necessário
+        if self.estoque:
+            if not self.lote:
+                self.lote = self.estoque.lote
+            if not self.cultivar:
+                self.cultivar = self.estoque.cultivar.nome if self.estoque.cultivar else ''
+            if not self.peneira:
+                self.peneira = self.estoque.peneira.nome if self.estoque.peneira else ''
+            if not self.categoria:
+                self.categoria = self.estoque.categoria.nome if self.estoque.categoria else ''
+            if not self.saldo_anterior:
+                self.saldo_anterior = self.estoque.saldo
+            if not self.endereco_origem:
+                self.endereco_origem = self.estoque.endereco
+        
+        with transaction.atomic():
+            # Bloquear o estoque para evitar concorrência
+            if self.estoque:
+                estoque = Estoque.objects.select_for_update().get(pk=self.estoque.pk)
+                
+                # Calcular quanto vai mudar no empenhado
+                delta = self.quantidade - old_quantidade
+                
+                # Validar se não ultrapassa o saldo físico
+                novo_empenhado = estoque.empenhado + delta
+                if novo_empenhado > estoque.saldo:
+                    raise ValueError(
+                        f"Saldo insuficiente para o lote {estoque.lote}. "
+                        f"Disponível: {estoque.saldo - estoque.empenhado}, "
+                        f"Tentando empenhar: {self.quantidade}"
+                    )
+                
+                # Atualizar empenhado no estoque
+                estoque.empenhado = novo_empenhado
+                estoque.save(update_fields=['empenhado'])
+            
+            super().save(*args, **kwargs)
+    
+    # ← ADICIONAR ESTE MÉTODO
+    def delete(self, *args, **kwargs):
+        """Libera a reserva ao excluir um item empenhado"""
+        from django.db import transaction
+        
+        with transaction.atomic():
+            if self.estoque:
+                estoque = Estoque.objects.select_for_update().get(pk=self.estoque.pk)
+                estoque.empenhado = max(0, estoque.empenhado - self.quantidade)
+                estoque.save(update_fields=['empenhado'])
+            
+            super().delete(*args, **kwargs)
     
     @property
     def saldo_disponivel(self): return self.estoque.saldo - self.quantidade
 
-# ============================================================================
+    ##===========================================================================
 # PRODUTO
 # ============================================================================
 
 # sapp/models.py - Classe Produto CORRIGIDA
+
+# No início de models.py
+from django.conf import settings
+from django.db import models
+
+
+class HistoricoItemEmpenho(models.Model):
+    """
+    Preserva os dados dos itens de um card que já foram
+    transferidos ou expedidos.
+
+    Esses registros não entram no cálculo de quantidade empenhada.
+    Eles são utilizados para auditoria, consulta e impressão.
+    """
+
+    TIPO_TRANSFERENCIA = 'transferencia'
+    TIPO_EXPEDICAO = 'expedicao'
+
+    TIPO_CHOICES = [
+        (TIPO_TRANSFERENCIA, 'Transferência'),
+        (TIPO_EXPEDICAO, 'Expedição'),
+    ]
+
+    empenho = models.ForeignKey(
+        'Empenho',
+        on_delete=models.PROTECT,
+        related_name='historico_itens',
+        verbose_name='Card de empenho',
+    )
+
+    item_empenho_id_original = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='ID do ItemEmpenho removido após o processamento.',
+    )
+
+    estoque_origem = models.ForeignKey(
+        'Estoque',
+        on_delete=models.PROTECT,
+        related_name='historicos_itens_origem',
+    )
+
+    estoque_destino = models.ForeignKey(
+        'Estoque',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='historicos_itens_destino',
+    )
+
+    # Cópia dos dados no momento do processamento.
+    # Isso evita que alterações futuras no estoque modifiquem a impressão antiga.
+    lote = models.CharField(
+        max_length=100,
+        db_index=True,
+    )
+
+    produto = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    cultivar = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    peneira = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    categoria = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    tratamento = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    especie = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    embalagem = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    empresa = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    cliente = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    endereco_origem = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    endereco_destino = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    quantidade = models.PositiveIntegerField()
+
+    tipo = models.CharField(
+        max_length=20,
+        choices=TIPO_CHOICES,
+        db_index=True,
+    )
+
+    observacao = models.TextField(
+        blank=True,
+        default='',
+    )
+
+    numero_carga = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    placa = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+    )
+
+    processado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='historicos_itens_empenhados_processados',
+    )
+
+    processado_em = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+    )
+
+    class Meta:
+        verbose_name = 'Histórico de item empenhado'
+        verbose_name_plural = 'Históricos de itens empenhados'
+        ordering = ['-processado_em', '-id']
+
+        indexes = [
+            models.Index(
+                fields=['empenho', '-processado_em'],
+                name='hist_emp_data_idx',
+            ),
+            models.Index(
+                fields=['estoque_origem', '-processado_em'],
+                name='hist_origem_data_idx',
+            ),
+        ]
+
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(quantidade__gt=0),
+                name='hist_item_quantidade_maior_zero',
+            ),
+        ]
+
+    def __str__(self):
+        data = (
+            self.processado_em.strftime('%d/%m/%Y %H:%M')
+            if self.processado_em
+            else 'não processado'
+        )
+
+        return (
+            f'{self.lote} - {self.quantidade} un - '
+            f'{self.get_tipo_display()} em {data}'
+        )
+
+    @property
+    def foi_transferido(self):
+        return self.tipo == self.TIPO_TRANSFERENCIA
+
+    @property
+    def foi_expedido(self):
+        return self.tipo == self.TIPO_EXPEDICAO
+
 
 class Produto(models.Model):
     cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT, verbose_name="Cultivar")
@@ -688,5 +948,317 @@ class ConfiguracaoLogo(models.Model):
             return primeira
         
 
+
+
+
+# ============================================================================
+# FASE 2 - SISTEMA DE SOLICITAÇÃO E KANBAN
+# ============================================================================
+
+class Solicitacao(models.Model):
+    """
+    Representa uma solicitação/card no sistema.
+    Separado do Empenho para ter critérios próprios e fluxo independente.
+    """
+    UNIDADE_CHOICES = [
+        ('EMBALAGEM', 'Embalagem'),
+        ('QUILOGRAMA', 'Quilograma'),
+    ]
+    
+    PRIORIDADE_CHOICES = [
+        ('BAIXA', 'Baixa'),
+        ('MEDIA', 'Média'),
+        ('ALTA', 'Alta'),
+        ('URGENTE', 'Urgente'),
+    ]
+    
+    # Identificação
+    titulo = models.CharField(max_length=100, verbose_name="Título do Card")
+    criador = models.ForeignKey(
+        User, 
+        on_delete=models.PROTECT, 
+        related_name='solicitacoes_criadas',
+        verbose_name="Usuário criador"
+    )
+    
+    # Critérios da solicitação
+    armazem = models.ForeignKey(
+        'Armazem', 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        verbose_name="Armazém"
+    )
+    produto = models.CharField(max_length=100, blank=True, null=True, verbose_name="Produto")
+    especie = models.ForeignKey(
+        'Especie', 
+        on_delete=models.PROTECT, 
+        null=True, 
+        blank=True,
+        verbose_name="Espécie"
+    )
+    cliente = models.CharField(max_length=255, blank=True, null=True, verbose_name="Cliente")
+    
+    # Controle de quantidade
+    unidade_controle = models.CharField(
+        max_length=20, 
+        choices=UNIDADE_CHOICES, 
+        default='EMBALAGEM',
+        verbose_name="Unidade de Controle"
+    )
+    quantidade_solicitada = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Quantidade Solicitada"
+    )
+    quantidade_empenhada = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Quantidade Empenhada"
+    )
+    quantidade_movimentada = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        default=0,
+        verbose_name="Quantidade Movimentada"
+    )
+    
+    # Metadados
+    observacao = models.TextField(blank=True, null=True, verbose_name="Observação")
+    responsavel = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='solicitacoes_responsavel',
+        verbose_name="Responsável"
+    )
+    prioridade = models.CharField(
+        max_length=10, 
+        choices=PRIORIDADE_CHOICES, 
+        default='MEDIA',
+        verbose_name="Prioridade"
+    )
+    
+    # Status e Kanban
+    status = models.CharField(
+        max_length=30, 
+        default='AGUARDANDO_EMPENHO',
+        verbose_name="Status da Solicitação"
+    )
+    coluna_kanban = models.ForeignKey(
+        'ColunaKanban', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='solicitacoes',
+        verbose_name="Coluna do Kanban"
+    )
+    
+    # Datas
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_atualizacao = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Solicitação"
+        verbose_name_plural = "Solicitações"
+        ordering = ['-data_criacao']
+        permissions = [
+            ("pode_criar_solicitacao", "Pode criar solicitação"),
+            ("pode_empenhar_solicitacao", "Pode empenhar itens em solicitação"),
+            ("pode_movimentar_solicitacao", "Pode transferir/expedir solicitação"),
+            ("pode_cancelar_solicitacao", "Pode cancelar solicitação"),
+        ]
+    
+    def __str__(self):
+        return f"Solicitação #{self.id} - {self.titulo}"
+    
+    @property
+    def percentual_empenhado(self):
+        """Percentual da quantidade já empenhada"""
+        if self.quantidade_solicitada > 0:
+            return (self.quantidade_empenhada / self.quantidade_solicitada) * 100
+        return 0
+    
+    @property
+    def percentual_movimentado(self):
+        """Percentual da quantidade já movimentada"""
+        if self.quantidade_solicitada > 0:
+            return (self.quantidade_movimentada / self.quantidade_solicitada) * 100
+        return 0
+    
+    @property
+    def quantidade_pendente_empenho(self):
+        """Quanto ainda falta empenhar"""
+        return max(0, self.quantidade_solicitada - self.quantidade_empenhada)
+    
+    @property
+    def quantidade_pendente_movimentacao(self):
+        """Quanto ainda falta movimentar"""
+        return max(0, self.quantidade_solicitada - self.quantidade_movimentada)
+
+   # No arquivo sapp/models.py, dentro da classe Solicitacao
+    @property
+    def quantidade_empenhada_kg(self):
+        if self.unidade_controle != 'QUILOGRAMA':
+            return None
+        empenho = Empenho.objects.filter(
+            observacao=self.titulo, status__nome='Rascunho'
+        ).first()
+        if not empenho:
+            return Decimal('0')
+        total = Decimal('0')
+        for item in empenho.itens.select_related('estoque'):
+            peso = item.estoque.peso_unitario or Decimal('0')
+            total += Decimal(str(item.quantidade)) * peso
+        return total
+
+
+class ColunaKanban(models.Model):
+    """Colunas do quadro Kanban"""
+    nome = models.CharField(max_length=50, verbose_name="Nome da Coluna")
+    cor = models.CharField(max_length=20, default='#6c757d', verbose_name="Cor")
+    ordem = models.IntegerField(default=0, verbose_name="Ordem")
+    ativa = models.BooleanField(default=True, verbose_name="Ativa")
+    
+    class Meta:
+        verbose_name = "Coluna Kanban"
+        verbose_name_plural = "Colunas Kanban"
+        ordering = ['ordem', 'nome']
+    
+    def __str__(self):
+        return self.nome
+    
+    @classmethod
+    def criar_colunas_padrao(cls):
+        """Cria as colunas padrão se não existirem"""
+        colunas = [
+            {'nome': 'Início', 'cor': '#6c757d', 'ordem': 1},
+            {'nome': 'Meio', 'cor': '#ffc107', 'ordem': 2},
+            {'nome': 'Fim', 'cor': '#28a745', 'ordem': 3},
+        ]
+        for col in colunas:
+            cls.objects.get_or_create(
+                nome=col['nome'],
+                defaults={'cor': col['cor'], 'ordem': col['ordem']}
+            )
+
+
+class RegraWorkflow(models.Model):
+    """Regras automáticas do Kanban"""
+    EVENTO_CHOICES = [
+        ('CRIACAO', 'Solicitação Criada'),
+        ('PRIMEIRO_EMPENHO', 'Primeiro Item Empenhado'),
+        ('EMPENHO_PARCIAL', 'Empenho Parcial'),
+        ('EMPENHO_COMPLETO', 'Volume Totalmente Empenhado'),
+        ('PRIMEIRA_MOVIMENTACAO', 'Primeira Movimentação'),
+        ('MOVIMENTACAO_PARCIAL', 'Movimentação Parcial'),
+        ('TRANSFERENCIA_COMPLETA', 'Transferência Completa'),
+        ('EXPEDICAO_COMPLETA', 'Expedição Completa'),
+        ('CONCLUSAO', 'Conclusão'),
+        ('CANCELAMENTO', 'Cancelamento'),
+        ('MOVIMENTACAO_MANUAL', 'Movimentação Manual'),
+    ]
+    
+    coluna = models.ForeignKey(
+        ColunaKanban, 
+        on_delete=models.CASCADE, 
+        related_name='regras',
+        verbose_name="Coluna"
+    )
+    evento = models.CharField(max_length=30, choices=EVENTO_CHOICES, verbose_name="Evento")
+    status_resultante = models.CharField(max_length=30, verbose_name="Status Resultante")
+    movimentacao_automatica = models.BooleanField(
+        default=True, 
+        verbose_name="Movimentação Automática"
+    )
+    
+    class Meta:
+        verbose_name = "Regra de Workflow"
+        verbose_name_plural = "Regras de Workflow"
+        unique_together = ['coluna', 'evento']
+    
+    def __str__(self):
+        return f"{self.coluna.nome} - {self.get_evento_display()}"
+
+
+class HistoricoCard(models.Model):
+    """Registro de alterações nos cards (feed de atualizações)"""
+    ACAO_CHOICES = [
+        ('CRIACAO', 'criou a solicitação'),
+        ('EMPENHO', 'empenhou'),
+        ('TRANSFERENCIA', 'transferiu'),
+        ('EXPEDICAO', 'expediu'),
+        ('CANCELAMENTO', 'cancelou'),
+        ('MOVIMENTACAO_KANBAN', 'moveu o card'),
+        ('REMOCAO_ITEM', 'removeu item'),
+        ('CONCLUSAO', 'concluiu'),
+    ]
+    
+    solicitacao = models.ForeignKey(
+        Solicitacao, 
+        on_delete=models.CASCADE, 
+        related_name='historico',
+        verbose_name="Solicitação"
+    )
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name="Usuário")
+    acao = models.CharField(max_length=20, choices=ACAO_CHOICES, verbose_name="Ação")
+    lote = models.CharField(max_length=50, blank=True, null=True, verbose_name="Lote")
+    quantidade = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        blank=True, 
+        null=True,
+        verbose_name="Quantidade"
+    )
+    unidade = models.CharField(max_length=10, blank=True, null=True, verbose_name="Unidade")
+    coluna_anterior = models.CharField(max_length=50, blank=True, null=True, verbose_name="Coluna Anterior")
+    coluna_nova = models.CharField(max_length=50, blank=True, null=True, verbose_name="Nova Coluna")
+    observacao = models.TextField(blank=True, null=True, verbose_name="Observação")
+    data = models.DateTimeField(auto_now_add=True, verbose_name="Data/Hora")
+    
+    class Meta:
+        verbose_name = "Histórico do Card"
+        verbose_name_plural = "Históricos dos Cards"
+        ordering = ['-data']
+    
+    def __str__(self):
+        return f"{self.usuario.username} {self.get_acao_display()} - {self.solicitacao.titulo}"
+    
+    def descricao_completa(self):
+        partes = [self.usuario.get_full_name() or self.usuario.username, self.get_acao_display()]
+        if self.lote:
+            partes.append(f"lote {self.lote}")
+        if self.quantidade:
+            partes.append(f"{self.quantidade} {self.unidade or 'un'}")
+        
+        # 👇 ALTERE AQUI
+        nome_card = self.solicitacao.titulo if self.solicitacao else f"Card {self.solicitacao_id}"
+        partes.append(f'no card "{nome_card}"')
+        
+        if self.coluna_anterior and self.coluna_nova:
+            partes.append(f"de '{self.coluna_anterior}' para '{self.coluna_nova}'")
+        return ' '.join(partes)
+
+class ConfiguracaoAtualizacao(models.Model):
+    """Preferências individuais de atualização"""
+    usuario = models.OneToOneField(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='config_atualizacao',
+        verbose_name="Usuário"
+    )
+    som_ativo = models.BooleanField(default=True, verbose_name="Som Ativo")
+    volume = models.IntegerField(default=50, verbose_name="Volume (0-100)")
+    intervalo_atualizacao = models.IntegerField(default=30, verbose_name="Intervalo (segundos)")
+    
+    class Meta:
+        verbose_name = "Configuração de Atualização"
+        verbose_name_plural = "Configurações de Atualização"
+    
+    def __str__(self):
+        return f"Config de {self.usuario.username}"
 
 

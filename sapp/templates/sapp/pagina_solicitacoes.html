@@ -1,0 +1,2369 @@
+{% extends 'sapp/base.html' %}
+{% load static humanize %}
+
+{% block content %}
+
+<style>
+    :root { 
+        --verde: #2f8f4e; 
+        --verde-escuro: #1e5f34; 
+        --borda: #e2e8f0; 
+        --shadow-sm: 0 2px 8px rgba(0,0,0,0.06); 
+        --shadow-md: 0 4px 15px rgba(0,0,0,0.1); 
+        --shadow-lg: 0 8px 30px rgba(0,0,0,0.15); 
+        --text-muted: #6c757d; 
+        --transition: all 0.2s ease; 
+    }
+
+    * { box-sizing: border-box; }
+    
+    .cards-scroll { 
+        display: flex; 
+        gap: 12px; 
+        overflow-x: auto; 
+        padding: 8px 4px 16px; 
+        -webkit-overflow-scrolling: touch; 
+        scroll-snap-type: x mandatory; 
+    }
+    
+    .solicitacao-card {
+        background: white; 
+        border: 2px solid var(--borda); 
+        border-radius: 14px; 
+        padding: 14px;
+        min-width: 260px; 
+        max-width: 290px; 
+        flex-shrink: 0; 
+        box-shadow: var(--shadow-sm);
+        position: relative; 
+        scroll-snap-align: start;
+        transition: all 0.3s ease;
+    }
+    
+    .solicitacao-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+    }
+    
+    .card-status { 
+        padding: 3px 8px; 
+        border-radius: 15px; 
+        font-size: 0.55rem; 
+        font-weight: 700; 
+        text-transform: uppercase; 
+        letter-spacing: 0.4px; 
+        display: inline-block; 
+    }
+    .status-AGUARDANDO_EMPENHO { background: #fff3cd; color: #856404; }
+    .status-EMPENHO_PARCIAL { background: #cce5ff; color: #004085; }
+    .status-EMPENHO_COMPLETO { background: #d4edda; color: #155724; }
+    .status-MOVIMENTACAO_PARCIAL { background: #d1ecf1; color: #0c5460; }
+    .status-CONCLUIDO { background: #e2e3e5; color: #383d41; }
+    .status-CANCELADO { background: #f8d7da; color: #721c24; }
+    
+    .card-progress-bar { 
+        height: 5px; 
+        background: #e9ecef; 
+        border-radius: 3px; 
+        overflow: hidden; 
+        margin: 6px 0; 
+    }
+    .card-progress-fill { 
+        height: 100%; 
+        border-radius: 3px; 
+        transition: width 0.4s ease; 
+        max-width: 100%; 
+    }
+    .card-badge { 
+        font-size: 0.5rem; 
+        padding: 2px 6px; 
+        border-radius: 8px; 
+        background: #f1f5f9; 
+        color: #475569; 
+        display: inline-block; 
+        margin: 1px; 
+    }
+    
+    .btn-excluir-card { 
+        position: absolute; 
+        top: 6px; 
+        right: 6px; 
+        background: none; 
+        border: none; 
+        color: #dc3545; 
+        cursor: pointer; 
+        font-size: 0.9rem; 
+        opacity: 0; 
+        transition: all 0.2s; 
+        z-index: 2; 
+    }
+    .solicitacao-card:hover .btn-excluir-card.show, 
+    .solicitacao-card:active .btn-excluir-card.show { 
+        opacity: 1; 
+    }
+    
+    /* TOGGLE */
+    .toggle-group { 
+        display: flex; 
+        gap: 0; 
+        border-radius: 20px; 
+        overflow: hidden; 
+        border: 2px solid var(--verde); 
+    }
+    .toggle-btn { 
+        padding: 6px 16px; 
+        font-size: 0.75rem; 
+        font-weight: 600; 
+        border: none; 
+        cursor: pointer; 
+        transition: all 0.2s; 
+        background: white; 
+        color: var(--verde); 
+    }
+    .toggle-btn.active { 
+        background: var(--verde); 
+        color: white; 
+    }
+    
+    /* ===== MODAL EMPENHO - TABELA ESTILO EXCEL ===== */
+    .modal-empenho-body { 
+        display: flex; 
+        flex-direction: column; 
+        max-height: 78vh; 
+        padding: 0 !important; 
+    }
+    
+    .modal-resumo-bar {
+        display: grid; 
+        grid-template-columns: repeat(4, 1fr); 
+        gap: 6px; 
+        padding: 8px 12px;
+        background: linear-gradient(135deg, #f8f9fa, #e9ecef); 
+        border-bottom: 2px solid #dee2e6; 
+        text-align: center; 
+        flex-shrink: 0;
+    }
+    .modal-resumo-item small { 
+        font-size: 0.55rem; 
+        color: var(--text-muted); 
+        display: block; 
+    }
+    .modal-resumo-item strong { 
+        font-size: 1rem; 
+    }
+    
+    .modal-toolbar { 
+        padding: 8px 10px; 
+        background: white; 
+        border-bottom: 1px solid var(--borda); 
+        flex-shrink: 0; 
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+    }
+    
+    /* SCROLL DA TABELA */
+    .modal-table-wrapper {
+        flex: 1; 
+        overflow: auto; 
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin; 
+        scrollbar-color: var(--verde) #f1f1f1; 
+        position: relative;
+        border: 1px solid #dee2e6;
+    }
+    .modal-table-wrapper::-webkit-scrollbar { 
+        width: 8px; 
+        height: 8px; 
+    }
+    .modal-table-wrapper::-webkit-scrollbar-track { 
+        background: #f1f1f1; 
+        border-radius: 10px; 
+    }
+    .modal-table-wrapper::-webkit-scrollbar-thumb { 
+        background: var(--verde); 
+        border-radius: 10px; 
+    }
+    
+    .modal-table {
+        width: 100%; 
+        font-size: 0.75rem; 
+        border-collapse: collapse; 
+        border-spacing: 0; 
+        min-width: 1800px;
+        table-layout: auto;
+    }
+    
+    .modal-table thead { 
+        position: sticky; 
+        top: 0; 
+        z-index: 10; 
+    }
+    
+    .modal-table thead th {
+        background: linear-gradient(135deg, var(--verde), var(--verde-escuro)); 
+        color: white; 
+        font-weight: 600;
+        padding: 8px 6px; 
+        font-size: 0.58rem; 
+        text-transform: uppercase; 
+        letter-spacing: 0.3px;
+        white-space: nowrap; 
+        cursor: pointer; 
+        border: 1px solid #1e5f34;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        position: relative;
+        user-select: none;
+    }
+    .modal-table thead th:hover { 
+        background: linear-gradient(135deg, #1e5f34, var(--verde)); 
+    }
+    .modal-table thead th.filter-active { 
+        background: linear-gradient(135deg, #1a4f2b, #0f3a1e); 
+        box-shadow: inset 0 -2px 0 #ffc107; 
+    }
+    .modal-table thead th.filter-active i { 
+        color: #ffc107; 
+    }
+    
+    .modal-table td { 
+        padding: 6px 5px; 
+        vertical-align: middle; 
+        border: 1px solid #e2e8f0; 
+        white-space: nowrap; 
+        background: white; 
+        font-size: 0.7rem; 
+        transition: background 0.2s;
+    }
+    
+    .modal-table tbody tr:hover { 
+        background-color: rgba(47,143,78,0.05); 
+    }
+    .modal-table tbody tr.empenhado td { 
+        background: #fff8e1; 
+    }
+    .modal-table tbody tr.empenhado td:first-child { 
+        border-left: 3px solid #ffc107; 
+    }
+    
+    .modal-table tbody tr.selected {
+        background-color: #e8f5e9 !important;
+    }
+    
+    .qtd-input { 
+        width: 60px; 
+        text-align: center; 
+        font-weight: 700; 
+        border: 2px solid #dee2e6; 
+        border-radius: 6px; 
+        padding: 5px; 
+        font-size: 0.75rem;
+        transition: all 0.2s;
+    }
+    .qtd-input:focus { 
+        border-color: var(--verde); 
+        outline: none; 
+        box-shadow: 0 0 0 3px rgba(47,143,78,0.1);
+    }
+    .qtd-input.invalid { 
+        border-color: #dc3545 !important; 
+        background: #fff5f5 !important; 
+        animation: shake 0.4s ease; 
+    }
+    .qtd-input.empenhado { 
+        background: #fff8e1; 
+        border-color: #ffc107; 
+        color: #856404; 
+        font-weight: 700; 
+    }
+    
+    @keyframes shake { 
+        0%,100%{transform:translateX(0)} 
+        25%{transform:translateX(-5px)} 
+        75%{transform:translateX(5px)} 
+    }
+    
+    .badge-empenhado-info { 
+        background: #fff3cd; 
+        color: #856404; 
+        padding: 1px 5px; 
+        border-radius: 6px; 
+        font-size: 0.5rem; 
+        font-weight: 600; 
+        margin-left: 3px; 
+    }
+    
+    .btn-remover-item { 
+        background: none; 
+        border: none; 
+        color: #dc3545; 
+        cursor: pointer; 
+        font-size: 0.8rem; 
+        padding: 2px 5px; 
+        border-radius: 50%; 
+        transition: all 0.2s; 
+    }
+    .btn-remover-item:hover { 
+        background: #fef2f2; 
+        transform: scale(1.2); 
+    }
+    
+    /* STATUS SISTÊMICO */
+    .status-sistemico-indicator-mini { 
+        width: 22px; 
+        height: 22px; 
+        border-radius: 50%; 
+        border: 2px solid white; 
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15); 
+        margin: 0 auto; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        font-size: 9px; 
+        color: white; 
+    }
+    
+    /* BADGES */
+    .badge-saldo { 
+        font-size: 0.65rem; 
+        padding: 2px 6px; 
+        border-radius: 20px; 
+        font-weight: 600; 
+    }
+    .badge-empenhado-badge { 
+        font-size: 0.65rem; 
+        padding: 2px 6px; 
+        border-radius: 20px; 
+        background: #fef3c7; 
+        color: #92400e; 
+    }
+    .badge-disponivel { 
+        font-size: 0.65rem; 
+        padding: 2px 6px; 
+        border-radius: 20px; 
+        background: #dbeafe; 
+        color: #1e40af; 
+    }
+    .badge-null { 
+        background: #f1f5f9; 
+        color: #64748b; 
+        padding: 2px 6px; 
+        border-radius: 20px; 
+        font-size: 0.6rem; 
+        font-style: italic; 
+        border: 1px dashed #cbd5e1; 
+    }
+    
+    .filter-popup {
+        position: fixed;
+        background: white;
+        border-radius: 14px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        z-index: 99999;
+        width: 90vw;
+        max-width: 350px;
+        max-height: 65vh;
+        overflow: hidden;
+        display: none;
+        /* remova top, left, transform daqui - serão definidos via JS */
+    }
+    .filter-popup-header { 
+        padding: 10px 14px; 
+        background: #f8f9fa; 
+        font-weight: 700; 
+        font-size: 0.85rem; 
+        border-bottom: 1px solid #dee2e6; 
+    }
+    .filter-popup-body { 
+        max-height: 200px; 
+        overflow-y: auto; 
+        padding: 4px 0; 
+    }
+    .filter-popup-footer { 
+        padding: 8px 12px; 
+        border-top: 1px solid #dee2e6; 
+        background: #f8f9fa; 
+        display: flex; 
+        gap: 6px; 
+        justify-content: flex-end; 
+    }
+    .filter-option { 
+        padding: 6px 12px; 
+        display: flex; 
+        align-items: center; 
+        gap: 8px; 
+        cursor: pointer; 
+        font-size: 0.75rem; 
+    }
+    .filter-option:hover { 
+        background: #f1f5f9; 
+    }
+    .filter-option input[type="checkbox"] { 
+        margin: 0; 
+        width: 15px; 
+        height: 15px; 
+        cursor: pointer; 
+        accent-color: var(--verde); 
+    }
+    
+    /* MODAL MOVIMENTAÇÃO */
+    .modal-mov-table { 
+        width: 100%; 
+        font-size: 0.65rem; 
+        border-collapse: collapse; 
+        min-width: 900px; 
+    }
+    .modal-mov-table thead { 
+        position: sticky; 
+        top: 0; 
+        z-index: 5; 
+    }
+    .modal-mov-table thead th { 
+        background: var(--verde-escuro); 
+        color: white; 
+        padding: 5px 3px; 
+        font-size: 0.5rem; 
+        text-transform: uppercase; 
+        white-space: nowrap; 
+        border: none; 
+    }
+    .modal-mov-table td { 
+        padding: 4px 3px; 
+        border-bottom: 1px solid var(--borda); 
+        white-space: nowrap; 
+        font-size: 0.62rem; 
+    }
+    .modal-mov-table tr.processado { 
+        background: #f8f9fa; 
+        opacity: 0.7; 
+    }
+    
+    /* GERENCIADOR DE COLUNAS DO MODAL */
+    .column-manager-modal {
+        position: fixed; 
+        background: white; 
+        border-radius: 14px; 
+        box-shadow: var(--shadow-lg);
+        z-index: 999999; 
+        width: 280px; 
+        max-height: 70vh; 
+        overflow: hidden;
+        display: none; 
+        top: 50%; 
+        left: 50%; 
+        transform: translate(-50%,-50%);
+    }
+    .column-manager-modal-header { 
+        padding: 10px 14px; 
+        background: linear-gradient(135deg, #6c5ce7, #a29bfe); 
+        color: white; 
+        font-weight: 700; 
+        font-size: 0.85rem; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+    }
+    .column-manager-modal-list { 
+        max-height: 250px; 
+        overflow-y: auto; 
+        padding: 4px 0; 
+    }
+    .column-manager-modal-item { 
+        padding: 6px 12px; 
+        display: flex; 
+        align-items: center; 
+        gap: 8px; 
+        cursor: pointer; 
+        font-size: 0.78rem; 
+    }
+    .column-manager-modal-item:hover { 
+        background: #f1f5f9; 
+    }
+    .column-manager-modal-footer { 
+        padding: 8px 12px; 
+        border-top: 1px solid #dee2e6; 
+        display: flex; 
+        gap: 6px; 
+        justify-content: flex-end; 
+    }
+    
+    /* LOADING OVERLAY */
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255,255,255,0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    
+    @media (max-width: 768px) {
+        .solicitacao-card { min-width: 240px; max-width: 260px; padding: 12px; }
+        .modal-resumo-bar { grid-template-columns: repeat(2, 1fr); gap: 4px; padding: 6px; }
+        .modal-table { font-size: 0.6rem; min-width: 1400px; }
+        .modal-table thead th { font-size: 0.45rem; padding: 5px 3px; }
+        .modal-table td { font-size: 0.58rem; padding: 4px 3px; }
+        .modal-mov-table { font-size: 0.55rem; min-width: 750px; }
+        .qtd-input { width: 45px; font-size: 0.65rem; }
+        .toggle-btn { padding: 5px 12px; font-size: 0.7rem; }
+    }
+</style>
+<audio id="audioNotificacao" preload="auto" style="display:none;">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/..." type="audio/wav">
+</audio>
+
+<div class="container-fluid py-2">
+    <!-- CABEÇALHO -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+        <h5 class="mb-0"><i class="fas fa-clipboard-list text-success me-2"></i>Solicitações</h5>
+
+       
+        
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <div class="toggle-group">
+                <button class="toggle-btn active" id="btnAtivos" onclick="mostrarAtivos()">Ativos</button>
+                <button class="toggle-btn" id="btnConcluidos" onclick="mostrarConcluidos()">Concluídos</button>
+            </div>
+            <a href="{% url 'sapp:criar_solicitacao' %}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus me-1"></i> Nova
+            </a>
+        </div>
+    </div>
+
+    <!-- CARDS ATIVOS -->
+    <div id="ativosContainer">
+        <div class="cards-scroll" id="cardsContainer">
+            <div class="text-center py-4 w-100 text-muted">
+                <i class="fas fa-spinner fa-pulse"></i> Carregando...
+            </div>
+        </div>
+    </div>
+
+    <!-- CARDS CONCLUÍDOS -->
+    <div id="concluidosContainer" style="display:none;">
+        <div class="cards-scroll" id="cardsConcluidos"></div>
+    </div>
+    
+    <!-- FEED -->
+    <div class="card mt-3">
+        <div class="card-header bg-light py-1">
+            <strong class="small"><i class="fas fa-history me-1"></i>Atualizações</strong>
+        </div>
+        <div class="card-body p-1" id="feedList" style="max-height:150px;overflow-y:auto;">
+            <div class="text-center text-muted py-2 small">Carregando...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== MODAL EMPENHO ==================== -->
+<div class="modal fade" id="modalEmpenho" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen" style="max-width:99vw;">
+        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+
+            
+            <!-- ==================== FILTRO POPUP ==================== -->
+<div class="filter-popup" id="filterPopup">
+    <div class="filter-popup-header" id="filterPopupTitle">Filtrar</div>
+    <div class="p-2">
+        <input type="text" class="form-control form-control-sm" id="filterPopupSearch" 
+               placeholder="Buscar opção..." oninput="filtrarPopup()">
+    </div>
+   
+
+    <div class="filter-popup-body" id="filterPopupBody"></div>
+    <div class="filter-popup-footer">
+        <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllPopup(false)">Nenhum</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="toggleAllPopup(true)">Todos</button>
+        <button class="btn btn-sm btn-secondary" onclick="fecharFiltro()">Cancelar</button>
+        <button class="btn btn-sm btn-success" onclick="aplicarFiltro()">Aplicar</button>
+    </div>
+</div>
+
+
+
+
+            <div class="modal-header bg-success text-white py-2 px-3">
+                <h6 class="modal-title mb-0" id="modalTitulo">📦 Empenhar Lotes</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+
+             <div class="px-3 pt-1 pb-2">
+                <small class="text-muted">Solicitação: <strong id="modalTituloCard">---</strong></small>
+                <div id="obsSolicitacao" class="small text-muted mt-1" style="display:none;"></div>
+            </div>
+            
+            <div class="modal-empenho-body">
+                    
+                <!-- RESUMO -->
+                <div class="modal-resumo-bar">
+                    <div class="modal-resumo-item"><small>Solicitado</small><strong id="rSolicitado">0</strong></div>
+                    <div class="modal-resumo-item"><small>Já Empenhado</small><strong id="rEmpenhado" class="text-warning">0</strong></div>
+                    <div class="modal-resumo-item"><small>Selecionado</small><strong id="rSelecionado" class="text-primary">0</strong></div>
+                    <div class="modal-resumo-item"><small>Restante</small><strong id="rRestante" class="text-danger">0</strong></div>
+                </div>
+                
+              <div class="modal-toolbar">
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                    <div class="flex-grow-1" style="min-width:120px;max-width:400px;">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control" id="modalBusca" 
+                                placeholder="Buscar lote, produto, endereço..." 
+                                oninput="debounceBusca()" autocomplete="off">
+                            <button class="btn btn-outline-secondary" id="modalClearSearch" 
+                                    style="display:none;" onclick="limparBusca()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+        <button class="btn btn-sm btn-outline-success" onclick="selecionarTodos()">
+            <i class="fas fa-check-double"></i> Todos
+        </button>
+        <button class="btn btn-sm btn-outline-danger" onclick="limparNovos()">
+            <i class="fas fa-times"></i> Limpar
+        </button>
+        <button class="btn btn-sm btn-outline-warning" id="btnLimparFiltros" 
+                onclick="limparTodosFiltros()" style="display:none;">
+            <i class="fas fa-filter-circle-xmark"></i> Limpar Filtros
+        </button>
+        <button class="btn btn-sm btn-columns-modal" onclick="toggleColumnManagerModal()" 
+                title="Gerenciar Colunas" 
+                style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:white;border:none;padding:4px 10px;border-radius:6px;font-size:0.75rem;">
+            <i class="fas fa-columns"></i>
+        </button>
+    </div>
+    <!-- Badges de filtros ativos -->
+    <div id="filtrosAtivosBadges" class="d-flex flex-wrap gap-1 mt-1"></div>
+</div>
+                
+               
+                
+                <!-- TABELA COM SCROLL -->
+                <div class="modal-table-wrapper" id="modalTableWrapper">
+                    <div class="loading-overlay" id="loadingOverlay" style="display:none;">
+                        <div class="spinner-border text-success" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                    <table class="modal-table" id="modalTable">
+                        <thead>
+                            <tr>
+                                <th style="width:30px;text-align:center;background:#1a4f2b;">
+                                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                                </th>
+                                <th style="text-align:center;min-width:45px;">Status</th>
+                                <th onclick="abrirFiltro('az', event)" style="min-width:80px;">AZ <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('lote', event)">Lote <i class="fas fa-filter text-white-50 ms-1"></i><span class="filter-count-badge" id="count-lote" style="display:none;"></span></th>
+                                <th onclick="abrirFiltro('produto', event)" style="min-width:150px;">Produto <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('cultivar', event)" style="min-width:120px;">Cultivar <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('peneira', event)" style="min-width:80px;">Peneira <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('categoria', event)" style="min-width:100px;">Categoria <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('especie', event)" style="min-width:100px;">Espécie <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('tratamento', event)" style="min-width:100px;">Tratamento <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('endereco', event)" style="min-width:150px;">Endereço <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('embalagem', event)" style="min-width:100px;">Embalagem <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('cliente', event)" style="min-width:120px;">Cliente <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('empresa', event)" style="min-width:120px;">Empresa <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th onclick="abrirFiltro('conferente', event)" style="min-width:100px;">Conferente <i class="fas fa-filter text-white-50 ms-1"></i></th>
+                                <th style="min-width:80px;">Saldo</th>
+                                <th style="min-width:80px;">Empenhado</th>
+                                <th style="min-width:80px;">Disponível</th>
+                                <th style="min-width:80px;">Qtd</th>
+                                <th style="min-width:80px;">Peso</th>
+                                <th style="min-width:60px;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="21" class="text-center py-4 text-muted">
+                                <i class="fas fa-spinner fa-pulse me-2"></i>Carregando lotes disponíveis...
+                            </td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- RODAPÉ COM INFO DE SCROLL -->
+                <div class="d-flex justify-content-between align-items-center p-1 border-top bg-light small flex-shrink-0">
+                    <span id="scrollInfo" class="text-muted ms-2"></span>
+                    <span class="text-muted me-2">
+                        <i class="fas fa-arrows-alt me-1"></i> Role para navegar
+                    </span>
+                </div>
+            </div>
+            
+            <div class="modal-footer py-1">
+                <span id="infoEmpenhados" class="text-muted small me-auto"></span>
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                <button class="btn btn-success btn-sm fw-bold px-3" id="btnConfirmar" disabled onclick="salvarEmpenho()">
+                    <i class="fas fa-save me-1"></i> Salvar Alterações
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- ==================== GERENCIADOR DE COLUNAS DO MODAL ==================== -->
+<div class="column-manager-modal" id="columnManagerModal">
+    <div class="column-manager-modal-header">
+        <span><i class="fas fa-columns me-1"></i> Colunas da Tabela</span>
+        <button class="btn-close btn-close-white" onclick="toggleColumnManagerModal()" style="font-size:0.6rem;"></button>
+    </div>
+    <div class="column-manager-modal-list" id="columnManagerModalList"></div>
+    <div class="column-manager-modal-footer">
+        <button class="btn btn-sm btn-outline-secondary" onclick="resetColumnsModal()">Restaurar</button>
+        <button class="btn btn-sm btn-primary" onclick="applyColumnVisibilityModal()">Aplicar</button>
+    </div>
+</div>
+
+<!-- ==================== MODAL MOVIMENTAÇÃO ==================== -->
+<div class="modal fade" id="modalMov" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered" style="max-width:98vw;">
+        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+            <div class="modal-header text-white py-1 px-3" id="headerMov">
+                <h6 class="modal-title mb-0" id="tituloMov"></h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-2" style="max-height:65vh;overflow:auto;">
+                <div class="alert alert-warning mb-1 py-1 small">
+                    Card: <strong id="movCardNome"></strong>
+                </div>
+                <div style="max-height:300px;overflow:auto;border:1px solid #dee2e6;border-radius:6px;">
+                    <table class="modal-mov-table">
+                        <thead>
+                            <tr>
+                                <th style="width:25px;">
+                                    <input type="checkbox" id="selAllMov" 
+                                           onchange="document.querySelectorAll('.mov-chk:not(:disabled)').forEach(c=>c.checked=this.checked)">
+                                </th>
+                                <th>Lote</th><th>Qtd</th><th>Saldo</th><th>Produto</th>
+                                <th>Cultivar</th><th>Endereço</th><th>AZ</th><th>Cliente</th>
+                                <th>Emb.</th><th>Situação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="movItemsBody">
+                            <tr><td colspan="11" class="text-center py-3 text-muted">Selecione um card</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="camposTransf" class="d-none mt-2">
+                    <h6 class="text-warning small mb-1">Destino da Transferência</h6>
+                    <div class="row g-1">
+                        <div class="col-8">
+                            <input type="text" id="movNovoEnd" class="form-control form-control-sm" 
+                                   placeholder="Novo Endereço *">
+                        </div>
+                        <div class="col-4">
+                            <input type="text" id="movNovoAz" class="form-control form-control-sm" 
+                                   placeholder="Novo AZ">
+                        </div>
+                    </div>
+                </div>
+                <div id="camposExped" class="d-none mt-2">
+                    <h6 class="text-danger small mb-1">Dados da Expedição (todos opcionais)</h6>
+                    <div class="row g-1">
+                        <div class="col-4">
+                            <input type="text" id="movCarga" class="form-control form-control-sm" 
+                                   placeholder="Nº Carga">
+                        </div>
+                        <div class="col-4">
+                            <input type="text" id="movCliente" class="form-control form-control-sm" 
+                                   placeholder="Cliente">
+                        </div>
+                        <div class="col-4">
+                            <input type="text" id="movPlaca" class="form-control form-control-sm" 
+                                   placeholder="Placa">
+                        </div>
+                    </div>
+                </div>
+                <textarea id="movObs" class="form-control form-control-sm mt-1" rows="2" 
+                          placeholder="Observação geral"></textarea>
+            </div>
+            <div class="modal-footer py-1">
+                <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button>
+                <button class="btn btn-primary btn-sm fw-bold px-3" id="btnConfirmMov" 
+                        onclick="confirmarMov()">Confirmar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+if ('Notification' in window && Notification.permission !== 'denied') {
+    Notification.requestPermission();
+}
+
+// ==================== SISTEMA DE BUSCA E FILTRO AVANÇADO ====================
+class DataGrid {
+    constructor() {
+        this.allData = [];
+        this.filteredData = [];
+        this.searchTerm = '';
+        this.activeFilters = {};
+        this.currentPage = 1;
+        this.pageSize = 50;
+        this.selectedRows = new Set();
+        this.empenhadosData = [];
+        this._qtdValues = {};
+    }
+
+    setData(data) {
+        console.log('DataGrid.setData:', data.length, 'registros recebidos');
+        this.allData = data;
+        this.applyAllFilters();
+    }
+
+    setEmpenhados(data) {
+        console.log('DataGrid.setEmpenhados:', data.length, 'registros');
+        this.empenhadosData = data;
+        this.applyAllFilters();
+    }
+
+    setSearch(term) {
+        this.searchTerm = term.toLowerCase();
+        this.currentPage = 1;
+        this.applyAllFilters();
+    }
+
+    setFilter(column, values) {
+        if (values && values.length > 0) {
+            this.activeFilters[column] = values;
+        } else {
+            delete this.activeFilters[column];
+        }
+        this.currentPage = 1;
+        this.applyAllFilters();
+    }
+
+    clearFilters() {
+        this.activeFilters = {};
+        this.currentPage = 1;
+        this.applyAllFilters();
+    }
+
+    clearSearch() {
+        this.searchTerm = '';
+        this.currentPage = 1;
+        this.applyAllFilters();
+    }
+
+    applyAllFilters() {
+        let data = [...this.allData];
+        console.log('Aplicando filtros. Total dados:', data.length);
+        console.log('Search term:', this.searchTerm);
+        console.log('Active filters:', this.activeFilters);
+
+        // Aplicar busca geral
+        if (this.searchTerm) {
+            data = data.filter(item => {
+                return Object.values(item).some(val => {
+                    if (val === null || val === undefined) return false;
+                    return String(val).toLowerCase().includes(this.searchTerm);
+                });
+            });
+            console.log('Após busca:', data.length, 'registros');
+        }
+
+        // Aplicar filtros específicos
+        Object.entries(this.activeFilters).forEach(([column, values]) => {
+            if (values.length > 0) {
+                data = data.filter(item => {
+                    const itemValue = String(item[column] || '').toLowerCase();
+                    return values.some(v => String(v).toLowerCase() === itemValue);
+                });
+                console.log(`Após filtro ${column}:`, data.length, 'registros');
+            }
+        });
+
+        this.filteredData = data;
+        console.log('Dados filtrados final:', this.filteredData.length);
+    }
+
+    getPageData() {
+        const start = 0;
+        const end = this.currentPage * this.pageSize;
+        const pageData = this.filteredData.slice(start, end);
+        
+        return {
+            data: pageData,
+            hasMore: end < this.filteredData.length,
+            total: this.filteredData.length,
+            showing: Math.min(end, this.filteredData.length)
+        };
+    }
+
+    loadMore() {
+        if (this.currentPage * this.pageSize < this.filteredData.length) {
+            this.currentPage++;
+            return this.getPageData();
+        }
+        return null;
+    }
+
+    getQtdValue(id) {
+        return this._qtdValues[id] || '';
+    }
+
+    setQtdValue(id, value) {
+        this._qtdValues[id] = value;
+    }
+
+    clearQtdValues() {
+        const empenhadosIds = new Set(this.empenhadosData.map(i => i.estoque_id));
+        Object.keys(this._qtdValues).forEach(id => {
+            if (!empenhadosIds.has(parseInt(id))) {
+                delete this._qtdValues[id];
+            }
+        });
+    }
+}
+
+const dataGrid = new DataGrid();
+
+// ==================== VARIÁVEIS GLOBAIS ====================
+let solicId = null;
+let carregando = false;
+let movSolId = null, movAcao = null;
+let unidadeControle = 'EMBALAGEM'; // padrão
+
+// Colunas do modal
+const modalColumnDefs = [
+    { key: 'status_sistemico', label: 'Status', alwaysVisible: true, index: 1 },
+    { key: 'az', label: 'AZ', alwaysVisible: false, index: 2 },
+    { key: 'lote', label: 'Lote', alwaysVisible: true, index: 3 },
+    { key: 'produto', label: 'Produto', alwaysVisible: false, index: 4 },
+    { key: 'cultivar', label: 'Cultivar', alwaysVisible: false, index: 5 },
+    { key: 'peneira', label: 'Peneira', alwaysVisible: false, index: 6 },
+    { key: 'categoria', label: 'Categoria', alwaysVisible: false, index: 7 },
+    { key: 'especie', label: 'Espécie', alwaysVisible: false, index: 8 },
+    { key: 'tratamento', label: 'Tratamento', alwaysVisible: false, index: 9 },
+    { key: 'endereco', label: 'Endereço', alwaysVisible: false, index: 10 },
+    { key: 'embalagem', label: 'Embalagem', alwaysVisible: false, index: 11 },
+    { key: 'cliente', label: 'Cliente', alwaysVisible: false, index: 12 },
+    { key: 'empresa', label: 'Empresa', alwaysVisible: false, index: 13 },
+    { key: 'conferente', label: 'Conferente', alwaysVisible: false, index: 14 },
+];
+
+// ==================== INICIALIZAÇÃO ====================
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM carregado - iniciando aplicação');
+    carregarCards();
+    carregarFeed();
+    initColumnVisibilityModal();
+    setInterval(carregarCards, 30000);
+    
+    // Detectar scroll para carregar mais
+    const wrap = document.getElementById('modalTableWrapper');
+    if (wrap) {
+        wrap.addEventListener('scroll', function() {
+            if (this.scrollTop + this.clientHeight >= this.scrollHeight - 100) {
+                if (!carregando) {
+                    const moreData = dataGrid.loadMore();
+                    if (moreData) {
+                        appendTableRows(moreData.data);
+                        updateScrollInfo(moreData);
+                    }
+                }
+            }
+        });
+    }
+});
+
+// ==================== BUSCA E FILTROS ====================
+function handleSearch(value) {
+    console.log('Busca:', value);
+    const clearBtn = document.getElementById('modalClearSearch');
+    if (clearBtn) {
+        clearBtn.style.display = value ? 'inline-block' : 'none';
+    }
+    
+    // Debounce para performance
+    clearTimeout(window.searchTimeout);
+    window.searchTimeout = setTimeout(() => {
+        dataGrid.setSearch(value);
+        renderTableData();
+    }, 300);
+}
+
+function clearSearch() {
+    console.log('Limpando busca');
+    document.getElementById('modalBusca').value = '';
+    document.getElementById('modalClearSearch').style.display = 'none';
+    dataGrid.clearSearch();
+    renderTableData();
+}
+
+
+function filtrarPopup() {
+    const s = document.getElementById('filterPopupSearch').value.toLowerCase();
+    document.querySelectorAll('#filterPopupBody .filter-option').forEach(o => {
+        o.style.display = o.textContent.toLowerCase().includes(s) ? '' : 'none';
+    });
+}
+
+function toggleAllPopup(checked) {
+    document.querySelectorAll('#filterPopupBody .filter-checkbox').forEach(cb => {
+        const option = cb.closest('.filter-option');
+        if (option.style.display !== 'none') {
+            cb.checked = checked;
+        }
+    });
+}
+
+
+
+
+function atualizarBadgesFiltros() {
+    const badges = document.getElementById('filtrosAtivosBadges');
+    badges.innerHTML = '';
+    
+    Object.entries(dataGrid.activeFilters).forEach(([k, values]) => {
+        values.forEach(v => {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-secondary me-1';
+            badge.style.cssText = 'cursor:pointer;font-size:0.55rem;';
+            badge.innerHTML = `${k}:${v} <i class="fas fa-times ms-1"></i>`;
+            badge.onclick = () => {
+                const newValues = dataGrid.activeFilters[k].filter(x => x !== v);
+                dataGrid.setFilter(k, newValues);
+                atualizarBadgesFiltros();
+                renderTableData();
+            };
+            badges.appendChild(badge);
+        });
+    });
+}
+
+function fecharFiltro() {
+    document.getElementById('filterPopup').style.display = 'none';
+    window.colFiltro = null;
+}
+
+// ==================== MODAL EMPENHO ====================
+async function abrirModalEmpenho(id) {
+    console.log('Abrindo modal empenho para solicitação:', id);
+    solicId = id;
+    document.getElementById('modalBusca').value = '';
+    document.getElementById('modalClearSearch').style.display = 'none';
+    document.getElementById('filtrosAtivosBadges').innerHTML = '';
+    document.getElementById('btnConfirmar').disabled = true;
+    document.getElementById('selectAllCheckbox').checked = false;
+    
+    // Resetar DataGrid
+    dataGrid.clearSearch();
+    dataGrid.activeFilters = {};  // ← Adicionar esta linha
+    dataGrid.clearQtdValues();
+    dataGrid.selectedRows.clear();
+    
+    document.querySelectorAll('#modalTable th').forEach(th => th.classList.remove('filter-active'));
+    
+    showLoading();
+    new bootstrap.Modal(document.getElementById('modalEmpenho')).show();
+    await carregarLotesInicial();
+    hideLoading();
+    atualizarUIComFiltros();  // ← Resetar UI
+}
+
+function showLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.style.display = 'flex';
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+async function carregarLotesInicial() {
+    carregando = true;
+    try {
+        const url = `/api/solicitacoes/${solicId}/lotes-disponiveis/?page=1&page_size=1000`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (data.success && data.lotes) {
+            // 1. Popular DataGrid
+            dataGrid.setData(data.lotes);
+            dataGrid.setEmpenhados(data.itens_empenhados || []);
+
+            // 2. Marcar itens já empenhados como selecionados
+            dataGrid.selectedRows.clear(); // limpa seleções antigas
+            dataGrid.empenhadosData.forEach(item => {
+                dataGrid.selectedRows.add(item.estoque_id);
+            });
+
+            // 3. Configurar unidade
+            unidadeControle = data.solicitacao?.unidade_controle || 'EMBALAGEM';
+            const unidadeAbrev = unidadeControle === 'QUILOGRAMA' ? 'KG' : 'Un';
+
+            // 4. Atualizar labels do resumo
+            document.querySelectorAll('.modal-resumo-item small').forEach(el => {
+                const original = el.textContent.split('(')[0].trim(); // pega só o nome original
+                el.textContent = `${original} (${unidadeAbrev})`;
+            });
+
+            // 5. Quantidade solicitada
+            document.getElementById('rSolicitado').textContent = data.solicitacao?.quantidade_solicitada || 0;
+
+            // 6. Títulos
+            document.getElementById('modalTitulo').textContent = '📦 ' + (data.solicitacao?.titulo || 'Sem título');
+            const tituloCard = document.getElementById('modalTituloCard');
+            if (tituloCard) tituloCard.textContent = data.solicitacao?.titulo || '---';
+
+            // Exibir observação da solicitação (se existir)
+            const obsDiv = document.getElementById('obsSolicitacao');
+            if (obsDiv) {
+                const obs = data.solicitacao?.observacao;
+                if (obs && obs.trim()) {
+                    obsDiv.innerHTML = '<i class="fas fa-sticky-note me-1"></i>' + obs;
+                    obsDiv.style.display = 'block';
+                } else {
+                    obsDiv.style.display = 'none';
+                }
+            }
+
+            // 7. Informações extras
+            document.getElementById('infoEmpenhados').textContent = 
+                (data.itens_empenhados || []).length ? `${data.itens_empenhados.length} lote(s) já empenhado(s)` : '';
+
+            // 8. Renderizar tabela e atualizar resumo (já com os empenhados no selectedRows)
+            renderTableData();
+            atualizarResumo();   // calcula emp, sel, removidos e atualiza todos os valores
+            applyColumnVisibilityModal();
+        }
+    } catch(e) {
+        console.error(e);
+        document.getElementById('tableBody').innerHTML = 
+            `<tr><td colspan="21" class="text-center text-danger py-4">Erro: ${e.message}</td></tr>`;
+    } finally {
+        carregando = false;
+    }
+}
+
+function renderTableData() {
+    const pageData = dataGrid.getPageData();
+    console.log('Renderizando tabela:', pageData);
+    
+    document.getElementById('tableBody').innerHTML = '';
+    
+    if (pageData.data.length === 0) {
+        document.getElementById('tableBody').innerHTML = 
+            '<tr><td colspan="21" class="text-center py-4 text-muted">Nenhum lote encontrado</td></tr>';
+    } else {
+        appendTableRows(pageData.data);
+    }
+    
+    updateScrollInfo(pageData);
+    atualizarResumo();
+}
+
+function appendTableRows(lotes) {
+    const body = document.getElementById('tableBody');
+    const idsEmp = new Set(dataGrid.empenhadosData.map(i => i.estoque_id));
+    
+    console.log('Append rows:', lotes.length, 'IDs empenhados:', idsEmp);
+    
+    const html = lotes.map(l => {
+        const emp = idsEmp.has(l.id);
+        const itemEmp = dataGrid.empenhadosData.find(i => i.estoque_id === l.id);
+        const st = l.status_sistemico || {};
+        const qtdValue = emp ? (itemEmp?.quantidade || '') : (dataGrid.getQtdValue(l.id) || '');
+        
+        return `
+        <tr id="row-${l.id}" class="${emp ? 'empenhado' : ''}">
+            <td style="text-align:center;">
+                <input type="checkbox" class="form-check-input chk-lote" 
+                       data-id="${l.id}" 
+                       ${emp || dataGrid.selectedRows.has(l.id) ? 'checked' : ''} 
+                       onchange="onRowCheck(this)">
+            </td>
+            <td style="text-align:center;">
+                <div class="status-sistemico-indicator-mini" 
+                     style="background-color:${st.cor||'#6c757d'};" 
+                     title="${st.nome||''}">${st.icone||''}</div>
+            </td>
+            <td>${l.az||'<span class="badge-null">vazio</span>'}</td>
+            <td class="fw-bold text-primary">
+                ${l.lote}
+                ${emp ? '<span class="badge-empenhado-info">Emp.</span>' : ''}
+            </td>
+            <td>${l.produto||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.cultivar||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.peneira||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.categoria||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.especie||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.tratamento||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.endereco}</td>
+            <td>${l.embalagem||'-'}</td>
+            <td class="small">${l.cliente||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.empresa||'<span class="badge-null">vazio</span>'}</td>
+            <td>${l.conferente||'<span class="badge-null">vazio</span>'}</td>
+            <td><span class="badge-saldo ${l.saldo>0?'bg-success':'bg-danger'}">${l.saldo}</span></td>
+            <td><span class="badge-empenhado-badge">${l.empenhado}</span></td>
+            <td><span class="badge-disponivel">${l.disponivel}</span></td>
+            <td>
+                <input type="number" class="qtd-input ${emp?'empenhado':''}" 
+                       data-id="${l.id}" 
+                       data-disp="${l.disponivel}" 
+                       data-emp="${emp}"
+                       data-peso="${l.peso_unitario || 0}"
+                       min="0" max="${l.disponivel}" 
+                       value="${qtdValue}" placeholder="0"
+                       onchange="validarQtd(this)" 
+                       onkeyup="validarQtd(this)"
+                       onfocus="this.select()">
+            </td>
+            <td>${l.peso_unitario||'0'}</td>
+            <td>
+                ${emp ? `<button class="btn-remover-item" onclick="removerItem(${itemEmp.id},${l.id})" 
+                         title="Remover empenho"><i class="fas fa-trash-alt"></i></button>` : ''}
+            </td>
+        </tr>`;
+    }).join('');
+    
+    body.insertAdjacentHTML('beforeend', html);
+}
+
+function updateScrollInfo(pageData) {
+    const info = document.getElementById('scrollInfo');
+    if (info) {
+        info.textContent = `Mostrando ${pageData.showing} de ${pageData.total} lotes`;
+    }
+}
+
+function toggleSelectAll(checkbox) {
+    const pageData = dataGrid.getPageData();
+    const empenhadosIds = new Set(dataGrid.empenhadosData.map(i => i.estoque_id));
+    
+    pageData.data.forEach(l => {
+        if (checkbox.checked) {
+            dataGrid.selectedRows.add(l.id);
+        } else {
+            if (!empenhadosIds.has(l.id)) {
+                dataGrid.selectedRows.delete(l.id);
+            }
+        }
+    });
+    
+    document.querySelectorAll('.chk-lote').forEach(chk => {
+        const id = parseInt(chk.dataset.id);
+        if (checkbox.checked) {
+            chk.checked = true;
+        } else if (!empenhadosIds.has(id)) {
+            chk.checked = false;
+        }
+    });
+    
+    atualizarResumo();
+}
+
+function onRowCheck(checkbox) {
+    const id = parseInt(checkbox.dataset.id);
+    if (checkbox.checked) {
+        dataGrid.selectedRows.add(id);
+    } else {
+        dataGrid.selectedRows.delete(id);
+    }
+    
+    // Atualizar select all
+    const pageData = dataGrid.getPageData();
+    const allChecked = pageData.data.every(l => {
+        const chk = document.querySelector(`.chk-lote[data-id="${l.id}"]`);
+        return chk && chk.checked;
+    });
+    document.getElementById('selectAllCheckbox').checked = allChecked;
+    
+    atualizarResumo();
+}
+
+
+
+
+function validarQtd(input) {
+    const id = parseInt(input.dataset.id);
+    const disp = parseInt(input.dataset.disp);
+    const pesoUnitario = parseFloat(input.dataset.peso) || 0;
+    let val = parseInt(input.value) || 0;
+
+    // Não ultrapassar o disponível do lote
+    if (val > disp) {
+        val = disp;
+        input.value = disp;
+        input.classList.add('invalid');
+        if (navigator.vibrate) navigator.vibrate(50);
+        setTimeout(() => input.classList.remove('invalid'), 600);
+    }
+
+    const sol = parseFloat(document.getElementById('rSolicitado').textContent) || 0;
+    const emp = parseFloat(document.getElementById('rEmpenhado').textContent) || 0;
+    const maxRestante = sol - emp;
+
+    if (unidadeControle === 'QUILOGRAMA' && pesoUnitario > 0) {
+        // Converter restante (KG) em unidades
+        let outrosKG = 0;
+        document.querySelectorAll('.qtd-input').forEach(inp => {
+            const inpId = parseInt(inp.dataset.id);
+            if (inpId !== id && inp.value && parseInt(inp.value) > 0 && inp.dataset.emp !== 'true') {
+                const q = parseInt(inp.value) || 0;
+                const p = parseFloat(inp.dataset.peso || 0);
+                outrosKG += q * p;
+            }
+        });
+        const disponivelKG = maxRestante - outrosKG;
+        const maxUnidades = Math.floor(disponivelKG / pesoUnitario);
+        if (val > maxUnidades && maxUnidades >= 0) {
+            val = Math.max(0, maxUnidades);
+            input.value = val;
+            input.classList.add('invalid');
+            if (navigator.vibrate) navigator.vibrate(50);
+            setTimeout(() => input.classList.remove('invalid'), 600);
+        }
+    } else {
+        // Embalagem: validação normal por unidades
+        let outros = 0;
+        document.querySelectorAll('.qtd-input').forEach(inp => {
+            const inpId = parseInt(inp.dataset.id);
+            if (inpId !== id && inp.value && parseInt(inp.value) > 0 && inp.dataset.emp !== 'true') {
+                outros += parseInt(inp.value) || 0;
+            }
+        });
+        const maxUnidades = Math.min(disp, maxRestante - outros);
+        if (val > maxUnidades && maxUnidades >= 0) {
+            val = Math.max(0, maxUnidades);
+            input.value = val;
+            input.classList.add('invalid');
+            if (navigator.vibrate) navigator.vibrate(50);
+            setTimeout(() => input.classList.remove('invalid'), 600);
+        }
+    }
+
+    dataGrid.setQtdValue(id, val);
+    const chk = document.querySelector(`.chk-lote[data-id="${id}"]`);
+    if (chk) {
+        chk.checked = val > 0;
+        if (val > 0) dataGrid.selectedRows.add(id);
+        else dataGrid.selectedRows.delete(id);
+    }
+    atualizarResumo();
+}
+
+
+function atualizarResumo() {
+    const sol = parseFloat(document.getElementById('rSolicitado').textContent) || 0;
+    let emp = 0, sel = 0, removidos = 0;
+    const idsEmp = new Set(dataGrid.empenhadosData.map(i => i.estoque_id));
+
+    // 1. Total já empenhado
+    if (unidadeControle === 'QUILOGRAMA') {
+        dataGrid.empenhadosData.forEach(item => {
+            const lote = dataGrid.allData.find(l => l.id == item.estoque_id);
+            const peso = parseFloat(lote?.peso_unitario || 0);
+            emp += item.quantidade * peso;
+        });
+    } else {
+        emp = dataGrid.empenhadosData.reduce((sum, item) => sum + item.quantidade, 0);
+    }
+
+    // 2. Selecionado agora (itens não empenhados que foram marcados e com qtd > 0)
+    if (unidadeControle === 'QUILOGRAMA') {
+        dataGrid.selectedRows.forEach(id => {
+            if (!idsEmp.has(id)) {
+                const qtd = parseInt(dataGrid.getQtdValue(id)) || 0;
+                const lote = dataGrid.allData.find(l => l.id == id);
+                const peso = parseFloat(lote?.peso_unitario || 0);
+                sel += qtd * peso;
+            }
+        });
+    } else {
+        dataGrid.selectedRows.forEach(id => {
+            if (!idsEmp.has(id)) {
+                sel += parseInt(dataGrid.getQtdValue(id)) || 0;
+            }
+        });
+    }
+
+    // 3. Removidos (itens empenhados que foram desmarcados)
+    if (unidadeControle === 'QUILOGRAMA') {
+        dataGrid.empenhadosData.forEach(item => {
+            if (!dataGrid.selectedRows.has(item.estoque_id)) {
+                const lote = dataGrid.allData.find(l => l.id == item.estoque_id);
+                const peso = parseFloat(lote?.peso_unitario || 0);
+                removidos += item.quantidade * peso;
+            }
+        });
+    } else {
+        dataGrid.empenhadosData.forEach(item => {
+            if (!dataGrid.selectedRows.has(item.estoque_id)) {
+                removidos += item.quantidade;
+            }
+        });
+    }
+
+    // 4. Restante
+    const restante = Math.max(0, sol - emp - sel + removidos);
+
+    // 5. Atualizar interface
+    if (unidadeControle === 'QUILOGRAMA') {
+        document.getElementById('rEmpenhado').textContent = emp.toFixed(2);
+        document.getElementById('rSelecionado').textContent = sel.toFixed(2);
+        document.getElementById('rRestante').textContent = restante.toFixed(2);
+    } else {
+        document.getElementById('rEmpenhado').textContent = emp;
+        document.getElementById('rSelecionado').textContent = sel;
+        document.getElementById('rRestante').textContent = restante;
+    }
+
+    // 6. Botão Salvar habilitado apenas se houver alterações
+    document.getElementById('btnConfirmar').disabled = (sel === 0 && removidos === 0);
+}
+
+// 🔁 KG: selecionar todos adaptado
+function selecionarTodos() {
+    const sol = parseFloat(document.getElementById('rSolicitado').textContent) || 0;
+    const emp = parseFloat(document.getElementById('rEmpenhado').textContent) || 0;
+    let rest = sol - emp;
+
+    const allData = dataGrid.getPageData().data;
+    allData.forEach(l => {
+        if (rest <= 0) return;
+        const input = document.querySelector(`.qtd-input[data-id="${l.id}"]`);
+        if (!input || input.dataset.emp === 'true') return;
+
+        if (unidadeControle === 'QUILOGRAMA') {
+            const peso = parseFloat(l.peso_unitario || 0);
+            if (peso <= 0) return;
+            const maxUnidades = Math.floor(rest / peso);
+            const q = Math.min(l.disponivel, maxUnidades);
+            if (q > 0) {
+                input.value = q;
+                validarQtd(input);
+                rest -= q * peso;
+            }
+        } else {
+            const q = Math.min(l.disponivel, rest);
+            if (q > 0) {
+                input.value = q;
+                validarQtd(input);
+                rest -= q;
+            }
+        }
+    });
+}
+
+
+
+
+
+
+
+
+
+// ==================== FILTROS (USANDO dataGrid) ====================
+let colFiltro = null;
+
+function abrirFiltro(col, event) {
+    colFiltro = col;
+    const th = event ? event.currentTarget : document.querySelector(`th[onclick*="${col}"]`);
+    
+    document.getElementById('filterPopupTitle').textContent = 'Filtrar: ' + col;
+    document.getElementById('filterPopupSearch').value = '';
+    
+    const todosDados = dataGrid.allData;
+    const opcoes = [...new Set(todosDados.map(l => {
+        if (col === 'status_sistemico') return l.status_sistemico?.nome || '';
+        return l[col] || '';
+    }).filter(v => v !== ''))].sort();
+    
+    const sel = dataGrid.activeFilters[col] || [];
+    
+    document.getElementById('filterPopupBody').innerHTML = opcoes.length > 0 
+        ? opcoes.map(v => `
+            <label class="filter-option">
+                <input type="checkbox" class="form-check-input" value="${v}" ${sel.includes(v) ? 'checked' : ''}>
+                <span>${v}</span>
+            </label>`).join('')
+        : '<div class="text-center text-muted py-3">Nenhuma opção disponível</div>';
+    
+    // Posicionar abaixo do cabeçalho clicado
+    if (th) {
+        const rect = th.getBoundingClientRect();
+        const popup = document.getElementById('filterPopup');
+        const popupWidth = 350;
+        const popupHeight = 400;
+        
+        let top = rect.bottom + 5;
+        let left = rect.left;
+        
+        // Ajustar para não sair da tela à direita
+        if (left + popupWidth > window.innerWidth - 10) {
+            left = window.innerWidth - popupWidth - 10;
+        }
+        // Ajustar para não sair da tela à esquerda
+        if (left < 10) left = 10;
+        // Ajustar para não sair da tela em baixo
+        if (top + popupHeight > window.innerHeight - 10) {
+            top = rect.top - popupHeight - 5;
+            if (top < 10) top = 10;
+        }
+        
+        popup.style.position = 'fixed';
+        popup.style.top = top + 'px';
+        popup.style.left = left + 'px';
+        popup.style.display = 'block';
+    } else {
+        // Fallback: centralizar
+        const popup = document.getElementById('filterPopup');
+        popup.style.top = '50%';
+        popup.style.left = '50%';
+        popup.style.transform = 'translate(-50%, -50%)';
+        popup.style.display = 'block';
+    }
+    
+    setTimeout(() => {
+        const inp = document.getElementById('filterPopupSearch');
+        if (inp) inp.focus();
+    }, 100);
+}
+
+function filtrarPopup() {
+    const s = document.getElementById('filterPopupSearch').value.toLowerCase();
+    document.querySelectorAll('#filterPopupBody .filter-option').forEach(o => {
+        o.style.display = o.textContent.toLowerCase().includes(s) ? '' : 'none';
+    });
+}
+
+function toggleAllPopup(checked) {
+    document.querySelectorAll('#filterPopupBody .filter-option:not([style*="display:none"]) input').forEach(cb => cb.checked = checked);
+}
+
+function aplicarFiltro() {
+    const sel = [...document.querySelectorAll('#filterPopupBody input:checked')].map(c => c.value);
+    // Usar dataGrid
+    if (sel.length) {
+        dataGrid.activeFilters[colFiltro] = sel;
+    } else {
+        delete dataGrid.activeFilters[colFiltro];
+    }
+    
+    dataGrid.applyAllFilters();
+
+    atualizarUIComFiltros();
+    fecharFiltro();
+    renderTableData();
+}
+
+function atualizarUIComFiltros() {
+    const badgesContainer = document.getElementById('filtrosAtivosBadges');
+    badgesContainer.innerHTML = '';
+    let count = 0;
+    
+    Object.entries(dataGrid.activeFilters).forEach(([k, values]) => {
+        values.forEach(v => {
+            count++;
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-secondary me-1';
+            badge.style.cssText = 'cursor:pointer;font-size:0.55rem;';
+            badge.innerHTML = `${k}:${v} <i class="fas fa-times ms-1"></i>`;
+            badge.onclick = () => {
+                dataGrid.activeFilters[k] = dataGrid.activeFilters[k].filter(x => x !== v);
+                if (!dataGrid.activeFilters[k].length) delete dataGrid.activeFilters[k];
+                dataGrid.applyAllFilters();  // ← ADICIONE ESTA LINHA
+                atualizarUIComFiltros();
+                renderTableData();
+            };
+            badgesContainer.appendChild(badge);
+        });
+    });
+    
+    // Botão limpar filtros
+    const btnLimpar = document.getElementById('btnLimparFiltros');
+    if (btnLimpar) btnLimpar.style.display = count > 0 ? 'inline-block' : 'none';
+    
+    // Marcar cabeçalhos e contadores
+    document.querySelectorAll('#modalTable th').forEach(th => {
+        const col = th.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+        if (col) {
+            th.classList.toggle('filter-active', !!dataGrid.activeFilters[col]);
+            let countBadge = th.querySelector('.filter-count-badge');
+            if (!countBadge) {
+                countBadge = document.createElement('span');
+                countBadge.className = 'filter-count-badge';
+                countBadge.style.cssText = 'background:#ffc107;color:#000;font-size:0.5rem;padding:1px 4px;border-radius:8px;margin-left:4px;display:none;';
+                th.appendChild(countBadge);
+            }
+            if (dataGrid.activeFilters[col] && dataGrid.activeFilters[col].length > 0) {
+                countBadge.textContent = dataGrid.activeFilters[col].length;
+                countBadge.style.display = 'inline';
+            } else {
+                countBadge.style.display = 'none';
+            }
+        }
+    });
+}
+
+function limparTodosFiltros() {
+    dataGrid.activeFilters = {};
+    dataGrid.applyAllFilters();  // ← ADICIONE ESTA LINHA
+    atualizarUIComFiltros();
+    renderTableData();
+}
+
+function fecharFiltro() {
+    document.getElementById('filterPopup').style.display = 'none';
+    colFiltro = null;
+}
+
+// ==================== BUSCA ====================
+function debounceBusca() {
+    clearTimeout(window._searchTimeout);
+    const input = document.getElementById('modalBusca');
+    const btn = document.getElementById('modalClearSearch');
+    if (btn) btn.style.display = input.value ? 'inline-block' : 'none';
+    
+    window._searchTimeout = setTimeout(() => {
+        dataGrid.setSearch(input.value);
+        renderTableData();
+    }, 300);
+}
+
+function limparBusca() {
+    document.getElementById('modalBusca').value = '';
+    document.getElementById('modalClearSearch').style.display = 'none';
+    dataGrid.clearSearch();
+    renderTableData();
+}
+
+
+
+
+
+
+
+function limparNovos() {
+    const empenhadosIds = new Set(dataGrid.empenhadosData.map(i => i.estoque_id));
+    
+    document.querySelectorAll('.qtd-input').forEach(i => {
+        if (i.dataset.emp === 'true') return;
+        i.value = '';
+        i.classList.remove('invalid');
+    });
+    
+    document.querySelectorAll('.chk-lote').forEach(c => {
+        const id = parseInt(c.dataset.id);
+        if (empenhadosIds.has(id)) return;
+        c.checked = false;
+        dataGrid.selectedRows.delete(id);
+    });
+    
+    dataGrid.clearQtdValues();
+    document.getElementById('selectAllCheckbox').checked = false;
+    atualizarResumo();
+}
+
+async function removerItem(itemId, loteId) {
+    if (!confirm('Remover este lote do empenho? O card voltará ao status anterior.')) return;
+    try {
+        const r = await fetch(`/api/solicitacoes/${solicId}/remover-item/${itemId}/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type':'application/json',
+                'X-CSRFToken':getCookie('csrftoken')
+            }
+        });
+        const d = await r.json();
+        if (d.success) {
+            await carregarLotesInicial();
+            carregarCards();
+            carregarFeed();
+        } else {
+            alert('❌ ' + (d.error || 'Erro'));
+        }
+    } catch(e) {
+        alert('Erro: ' + e.message);
+    }
+}
+
+async function salvarEmpenho() {
+    const adicionar = [], remover = [];
+    const idsEmp = new Set(dataGrid.empenhadosData.map(i => i.estoque_id));
+    
+    dataGrid.selectedRows.forEach(id => {
+        if (idsEmp.has(id)) return;
+        const qtd = dataGrid.getQtdValue(id);
+        if (qtd && parseInt(qtd) > 0) {
+            adicionar.push({ lote_id: id, quantidade: parseInt(qtd) });
+        }
+    });
+    
+    dataGrid.empenhadosData.forEach(item => {
+        if (!dataGrid.selectedRows.has(item.estoque_id)) {
+            remover.push(item.id);
+        }
+    });
+    
+    if (adicionar.length === 0 && remover.length === 0) {
+        alert('Nenhuma alteração detectada');
+        return;
+    }
+    
+    const btn = document.getElementById('btnConfirmar');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
+    
+    try {
+        // Remover itens
+        for (const itemId of remover) {
+            await fetch(`/api/solicitacoes/${solicId}/remover-item/${itemId}/`, {
+                method: 'POST', 
+                headers: {
+                    'Content-Type':'application/json',
+                    'X-CSRFToken':getCookie('csrftoken')
+                }
+            });
+        }
+        
+        // Adicionar itens
+        if (adicionar.length > 0) {
+            const r = await fetch(`/api/solicitacoes/${solicId}/empenhar/`, {
+                method: 'POST', 
+                headers: {
+                    'Content-Type':'application/json',
+                    'X-CSRFToken':getCookie('csrftoken')
+                },
+                body: JSON.stringify({ itens: adicionar })
+            });
+            const d = await r.json();
+            if (!d.success) throw new Error(d.error);
+        }
+        
+        bootstrap.Modal.getInstance(document.getElementById('modalEmpenho')).hide();
+        carregarCards();
+        carregarFeed();
+        alert('✅ Alterações salvas com sucesso!');
+    } catch(e) {
+        alert('❌ ' + (e.message || 'Erro'));
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save me-1"></i> Salvar Alterações';
+    }
+}
+
+// ==================== GERENCIADOR DE COLUNAS ====================
+function initColumnVisibilityModal() {
+    const saved = localStorage.getItem('modalColumnVis');
+    if (saved) {
+        try {
+            const vis = JSON.parse(saved);
+            applyColumnVisibilityData(vis);
+        } catch(e) {
+            console.error('Erro ao carregar configurações de colunas:', e);
+        }
+    }
+    buildColumnManagerModal();
+}
+
+function buildColumnManagerModal() {
+    const list = document.getElementById('columnManagerModalList');
+    if (!list) return;
+    
+    const saved = JSON.parse(localStorage.getItem('modalColumnVis') || '{}');
+    
+    list.innerHTML = modalColumnDefs.map(def => {
+        const isVis = saved[def.key] !== undefined ? saved[def.key] : true;
+        return `
+        <div class="column-manager-modal-item">
+            <input type="checkbox" id="mcol-${def.key}" ${isVis ? 'checked' : ''} ${def.alwaysVisible ? 'disabled' : ''}>
+            <label for="mcol-${def.key}" style="flex:1;cursor:pointer;font-size:0.75rem;">${def.label}</label>
+            ${def.alwaysVisible ? '<small style="color:#94a3b8;">fixa</small>' : ''}
+        </div>`;
+    }).join('');
+}
+
+function toggleColumnManagerModal() {
+    const c = document.getElementById('columnManagerModal');
+    if (c.style.display === 'block') {
+        c.style.display = 'none';
+        return;
+    }
+    buildColumnManagerModal();
+    c.style.display = 'block';
+}
+
+function applyColumnVisibilityModal() {
+    const vis = {};
+    modalColumnDefs.forEach(def => {
+        const cb = document.getElementById(`mcol-${def.key}`);
+        if (cb) vis[def.key] = cb.checked;
+    });
+    
+    localStorage.setItem('modalColumnVis', JSON.stringify(vis));
+    applyColumnVisibilityData(vis);
+    document.getElementById('columnManagerModal').style.display = 'none';
+}
+
+function applyColumnVisibilityData(vis) {
+    modalColumnDefs.forEach(def => {
+        if (def.alwaysVisible) return;
+        const isVis = vis[def.key] !== undefined ? vis[def.key] : true;
+        
+        // Cabeçalho
+        const th = document.querySelector(`#modalTable th:nth-child(${def.index + 1})`);
+        if (th) th.style.display = isVis ? '' : 'none';
+        
+        // Células
+        document.querySelectorAll(`#tableBody tr`).forEach(row => {
+            const cell = row.cells[def.index];
+            if (cell) cell.style.display = isVis ? '' : 'none';
+        });
+    });
+}
+
+function resetColumnsModal() {
+    const vis = {};
+    modalColumnDefs.forEach(def => vis[def.key] = true);
+    localStorage.setItem('modalColumnVis', JSON.stringify(vis));
+    applyColumnVisibilityData(vis);
+    buildColumnManagerModal();
+    document.getElementById('columnManagerModal').style.display = 'none';
+}
+
+// ==================== CARDS ====================
+async function carregarCards() {
+    try {
+        const r = await fetch('/api/solicitacoes/listar/');
+        const d = await r.json();
+        if (d.success) renderCards(d.solicitacoes);
+    } catch(e) { 
+        console.error('Erro ao carregar cards:', e); 
+    }
+}
+
+function renderCards(sols) {
+    const ativos = sols.filter(s => !['CONCLUIDO', 'CANCELADO'].includes(s.status));
+    const concluidos = sols.filter(s => ['CONCLUIDO', 'CANCELADO'].includes(s.status));
+    
+    const ca = document.getElementById('cardsContainer');
+    ca.innerHTML = ativos.length ? ativos.map(s => criarCardHTML(s)).join('') : 
+        '<div class="text-center py-4 w-100 text-muted">Nenhuma solicitação ativa</div>';
+    
+    const cc = document.getElementById('cardsConcluidos');
+    cc.innerHTML = concluidos.length ? concluidos.map(s => criarCardHTML(s)).join('') : 
+        '<div class="text-center py-4 w-100 text-muted">Nenhuma solicitação concluída</div>';
+}
+
+function criarCardHTML(s) {
+    // Usar o valor display (já em KG se for o caso)
+    const qtdEmp = s.quantidade_empenhada_display ?? s.quantidade_empenhada ?? 0;
+    const pct = s.percentual_empenhado ?? 0;
+    const barColor = pct >= 100 ? '#28a745' : pct >= 50 ? '#ffc107' : '#dc3545';
+    const unidade = s.unidade_controle || 'EMBALAGEM';
+    const concluido = ['CONCLUIDO', 'CANCELADO'].includes(s.status);
+    const showExcluir = s.quantidade_empenhada <= 0 && !concluido;
+    const temItens = s.quantidade_empenhada > 0;
+
+    // Formatar número: 2 casas para KG, inteiro para unidades
+    const qtdFormatada = unidade === 'QUILOGRAMA' ? Number(qtdEmp).toFixed(2) : Math.round(qtdEmp);
+    const pctFormatado = Math.round(pct);
+
+    return `<div class="solicitacao-card" id="card-${s.id}" style="${concluido ? 'opacity:0.8;' : ''}">
+        ${showExcluir ? `<button class="btn-excluir-card show" onclick="excluirCard(${s.id},'${(s.titulo || '').replace(/'/g, "\\'")}')"><i class="fas fa-times-circle"></i></button>` : ''}
+        <div class="d-flex justify-content-between mb-1">
+            <span class="card-status status-${s.status}">${fmtStatus(s.status)}</span>
+            <small class="text-muted">#${s.id}</small>
+        </div>
+        <h6 class="mb-1 pe-3" style="font-size:0.8rem;">${s.titulo}</h6>
+        <div class="mb-1">
+            ${s.criterios?.armazem ? `<span class="card-badge">🏭 ${s.criterios.armazem}</span>` : ''}
+            ${s.criterios?.produto ? `<span class="card-badge">📦 ${s.criterios.produto}</span>` : ''}
+            ${s.criterios?.cliente ? `<span class="card-badge">👤 ${s.criterios.cliente}</span>` : ''}
+        </div>
+        <div class="card-progress-bar">
+            <div class="card-progress-fill" style="width:${pct}%;background:${barColor};"></div>
+        </div>
+        <div class="d-flex justify-content-between small mb-1">
+            <span>${qtdFormatada}/${s.quantidade_solicitada} ${unidade === 'QUILOGRAMA' ? 'KG' : unidade}</span>
+            <strong>${pctFormatado}%</strong>
+        </div>
+        <div class="small text-muted mb-1">👤 ${s.criador_nome} | 📅 ${s.data_criacao}</div>
+        ${concluido ? `
+            <button class="btn btn-sm btn-outline-info w-100" onclick="imprimirCard(${s.id})">
+                <i class="fas fa-print"></i> Imprimir
+            </button>` : `
+            <button class="btn btn-sm btn-success w-100" onclick="abrirModalEmpenho(${s.id})">
+                <i class="fas fa-edit me-1"></i> Empenhar
+            </button>
+            <div class="d-flex gap-1 mt-1">
+                <button class="btn btn-sm btn-outline-info flex-fill" onclick="imprimirCard(${s.id})">
+                    <i class="fas fa-print"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-warning flex-fill" 
+                        onclick="abrirMovModal(${s.id},'transferir')" ${!temItens ? 'disabled' : ''}>
+                    <i class="fas fa-exchange-alt"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger flex-fill" 
+                        onclick="abrirMovModal(${s.id},'expedir')" ${!temItens ? 'disabled' : ''}>
+                    <i class="fas fa-truck"></i>
+                </button>
+            </div>`}
+    </div>`;
+}
+
+function fmtStatus(s) {
+    const m = {
+        'AGUARDANDO_EMPENHO': 'Ag. Empenho', 
+        'EMPENHO_PARCIAL': 'Emp. Parcial',
+        'EMPENHO_COMPLETO': 'Emp. Completo', 
+        'MOVIMENTACAO_PARCIAL': 'Mov. Parcial',
+        'CONCLUIDO': 'Concluído', 
+        'CANCELADO': 'Cancelado'
+    };
+    return m[s] || s;
+}
+
+function mostrarAtivos() {
+    document.getElementById('ativosContainer').style.display = 'block';
+    document.getElementById('concluidosContainer').style.display = 'none';
+    document.getElementById('btnAtivos').classList.add('active');
+    document.getElementById('btnConcluidos').classList.remove('active');
+}
+
+function mostrarConcluidos() {
+    document.getElementById('ativosContainer').style.display = 'none';
+    document.getElementById('concluidosContainer').style.display = 'block';
+    document.getElementById('btnAtivos').classList.remove('active');
+    document.getElementById('btnConcluidos').classList.add('active');
+}
+
+async function excluirCard(id, titulo) {
+    if (!confirm(`Excluir "${titulo}"?`)) return;
+    try {
+        const r = await fetch(`/api/solicitacoes/${id}/excluir/`, {
+            method: 'POST', 
+            headers: {
+                'Content-Type':'application/json',
+                'X-CSRFToken':getCookie('csrftoken')
+            }
+        });
+        const d = await r.json();
+        if (d.success) { 
+            carregarCards(); 
+            carregarFeed(); 
+        } else {
+            alert('❌ ' + d.error);
+        }
+    } catch(e) { 
+        alert('Erro: ' + e.message); 
+    }
+}
+
+// ==================== MODAL MOVIMENTAÇÃO ====================
+async function abrirMovModal(solId, acao) {
+    movSolId = solId;
+    movAcao = acao;
+    
+    const h = document.getElementById('headerMov');
+    const t = document.getElementById('tituloMov');
+    const cT = document.getElementById('camposTransf');
+    const cE = document.getElementById('camposExped');
+    
+    if (acao === 'transferir') {
+        h.className = 'modal-header bg-warning text-dark';
+        t.innerHTML = '<i class="fas fa-exchange-alt me-2"></i>Transferência Parcial';
+        cT.classList.remove('d-none');
+        cE.classList.add('d-none');
+    } else {
+        h.className = 'modal-header bg-danger text-white';
+        t.innerHTML = '<i class="fas fa-truck me-2"></i>Expedição (campos opcionais)';
+        cT.classList.add('d-none');
+        cE.classList.remove('d-none');
+    }
+    
+    ['movNovoEnd', 'movNovoAz', 'movCarga', 'movCliente', 'movPlaca', 'movObs'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    document.getElementById('selAllMov').checked = false;
+    
+    const tbody = document.getElementById('movItemsBody');
+    tbody.innerHTML = '<tr><td colspan="11" class="text-center py-3"><div class="spinner-border spinner-border-sm text-success"></div> Carregando itens...</td></tr>';
+    
+    try {
+        const r = await fetch(`/api/solicitacoes/${solId}/impressao/`);
+        const d = await r.json();
+        
+        document.getElementById('movCardNome').textContent = d.solicitacao?.titulo || '---';
+        
+        const pendentes = d.itens_pendentes || [];
+        const processados = d.itens_processados || [];
+        
+        const todos = [
+            ...pendentes.map(i => ({...i, situacao: 'PENDENTE', podeSelecionar: true})),
+            ...processados.map(i => ({
+                ...i, 
+                situacao: i.tipo === 'transferencia' ? 'TRANSFERIDO' : 'EXPEDIDO', 
+                podeSelecionar: false
+            }))
+        ];
+        
+        if (todos.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center py-3 text-muted">Nenhum item neste card</td></tr>';
+        } else {
+            tbody.innerHTML = todos.map(item => `
+                <tr class="${!item.podeSelecionar ? 'processado' : ''}">
+                    <td>
+                        ${item.podeSelecionar 
+                            ? `<input type="checkbox" class="mov-chk" data-id="${item.item_id || item.id}" data-lote="${item.lote}" data-qtd="${item.quantidade}">`
+                            : '<span class="badge bg-secondary">✓</span>'}
+                    </td>
+                    <td class="fw-bold">${item.lote}</td>
+                    <td>${item.quantidade}</td>
+                    <td>${item.saldo_atual || 0}</td>
+                    <td>${item.produto || '-'}</td>
+                    <td>${item.cultivar || '-'}</td>
+                    <td>${item.endereco || '-'}</td>
+                    <td>${item.az || '-'}</td>
+                    <td>${item.cliente || '-'}</td>
+                    <td>${item.embalagem || '-'}</td>
+                    <td>
+                        <span class="badge ${item.situacao === 'PENDENTE' ? 'bg-warning text-dark' : item.situacao === 'TRANSFERIDO' ? 'bg-success' : 'bg-danger'}">
+                            ${item.situacao}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch(e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-danger py-3">Erro ao carregar itens</td></tr>';
+    }
+    
+    new bootstrap.Modal(document.getElementById('modalMov')).show();
+}
+
+async function confirmarMov() {
+    const ids = [...document.querySelectorAll('.mov-chk:checked')]
+        .map(c => parseInt(c.dataset.id))
+        .filter(id => id > 0);
+    
+    if (!ids.length) {
+        alert('Selecione pelo menos um item PENDENTE!');
+        return;
+    }
+    
+    const payload = {
+        acao: movAcao,
+        itens_ids: ids,
+        observacao: document.getElementById('movObs').value
+    };
+    
+    if (movAcao === 'transferir') {
+        payload.novo_endereco = document.getElementById('movNovoEnd').value;
+        payload.az = document.getElementById('movNovoAz').value;
+        if (!payload.novo_endereco) {
+            alert('Informe o novo endereço para transferência!');
+            return;
+        }
+    } else {
+        payload.numero_carga = document.getElementById('movCarga').value;
+        payload.cliente = document.getElementById('movCliente').value;
+        payload.placa = document.getElementById('movPlaca').value;
+    }
+    
+    const btn = document.getElementById('btnConfirmMov');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
+    
+    try {
+        const r = await fetch(`/api/solicitacoes/${movSolId}/movimentar/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', 
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        
+        if (d.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalMov')).hide();
+            carregarCards();
+            carregarFeed();
+            alert('✅ ' + d.message);
+        } else {
+            alert('❌ ' + (d.error || 'Erro ao processar'));
+        }
+    } catch(e) {
+        alert('Erro: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Confirmar';
+    }
+}
+
+// ==================== IMPRESSÃO ====================
+function imprimirCard(id) {
+    const win = window.open('', '_blank', 'width=1000,height=700');
+    win.document.write(`
+        <html><head><title>Carregando...</title></head>
+        <body style="text-align:center;padding-top:50px;font-family:sans-serif;">
+            <h3>⏳ Carregando relatório...</h3>
+        </body></html>
+    `);
+
+    fetch(`/api/solicitacoes/${id}/impressao/`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                win.document.body.innerHTML = '<h3 style="color:red;">Erro ao carregar dados</h3>';
+                return;
+            }
+
+            const sol = data.solicitacao;
+            const pendentes = data.itens_pendentes || [];
+            const processados = data.itens_processados || [];
+            const todos = [...pendentes.map(i => ({...i, situacao: 'PENDENTE'})), ...processados];
+            const totalQtd = todos.reduce((s, i) => s + (i.quantidade || 0), 0);
+
+            win.document.title = `Card #${sol.id} - ${sol.titulo}`;
+            win.document.body.innerHTML = `
+                <style>
+                    *{margin:0;padding:0;box-sizing:border-box}
+                    body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;color:#1a202c;font-size:10px}
+                    .header{text-align:center;border-bottom:3px solid #2f8f4e;padding-bottom:12px;margin-bottom:15px}
+                    .header h2{color:#2f8f4e;font-size:18px;margin-bottom:3px}
+                    .info-box{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:15px}
+                    .info-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #e2e8f0;font-size:10px}
+                    .info-row strong{color:#2f8f4e;min-width:130px}
+                    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:9px}
+                    thead th{background:#2f8f4e;color:white;padding:6px 4px;text-align:left;font-weight:600;text-transform:uppercase;font-size:8px}
+                    tbody td{padding:5px 4px;border-bottom:1px solid #e2e8f0}
+                    tbody tr:nth-child(even){background:#f8fafc}
+                    .badge{display:inline-block;padding:2px 6px;border-radius:10px;font-size:7px;font-weight:700}
+                    .badge-pendente{background:#fff3cd;color:#856404}
+                    .badge-transferido{background:#d4edda;color:#155724}
+                    .badge-expedido{background:#d1ecf1;color:#0c5460}
+                    .footer{margin-top:20px;text-align:center;color:#94a3b8;font-size:9px;border-top:1px solid #e2e8f0;padding-top:12px}
+                    @media print{button{display:none!important}@page{margin:8mm}}
+                </style>
+
+                <div class="header">
+                    <h2>🧾 RELATÓRIO DE SOLICITAÇÃO</h2>
+                    <p>Emitido em: ${new Date().toLocaleString('pt-BR')}</p>
+                </div>
+
+                <div class="info-box">
+                    <div class="info-row"><strong>Card:</strong><span>#${sol.id} - ${sol.titulo}</span></div>
+                    <div class="info-row"><strong>Criador:</strong><span>${sol.criador || '---'}</span></div>
+                    <div class="info-row"><strong>Data Criação:</strong><span>${sol.data_criacao || '---'}</span></div>
+                    <div class="info-row"><strong>Unidade:</strong><span>${sol.unidade_controle || '---'}</span></div>
+                    <div class="info-row"><strong>Qtd Solicitada:</strong><span style="font-size:13px;font-weight:700;">${sol.quantidade_solicitada || 0}</span></div>
+                    <div class="info-row"><strong>Qtd Empenhada:</strong><span style="color:#f59e0b;font-weight:700;">${sol.quantidade_empenhada || 0}</span></div>
+                    <div class="info-row"><strong>Qtd Movimentada:</strong><span style="color:#3b82f6;font-weight:700;">${sol.quantidade_movimentada || 0}</span></div>
+                    <div class="info-row"><strong>Status:</strong><span>${sol.status || '---'}</span></div>
+                    ${sol.criterios ? `
+                    <div class="info-row"><strong>Critérios:</strong><span>${
+                        [sol.criterios.armazem ? '🏭 ' + sol.criterios.armazem : '',
+                         sol.criterios.produto ? '📦 ' + sol.criterios.produto : '',
+                         sol.criterios.especie ? '🌱 ' + sol.criterios.especie : '',
+                         sol.criterios.cliente ? '👤 ' + sol.criterios.cliente : ''
+                        ].filter(Boolean).join(' | ') || 'Nenhum'
+                    }</span></div>` : ''}
+                    ${sol.observacao ? `<div class="info-row"><strong>Observação:</strong><span>📝 ${sol.observacao}</span></div>` : ''}
+                </div>
+
+                <h3 style="color:#2f8f4e;margin-bottom:8px;">📋 Itens (${todos.length}) - Total: ${totalQtd} ${sol.unidade_controle || 'un'}</h3>
+
+                ${todos.length > 0 ? `
+                <table>
+                    <thead>
+                        <tr><th>#</th><th>Situação</th><th>Lote</th><th>Qtd</th><th>Produto</th><th>Cultivar</th><th>Peneira</th><th>Endereço</th><th>Cliente</th></tr>
+                    </thead>
+                    <tbody>
+                        ${todos.map((item, idx) => `
+                            <tr>
+                                <td>${idx + 1}</td>
+                                <td><span class="badge badge-${(item.situacao || 'pendente').toLowerCase()}">${item.situacao || 'PENDENTE'}</span></td>
+                                <td><strong>${item.lote || '-'}</strong></td>
+                                <td style="text-align:center;font-weight:700;">${item.quantidade || 0}</td>
+                                <td>${item.produto || '-'}</td>
+                                <td>${item.cultivar || '-'}</td>
+                                <td>${item.peneira || '-'}</td>
+                                <td>${item.endereco || '-'}</td>
+                                <td>${item.cliente || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background:#f8f9fa;font-weight:700;">
+                            <td colspan="3" style="text-align:right;">TOTAL:</td>
+                            <td style="text-align:center;color:#2f8f4e;font-size:11px;">${totalQtd}</td>
+                            <td colspan="5"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                ` : '<p style="text-align:center;color:#94a3b8;padding:20px;">Nenhum item registrado</p>'}
+
+                <div class="footer">
+                    <p>INFINITY STOCK - Sistema de Gestão de Estoque</p>
+                    <p>Documento gerado automaticamente em ${new Date().toLocaleString('pt-BR')}</p>
+                </div>
+
+                <div style="text-align:center;margin-top:15px;">
+                    <button onclick="window.print()" style="padding:10px 25px;background:#2f8f4e;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">
+                        🖨️ Imprimir
+                    </button>
+                    <button onclick="window.close()" style="padding:10px 25px;background:#6c757d;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;margin-left:8px;">
+                        Fechar
+                    </button>
+                </div>
+            `;
+        })
+        .catch(e => {
+            win.document.body.innerHTML = '<h3 style="color:red;">Erro ao carregar relatório</h3>';
+        });
+}
+
+// ==================== FEED ====================
+async function carregarFeed() {
+    try {
+        const r = await fetch('/api/cards/atualizacoes/?limite=10');
+        const d = await r.json();
+        const el = document.getElementById('feedList');
+        if (d.success && d.atualizacoes.length) {
+            el.innerHTML = d.atualizacoes.map(a => `
+                <div class="py-1 border-bottom small">
+                    <strong>${a.usuario}</strong> ${a.descricao}
+                    <span class="text-muted ms-2">${a.data}</span>
+                </div>
+            `).join('');
+        } else {
+            el.innerHTML = '<div class="text-center text-muted py-2">Nenhuma atualização recente</div>';
+        }
+    } catch(e) {
+        console.error('Erro ao carregar feed:', e);
+    }
+}
+
+// ==================== UTILITÁRIOS ====================
+function getCookie(n) {
+    let v = null;
+    document.cookie.split(';').forEach(c => {
+        c = c.trim();
+        if (c.startsWith(n + '=')) v = decodeURIComponent(c.substring(n.length + 1));
+    });
+    return v;
+}
+
+// Fechar popups ao clicar fora
+document.addEventListener('click', e => {
+    const fp = document.getElementById('filterPopup');
+    if (fp && fp.style.display === 'block' && !fp.contains(e.target) && !e.target.closest('th')) {
+        fecharFiltro();
+    }
+    
+    const cm = document.getElementById('columnManagerModal');
+    if (cm && cm.style.display === 'block' && !cm.contains(e.target) && !e.target.closest('.btn-columns-modal')) {
+        cm.style.display = 'none';
+    }
+});
+
+// Fechar com ESC
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        fecharFiltro();
+        document.getElementById('columnManagerModal').style.display = 'none';
+    }
+});
+
+// Melhorar navegação na tabela com teclado
+document.addEventListener('keydown', e => {
+    if (e.target.classList.contains('qtd-input')) {
+        if (e.key === 'Tab' && !e.shiftKey) {
+            // Navegar para próxima linha mesmo campo
+            const currentRow = e.target.closest('tr');
+            if (currentRow && currentRow.nextElementSibling) {
+                const nextInput = currentRow.nextElementSibling.querySelector('.qtd-input');
+                if (nextInput) {
+                    e.preventDefault();
+                    nextInput.focus();
+                    nextInput.select();
+                }
+            }
+        }
+    }
+});
+
+function mostrarNotificacaoNavegador(titulo, corpo) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(titulo, {
+            body: corpo,
+            icon: '/static/img/logo.png',
+            tag: 'solicitacao-update'
+        });
+    }
+}
+
+// ==================== POLLING DE ATUALIZAÇÃO AO VIVO ====================
+let _ultimaVersao = null;
+let _pollingInterval = null;
+
+function iniciarPolling() {
+    if (_pollingInterval) clearInterval(_pollingInterval);
+    _pollingInterval = setInterval(verificarAtualizacoes, 5000); // 5 segundos
+    console.log('✅ Polling iniciado a cada 30s');
+}
+
+async function verificarAtualizacoes() {
+    try {
+        const resp = await fetch('/api/cards/versao/');
+        const data = await resp.json();
+        if (!data.success) return;
+
+        if (_ultimaVersao === null) {
+            _ultimaVersao = data.version;
+            return;
+        }
+
+        if (data.version !== _ultimaVersao) {
+            console.log('🔄 Alteração detectada!');
+            _ultimaVersao = data.version;
+            await carregarCards();
+            await carregarFeed();
+            tocarSomNotificacao();
+            mostrarNotificacaoNavegador('Solicitações atualizadas', 'Um card foi modificado.');
+        }
+    } catch (e) {
+        console.error('Erro no polling:', e);
+    }
+}
+
+function tocarSomNotificacao() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 800;
+        gain.gain.value = 0.3;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {
+        console.log('Não foi possível tocar o som:', e);
+    }
+}
+
+// Iniciar automaticamente após 5 segundos
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(iniciarPolling, 5000);
+});
+</script>
+{% endblock %}

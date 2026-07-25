@@ -3,1340 +3,237 @@
 
 {% block content %}
 <style>
-    /* =========================================
-       1. ESTILOS GERAIS
-       ========================================= */
-    :root {
-        --primary-gradient: linear-gradient(135deg, #2f8f4e 0%, #267a41 100%);
-        --hover-gradient: linear-gradient(135deg, #267a41 0%, #1f5a34 100%);
-        --active-gradient: linear-gradient(135deg, #1f6a36 0%, #16572b 100%);
-        --border-color: #e2e8f0;
-        --bg-light: #f8fafc;
-        --card-width: 260px;
-    }
-
-    .container-fluid { padding: 20px; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-
-    /* HEADER */
-    .page-header {
-        background: var(--primary-gradient);
-        color: white;
-        padding: 16px 24px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    /* CARDS */
-    #sectionCards {
-        background: var(--bg-light);
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        border: 1px solid var(--border-color);
-        transition: all 0.3s ease;
-    }
-    #sectionCards.hidden { display: none; }
-
-    .cards-wrapper-container { display: flex; align-items: center; gap: 10px; }
-
-    .cards-scroll-area {
-        display: flex; gap: 15px; overflow-x: auto; padding: 5px 5px 15px 5px;
-        scroll-behavior: smooth; flex: 1; scrollbar-width: thin;
-    }
-    .cards-scroll-area::-webkit-scrollbar { height: 6px; }
-    .cards-scroll-area::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 4px; }
-
-    .scroll-btn {
-        background: white; border: 1px solid var(--border-color); border-radius: 50%;
-        width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-        cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 2; flex-shrink: 0;
-    }
-    .scroll-btn:hover { background: #f1f5f9; transform: scale(1.1); }
-
-    .draft-card {
-        background: white; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;
-        min-width: var(--card-width); max-width: var(--card-width);
-        display: flex; flex-direction: column; justify-content: space-between; position: relative;
-        transition: all 0.2s;
-    }
-    .draft-card:hover { transform: translateY(-2px); box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.1); }
-    .draft-card.active { border: 2px solid #2f8f4e; background-color: #f0fdf4; box-shadow: 0 0 0 4px rgba(47, 143, 78, 0.1); }
-    .draft-card.has-error { border: 2px solid #ef4444; background-color: #fef2f2; }
-
-    .card-badge {
-        background: var(--primary-gradient); color: white; padding: 2px 10px; border-radius: 12px;
-        font-size: 0.75rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;
-    }
-    .card-total-badge { background: #334155; color: white; padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; }
-    .lote-list-preview { max-height: 60px; overflow-y: auto; font-size: 0.7rem; margin-top: 8px; border-top: 1px solid #eee; padding-top: 4px; }
-
-    /* STATS */
-    .summary-card {
-        border: 1px solid var(--border-color); border-radius: 8px; background: white;
-        transition: transform 0.2s; height: 100%; border-top-width: 4px; padding: 15px;
-    }
-    .summary-card:hover { transform: translateY(-2px); }
-    .summary-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; }
-
-    /* TABELA */
-    .table-container { background: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border: 1px solid var(--border-color); margin-bottom: 30px; }
-    .table-responsive { max-height: 65vh; overflow: auto; border-radius: 8px; }
-    .table-advanced { width: 100%; border-collapse: separate; border-spacing: 0; min-width: 1800px; font-size: 0.85rem; }
+    :root { --primary-dark: #2f8f4e; --border-color: #e2e8f0; --bg-light: #f8fafc; --card-width: 260px; --shadow-sm: 0 2px 8px rgba(0,0,0,0.06); --shadow-md: 0 4px 16px rgba(0,0,0,0.1); --shadow-lg: 0 8px 30px rgba(0,0,0,0.15); }
+    .container-fluid { padding: 15px; font-family: 'Segoe UI', system-ui, sans-serif; }
+    .page-header { background: linear-gradient(135deg, var(--primary-dark), #267a41); color: white; padding: 14px 20px; border-radius: 8px; margin-bottom: 16px; }
+    .cards-scroll-area { display: flex; gap: 12px; overflow-x: auto; padding: 5px 5px 12px 5px; }
+    .draft-card { background: white; border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; min-width: var(--card-width); max-width: var(--card-width); box-shadow: var(--shadow-sm); }
+    .card-badge { background: linear-gradient(135deg, var(--primary-dark), #267a41); color: white; padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+    .badge-concluido { background: #6c757d; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; }
+    .badge-transferido { background: #198754; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; }
+    .badge-expedido { background: #dc3545; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; }
     
-    .table-advanced th {
-        background: var(--primary-gradient); color: white; font-weight: 600; padding: 10px 8px;
-        position: sticky; top: 0; z-index: 20; white-space: nowrap; cursor: pointer; border-right: 1px solid rgba(255,255,255,0.1);
-        user-select: none;
-    }
-    .table-advanced th:hover { background: var(--hover-gradient); }
-    .table-advanced td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); border-right: 1px solid #f1f5f9; white-space: nowrap; vertical-align: middle; color: #334155; }
+    .table-wrapper { background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-md); border: 1px solid var(--border-color); }
+    .table-scroll-container { max-height: 60vh; overflow: auto; }
+    .table-advanced { width: 100%; font-size: 0.78rem; border-collapse: collapse; min-width: 1400px; }
+    .table-advanced thead { position: sticky; top: 0; z-index: 10; }
+    .table-advanced thead th { background: linear-gradient(135deg, var(--primary-dark), #1e5f34); color: white; font-weight: 600; padding: 8px 6px; font-size: 0.65rem; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+    .table-advanced thead th.filter-active { background: #1a4f2b; box-shadow: inset 0 -2px 0 #ffc107; }
+    .table-advanced td { padding: 6px; border-bottom: 1px solid var(--border-color); white-space: nowrap; font-size: 0.73rem; }
     
-    .tag-rascunho {
-        display: inline-flex; align-items: center; background: #ecfdf5; color: #047857;
-        border: 1px solid #a7f3d0; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin: 1px;
-    }
-    .tag-rascunho.inconsistente { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; font-weight: bold; }
+    .badge-saldo { font-size: 0.65rem; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .badge-empenhado { font-size: 0.65rem; padding: 2px 8px; border-radius: 20px; background: #fef3c7; color: #92400e; }
+    .badge-disponivel { font-size: 0.65rem; padding: 2px 8px; border-radius: 20px; background: #dbeafe; color: #1e40af; }
+    .endereco-badge { background: #f1f5f9; padding: 2px 8px; border-radius: 20px; font-size: 0.65rem; font-weight: 600; }
+    .status-sistemico-indicator { width: 26px; height: 26px; border-radius: 50%; border: 2px solid white; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 11px; color: white; }
+    .tag-rascunho { display: inline-flex; align-items: center; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 2px 5px; border-radius: 4px; font-size: 0.6rem; margin: 1px; gap: 3px; }
     
-    .btn-delete-item { color: #ef4444; margin-left: 5px; cursor: pointer; background: none; border: none; padding: 0; }
-    .col-actions { position: sticky; right: 0; background: white; z-index: 10; border-left: 2px solid #e2e8f0; text-align: center; width: 80px; }
-    .table-advanced th:last-child { position: sticky; right: 0; z-index: 30; }
-
-    /* POPUP EXCEL */
-    .excel-popup {
-        position: fixed; background: white; border: 1px solid #cbd5e1; border-radius: 6px;
-        box-shadow: 0 10px 25px -5px rgba(0,0,0,0.25); width: 280px; z-index: 9999;
-        font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column;
-        animation: fadeIn 0.15s ease-out;
-    }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-
-    .excel-popup-header { padding: 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; border-radius: 6px 6px 0 0; }
-    .excel-search { width: 100%; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.8rem; outline: none; }
-    .excel-search:focus { border-color: #2f8f4e; box-shadow: 0 0 0 2px rgba(47, 143, 78, 0.2); }
+    .filter-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.3); z-index: 99998; display: none; }
+    .filter-overlay.show { display: block; }
+    .excel-filter-container { position: fixed; background: white; border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 999999; min-width: 280px; max-width: 360px; max-height: 70vh; overflow: hidden; display: none; }
+    .filter-header { padding: 10px 14px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; font-weight: 700; font-size: 0.9rem; }
+    .filter-search { padding: 8px 12px; border-bottom: 1px solid #dee2e6; }
+    .filter-search input { width: 100%; padding: 6px 12px; border: 2px solid #e9ecef; border-radius: 20px; font-size: 0.8rem; }
+    .filter-options { max-height: 180px; overflow-y: auto; padding: 4px 0; }
+    .filter-option { padding: 6px 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.8rem; }
+    .filter-option:hover { background: #f1f5f9; }
+    .filter-actions { padding: 8px 12px; border-top: 1px solid #dee2e6; background: #f8f9fa; display: flex; gap: 8px; justify-content: space-between; }
     
-    .excel-list { max-height: 250px; overflow-y: auto; padding: 4px; background: #fff; }
-    .excel-option { display: flex; align-items: center; padding: 4px 6px; border-radius: 3px; cursor: pointer; font-size: 0.8rem; color: #334155; }
-    .excel-option:hover { background-color: #f1f5f9; }
-    .excel-option.selected { background-color: #f0fdf4; color: #166534; font-weight: 500; }
+    .column-manager-container { position: fixed; background: white; border-radius: 14px; box-shadow: var(--shadow-lg); z-index: 999999; width: 300px; display: none; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+    .column-manager-header { padding: 10px 14px; background: linear-gradient(135deg, #6c5ce7, #a29bfe); color: white; border-radius: 14px 14px 0 0; font-weight: 700; display: flex; justify-content: space-between; }
+    .column-manager-list { max-height: 250px; overflow-y: auto; padding: 4px 0; }
+    .column-manager-item { padding: 7px 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.8rem; }
+    .column-manager-item:hover { background: #f1f5f9; }
+    .column-manager-footer { padding: 8px 14px; border-top: 1px solid #dee2e6; display: flex; gap: 8px; justify-content: flex-end; }
     
-    .excel-footer { padding: 8px; border-top: 1px solid #e2e8f0; background: #f8fafc; display: flex; justify-content: space-between; gap: 8px; border-radius: 0 0 6px 6px; }
-    .excel-btn { flex: 1; padding: 4px; font-size: 0.75rem; border-radius: 4px; border: 1px solid transparent; cursor: pointer; }
-    .btn-apply { background: #2f8f4e; color: white; }
-    .btn-clear { background: #fff; border-color: #cbd5e1; color: #64748b; }
-
-    /* Utils */
-    .badge-filter-count {
-        position: absolute; top: 2px; right: 2px; background: #ef4444; color: white;
-        font-size: 9px; width: 14px; height: 14px; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-    }
+    @media (max-width: 768px) { .draft-card { min-width: 200px; max-width: 200px; } .table-advanced { font-size: 0.65rem; min-width: 1100px; } }
 </style>
 
 <div class="container-fluid">
-    <!-- HEADER -->
     <div class="page-header d-flex justify-content-between align-items-center">
-        <div>
-            <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Centro de Movimentações</h5>
-            <small class="opacity-75">Gestão Profissional de Lotes</small>
-        </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-light" onclick="window.Sistema.resetFilters()">
-                <i class="fas fa-broom me-1"></i> Limpar Filtros
-            </button>
-            <button class="btn btn-sm btn-outline-light" onclick="window.Sistema.toggleCards(this)">
-                <i class="fas fa-eye-slash me-1"></i> <span>Cards</span>
-            </button>
-        </div>
+        <div><h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Centro de Movimentações</h5><small class="opacity-75">Transferência e Expedição</small></div>
+        <button class="btn btn-sm btn-outline-light" onclick="limparTodosFiltros()"><i class="fas fa-broom me-1"></i> Limpar Filtros</button>
     </div>
 
-    <!-- CARDS HORIZONTAIS -->
-    <div id="sectionCards">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="fw-bold text-muted small text-uppercase">
-                <i class="fas fa-clipboard-list me-1"></i> Rascunhos Ativos
-            </div>
-            <div class="card-total-badge" id="cardsCounterBadge">{{ cards.count }} Cards</div>
-        </div>
-
-        <div class="cards-wrapper-container">
-            <button class="scroll-btn" onclick="window.Sistema.scrollCards(-300)"><i class="fas fa-chevron-left"></i></button>
-            
-            <div class="cards-scroll-area" id="cardsContainer">
-                {% for c in cards %}
-                <div class="draft-card" id="card_{{ c.id }}" data-card-name="{{ c.observacao }}">
-                    <!-- Indicador de Erro Injetado via JS -->
-                    <div class="error-indicator text-danger fw-bold small mb-1" style="display:none;">
-                        <i class="fas fa-exclamation-triangle animate__animated animate__flash"></i> VERIFICAR ITENS
-                    </div>
-
-                    <div>
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <span class="card-badge" title="{{ c.observacao }}">{{ c.observacao }}</span>
-                            <form method="POST" onsubmit="return confirm('Tem certeza que deseja EXCLUIR todo o card?');">
-                                {% csrf_token %}
-                                <input type="hidden" name="excluir_card" value="1">
-                                <input type="hidden" name="empenho_id" value="{{ c.id }}">
-                                <button type="submit" class="btn btn-link text-danger p-0 border-0" title="Excluir Card">
-                                    <i class="fas fa-times-circle"></i>
-                                </button>
-                            </form>
-                        </div>
-                        <div class="small text-muted mb-1 d-flex justify-content-between">
-                            <span><i class="fas fa-box me-1"></i> {{ c.total_itens }} Lotes</span>
-                            <span><i class="fas fa-weight-hanging me-1"></i> {{ c.saldo_afetado|default:0|intcomma }} Un</span>
-                        </div>
-                        
-                        <!-- Preview -->
-                        <div class="lote-list-preview">
-                            {% for item in c.itens.all|slice:":4" %}
-                            <div class="d-flex justify-content-between">
-                                <span class="text-truncate" style="max-width: 140px;" title="{{ item.estoque.lote }}">{{ item.estoque.lote }}</span>
-                                <span class="fw-bold">{{ item.quantidade }}</span>
-                            </div>
-                            {% endfor %}
-                            {% if c.itens.count > 4 %}
-                            <div class="text-center text-muted fst-italic" style="font-size:0.65rem">+{{ c.itens.count|add:"-4" }} outros...</div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="mt-2 d-flex flex-column gap-2">
-                        <button class="btn btn-sm btn-outline-success w-100 btn-filter-card" onclick="window.Sistema.filterByCard('{{ c.observacao }}', this)">
-                            <i class="fas fa-filter me-1"></i> Filtrar
-                        </button>
-                        <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-outline-warning w-50 btn-action-card" 
-                                    onclick="window.Sistema.openModalMass('transferir', '{{ c.id }}', '{{ c.observacao }}')" 
-                                    title="Transferir">
-                                <i class="fas fa-exchange-alt"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger w-50 btn-action-card" 
-                                    onclick="window.Sistema.openModalMass('expedir', '{{ c.id }}', '{{ c.observacao }}')" 
-                                    title="Expedir">
-                                <i class="fas fa-truck"></i>
-                            </button>
-                        </div>
-                    </div>
+    <!-- CARDS -->
+    <div class="mb-3" id="sectionCards">
+        <div class="d-flex justify-content-between align-items-center mb-2"><strong class="text-muted small">CARDS ATIVOS</strong><span class="badge bg-dark">{{ cards_ativos|length }}</span></div>
+        <div class="cards-scroll-area">
+            {% for card in cards_ativos %}
+            <div class="draft-card">
+                <div class="d-flex justify-content-between mb-1"><span class="card-badge">{{ card.observacao|default:'Sem Nome'|truncatechars:18 }}</span>
+                    {% if not card.historico_itens.exists %}<form method="POST" class="d-inline" onsubmit="return confirm('Excluir?')">{% csrf_token %}<input type="hidden" name="excluir_card" value="1"><input type="hidden" name="empenho_id" value="{{ card.id }}"><button class="btn btn-link text-danger p-0" style="font-size:0.7rem;"><i class="fas fa-times-circle"></i></button></form>{% endif %}
                 </div>
-                {% endfor %}
+                <div class="small text-muted mb-1">{{ card.itens.count }} itens | {{ card.saldo_afetado|default:0|intcomma }} Un</div>
+                <div class="d-flex gap-1 mt-2">
+                    <button class="btn btn-sm btn-outline-warning w-50" onclick="abrirModal('transferir',{{ card.id }})"><i class="fas fa-exchange-alt"></i></button>
+                    <button class="btn btn-sm btn-outline-danger w-50" onclick="abrirModal('expedir',{{ card.id }})"><i class="fas fa-truck"></i></button>
+                </div>
             </div>
-
-            <button class="scroll-btn" onclick="window.Sistema.scrollCards(300)"><i class="fas fa-chevron-right"></i></button>
+            {% empty %}<div class="text-muted p-3">Nenhum card ativo</div>{% endfor %}
         </div>
     </div>
 
-    <!-- STATS -->
-    <div class="row g-2 mb-3" id="statsRow">
-        <div class="col-6 col-md-3">
-            <div class="summary-card border-primary d-flex align-items-center justify-content-between p-3">
-                <div><h4 class="mb-0 text-primary" id="statLotes">0</h4><small class="text-muted">Lotes Visíveis</small></div>
-                <div class="summary-icon bg-primary"><i class="fas fa-cubes"></i></div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="summary-card border-primary d-flex align-items-center justify-content-between p-3">
-                <div><h4 class="mb-0 text-primary" id="statClientes">0</h4><small class="text-muted">Clientes Únicos</small></div>
-                <div class="summary-icon bg-primary"><i class="fas fa-users"></i></div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="summary-card border-success d-flex align-items-center justify-content-between p-3">
-                <div><h4 class="mb-0 text-success" id="statDisponivel">0</h4><small class="text-muted">Saldo Disp.</small></div>
-                <div class="summary-icon bg-success"><i class="fas fa-coins"></i></div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="summary-card border-warning d-flex align-items-center justify-content-between p-3">
-                <div><h4 class="mb-0 text-warning" id="statEmpenhado">0</h4><small class="text-muted">Total em Rascunho</small></div>
-                <div class="summary-icon bg-warning"><i class="fas fa-file-signature"></i></div>
-            </div>
+    {% if cards_concluidos %}
+    <div class="mb-3"><strong class="text-muted small">CONCLUÍDOS</strong>
+        <div class="cards-scroll-area">
+            {% for card in cards_concluidos %}
+            <div class="draft-card" style="opacity:0.8;background:#f8f9fa;"><span class="card-badge bg-secondary">{{ card.observacao|default:'Sem Nome'|truncatechars:18 }}</span><span class="badge-concluido ms-2">✓</span><div class="small text-muted mt-1">{{ card.historico_itens.count }} processados</div></div>
+            {% endfor %}
         </div>
     </div>
+    {% endif %}
+
+    <!-- BOTÃO COLUNAS -->
+    <button class="btn btn-sm mb-2" onclick="toggleColunas()" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:600;"><i class="fas fa-columns me-1"></i> Colunas</button>
 
     <!-- TABELA -->
-    <div class="table-container">
-        <div class="table-responsive">
-            <table class="table-advanced" id="mainTable">
-                <thead>
-                    <tr>
-                        <th onclick="window.Sistema.toggleFilter(0, this)">AZ <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(1, this)">Lote <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(2, this)">Cultivar <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(3, this)">Peneira <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(4, this)">Categoria <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(5, this)">Espécie <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(6, this)">Tratamento <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(7, this)">Emb. <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(8, this)">Cliente <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(9, this)">Empresa <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(10, this)">Endereço <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(11, this)">Peso Un. <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(12, this)">Peso Tot. <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(13, this)">Saldo <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(14, this)">Empenho <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(15, this)" class="bg-success border-success text-white">Disp. <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th onclick="window.Sistema.toggleFilter(16, this)">Rascunhos <i class="fas fa-filter text-white-50 ms-1"></i></th>
-                        <th class="col-actions">Ações</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody">
-                    {% for item in lotes %}
-                    <tr>
-                        <td>{{ item.lote.az|default:"-" }}</td>
-                        <td class="fw-bold text-primary">{{ item.lote.lote }}</td>
-                        <td>{{ item.lote.cultivar.nome }}</td>
-                        <td>{{ item.lote.peneira|default:"-" }}</td>
-                        <td>{{ item.lote.categoria|default:"-" }}</td>
-                        <td>{{ item.lote.especie|default:"-" }}</td>
-                        <td>{{ item.lote.tratamento|default:"-" }}</td>
-                        <td>{{ item.lote.embalagem|default:"-" }}</td>
-                        <td>{{ item.lote.cliente|default:"-" }}</td>
-                        <td>{{ item.lote.empresa|default:"-" }}</td>
-                        <td><span class="badge bg-light text-dark border">{{ item.lote.endereco }}</span></td>
-                        
-                        <td data-value="{{ item.lote.peso_unitario }}">{{ item.lote.peso_unitario|default:"0" }}</td>
-                        <td data-value="{{ item.lote.peso_total }}">{{ item.lote.peso_total|default:"0" }}</td>
-                        
-                        <td class="fw-bold" data-value="{{ item.lote.saldo }}">{{ item.lote.saldo|intcomma }}</td>
-                        <td class="text-warning fw-bold" data-value="{{ item.empenhado }}">{{ item.empenhado|intcomma }}</td>
-                        <td class="text-success fw-bold" data-value="{{ item.disponivel }}">{{ item.disponivel|intcomma }}</td>
-                        
-                        <!-- Coluna Rascunhos -->
-                        <td data-raw-rascunhos="{% for r in item.itens_empenho %}{{ r.empenho.observacao }}{% if not forloop.last %}|{% endif %}{% endfor %}">
-                            <div class="d-flex flex-wrap gap-1" style="max-width: 250px;">
-                                {% for r in item.itens_empenho %}
-                                <span class="tag-rascunho {% if r.inconsistente %}inconsistente{% endif %}"
-                                      data-card-ref="{{ r.empenho.observacao }}"
-                                      title="Card: {{ r.empenho.observacao }}">
-                                    {% if r.inconsistente %}<i class="fas fa-exclamation-circle me-1"></i>{% endif %}
-                                    {{ r.empenho.observacao }}: {{ r.quantidade }}
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('Remover item?');">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="excluir_item" value="1">
-                                        <input type="hidden" name="item_id" value="{{ r.id }}">
-                                        <button class="btn-delete-item" type="submit"><i class="fas fa-times"></i></button>
-                                    </form>
-                                </span>
-                                {% endfor %}
-                            </div>
-                        </td>
-
-                        <td class="col-actions">
-                            {% if item.tem_inconsistencia %}
-                                <button class="btn btn-sm btn-outline-danger border-0" disabled title="Corrija os rascunhos em excesso primeiro">
-                                    <i class="fas fa-ban"></i>
-                                </button>
-                            {% else %}
-                                <!-- Garantindo chamada segura ao JS -->
-                                <button class="btn btn-sm btn-outline-success border-0" 
-                                        onclick="window.Sistema.openModalIndividual('{{ item.lote.id }}', '{{ item.lote.lote }}', {{ item.disponivel|unlocalize }})"
-                                        title="Adicionar a Card">
-                                    <i class="fas fa-plus-circle fa-lg"></i>
-                                </button>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <div class="table-wrapper"><div class="table-scroll-container">
+        <table class="table-advanced" id="mainTable">
+            <thead><tr>
+                <th>Status</th>
+                <th onclick="abrirFiltro('produto',this)">Produto <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('lote',this)">Lote <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('cultivar',this)">Cultivar <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('peneira',this)">Pen <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('categoria',this)">Cat <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('especie',this)">Espécie <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('tratamento',this)">Trat <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('embalagem',this)">Emb <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('cliente',this)">Cliente <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('empresa',this)">Empresa <i class="fas fa-filter"></i></th>
+                <th onclick="abrirFiltro('az',this)">Armazém <i class="fas fa-filter"></i></th>
+                <th>Endereço</th><th>Empenhado</th><th>Saldo</th><th>Disponível</th><th>Rascunhos</th>
+            </tr></thead>
+            <tbody>
+                {% for item in lotes %}
+                <tr>
+                    <td><div class="status-sistemico-indicator" style="background-color:{{ item.lote.status_sistemico.cor|default:'#6c757d' }};" title="{{ item.lote.get_status_legenda_completa|default:'Sem status' }}">{{ item.lote.status_sistemico.icone|default:'' }}</div></td>
+                    <td>{{ item.lote.produto|default:"-" }}</td>
+                    <td class="fw-bold text-primary">{{ item.lote.lote }}</td>
+                    <td>{{ item.lote.cultivar.nome|default:"-" }}</td>
+                    <td>{{ item.lote.peneira.nome|default:"-" }}</td>
+                    <td>{{ item.lote.categoria.nome|default:"-" }}</td>
+                    <td>{{ item.lote.especie.nome|default:"-" }}</td>
+                    <td>{{ item.lote.tratamento.nome|default:"-" }}</td>
+                    <td>{{ item.lote.get_embalagem_display|default:"-" }}</td>
+                    <td>{{ item.lote.cliente|default:"-" }}</td>
+                    <td>{{ item.lote.empresa|default:"-" }}</td>
+                    <td>{{ item.lote.az|default:"-" }}</td>
+                    <td><span class="endereco-badge">{{ item.lote.endereco }}</span></td>
+                    <td><span class="badge badge-empenhado">{{ item.empenhado|intcomma }}</span></td>
+                    <td><span class="badge badge-saldo {% if item.lote.saldo > 0 %}bg-success{% else %}bg-danger{% endif %}">{{ item.lote.saldo|intcomma }}</span></td>
+                    <td><span class="badge badge-disponivel">{{ item.disponivel|intcomma }}</span></td>
+                    <td>{% for r in item.itens_empenho %}<span class="tag-rascunho">{{ r.empenho.observacao|default:'Card'|truncatechars:8 }}:{{ r.quantidade }} <form method="POST" class="d-inline" onsubmit="return confirm('Remover?')">{% csrf_token %}<input type="hidden" name="excluir_item" value="1"><input type="hidden" name="item_id" value="{{ r.id }}"><button class="btn btn-link text-danger p-0" style="font-size:0.5rem;"><i class="fas fa-times"></i></button></form></span>{% endfor %}</td>
+                </tr>
+                {% empty %}<tr><td colspan="17" class="text-center py-4 text-muted">Nenhum lote</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div></div>
 </div>
 
-<!-- !!! MOVI OS MODAIS PARA O FINAL ABSOLUTO DO BLOCK CONTENT PARA GARANTIR VISIBILIDADE !!! -->
+<!-- FILTRO POPUP -->
+<div class="filter-overlay" id="filterOverlay" onclick="fecharFiltro()"></div>
+<div class="excel-filter-container" id="filterPopup"></div>
 
-<!-- MODAL INDIVIDUAL -->
-<div class="modal fade" id="modalIndividual" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Adicionar ao Rascunho</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+<!-- COLUNAS -->
+<div class="column-manager-container" id="colManager"><div class="column-manager-header"><span>Colunas</span><button class="btn-close btn-close-white" onclick="toggleColunas()"></button></div><div class="column-manager-list" id="colList"></div><div class="column-manager-footer"><button class="btn btn-sm btn-outline-secondary" onclick="resetColunas()">Restaurar</button><button class="btn btn-sm btn-primary" onclick="applyColunas()">Aplicar</button></div></div>
+
+<!-- JSON -->
+{{ cards_impressao_json|json_script:"cards-impressao-data" }}
+
+<!-- MODAL -->
+<div class="modal fade" id="modalMassa" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content">
+    <div class="modal-header text-white" id="headerMassa"><h5 class="modal-title" id="titleMassa"></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+    <form method="POST" action="{% url 'sapp:pagina_rascunho' %}">
+        {% csrf_token %}<input type="hidden" name="origem_acao" value="cards"><input type="hidden" name="acao_tipo" id="acao_tipo"><input type="hidden" name="empenho_id" id="mass_empenho_id"><input type="hidden" name="selected_items" id="selected_items_input" value="[]">
+        <div class="modal-body">
+            <div class="alert alert-warning mb-2">Card: <strong id="mass_card_name"></strong></div>
+            <div style="max-height:300px;overflow:auto;border:1px solid #dee2e6;border-radius:6px;">
+                <table class="table table-sm table-striped mb-0" style="font-size:0.7rem;min-width:1000px;">
+                    <thead class="table-light" style="position:sticky;top:0;z-index:5;"><tr><th><input type="checkbox" id="selAllModal" onchange="document.querySelectorAll('.modal-item-checkbox').forEach(c=>c.checked=this.checked);updateBtn()"></th><th>Lote</th><th>Qtd</th><th>Saldo</th><th>Produto</th><th>Cultivar</th><th>Endereço</th><th>AZ</th><th>Cliente</th><th>Emb.</th></tr></thead>
+                    <tbody id="modalItemsList"><tr><td colspan="10" class="text-center py-3 text-muted">Selecione um card</td></tr></tbody>
+                </table>
             </div>
-            <form method="POST">
-                {% csrf_token %}
-                <input type="hidden" name="empenhar_lote" value="1">
-                <input type="hidden" name="lote_id" id="ind_lote_id">
-                <div class="modal-body">
-                    <div class="alert alert-light border border-success d-flex justify-content-between align-items-center">
-                        <div>
-                            <small class="text-muted d-block">LOTE</small>
-                            <strong id="ind_lote_nome" class="fs-5 text-dark">...</strong>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted d-block">DISPONÍVEL</small>
-                            <strong id="ind_lote_disp" class="fs-4 text-success">...</strong>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Quantidade</label>
-                        <input type="number" name="quantidade" id="ind_qtd" class="form-control form-control-lg text-center fw-bold" min="1" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Selecionar Card / Criar Novo</label>
-                        <input type="text" name="nome_empenho" class="form-control text-uppercase" placeholder="Digite o nome (Ex: CARGA SP)" required list="cards_list" autocomplete="off">
-                        <datalist id="cards_list">
-                            {% for c in cards %}
-                            <option value="{{ c.observacao }}">
-                            {% endfor %}
-                        </datalist>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success px-4 fw-bold">Salvar</button>
-                </div>
-            </form>
+            <div id="blockTransfer" class="d-none mt-3"><h6 class="text-warning">Destino</h6><div class="row g-2"><div class="col-8"><input type="text" name="novo_endereco" class="form-control" placeholder="Endereço *"></div><div class="col-4"><input type="text" name="az" class="form-control" placeholder="AZ"></div></div><input type="text" name="obs_transferencia" class="form-control mt-2" placeholder="Obs"></div>
+            <div id="blockExped" class="d-none mt-3"><h6 class="text-danger">Expedição</h6><input type="text" name="numero_carga" class="form-control mb-2" placeholder="Nº Carga *"><div class="row g-2"><div class="col-6"><input type="text" name="cliente" class="form-control" placeholder="Cliente"></div><div class="col-6"><input type="text" name="placa" class="form-control" placeholder="Placa"></div></div><input type="text" name="obs_expedicao" class="form-control mt-2" placeholder="Obs"></div>
+            <textarea name="obs_global" class="form-control mt-2" rows="2" placeholder="Obs global"></textarea>
         </div>
-    </div>
-</div>
+        <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button><button type="submit" class="btn btn-primary btn-sm fw-bold px-4" id="btnConfirmMass" disabled>Confirmar</button></div>
+    </form>
+</div></div></div>
 
-<!-- MODAL MASSA -->
-<div class="modal fade" id="modalMassa" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header text-white" id="headerMassa">
-                <h5 class="modal-title" id="titleMassa">Processar Lote</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form method="POST" id="formMassa">
-                {% csrf_token %}
-                <input type="hidden" name="origem_acao" value="cards">
-                <input type="hidden" name="acao_tipo" id="acao_tipo">
-                <input type="hidden" name="empenho_id" id="mass_empenho_id">
-
-                <div class="modal-body">
-                    <div class="alert alert-warning mb-3">
-                        Card Selecionado: <strong id="mass_card_name" class="d-block mt-1 fs-5"></strong>
-                    </div>
-
-                    <!-- Campos Transferencia -->
-                    <div id="blockTransfer" class="d-none animate__animated animate__fadeIn">
-                        <h6 class="text-warning border-bottom pb-2 mb-3">Dados de Destino (Transferência Interna)</h6>
-                        <div class="row g-2">
-                            <div class="col-8">
-                                <label class="form-label small">Novo Endereço *</label>
-                                <input type="text" name="novo_endereco" class="form-control">
-                            </div>
-                            <div class="col-4">
-                                <label class="form-label small">Novo AZ</label>
-                                <input type="text" name="az" class="form-control">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Campos Expedição -->
-                    <div id="blockExped" class="d-none animate__animated animate__fadeIn">
-                        <h6 class="text-danger border-bottom pb-2 mb-3">Dados de Faturamento (Saída)</h6>
-                        <div class="mb-2">
-                            <label class="form-label small">Nº Pedido / Carga *</label>
-                            <input type="text" name="numero_carga" class="form-control" placeholder="Ex: PED-1234">
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <label class="form-label small">Cliente Destino</label>
-                                <input type="text" name="cliente" class="form-control">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small">Placa do Veículo</label>
-                                <input type="text" name="placa" class="form-control">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-3">
-                        <label class="form-label small">Observação Geral</label>
-                        <textarea name="obs_global" class="form-control" rows="2"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="submit" class="btn btn-primary fw-bold px-4" id="btnConfirmMass">Confirmar Ação</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- ======================= JS SCRIPT ======================== -->
 <script>
-/**
- * Sistema - Engine de Filtros Avançada (Estilo Excel)
- * Versão 2.0 - Refatoração Completa
- */
-const Sistema = (function() {
-    // Estado Global
-    const state = {
-        filters: {},           // {colIndex: [valoresSelecionados]}
-        cardFilter: null,      // Nome do card ativo
-        activeCardElement: null, // Elemento do card ativo
-        openPopup: null,       // Popup aberto atualmente
-        rawData: [],           // Dados brutos da tabela
-        allRows: [],           // Referências a todas as linhas
-        columns: [],           // Metadados das colunas
-        visibleRows: new Set(), // Linhas visíveis após filtro
-        filterDebounce: null   // Debounce para busca
-    };
+// ==================== FILTROS ====================
+let filtroCol = null, filtrosAtivos = {};
+const colMap = {produto:2,lote:3,cultivar:4,peneira:5,categoria:6,especie:7,tratamento:8,embalagem:9,cliente:10,empresa:11,az:12};
 
-    // Constantes
-    const COLUMNS_CONFIG = [
-        { index: 0, name: 'AZ', type: 'text' },
-        { index: 1, name: 'Lote', type: 'text' },
-        { index: 2, name: 'Cultivar', type: 'text' },
-        { index: 3, name: 'Peneira', type: 'text' },
-        { index: 4, name: 'Categoria', type: 'text' },
-        { index: 5, name: 'Espécie', type: 'text' },
-        { index: 6, name: 'Tratamento', type: 'text' },
-        { index: 7, name: 'Emb.', type: 'text' },
-        { index: 8, name: 'Cliente', type: 'text' },
-        { index: 9, name: 'Empresa', type: 'text' },
-        { index: 10, name: 'Endereço', type: 'text' },
-        { index: 11, name: 'Peso Un.', type: 'number', dataAttr: 'value' },
-        { index: 12, name: 'Peso Tot.', type: 'number', dataAttr: 'value' },
-        { index: 13, name: 'Saldo', type: 'number', dataAttr: 'value' },
-        { index: 14, name: 'Empenho', type: 'number', dataAttr: 'value' },
-        { index: 15, name: 'Disp.', type: 'number', dataAttr: 'value' },
-        { index: 16, name: 'Rascunhos', type: 'multivalue', dataAttr: 'raw-rascunhos' }
-    ];
-
-    /**
-     * Extrai dados brutos da tabela
-     */
-    function extractRawData() {
-        const rows = document.querySelectorAll('#tableBody tr');
-        state.allRows = Array.from(rows);
-        
-        state.rawData = state.allRows.map(row => {
-            const rowData = {};
-            COLUMNS_CONFIG.forEach(col => {
-                const cell = row.children[col.index];
-                if (!cell) return;
-                
-                if (col.type === 'multivalue' && col.dataAttr) {
-                    const raw = cell.getAttribute(`data-${col.dataAttr}`) || '';
-                    rowData[col.index] = raw ? raw.split('|').filter(v => v.trim()) : [];
-                } else if (col.dataAttr === 'value') {
-                    const val = parseFloat(cell.getAttribute('data-value') || cell.textContent.replace(/[^\d,-]/g, '').replace(',', '.'));
-                    rowData[col.index] = isNaN(val) ? 0 : val;
-                } else {
-                    rowData[col.index] = cell.textContent.trim() || '-';
-                }
-            });
-            
-            // Adiciona referência DOM
-            rowData._element = row;
-            rowData._visible = true;
-            
-            return rowData;
-        });
-    }
-
-    /**
-     * Coleta valores únicos para uma coluna, considerando apenas linhas visíveis
-     */
-    function getColumnValues(colIndex, onlyVisible = true) {
-        const values = new Set();
-        const rows = onlyVisible ? 
-            state.rawData.filter(r => state.visibleRows.has(r._element)) :
-            state.rawData;
-        
-        rows.forEach(row => {
-            const val = row[colIndex];
-            if (Array.isArray(val)) {
-                val.forEach(v => values.add(v.trim()));
-            } else if (val !== undefined && val !== '') {
-                values.add(val);
-            }
-        });
-        
-        return Array.from(values).sort((a, b) => {
-            if (typeof a === 'string' && typeof b === 'string') {
-                return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
-            }
-            return a > b ? 1 : a < b ? -1 : 0;
-        });
-    }
-
-    /**
-     * Engine de Filtros - Centralizada
-     */
-    function applyFilters() {
-        // Inicia com todas as linhas visíveis
-        let filteredRows = [...state.rawData];
-        
-        // 1. Filtro por Card (se ativo)
-        if (state.cardFilter) {
-            filteredRows = filteredRows.filter(row => {
-                const rascunhos = row[16]; // Índice da coluna Rascunhos
-                if (!Array.isArray(rascunhos)) return false;
-                return rascunhos.some(r => r.includes(state.cardFilter));
-            });
-        }
-        
-        // 2. Filtros por Coluna (encadeados)
-        Object.entries(state.filters).forEach(([colIdx, selectedValues]) => {
-            const colIndex = parseInt(colIdx);
-            filteredRows = filteredRows.filter(row => {
-                const cellValue = row[colIndex];
-                
-                if (Array.isArray(cellValue)) {
-                    // Para colunas multivalor (Rascunhos)
-                    return cellValue.some(val => 
-                        selectedValues.some(selected => val.includes(selected))
-                    );
-                }
-                
-                // Para valores únicos
-                return selectedValues.includes(cellValue);
-            });
-        });
-        
-        // 3. Atualiza estado de visibilidade
-        const visibleElements = new Set(filteredRows.map(r => r._element));
-        state.visibleRows = visibleElements;
-        
-        // 4. Aplica visibilidade no DOM
-        state.allRows.forEach(row => {
-            row.style.display = visibleElements.has(row) ? '' : 'none';
-        });
-        
-        // 5. Atualiza UI
-        updateFilterBadges();
-        updateStatistics();
-    }
-
-    /**
-     * Atualiza estatísticas com base em data-value
-     */
-    function updateStatistics() {
-    let visibleCount = 0;
-    let totalSaldo = 0;
-    let totalEmpenhado = 0;
-    let totalDisponivel = 0;  // <-- Adicione esta variável
-    const uniqueClients = new Set();
-    
-    state.rawData.forEach(row => {
-        if (state.visibleRows.has(row._element)) {
-            visibleCount++;
-            
-            // Índices CORRETOS baseados na sua tabela:
-            // 13 = Saldo, 14 = Empenho, 15 = Disponivel, 8 = Cliente
-            const saldo = row[13] || 0;         // Coluna Saldo
-            const empenhado = row[14] || 0;     // Coluna Empenho
-            const disponivel = row[15] || 0;    // Coluna Disponivel <-- ESTAVA FALTANDO
-            const cliente = row[8] || '';       // Coluna Cliente
-            
-            totalSaldo += saldo;
-            totalEmpenhado += empenhado;
-            totalDisponivel += disponivel;      // <-- Adicione esta linha
-            
-            if (cliente && cliente !== '-') {
-                uniqueClients.add(cliente);
-            }
-        }
-    });
-    
-    // Formata números no padrão brasileiro
-    const formatNumber = (num) => {
-        return num.toLocaleString('pt-BR', { 
-            minimumFractionDigits: 0, 
-            maximumFractionDigits: 0 
-        });
-    };
-    
-    // Atualiza elementos DOM
-    safeSetText('statLotes', formatNumber(visibleCount));
-    safeSetText('statClientes', formatNumber(uniqueClients.size));
-    safeSetText('statSaldo', formatNumber(totalSaldo));
-    safeSetText('statEmpenhado', formatNumber(totalEmpenhado));
-    // Se quiser mostrar o disponível total também, você pode adicionar:
-    safeSetText('statDisponivel', formatNumber(totalDisponivel));
+function abrirFiltro(col, th) {
+    filtroCol = col;
+    const idx = colMap[col];
+    const vals = [...new Set([...document.querySelectorAll(`#mainTable tbody tr td:nth-child(${idx})`)].map(td=>td.textContent.trim()).filter(v=>v&&v!=='-'))].sort();
+    const sel = filtrosAtivos[col]||[];
+    const popup = document.getElementById('filterPopup');
+    popup.innerHTML = `<div class="filter-header">${col}</div><div class="filter-search"><input type="text" class="form-control form-control-sm" placeholder="Buscar..." onkeyup="this.parentElement.nextElementSibling.querySelectorAll('.filter-option').forEach(o=>o.style.display=o.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none')"></div><div class="filter-options">${vals.map(v=>`<div class="filter-option"><input type="checkbox" class="fc" value="${v}" ${sel.includes(v)?'checked':''}><span>${v}</span></div>`).join('')}</div><div class="filter-actions"><div><button class="btn btn-sm btn-link" onclick="document.querySelectorAll('.fc').forEach(c=>c.checked=true)">Todos</button><button class="btn btn-sm btn-link" onclick="document.querySelectorAll('.fc').forEach(c=>c.checked=false)">Nenhum</button></div><div><button class="btn btn-sm btn-secondary" onclick="fecharFiltro()">Cancelar</button><button class="btn btn-sm btn-primary" onclick="aplicarFiltro()">Aplicar</button></div></div>`;
+    popup.style.display='block';
+    const r=th.getBoundingClientRect();
+    popup.style.top=Math.min(r.bottom+5,window.innerHeight-350)+'px';
+    popup.style.left=Math.min(r.left,window.innerWidth-370)+'px';
+    document.getElementById('filterOverlay').classList.add('show');
 }
-    /**
-     * Cria popup de filtro estilo Excel
-     */
-    function createFilterPopup(colIndex, thElement) {
-        // Remove popup existente
-        closeAllPopups();
-        
-        // Coleta valores considerando filtros atuais
-        const values = getColumnValues(colIndex, true);
-        const activeFilters = state.filters[colIndex] || [];
-        
-        // Cria elemento popup
-        const popup = document.createElement('div');
-        popup.className = 'excel-popup';
-        popup.dataset.col = colIndex;
-        
-        // Header com busca
-        const headerHTML = `
-            <div class="excel-popup-header">
-                <input type="text" class="excel-search" 
-                       placeholder="Digite para buscar..." 
-                       autocomplete="off">
-            </div>
-        `;
-        
-        // Lista de opções
-        let listHTML = '';
-        if (values.length === 0) {
-            listHTML = '<div class="p-3 text-center text-muted small">Nenhum valor disponível</div>';
-        } else {
-            values.forEach(value => {
-                const displayValue = value === '' ? '(Vazio)' : value;
-                const isChecked = activeFilters.includes(value);
-                const escapedValue = escapeHtml(value);
-                
-                listHTML += `
-                    <div class="excel-option ${isChecked ? 'selected' : ''}" 
-                         data-value="${escapedValue}"
-                         onclick="window.Sistema._handleOptionClick(this, event)">
-                        <input type="checkbox" value="${escapedValue}" 
-                               ${isChecked ? 'checked' : ''}
-                               onchange="window.Sistema._handleCheckboxChange(this)">
-                        <span class="ms-2 text-truncate">${displayValue}</span>
-                    </div>
-                `;
-            });
-        }
-        
-        // Footer com ações
-        const footerHTML = `
-            <div class="excel-footer">
-                <button type="button" class="excel-btn" 
-                        onclick="window.Sistema._selectAllOptions(${colIndex})">
-                    <i class="fas fa-check-square me-1"></i> Marcar Todos
-                </button>
-                <button type="button" class="excel-btn" 
-                        onclick="window.Sistema._deselectAllOptions(${colIndex})">
-                    <i class="fas fa-square me-1"></i> Desmarcar Todos
-                </button>
-                <button type="button" class="excel-btn btn-apply" 
-                        onclick="window.Sistema._applyPopupFilter(${colIndex})">
-                    <i class="fas fa-check me-1"></i> Aplicar
-                </button>
-            </div>
-        `;
-        
-        popup.innerHTML = headerHTML + 
-                        `<div class="excel-list">${listHTML}</div>` + 
-                        footerHTML;
-        
-        document.body.appendChild(popup);
-        state.openPopup = { element: popup, colIndex };
-        
-        // Posiciona o popup
-        positionPopup(popup, thElement);
-        
-        // Foca no campo de busca
-        setTimeout(() => {
-            const searchInput = popup.querySelector('.excel-search');
-            if (searchInput) {
-                searchInput.focus();
-                searchInput.addEventListener('input', function(e) {
-                    filterPopupList(this.value.trim().toLowerCase(), popup);
-                });
-            }
-        }, 50);
-    }
+function aplicarFiltro() {
+    const s=[...document.querySelectorAll('#filterPopup .fc:checked')].map(c=>c.value);
+    if(s.length) filtrosAtivos[filtroCol]=s; else delete filtrosAtivos[filtroCol];
+    document.querySelectorAll('#mainTable tbody tr').forEach(r=>{let m=true;for(const[c,v]of Object.entries(filtrosAtivos)){const td=r.querySelector(`td:nth-child(${colMap[c]})`);if(td&&!v.includes(td.textContent.trim())){m=false;break}}r.style.display=m?'':'none';});
+    document.querySelectorAll('#mainTable thead th').forEach(th=>{const icon=th.querySelector('.fa-filter');if(icon){const c=icon.parentElement.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];th.classList.toggle('filter-active',c&&filtrosAtivos[c]);}});
+    fecharFiltro();
+}
+function fecharFiltro(){document.getElementById('filterPopup').style.display='none';document.getElementById('filterOverlay').classList.remove('show');filtroCol=null;}
+function limparTodosFiltros(){filtrosAtivos={};document.querySelectorAll('#mainTable tbody tr').forEach(r=>r.style.display='');document.querySelectorAll('#mainTable thead th').forEach(th=>th.classList.remove('filter-active'));}
 
-    /**
-     * Filtra lista dentro do popup
-     */
-    function filterPopupList(searchTerm, popup) {
-        const options = popup.querySelectorAll('.excel-option');
-        let hasVisible = false;
-        
-        options.forEach(option => {
-            const text = option.textContent.toLowerCase();
-            const isMatch = text.includes(searchTerm);
-            option.style.display = isMatch ? 'flex' : 'none';
-            
-            // Marca/desmarca baseado no texto
-            if (searchTerm) {
-                const checkbox = option.querySelector('input[type="checkbox"]');
-                if (checkbox) {
-                    checkbox.checked = isMatch;
-                    option.classList.toggle('selected', isMatch);
-                }
-            }
-            
-            if (isMatch) hasVisible = true;
-        });
-        
-        // Mostra mensagem se nenhum resultado
-        let noResults = popup.querySelector('.no-results');
-        if (!hasVisible && !noResults) {
-            noResults = document.createElement('div');
-            noResults.className = 'p-2 text-center text-muted small no-results';
-            noResults.textContent = 'Nenhum resultado encontrado';
-            popup.querySelector('.excel-list').appendChild(noResults);
-        } else if (hasVisible && noResults) {
-            noResults.remove();
-        }
-    }
+// ==================== COLUNAS ====================
+const colDefs=['status','produto','lote','cultivar','peneira','categoria','especie','tratamento','embalagem','cliente','empresa','az','endereco','empenhado','saldo','disponivel','rascunhos'];
+const colFixas=[0,2,12,13,14,15,16];
+function toggleColunas(){
+    const c=document.getElementById('colManager');
+    if(c.style.display==='block'){c.style.display='none';return;}
+    const saved=JSON.parse(localStorage.getItem('rc_v2')||'{}');
+    document.getElementById('colList').innerHTML=colDefs.map((d,i)=>`<div class="column-manager-item"><input type="checkbox" id="vc-${i}" ${saved[i]!==undefined?saved[i]:true?'checked':''} ${colFixas.includes(i)?'disabled':''}><span>${d}</span>${colFixas.includes(i)?'<small style="color:#94a3b8">fixa</small>':''}</div>`).join('');
+    c.style.display='block';
+}
+function applyColunas(){
+    const v={};colDefs.forEach((d,i)=>{const cb=document.getElementById('vc-'+i);if(cb)v[i]=cb.checked;});
+    localStorage.setItem('rc_v2',JSON.stringify(v));
+    colDefs.forEach((d,i)=>{document.querySelectorAll(`#mainTable th:nth-child(${i+1}),#mainTable td:nth-child(${i+1})`).forEach(el=>el.style.display=v[i]?'':'none');});
+    document.getElementById('colManager').style.display='none';
+}
+function resetColunas(){localStorage.removeItem('rc_v2');colDefs.forEach((d,i)=>{document.querySelectorAll(`#mainTable th:nth-child(${i+1}),#mainTable td:nth-child(${i+1})`).forEach(el=>el.style.display='');});document.getElementById('colManager').style.display='none';}
+document.addEventListener('DOMContentLoaded',()=>{const s=JSON.parse(localStorage.getItem('rc_v2')||'{}');if(Object.keys(s).length)colDefs.forEach((d,i)=>{if(s[i]===false)document.querySelectorAll(`#mainTable th:nth-child(${i+1}),#mainTable td:nth-child(${i+1})`).forEach(el=>el.style.display='none');});});
 
-    /**
-     * Posiciona popup relativo ao th
-     */
-    function positionPopup(popup, thElement) {
-        const rect = thElement.getBoundingClientRect();
-        const scrollY = window.scrollY || window.pageYOffset;
-        const scrollX = window.scrollX || window.pageXOffset;
-        
-        // Posição vertical - abaixo do th
-        popup.style.top = (rect.bottom + scrollY + 2) + 'px';
-        
-        // Posição horizontal - alinhado à esquerda do th
-        let leftPos = rect.left + scrollX;
-        
-        // Ajusta se ultrapassar a largura da janela
-        const popupWidth = 280;
-        if (leftPos + popupWidth > window.innerWidth + scrollX) {
-            leftPos = window.innerWidth + scrollX - popupWidth - 10;
-        }
-        
-        popup.style.left = leftPos + 'px';
-    }
-
-    /**
-     * Fecha todos os popups
-     */
-    function closeAllPopups() {
-        document.querySelectorAll('.excel-popup').forEach(popup => popup.remove());
-        state.openPopup = null;
-    }
-
-    /**
-     * Atualiza badges nos cabeçalhos
-     */
-    function updateFilterBadges() {
-        // Remove badges antigos
-        document.querySelectorAll('.badge-filter-count').forEach(badge => badge.remove());
-        
-        // Adiciona novos badges
-        Object.entries(state.filters).forEach(([colIndex, values]) => {
-            if (values && values.length > 0) {
-                const th = document.querySelector(`.table-advanced th:nth-child(${parseInt(colIndex) + 1})`);
-                if (th) {
-                    const badge = document.createElement('span');
-                    badge.className = 'badge-filter-count';
-                    badge.textContent = values.length;
-                    th.appendChild(badge);
-                }
-            }
-        });
-    }
-
-    /**
-     * Verifica inconsistências nos cards
-     */
-    function checkInconsistencies() {
-        const inconsistentCards = new Set();
-        
-        // Identifica cards com inconsistências
-        document.querySelectorAll('.tag-rascunho.inconsistente').forEach(tag => {
-            const cardRef = tag.dataset.cardRef;
-            if (cardRef) inconsistentCards.add(cardRef);
-        });
-        
-        // Atualiza estado dos cards
-        document.querySelectorAll('.draft-card').forEach(card => {
-            const cardName = card.dataset.cardName;
-            const hasError = inconsistentCards.has(cardName);
-            const errorIndicator = card.querySelector('.error-indicator');
-            const actionButtons = card.querySelectorAll('.btn-action-card');
-            
-            card.classList.toggle('has-error', hasError);
-            
-            if (errorIndicator) {
-                errorIndicator.style.display = hasError ? 'block' : 'none';
-            }
-            
-            actionButtons.forEach(btn => {
-                btn.disabled = hasError;
-                btn.title = hasError ? 'Corrija os erros antes de prosseguir' : '';
-            });
-        });
-    }
-
-    /**
-     * Utilitários
-     */
-    function safeSetText(id, text) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = text;
-    }
-
-    function safeSetVal(id, value) {
-        const el = document.getElementById(id);
-        if (el) el.value = value;
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    /**
-     * API Pública - window.Sistema
-     */
-    return {
-        // Inicialização
-        init() {
-            console.log('Inicializando Sistema Filtros v2.0');
-            
-            extractRawData();
-            applyFilters();
-            checkInconsistencies();
-            
-            // Listener para fechar popups ao clicar fora
-            document.addEventListener('click', (e) => {
-                if (state.openPopup && 
-                    !e.target.closest('.excel-popup') && 
-                    !e.target.closest('th')) {
-                    closeAllPopups();
-                }
-            });
-            
-            // Listener para tecla Escape
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && state.openPopup) {
-                    closeAllPopups();
-                }
-            });
-        },
-
-        // Interface de Filtros
-        toggleFilter(colIndex, thElement) {
-            if (state.openPopup && state.openPopup.colIndex === colIndex) {
-                closeAllPopups();
-            } else {
-                createFilterPopup(colIndex, thElement);
-            }
-        },
-
-        filterByCard(cardName, btnElement) {
-            // Remove seleção anterior
-            if (state.activeCardElement) {
-                state.activeCardElement.classList.remove('active');
-                const prevBtn = state.activeCardElement.querySelector('.btn-filter-card');
-                if (prevBtn) {
-                    prevBtn.classList.replace('btn-success', 'btn-outline-success');
-                    prevBtn.innerHTML = '<i class="fas fa-filter me-1"></i> Filtrar';
-                }
-            }
-            
-            // Ativa/desativa filtro
-            if (state.cardFilter === cardName) {
-                state.cardFilter = null;
-                state.activeCardElement = null;
-            } else {
-                state.cardFilter = cardName;
-                state.activeCardElement = btnElement.closest('.draft-card');
-                
-                if (state.activeCardElement) {
-                    state.activeCardElement.classList.add('active');
-                    btnElement.classList.replace('btn-outline-success', 'btn-success');
-                    btnElement.innerHTML = '<i class="fas fa-check me-1"></i> Ativo';
-                }
-            }
-            
-            applyFilters();
-        },
-
-        resetFilters() {
-            state.filters = {};
-            state.cardFilter = null;
-            
-            // Reseta UI dos cards
-            if (state.activeCardElement) {
-                state.activeCardElement.classList.remove('active');
-                const btn = state.activeCardElement.querySelector('.btn-filter-card');
-                if (btn) {
-                    btn.classList.replace('btn-success', 'btn-outline-success');
-                    btn.innerHTML = '<i class="fas fa-filter me-1"></i> Filtrar';
-                }
-                state.activeCardElement = null;
-            }
-            
-            // Reseta todos os botões de card
-            document.querySelectorAll('.btn-filter-card').forEach(btn => {
-                btn.classList.replace('btn-success', 'btn-outline-success');
-                btn.innerHTML = '<i class="fas fa-filter me-1"></i> Filtrar';
-            });
-            
-            document.querySelectorAll('.draft-card').forEach(card => {
-                card.classList.remove('active');
-            });
-            
-            applyFilters();
-        },
-
-        // Controle de Cards
-        scrollCards(offset) {
-            const container = document.getElementById('cardsContainer');
-            if (container) {
-                container.scrollBy({ left: offset, behavior: 'smooth' });
-            }
-        },
-
-        toggleCards(btn) {
-            const section = document.getElementById('sectionCards');
-            const span = btn.querySelector('span');
-            const icon = btn.querySelector('i');
-            
-            if (!section) return;
-            
-            const isHidden = section.classList.contains('hidden');
-            
-            if (isHidden) {
-                section.classList.remove('hidden');
-                if (span) span.textContent = 'Cards';
-                if (icon) icon.className = 'fas fa-eye-slash me-1';
-                btn.classList.add('btn-outline-light');
-                btn.classList.remove('btn-danger');
-            } else {
-                section.classList.add('hidden');
-                if (span) span.textContent = 'Mostrar';
-                if (icon) icon.className = 'fas fa-eye me-1';
-                btn.classList.remove('btn-outline-light');
-                btn.classList.add('btn-danger');
-            }
-        },
-
-        // Modais (mantidos da versão anterior)
-        openModalIndividual(id, lote, saldoDisp) {
-            safeSetVal('ind_lote_id', id);
-            safeSetText('ind_lote_nome', lote);
-            safeSetText('ind_lote_disp', saldoDisp.toLocaleString('pt-BR'));
-            
-            const inputQtd = document.getElementById('ind_qtd');
-            if (inputQtd) {
-                inputQtd.value = '';
-                inputQtd.max = saldoDisp;
-                inputQtd.placeholder = 'Máx: ' + saldoDisp.toLocaleString('pt-BR');
-            }
-            
-            const modal = new bootstrap.Modal(document.getElementById('modalIndividual'));
-            modal.show();
-            
-            setTimeout(() => {
-                if (inputQtd) inputQtd.focus();
-            }, 500);
-        },
-
-        openModalMass(acao, idCard, nomeCard) {
-            safeSetVal('acao_tipo', acao);
-            safeSetVal('mass_empenho_id', idCard);
-            safeSetText('mass_card_name', nomeCard);
-            
-            const header = document.getElementById('headerMassa');
-            const title = document.getElementById('titleMassa');
-            const blockTransfer = document.getElementById('blockTransfer');
-            const blockExped = document.getElementById('blockExped');
-            const btnConfirm = document.getElementById('btnConfirmMass');
-            
-            if (header && title && blockTransfer && blockExped && btnConfirm) {
-                // Reset de campos obrigatórios
-                document.querySelectorAll('#modalMassa [required]').forEach(el => {
-                    el.required = false;
-                });
-                
-                if (acao === 'transferir') {
-                    header.className = 'modal-header bg-warning text-dark';
-                    title.innerHTML = '<i class="fas fa-exchange-alt me-2"></i> Transferência em Massa';
-                    blockTransfer.classList.remove('d-none');
-                    blockExped.classList.add('d-none');
-                    btnConfirm.className = 'btn btn-warning fw-bold px-4';
-                    
-                    // Torna campo obrigatório
-                    const endInput = blockTransfer.querySelector('input[name="novo_endereco"]');
-                    if (endInput) endInput.required = true;
-                } else {
-                    header.className = 'modal-header bg-danger text-white';
-                    title.innerHTML = '<i class="fas fa-truck me-2"></i> Expedição em Massa';
-                    blockTransfer.classList.add('d-none');
-                    blockExped.classList.remove('d-none');
-                    btnConfirm.className = 'btn btn-danger fw-bold px-4';
-                    
-                    // Torna campo obrigatório
-                    const cargaInput = blockExped.querySelector('input[name="numero_carga"]');
-                    if (cargaInput) cargaInput.required = true;
-                }
-            }
-            
-            const modal = new bootstrap.Modal(document.getElementById('modalMassa'));
-            modal.show();
-        },
-
-        // Métodos Internos (acessíveis via onclick)
-        _handleOptionClick(optionElement, event) {
-            // Evita propagação dupla
-            if (event.target.type === 'checkbox') return;
-            
-            const checkbox = optionElement.querySelector('input[type="checkbox"]');
-            if (checkbox) {
-                checkbox.checked = !checkbox.checked;
-                optionElement.classList.toggle('selected', checkbox.checked);
-            }
-        },
-
-        _handleCheckboxChange(checkbox) {
-            const option = checkbox.closest('.excel-option');
-            if (option) {
-                option.classList.toggle('selected', checkbox.checked);
-            }
-        },
-
-        _selectAllOptions(colIndex) {
-            const popup = document.querySelector('.excel-popup[data-col="' + colIndex + '"]');
-            if (!popup) return;
-            
-            popup.querySelectorAll('.excel-option:not([style*="display: none"])').forEach(option => {
-                const checkbox = option.querySelector('input[type="checkbox"]');
-                if (checkbox) {
-                    checkbox.checked = true;
-                    option.classList.add('selected');
-                }
-            });
-        },
-
-        _deselectAllOptions(colIndex) {
-            const popup = document.querySelector('.excel-popup[data-col="' + colIndex + '"]');
-            if (!popup) return;
-            
-            popup.querySelectorAll('.excel-option').forEach(option => {
-                const checkbox = option.querySelector('input[type="checkbox"]');
-                if (checkbox) {
-                    checkbox.checked = false;
-                    option.classList.remove('selected');
-                }
-            });
-        },
-
-        _applyPopupFilter(colIndex) {
-            const popup = document.querySelector('.excel-popup[data-col="' + colIndex + '"]');
-            if (!popup) return;
-            
-            const checkboxes = popup.querySelectorAll('input[type="checkbox"]:checked');
-            const selectedValues = Array.from(checkboxes).map(cb => cb.value);
-            
-            if (selectedValues.length > 0) {
-                state.filters[colIndex] = selectedValues;
-            } else {
-                delete state.filters[colIndex];
-            }
-            
-            closeAllPopups();
-            applyFilters();
-        },
-
-        // Depuração
-        debug() {
-            console.log('Estado atual:', {
-                filters: state.filters,
-                cardFilter: state.cardFilter,
-                visibleRows: state.visibleRows.size,
-                totalRows: state.rawData.length
-            });
-        }
-    };
-})();
-
-// Inicialização
-document.addEventListener('DOMContentLoaded', () => {
-    // Garante que Sistema esteja disponível globalmente
-    window.Sistema = Sistema;
-    window.Sistema.init();
+// ==================== MODAL ====================
+function updateBtn(){document.getElementById('btnConfirmMass').disabled=!document.querySelectorAll('#modalItemsList .modal-item-checkbox:checked').length;}
+function abrirModal(acao,cardId){
+    document.getElementById('acao_tipo').value=acao;document.getElementById('mass_empenho_id').value=cardId;document.getElementById('selected_items_input').value='[]';
+    const h=document.getElementById('headerMassa'),t=document.getElementById('titleMassa'),bT=document.getElementById('blockTransfer'),bE=document.getElementById('blockExped');
+    if(acao==='transferir'){h.className='modal-header bg-warning text-dark';t.innerHTML='<i class="fas fa-exchange-alt me-2"></i>Transferência';bT.classList.remove('d-none');bE.classList.add('d-none');}
+    else{h.className='modal-header bg-danger text-white';t.innerHTML='<i class="fas fa-truck me-2"></i>Expedição';bT.classList.add('d-none');bE.classList.remove('d-none');}
+    const jsonEl=document.getElementById('cards-impressao-data'),tbody=document.getElementById('modalItemsList');
+    if(!jsonEl){tbody.innerHTML='<tr><td colspan="10" class="text-center text-danger py-3">Erro: dados não encontrados</td></tr>';return;}
+    try{
+        const data=JSON.parse(jsonEl.textContent),card=data[String(cardId)];
+        if(!card){tbody.innerHTML='<tr><td colspan="10" class="text-center py-3">Card não encontrado</td></tr>';return;}
+        document.getElementById('mass_card_name').textContent=card.card_nome;
+        if(card.itens_pendentes&&card.itens_pendentes.length){tbody.innerHTML=card.itens_pendentes.map(i=>`<tr><td><input type="checkbox" class="modal-item-checkbox" data-item-id="${i.item_id}" checked onchange="updateBtn()"></td><td class="fw-bold">${i.lote}</td><td>${i.quantidade}</td><td>${i.saldo_atual||0}</td><td>${i.produto||'-'}</td><td>${i.cultivar||'-'}</td><td>${i.endereco||'-'}</td><td>${i.az||'-'}</td><td>${i.cliente||'-'}</td><td>${i.embalagem||'-'}</td></tr>`).join('');updateBtn();}
+        else{tbody.innerHTML='<tr><td colspan="10" class="text-center py-3 text-muted">Nenhum item pendente</td></tr>';document.getElementById('btnConfirmMass').disabled=true;}
+    }catch(e){console.error(e);tbody.innerHTML='<tr><td colspan="10" class="text-center text-danger py-3">Erro ao carregar dados</td></tr>';}
+    new bootstrap.Modal(document.getElementById('modalMassa')).show();
+}
+document.querySelector('#modalMassa form').addEventListener('submit',function(e){
+    e.preventDefault();
+    const ids=[...document.querySelectorAll('#modalItemsList .modal-item-checkbox:checked')].map(c=>parseInt(c.getAttribute('data-item-id'))).filter(id=>id>0);
+    if(!ids.length){alert('Selecione pelo menos um item!');return;}
+    document.getElementById('selected_items_input').value=JSON.stringify(ids);
+    this.submit();
 });
-
-// Adiciona CSS para popup aprimorado
-const style = document.createElement('style');
-style.textContent = `
-    .excel-popup {
-        position: fixed;
-        background: white;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        width: 300px;
-        z-index: 9999;
-        font-family: 'Segoe UI', system-ui, sans-serif;
-        display: flex;
-        flex-direction: column;
-        max-height: 400px;
-        animation: slideIn 0.2s ease-out;
-    }
-    
-    @keyframes slideIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    
-    .excel-popup-header {
-        padding: 12px;
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
-        border-radius: 8px 8px 0 0;
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-    
-    .excel-search {
-        width: 100%;
-        padding: 8px 12px;
-        border: 2px solid #cbd5e1;
-        border-radius: 6px;
-        font-size: 14px;
-        outline: none;
-        transition: all 0.2s;
-    }
-    
-    .excel-search:focus {
-        border-color: #2f8f4e;
-        box-shadow: 0 0 0 3px rgba(47, 143, 78, 0.1);
-    }
-    
-    .excel-list {
-        flex: 1;
-        overflow-y: auto;
-        padding: 8px;
-        background: white;
-    }
-    
-    .excel-option {
-        display: flex;
-        align-items: center;
-        padding: 8px 12px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        color: #334155;
-        margin: 2px 0;
-        transition: all 0.15s;
-        min-height: 36px;
-    }
-    
-    .excel-option:hover {
-        background-color: #f1f5f9;
-    }
-    
-    .excel-option.selected {
-        background-color: #f0fdf4;
-        color: #166534;
-        font-weight: 500;
-        border-left: 3px solid #2f8f4e;
-    }
-    
-    .excel-option input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-        accent-color: #2f8f4e;
-    }
-    
-    .excel-footer {
-        padding: 12px;
-        border-top: 1px solid #e2e8f0;
-        background: #f8fafc;
-        display: flex;
-        gap: 8px;
-        border-radius: 0 0 8px 8px;
-        flex-wrap: wrap;
-    }
-    
-    .excel-footer .excel-btn {
-        flex: 1;
-        min-width: calc(33.333% - 6px);
-        padding: 8px;
-        font-size: 13px;
-        border-radius: 6px;
-        border: 1px solid #cbd5e1;
-        background: white;
-        color: #64748b;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        font-weight: 500;
-    }
-    
-    .excel-footer .excel-btn:hover {
-        background-color: #f1f5f9;
-        transform: translateY(-1px);
-    }
-    
-    .excel-footer .excel-btn.btn-apply {
-        background: #2f8f4e;
-        color: white;
-        border-color: #2f8f4e;
-    }
-    
-    .excel-footer .excel-btn.btn-apply:hover {
-        background: #267a41;
-        transform: translateY(-1px);
-    }
-    
-    .no-results {
-        font-size: 13px;
-        color: #94a3b8;
-        padding: 16px !important;
-        font-style: italic;
-    }
-    
-    /* Badge aprimorado */
-    .badge-filter-count {
-        position: absolute;
-        top: -6px;
-        right: -6px;
-        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        color: white;
-        font-size: 10px;
-        font-weight: 700;
-        min-width: 18px;
-        height: 18px;
-        border-radius: 9px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 2px solid white;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        z-index: 10;
-    }
-    
-    /* Cards sempre visíveis */
-    .cards-scroll-area {
-        scrollbar-width: thin;
-        scrollbar-color: #cbd5e1 #f1f5f9;
-        min-height: 200px;
-    }
-    
-    .cards-scroll-area::-webkit-scrollbar {
-        height: 8px;
-    }
-    
-    .cards-scroll-area::-webkit-scrollbar-track {
-        background: #f1f5f9;
-        border-radius: 4px;
-    }
-    
-    .cards-scroll-area::-webkit-scrollbar-thumb {
-        background-color: #cbd5e1;
-        border-radius: 4px;
-    }
-    
-    .cards-scroll-area::-webkit-scrollbar-thumb:hover {
-        background-color: #94a3b8;
-    }
-`;
-document.head.appendChild(style);
 </script>
 {% endblock %}

@@ -30,7 +30,7 @@ urlpatterns = [
     path('api/estoque/opcoes-filtro/', views.api_opcoes_filtro, name='api_opcoes_filtro'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     path('historico-geral/', views.historico_geral, name='historico_geral'),
-    path('empenho/', views.pagina_rascunho, name='pagina_rascunho'),
+    
     path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
@@ -74,6 +74,82 @@ urlpatterns = [
     path('api/excluir-status/<int:status_id>/', views.api_excluir_status, name='api_excluir_status'),
     path('api/estoque/opcoes-filtro/', views.opcoes_filtro_api, name='opcoes_filtro_api'),
     path('exportar-estoque-excel/', views.exportar_estoque_excel, name='exportar_estoque_excel'),
+    # ADICIONAR
+    path('api/solicitacoes/listar/', views.api_listar_solicitacoes, name='api_listar_solicitacoes'),
+
+
+
+
+    # ADICIONAR no urlpatterns (após as URLs existentes)
+
+# FASE 2 - Solicitações
+    path('solicitacoes/', views.pagina_solicitacoes, name='pagina_solicitacoes'),
+    path('solicitacoes/nova/', views.criar_solicitacao, name='criar_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/lotes-disponiveis/', 
+        views.api_lotes_disponiveis_para_solicitacao, 
+        name='api_lotes_disponiveis_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/empenhar/', 
+        views.empenhar_na_solicitacao, 
+        name='api_empenhar_solicitacao'),
+
+
+    # ADICIONAR no urlpatterns
+
+    # FASE 3 - Movimentação e Impressão
+    path('api/solicitacoes/<int:solicitacao_id>/movimentar/', 
+        views.api_movimentar_solicitacao, 
+        name='api_movimentar_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/impressao/', 
+        views.api_dados_impressao_solicitacao, 
+        name='api_impressao_solicitacao'),
+
+
+    # ADICIONAR no urlpatterns
+
+    # FASE 4 - Atualização ao vivo, feed e som
+    path('api/cards/versao/', views.api_versao_cards, name='api_versao_cards'),
+    path('api/cards/atualizacoes/', views.api_atualizacoes_recentes, name='api_atualizacoes_recentes'),
+    path('api/cards/html/', views.api_html_cards_atualizados, name='api_html_cards'),
+    path('api/configuracao-atualizacao/', views.api_configuracao_atualizacao, name='api_config_atualizacao'),
+
+    # ADICIONAR no urlpatterns
+
+    # FASE 5 - Kanban e Workflow
+    path('kanban/', views.pagina_kanban, name='pagina_kanban'),
+    path('api/kanban/dados/', views.api_kanban_dados, name='api_kanban_dados'),
+    path('api/solicitacoes/<int:solicitacao_id>/mover-kanban/', 
+        views.api_mover_card_kanban, 
+        name='api_mover_card_kanban'),
+    path('api/workflow/config/', views.api_config_workflow, name='api_config_workflow'),
+    path('configuracao-workflow/', views.pagina_config_workflow, name='pagina_config_workflow'),
+    path('api/solicitacoes/<int:solicitacao_id>/remover-itens/', 
+        views.api_remover_itens_solicitacao, 
+        name='api_remover_itens_solicitacao'),
+
+    path('api/solicitacoes/<int:solicitacao_id>/remover-item/<int:item_id>/', 
+        views.api_remover_item_empenho, 
+        name='api_remover_item_empenho'),
+
+    path('api/solicitacoes/<int:solicitacao_id>/excluir/', 
+        views.api_excluir_solicitacao, 
+        name='api_excluir_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/movimentar/', views.api_movimentar_solicitacao, name='api_movimentar_solicitacao'),
+
+
+    # Certifique-se que estas URLs existem:
+    path('solicitacoes/', views.pagina_solicitacoes, name='pagina_solicitacoes'),
+    path('solicitacoes/nova/', views.criar_solicitacao, name='criar_solicitacao'),
+    path('api/solicitacoes/listar/', views.api_listar_solicitacoes, name='api_listar_solicitacoes'),
+    path('api/solicitacoes/<int:solicitacao_id>/lotes-disponiveis/', views.api_lotes_disponiveis_para_solicitacao, name='api_lotes_disponiveis_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/empenhar/', views.empenhar_na_solicitacao, name='api_empenhar_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/remover-item/<int:item_id>/', views.api_remover_item_empenho, name='api_remover_item_empenho'),
+    path('api/solicitacoes/<int:solicitacao_id>/movimentar/', views.api_movimentar_solicitacao, name='api_movimentar_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/impressao/', views.api_dados_impressao_solicitacao, name='api_impressao_solicitacao'),
+    path('api/solicitacoes/<int:solicitacao_id>/excluir/', views.api_excluir_solicitacao, name='api_excluir_solicitacao'),
+    path('api/workflow/config/', views.api_config_workflow, name='api_config_workflow'),
+    path('api/cards/atualizacoes/', views.api_atualizacoes_recentes, name='api_atualizacoes_recentes'),
+
+
 ]
 
 # ============================================================================
