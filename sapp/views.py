@@ -2635,65 +2635,602 @@ def api_user_permissions(request, user_id):
         return JsonResponse({'success': False, 'error': 'Usuário não encontrado'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import Q, Count, Min
+from django.contrib.auth.decorators import login_required, permission_required
+from sapp.models import HistoricoItemEmpenho
+
+from collections import defaultdict
+
+from django.contrib.auth.decorators import login_required, permission_required
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import Count, Max, Q, Sum
+from django.shortcuts import render
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+
+from sapp.models import HistoricoItemEmpenho
+
+
+def campo_existe(model, caminho):
+    """
+    Verifica se um caminho de campo existe no model.
+
+    Exemplos:
+        cliente__nome
+        empenho__cliente__nome
+        processado_por__username
+    """
+    model_atual = model
+
+    try:
+        partes = caminho.split('__')
+
+        for indice, parte in enumerate(partes):
+            campo = model_atual._meta.get_field(parte)
+
+            if indice < len(partes) - 1:
+                if not campo.is_relation or not campo.related_model:
+                    return False
+
+                model_atual = campo.related_model
+
+        return True
+
+    except Exception:
+        return False
+
+
+def encontrar_campo_cliente():
+    """
+    Procura automaticamente onde está armazenado o nome do cliente.
+
+    Adicione outros caminhos nesta lista caso seu model use outro nome.
+    """
+    campos_possiveis = [
+        'cliente_nome',
+        'nome_cliente',
+        'cliente__nome',
+        'cliente__razao_social',
+        'cliente__nome_fantasia',
+
+        'empenho__cliente_nome',
+        'empenho__nome_cliente',
+        'empenho__cliente__nome',
+        'empenho__cliente__razao_social',
+        'empenho__cliente__nome_fantasia',
+
+        'estoque_origem__cliente__nome',
+        'estoque_destino__cliente__nome',
+    ]
+
+    for caminho in campos_possiveis:
+        if campo_existe(HistoricoItemEmpenho, caminho):
+            return caminho
+
+    return None
+
+
+def obter_valor_atributo(objeto, caminho):
+    """
+    Obtém um valor usando caminhos como:
+        empenho.cliente.nome
+        cliente.razao_social
+    """
+    if objeto is None or not caminho:
+        return ''
+
+    valor = objeto
+
+    for parte in caminho.split('__'):
+        if valor is None:
+            return ''
+
+        valor = getattr(valor, parte, None)
+
+        if callable(valor):
+            try:
+                valor = valor()
+            except Exception:
+                return ''
+
+    if valor is None:
+        return ''
+
+    return str(valor).strip()
+
+
+def obter_nome_cliente(movimentacao, campo_cliente=None):
+    """
+    Retorna o nome do cliente da movimentação.
+    """
+    if campo_cliente:
+        nome = obter_valor_atributo(movimentacao, campo_cliente)
+
+        if nome:
+            return nome
+
+    # Fallback para propriedades ou atributos que não sejam campos do banco.
+    caminhos_fallback = [
+        'cliente_nome',
+        'nome_cliente',
+        'cliente__nome',
+        'cliente__razao_social',
+        'cliente__nome_fantasia',
+
+        'empenho__cliente_nome',
+        'empenho__nome_cliente',
+        'empenho__cliente__nome',
+        'empenho__cliente__razao_social',
+        'empenho__cliente__nome_fantasia',
+    ]
+
+    for caminho in caminhos_fallback:
+        nome = obter_valor_atributo(movimentacao, caminho)
+
+        if nome:
+            return nome
+
+    return ''
+
+
+def obter_nome_usuario(usuario):
+    """
+    Retorna o nome completo do usuário ou o username.
+    """
+    if not usuario:
+        return ''
+
+    nome_completo = usuario.get_full_name().strip()
+
+    if nome_completo:
+        return nome_completo
+
+    return usuario.username or ''
+
+
+from collections import defaultdict
+from types import SimpleNamespace
+
+from django.contrib.auth.decorators import login_required, permission_required
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import Q
+from django.shortcuts import render
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+
+from .models import HistoricoMovimentacao, HistoricoItemEmpenho
+
+
+def nome_usuario_historico(usuario):
+    """Nome completo do usuário ou username; 'Sistema' se nulo."""
+    if not usuario:
+        return 'Sistema'
+    nome = usuario.get_full_name().strip()
+    return nome or usuario.username or 'Sistema'
+
+
+def normalizar_tipo_historico(tipo):
+    """
+    Retorna o tipo normalizado (sem acentos, sem espaços extras, minúsculo).
+    Mapeia variações comuns para uma chave única.
+    """
+    tipo_original = str(tipo or '').strip()
+    tipo_lower = tipo_original.lower()
+
+    mapa = {
+        'entrada': 'entrada',
+        'nova entrada': 'entrada',
+        'saida': 'saida',
+        'saída': 'saida',
+        'baixa': 'saida',
+        'transferencia': 'transferencia',
+        'transferência': 'transferencia',
+        'expedicao': 'expedicao',
+        'expedição': 'expedicao',
+        'edicao': 'edicao',
+        'edição': 'edicao',
+        'exclusao': 'exclusao',
+        'exclusão': 'exclusao',
+    }
+    return mapa.get(tipo_lower, tipo_lower.replace(' ', '_'))
+
+
+def nome_tipo_historico(tipo):
+    """Nome amigável para exibição."""
+    nomes = {
+        'entrada': 'Entrada',
+        'saida': 'Saída',
+        'transferencia': 'Transferência',
+        'expedicao': 'Expedição',
+        'edicao': 'Edição',
+        'exclusao': 'Exclusão',
+    }
+    return nomes.get(tipo, str(tipo or 'Não informado').replace('_', ' ').title())
+
+
+def obter_enderecos_historico_antigo(movimentacao, tipo):
+    """
+    No histórico antigo não há endereços separados.
+    Utiliza o endereço do estoque quando disponível.
+    """
+    endereco = movimentacao.estoque.endereco if movimentacao.estoque else ''
+
+    if tipo == 'entrada':
+        return '', endereco
+    if tipo in ('saida', 'expedicao'):
+        return endereco, ''
+    if tipo == 'transferencia':
+        return endereco, ''  # origem; destino normalmente na descrição
+    return endereco, ''
+
 
 @login_required
 @permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def historico_geral(request):
-    """Histórico completo para DataTables"""
-    historico_completo = HistoricoMovimentacao.objects.all().select_related(
-        'estoque', 'usuario'
-    ).order_by('-data_hora')
-    
-    # Estatísticas para os cards
-    total_registros = historico_completo.count()
-    
-    total_entradas = historico_completo.filter(
-        Q(tipo__icontains='Entrada') | Q(tipo__icontains='entrada')
-    ).count()
-    
-    total_saidas = historico_completo.filter(
-        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição')
-    ).count()
-    
-    total_transferencias = historico_completo.filter(
-        tipo__icontains='Transferência'
-    ).count()
-    
-    # Totais de bags e sc
-    entradas_bags = historico_completo.filter(
-        tipo__icontains='Entrada', 
-        estoque__embalagem='BAG'
-    ).aggregate(total=Sum('quantidade'))['total'] or 0
-    
-    entradas_sc = historico_completo.filter(
-        tipo__icontains='Entrada',
-        estoque__embalagem='SC'
-    ).aggregate(total=Sum('quantidade'))['total'] or 0
-    
-    saidas_bags = historico_completo.filter(
-        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição'),
-        estoque__embalagem='BAG'
-    ).aggregate(total=Sum('quantidade'))['total'] or 0
-    
-    saidas_sc = historico_completo.filter(
-        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição'),
-        estoque__embalagem='SC'
-    ).aggregate(total=Sum('quantidade'))['total'] or 0
-    
-    context = {
-        'historico_lista': historico_completo,
-        'total_registros': total_registros,
-        'total_entradas': total_entradas,
-        'total_saidas': total_saidas,
-        'total_transferencias': total_transferencias,
-        'entradas_bags': entradas_bags,
-        'entradas_sc': entradas_sc,
-        'saidas_bags': saidas_bags,
-        'saidas_sc': saidas_sc,
-    }
-    
-    return render(request, 'sapp/historico_geral.html', context)
+    # ----------------------------------------------------------
+    # 1. Captura dos parâmetros de filtro
+    # ----------------------------------------------------------
+    busca = request.GET.get('busca', '').strip()
+    filtro_lote = request.GET.get('lote', '').strip()
+    filtro_produto = request.GET.get('produto', '').strip()
+    filtro_cliente = request.GET.get('cliente', '').strip()
+    filtro_tipo = request.GET.get('tipo', '').strip()
+    filtro_usuario = request.GET.get('usuario', '').strip()
+    data_inicial_txt = request.GET.get('data_inicial', '').strip()
+    data_final_txt = request.GET.get('data_final', '').strip()
 
+    data_inicial = parse_date(data_inicial_txt)
+    data_final = parse_date(data_final_txt)
+
+    # ----------------------------------------------------------
+    # 2. Querysets base
+    # ----------------------------------------------------------
+    qs_antigo = HistoricoMovimentacao.objects.select_related(
+        'estoque', 'usuario'
+    ).all()
+
+    qs_novo = HistoricoItemEmpenho.objects.select_related(
+        'estoque_origem', 'estoque_destino', 'processado_por', 'empenho'
+    ).all()
+
+    # ----------------------------------------------------------
+    # 3. Busca textual (múltiplos termos → AND)
+    # ----------------------------------------------------------
+    if busca:
+        termos = [t for t in busca.split() if t]
+        for termo in termos:
+            qs_antigo = qs_antigo.filter(
+                Q(lote_ref__icontains=termo) |
+                Q(estoque__lote__icontains=termo) |
+                Q(estoque__produto__icontains=termo) |
+                Q(estoque__cultivar__nome__icontains=termo) |
+                Q(estoque__cliente__icontains=termo) |
+                Q(estoque__empresa__icontains=termo) |
+                Q(cliente__icontains=termo) |
+                Q(tipo__icontains=termo) |
+                Q(descricao__icontains=termo) |
+                Q(numero_carga__icontains=termo) |
+                Q(motorista__icontains=termo) |
+                Q(placa__icontains=termo) |
+                Q(ordem_entrega__icontains=termo) |
+                Q(usuario__username__icontains=termo) |
+                Q(usuario__first_name__icontains=termo) |
+                Q(usuario__last_name__icontains=termo)
+            )
+            qs_novo = qs_novo.filter(
+                Q(lote__icontains=termo) |
+                Q(produto__icontains=termo) |
+                Q(cultivar__icontains=termo) |
+                Q(cliente__icontains=termo) |
+                Q(empresa__icontains=termo) |
+                Q(tipo__icontains=termo) |
+                Q(observacao__icontains=termo) |
+                Q(numero_carga__icontains=termo) |
+                Q(placa__icontains=termo) |
+                Q(endereco_origem__icontains=termo) |
+                Q(endereco_destino__icontains=termo) |
+                Q(processado_por__username__icontains=termo) |
+                Q(processado_por__first_name__icontains=termo) |
+                Q(processado_por__last_name__icontains=termo)
+            )
+
+    # ----------------------------------------------------------
+    # 4. Filtros exatos
+    # ----------------------------------------------------------
+    if filtro_lote:
+        qs_antigo = qs_antigo.filter(
+            Q(lote_ref=filtro_lote) | Q(estoque__lote=filtro_lote)
+        )
+        qs_novo = qs_novo.filter(lote=filtro_lote)
+
+    if filtro_produto:
+        qs_antigo = qs_antigo.filter(estoque__produto=filtro_produto)
+        qs_novo = qs_novo.filter(produto=filtro_produto)
+
+    if filtro_cliente:
+        qs_antigo = qs_antigo.filter(
+            Q(cliente=filtro_cliente) | Q(estoque__cliente=filtro_cliente)
+        )
+        qs_novo = qs_novo.filter(cliente=filtro_cliente)
+
+    if filtro_usuario:
+        qs_antigo = qs_antigo.filter(usuario__username=filtro_usuario)
+        qs_novo = qs_novo.filter(processado_por__username=filtro_usuario)
+
+    # Filtro por tipo – agora 100% flexível: usamos icontains com a string normalizada,
+    # o que casa com qualquer variação de maiúsculas/minúsculas e acentos.
+    if filtro_tipo:
+        tipo_normalizado = normalizar_tipo_historico(filtro_tipo)
+        # Mapeamos as grafias mais comuns que podem estar no banco para o termo normalizado
+        mapa_busca = {
+            'entrada': ['entrada', 'nova entrada'],
+            'saida': ['saida', 'saída', 'baixa'],
+            'transferencia': ['transferencia', 'transferência'],
+            'expedicao': ['expedicao', 'expedição'],
+            'edicao': ['edicao', 'edição'],
+            'exclusao': ['exclusao', 'exclusão'],
+        }
+        variantes = mapa_busca.get(tipo_normalizado, [filtro_tipo])
+        tipo_q = Q()
+        for v in variantes:
+            tipo_q |= Q(tipo__icontains=v)  # icontains ignora case e acentos parcialmente
+        qs_antigo = qs_antigo.filter(tipo_q)
+        qs_novo = qs_novo.filter(tipo_q)
+
+    # Datas
+    if data_inicial:
+        qs_antigo = qs_antigo.filter(data_hora__date__gte=data_inicial)
+        qs_novo = qs_novo.filter(processado_em__date__gte=data_inicial)
+    if data_final:
+        qs_antigo = qs_antigo.filter(data_hora__date__lte=data_final)
+        qs_novo = qs_novo.filter(processado_em__date__lte=data_final)
+
+    # ----------------------------------------------------------
+    # 5. Normalização dos registros (histórico antigo + novo)
+    # ----------------------------------------------------------
+    movimentacoes = []
+
+    for m in qs_antigo.iterator(chunk_size=1000):
+        estoque = m.estoque
+        lote = m.lote_ref or (estoque.lote if estoque else '') or 'Sem lote'
+        produto = estoque.produto if estoque else ''
+        cliente = m.cliente or (estoque.cliente if estoque else '') or ''
+        empresa = estoque.empresa if estoque else ''
+        tipo = normalizar_tipo_historico(m.tipo)
+        end_orig, end_dest = obter_enderecos_historico_antigo(m, tipo)
+
+        movimentacoes.append(SimpleNamespace(
+            chave=f'antigo-{m.pk}',
+            origem_historico='Histórico geral',
+            lote=lote,
+            produto=produto,
+            cliente_exibicao=cliente,
+            empresa=empresa,
+            cultivar=estoque.cultivar.nome if estoque and estoque.cultivar else '',
+            peneira=estoque.peneira.nome if estoque and estoque.peneira else '',
+            categoria=estoque.categoria.nome if estoque and estoque.categoria else '',
+            tratamento=estoque.tratamento.nome if estoque and estoque.tratamento else '',
+            especie=estoque.especie.nome if estoque and estoque.especie else '',
+            embalagem=estoque.embalagem if estoque else '',
+            quantidade=m.quantidade or 0,
+            tipo=tipo,
+            tipo_exibicao=nome_tipo_historico(tipo),
+            endereco_origem=end_orig,
+            endereco_destino=end_dest,
+            usuario_exibicao=nome_usuario_historico(m.usuario),
+            processado_em=m.data_hora,
+            observacao=m.descricao or '',
+            numero_carga=m.numero_carga or '',
+            motorista=m.motorista or '',
+            placa=m.placa or '',
+            ordem_entrega=m.ordem_entrega or '',
+        ))
+
+    for m in qs_novo.iterator(chunk_size=1000):
+        tipo = normalizar_tipo_historico(m.tipo)
+        movimentacoes.append(SimpleNamespace(
+            chave=f'novo-{m.pk}',
+            origem_historico='Cards e empenhos',
+            lote=m.lote or 'Sem lote',
+            produto=m.produto or '',
+            cliente_exibicao=m.cliente or '',
+            empresa=m.empresa or '',
+            cultivar=m.cultivar or '',
+            peneira=m.peneira or '',
+            categoria=m.categoria or '',
+            tratamento=m.tratamento or '',
+            especie=m.especie or '',
+            embalagem=m.embalagem or '',
+            quantidade=m.quantidade or 0,
+            tipo=tipo,
+            tipo_exibicao=nome_tipo_historico(tipo),
+            endereco_origem=m.endereco_origem or '',
+            endereco_destino=m.endereco_destino or '',
+            usuario_exibicao=nome_usuario_historico(m.processado_por),
+            processado_em=m.processado_em,
+            observacao=m.observacao or '',
+            numero_carga=m.numero_carga or '',
+            motorista=m.empenho.motorista if m.empenho else '',
+            placa=m.placa or '',
+            ordem_entrega='',
+        ))
+
+    # ----------------------------------------------------------
+    # 6. Ordenação e deduplicação leve
+    # ----------------------------------------------------------
+    data_minima = timezone.make_aware(timezone.datetime.min)
+    movimentacoes.sort(key=lambda x: x.processado_em or data_minima, reverse=True)
+
+    # Remove eventos duplicados (mesmo lote, tipo, qtd, data/minuto e carga)
+    vistos = set()
+    unicos = []
+    for mov in movimentacoes:
+        data_chave = mov.processado_em.strftime('%Y-%m-%d %H:%M') if mov.processado_em else ''
+        chave = (
+            str(mov.lote).strip().upper(),
+            mov.tipo,
+            int(mov.quantidade or 0),
+            data_chave,
+            str(mov.numero_carga or '').strip().upper(),
+        )
+        if chave not in vistos:
+            vistos.add(chave)
+            unicos.append(mov)
+    movimentacoes = unicos
+
+    # ----------------------------------------------------------
+    # 7. Agrupamento por lote
+    # ----------------------------------------------------------
+    por_lote = defaultdict(list)
+    for mov in movimentacoes:
+        por_lote[str(mov.lote or 'Sem lote').strip()].append(mov)
+
+    lotes_agrupados = []
+    for idx, (lote_ref, movs) in enumerate(por_lote.items(), start=1):
+        movs.sort(key=lambda x: x.processado_em or data_minima, reverse=True)
+        ultima = movs[0]
+        quantidade_total = sum(int(m.quantidade or 0) for m in movs)
+
+        # Clientes e produtos únicos (resumo)
+        clientes_unicos = list(dict.fromkeys(m.cliente_exibicao for m in movs if m.cliente_exibicao))
+        cliente_resumo = ', '.join(clientes_unicos[:3])
+        if len(clientes_unicos) > 3:
+            cliente_resumo += f' +{len(clientes_unicos)-3}'
+
+        produtos_unicos = list(dict.fromkeys(m.produto for m in movs if m.produto))
+        produto_resumo = ', '.join(produtos_unicos[:2])
+        if len(produtos_unicos) > 2:
+            produto_resumo += f' +{len(produtos_unicos)-2}'
+
+        lotes_agrupados.append({
+            'grupo_id': f'grupo-{idx}',
+            'lote_ref': lote_ref,
+            'produto': produto_resumo,
+            'cliente': cliente_resumo,
+            'total_mov': len(movs),
+            'quantidade_total': quantidade_total,
+            'ultima_data': ultima.processado_em,
+            'ultimo_end_origem': ultima.endereco_origem,
+            'ultimo_end_destino': ultima.endereco_destino,
+            'ultimo_usuario': ultima.usuario_exibicao,
+            'ultimo_tipo': ultima.tipo,
+            'ultimo_tipo_exibicao': ultima.tipo_exibicao,
+            'movimentacoes': movs,
+        })
+
+    lotes_agrupados.sort(key=lambda g: g['ultima_data'] or data_minima, reverse=True)
+
+    # ----------------------------------------------------------
+    # 8. Cards informativos
+    # ----------------------------------------------------------
+    hoje = timezone.localdate()
+    total_mov = len(movimentacoes)
+    total_lotes = len(lotes_agrupados)
+    total_exp = sum(1 for m in movimentacoes if m.tipo == 'expedicao')
+    mov_hoje = sum(
+        1 for m in movimentacoes
+        if m.processado_em and timezone.localtime(m.processado_em).date() == hoje
+    )
+
+    # ----------------------------------------------------------
+    # 9. Opções para os selects (sempre completas, sem filtro)
+    # ----------------------------------------------------------
+    def _lista_distinta(qs, campo, modelo_rel=None):
+        """Extrai valores distintos de um campo, aceitando relacionamento."""
+        if modelo_rel:
+            return set(
+                qs.exclude(**{f'{modelo_rel}__isnull': True})
+                .values_list(f'{modelo_rel}__{campo}', flat=True)
+            )
+        return set(qs.exclude(**{campo: ''}).values_list(campo, flat=True))
+
+    lotes_ant = _lista_distinta(HistoricoMovimentacao.objects, 'lote_ref')
+    lotes_ant_est = _lista_distinta(HistoricoMovimentacao.objects, 'lote', modelo_rel='estoque')
+    lotes_nov = _lista_distinta(HistoricoItemEmpenho.objects, 'lote')
+    opcoes_lotes = sorted({x.strip() for x in (lotes_ant | lotes_ant_est | lotes_nov) if x and x.strip()}, key=str.lower)
+
+    prod_ant = _lista_distinta(HistoricoMovimentacao.objects, 'produto', modelo_rel='estoque')
+    prod_nov = _lista_distinta(HistoricoItemEmpenho.objects, 'produto')
+    opcoes_produtos = sorted({x.strip() for x in (prod_ant | prod_nov) if x and x.strip()}, key=str.lower)
+
+    cli_ant = _lista_distinta(HistoricoMovimentacao.objects, 'cliente')
+    cli_ant_est = _lista_distinta(HistoricoMovimentacao.objects, 'cliente', modelo_rel='estoque')
+    cli_nov = _lista_distinta(HistoricoItemEmpenho.objects, 'cliente')
+    opcoes_clientes = sorted({x.strip() for x in (cli_ant | cli_ant_est | cli_nov) if x and x.strip()}, key=str.lower)
+
+    # Usuários (dicionário username -> nome)
+    usuarios_dict = {}
+    for u in HistoricoMovimentacao.objects.select_related('usuario').exclude(usuario__isnull=True).values('usuario__username', 'usuario__first_name', 'usuario__last_name').distinct():
+        username = u['usuario__username']
+        nome = f"{u['usuario__first_name']} {u['usuario__last_name']}".strip() or username
+        usuarios_dict[username] = nome
+    for u in HistoricoItemEmpenho.objects.select_related('processado_por').exclude(processado_por__isnull=True).values('processado_por__username', 'processado_por__first_name', 'processado_por__last_name').distinct():
+        username = u['processado_por__username']
+        nome = f"{u['processado_por__first_name']} {u['processado_por__last_name']}".strip() or username
+        usuarios_dict[username] = nome
+    opcoes_usuarios = [{'valor': k, 'nome': v} for k, v in sorted(usuarios_dict.items(), key=lambda item: item[1].lower())]
+
+    choices_tipo = [
+        ('entrada', 'Entrada'),
+        ('saida', 'Saída'),
+        ('transferencia', 'Transferência'),
+        ('expedicao', 'Expedição'),
+        ('edicao', 'Edição'),
+        ('exclusao', 'Exclusão'),
+    ]
+
+    # ----------------------------------------------------------
+    # 10. Paginação dos lotes agrupados
+    # ----------------------------------------------------------
+    try:
+        page_size = int(request.GET.get('page_size', 25))
+    except (ValueError, TypeError):
+        page_size = 25
+    if page_size not in (10, 25, 50, 100, 200):
+        page_size = 25
+
+    paginator = Paginator(lotes_agrupados, page_size)
+    page_number = request.GET.get('page', 1)
+    try:
+        pagina = paginator.page(page_number)
+    except PageNotAnInteger:
+        pagina = paginator.page(1)
+    except EmptyPage:
+        pagina = paginator.page(paginator.num_pages)
+
+    # Ajusta IDs dos grupos por página
+    for i, grupo in enumerate(pagina.object_list, start=1):
+        grupo['grupo_id'] = f'grupo-{pagina.number}-{i}'
+
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    url_params = query_params.urlencode()
+
+    context = {
+        'lotes': pagina,
+        'busca': busca,
+        'filtro_lote': filtro_lote,
+        'filtro_produto': filtro_produto,
+        'filtro_cliente': filtro_cliente,
+        'filtro_tipo': filtro_tipo,
+        'filtro_usuario': filtro_usuario,
+        'data_inicial': data_inicial_txt,
+        'data_final': data_final_txt,
+        'opcoes_lotes': opcoes_lotes,
+        'opcoes_produtos': opcoes_produtos,
+        'opcoes_clientes': opcoes_clientes,
+        'opcoes_usuarios': opcoes_usuarios,
+        'choices_tipo': choices_tipo,
+        'total_movimentacoes': total_mov,
+        'total_lotes': total_lotes,
+        'total_expedicoes': total_exp,
+        'movimentacoes_hoje': mov_hoje,
+        'page_size': page_size,
+        'page_sizes': [10, 25, 50, 100, 200],
+        'url_params': url_params,
+    }
+    return render(request, 'sapp/historico_geral.html', context)
 
 
 from django.contrib.auth import update_session_auth_hash

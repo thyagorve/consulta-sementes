@@ -1,16 +1,30 @@
 import time
-from django.conf import settings
-from django.contrib import auth
 from django.shortcuts import redirect
+from django.contrib import auth
+
+# sapp/middleware.py (apenas o Smart404FallbackMiddleware)
+from django.shortcuts import redirect
+from django.urls import reverse, NoReverseMatch
+from django.conf import settings
+from urllib.parse import urlparse
+from django.shortcuts import redirect
+from django.urls import reverse
+from django.contrib.auth.hashers import check_password
+
+# sapp/middleware.py
+from django.shortcuts import redirect
+from django.urls import reverse
 from django.contrib import messages
 
 class AutoLogoutMiddleware:
     """
     Desloga usuário se ficar inativo por mais que AUTO_LOGOUT_DELAY segundos.
+    Redireciona para a página de login com aviso de sessão expirada.
     """
     def __init__(self, get_response):
         self.get_response = get_response
-        self.timeout = getattr(settings, 'AUTO_LOGOUT_DELAY', 1800)  # default 30min
+        from django.conf import settings
+        self.timeout = getattr(settings, 'AUTO_LOGOUT_DELAY', 1800)  # 30min
 
     def __call__(self, request):
         if request.user.is_authenticated:
@@ -18,16 +32,12 @@ class AutoLogoutMiddleware:
             last_activity = request.session.get('last_activity', now)
             if now - last_activity > self.timeout:
                 auth.logout(request)
-                messages.warning(request, "Você foi desconectado por inatividade.")  # opcional
-                return redirect('sapp:login')  # ou o nome da sua URL de login
+                # ✅ Redireciona com o parâmetro 'expired=1'
+                return redirect('/login/?expired=1')
             request.session['last_activity'] = now
         return self.get_response(request)
 
 
-# sapp/middleware.py
-from django.shortcuts import redirect
-from django.urls import reverse, NoReverseMatch
-from django.conf import settings
 
 class Smart404FallbackMiddleware:
     """
@@ -36,7 +46,14 @@ class Smart404FallbackMiddleware:
     """
     def __init__(self, get_response):
         self.get_response = get_response
-        self.login_url = reverse(settings.LOGIN_URL) if ':' in settings.LOGIN_URL else reverse(settings.LOGIN_URL)
+        # Obtém a URL de login corretamente, independente do formato
+        login_url = settings.LOGIN_URL
+        if ':' in login_url:
+            # É um nome de URL (ex: 'sapp:login')
+            self.login_url = reverse(login_url)
+        else:
+            # É um caminho (ex: '/login/?expired=1')
+            self.login_url = login_url
 
     def __call__(self, request):
         response = self.get_response(request)
@@ -47,7 +64,7 @@ class Smart404FallbackMiddleware:
         path = request.path
         if not request.user.is_authenticated:
             # evita loop se já estiver no login
-            if path != self.login_url:
+            if path != self.login_url.split('?')[0]:  # Compara apenas o caminho, sem query string
                 return redirect(self.login_url)
             return response
 
@@ -64,38 +81,35 @@ class Smart404FallbackMiddleware:
         return response
 
 
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.contrib.auth.hashers import check_password
 
 SENHA_PADRAO = 'conceito123'
 
-class ForcePasswordChangeMiddleware:
-    
+class ForcarTrocaSenhaMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
         if request.user.is_authenticated:
-            # Verifica se a senha atual é a padrão
             if check_password(SENHA_PADRAO, request.user.password):
-                # Permite acesso apenas a estas URLs
                 urls_permitidas = [
                     reverse('sapp:mudar_senha'),
                     reverse('sapp:logout'),
-                    '/static/',   # arquivos estáticos
-                    '/media/',    # uploads
+                    reverse('sapp:login'),
+                    '/static/',
+                    '/media/',
                 ]
                 current_path = request.path
+
+                if request.method == 'POST':
+                    return self.get_response(request)
+
                 if not any(current_path.startswith(url) for url in urls_permitidas):
                     return redirect('sapp:mudar_senha')
+
         return self.get_response(request)
     
 
-# sapp/middleware.py
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.contrib import messages
+
 
 class PermissionMiddleware:
     """

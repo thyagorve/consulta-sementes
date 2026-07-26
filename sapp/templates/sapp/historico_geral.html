@@ -1,1352 +1,708 @@
 {% extends 'sapp/base.html' %}
+{% load static %}
 {% load humanize %}
 
 {% block content %}
 
-<!-- Bibliotecas Necessárias -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-
 <style>
     :root {
-        --primary-brown: #8B4513;
-        --secondary-brown: #D2691E;
-        --header-bg: linear-gradient(135deg, #2c3e50, #34495e);
-        --accent-color: #e67e22;
-        --stats-green: #10b981;
-        --stats-red: #ef4444;
-        --stats-blue: #3b82f6;
-        --stats-orange: #f97316;
+        --h-primary: #2563eb;
+        --h-primary-dark: #1d4ed8;
+        --h-success: #16a34a;
+        --h-danger: #dc2626;
+        --h-warning: #d97706;
+        --h-purple: #7c3aed;
+        --h-dark: #0f172a;
+        --h-text: #334155;
+        --h-muted: #64748b;
+        --h-bg: #f8fafc;
+        --h-border: #e2e8f0;
+        --h-white: #fff;
     }
-
-    /* --- Cards de Estatísticas --- */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .stats-card {
-        background: white;
-        border-radius: 12px;
-        padding: 1.25rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        transition: transform 0.2s, box-shadow 0.2s;
-        border: 1px solid #f0f0f0;
-    }
-
-    .stats-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-    }
-
-    .stats-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        background: #f8fafc;
-    }
-
-    .stats-icon.total { background: #e6f7ff; color: #0284c7; }
-    .stats-icon.entradas { background: #e6f7e6; color: #059669; }
-    .stats-icon.saidas { background: #fee2e2; color: #dc2626; }
-    .stats-icon.transf { background: #fff3e6; color: #d97706; }
-
-    .stats-content {
-        flex: 1;
-    }
-
-    .stats-label {
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #64748b;
-        margin-bottom: 0.25rem;
-    }
-
-    .stats-value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #1e293b;
-        line-height: 1.2;
-    }
-
-    .stats-sub {
-        font-size: 0.7rem;
-        color: #64748b;
-        margin-top: 0.15rem;
-    }
-
-    /* --- Título e Card --- */
-    .page-title {
-        background: white;
-        color: #333;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        border-left: 5px solid var(--primary-brown);
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    .page-title h1 {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin: 0;
-        color: var(--primary-brown);
-    }
-
-    .card {
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        overflow: hidden;
-    }
-
-    /* --- Customização do DataTables --- */
-    .dataTables_wrapper {
-        padding: 0;
-    }
-
-    .dataTables_filter {
-        padding: 15px;
-        background: #f8f9fa;
-        border-bottom: 1px solid #eee;
-        margin-bottom: 0 !important;
-        text-align: right;
-    }
-
-    .dataTables_filter input {
-        border: 1px solid #ddd;
-        border-radius: 20px;
-        padding: 6px 15px;
-        width: 250px;
-        transition: all 0.3s;
-        outline: none;
-    }
-
-    .dataTables_filter input:focus {
-        border-color: var(--primary-brown);
-        box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
-    }
-
-    .dt-footer-wrapper {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 15px;
-        background: #f8f9fa;
-        border-top: 1px solid #eee;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .dataTables_info {
-        padding-top: 0 !important;
-        font-size: 0.85rem;
-        color: #666;
-    }
-
-    .dataTables_paginate .pagination {
-        margin: 0 !important;
-    }
-
-    .page-item.active .page-link {
-        background-color: var(--primary-brown) !important;
-        border-color: var(--primary-brown) !important;
-    }
-
-    .page-link {
-        color: var(--primary-brown);
-        border-radius: 4px;
-        margin: 0 2px;
-        border: none;
-        font-size: 0.85rem;
-    }
-
-    /* Remover setas de ordenação */
-    table.dataTable thead .sorting,
-    table.dataTable thead .sorting_asc,
-    table.dataTable thead .sorting_desc,
-    table.dataTable thead .sorting_asc_disabled,
-    table.dataTable thead .sorting_desc_disabled {
-        background-image: none !important;
-        cursor: default;
-    }
-
-    /* --- Tabela e Cabeçalhos --- */
-    #tabelaHistorico {
-        margin: 0 !important;
-        width: 100% !important;
-        border-collapse: collapse;
-    }
-
-    #tabelaHistorico thead th {
-        background: var(--header-bg) !important;
-        color: white !important;
-        font-weight: 600;
-        font-size: 0.8rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        padding: 0 !important;
-        border: none;
-        height: 50px;
-        vertical-align: middle;
-    }
-
-    .filter-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
-        height: 100%;
-        padding: 0 12px;
-        cursor: pointer;
-        transition: background 0.2s;
-    }
-
-    .filter-header:hover {
-        background: rgba(255, 255, 255, 0.15);
-    }
-
-    .filter-icon {
-        background: rgba(255,255,255,0.15);
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 4px;
-        font-size: 10px;
-        margin-left: 8px;
-    }
-
-    .filter-icon.active {
-        background: var(--accent-color);
-        color: white;
-        box-shadow: 0 0 5px rgba(0,0,0,0.3);
-    }
-
-    #tabelaHistorico tbody td {
-        padding: 10px 12px;
-        font-size: 0.9rem;
-        vertical-align: middle;
-        border-bottom: 1px solid #f1f1f1;
-    }
-
-    /* Badges e formatação */
-    .badge-quantidade {
+    .history-page {
+        padding: 24px 16px 40px;
         background: #f1f5f9;
-        color: #1e293b;
-        font-weight: 600;
-        padding: 8px 12px;
-        border-radius: 20px;
-        font-size: 0.9rem;
+        min-height: calc(100vh - 60px);
+    }
+    .history-wrapper {
+        max-width: 1800px;
+        margin: 0 auto;
+    }
+    /* Cabeçalho */
+    .history-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 22px;
+    }
+    .history-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 0;
+        color: var(--h-dark);
+        font-size: 1.75rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+    }
+    .history-title-icon {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        min-width: 100%;
-        width: 100%;
-        text-align: center;
-        border: 1px solid #e2e8f0;
-        white-space: nowrap;
-        transition: all 0.3s ease;
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
+        background: linear-gradient(135deg, var(--h-primary), var(--h-purple));
+        color: white;
+        box-shadow: 0 8px 20px rgba(37,99,235,0.22);
     }
-
-    .badge-quantidade.entrada { 
-        background: linear-gradient(135deg, #dcfce7, #d1fae5); 
-        color: #065f46;
-        border: 2px solid #059669;
-        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+    .history-subtitle {
+        margin: 7px 0 0 58px;
+        color: var(--h-muted);
+        font-size: 0.93rem;
     }
-    
-    .badge-quantidade.saida { 
-        background: linear-gradient(135deg, #fee2e2, #fecaca); 
-        color: #991b1b;
-        border: 2px solid #dc2626;
-        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
-    }
-    
-    .badge-quantidade.transferencia {
-        background: linear-gradient(135deg, #fff3e6, #ffedd5);
-        color: #9a3412;
-        border: 2px solid #d97706;
-        box-shadow: 0 2px 8px rgba(217, 119, 6, 0.15);
-    }
-
-    .badge-quantidade.extraido {
-        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-        color: #0369a1;
-        border: 2px solid #0284c7;
-        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15);
-    }
-
-    .badge-quantidade.sem-quantidade {
-        background: #f8f9fa !important;
-        color: #6c757d !important;
-        border: 1px dashed #dee2e6 !important;
-        box-shadow: none !important;
-    }
-
-    .badge {
-        font-weight: 500;
-        letter-spacing: 0.3px;
-        padding: 6px 10px;
-        font-size: 0.75rem;
-    }
-
-    .badge-entrada { background-color: #27ae60; }
-    .badge-saida { background-color: #c0392b; }
-    .badge-transferencia { background-color: #f39c12; color: white; }
-    .badge-edicao { background-color: #2980b9; }
-    .badge-exclusao { background-color: #7f8c8d; }
-
-    .endereco-badge {
-        background: #f1f5f9;
-        color: #334155;
-        padding: 4px 8px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 500;
-        display: inline-block;
-    }
-
-    .endereco-badge i {
-        color: #64748b;
-        margin-right: 4px;
-    }
-
-    /* --- Menu Dropdown de Filtro --- */
-    .excel-filter-dropdown {
-        position: absolute;
-        z-index: 10000;
+    .btn-history-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 42px;
+        padding: 9px 15px;
+        border: 1px solid var(--h-border);
+        border-radius: 10px;
         background: white;
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-        width: 300px;
-        display: none;
-        font-family: 'Segoe UI', sans-serif;
-        overflow: hidden;
-        animation: fadeIn 0.2s ease-out;
-        border: 1px solid #e2e8f0;
+        color: var(--h-text);
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.88rem;
+        transition: all 0.2s ease;
     }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
+    .btn-history-back:hover {
+        color: var(--h-primary);
+        border-color: #bfdbfe;
+        background: #eff6ff;
+        transform: translateY(-1px);
     }
-
-    .excel-filter-header {
-        background: #f8fafc;
-        padding: 15px;
-        border-bottom: 1px solid #e2e8f0;
+    /* Cards */
+    .history-cards {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0,1fr));
+        gap: 16px;
+        margin-bottom: 20px;
     }
-
-    .filter-search-box {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        transition: all 0.2s;
-    }
-
-    .filter-search-box:focus {
-        border-color: var(--primary-brown);
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(139, 69, 19, 0.1);
-    }
-
-    .excel-filter-content {
-        max-height: 300px;
-        overflow-y: auto;
-        padding: 8px 0;
-        background: white;
-    }
-
-    .filter-checkbox-item {
-        padding: 8px 15px;
-        transition: background 0.1s;
-        border-bottom: 1px solid #f1f5f9;
-    }
-
-    .filter-checkbox-item:hover {
-        background-color: #f1f5f9;
-    }
-
-    .filter-checkbox-item label {
+    .history-card {
+        position: relative;
         display: flex;
         align-items: center;
-        width: 100%;
-        cursor: pointer;
-        font-size: 0.9rem;
-        color: #1e293b;
-        margin: 0;
-        gap: 8px;
-    }
-
-    .filter-checkbox-item input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        accent-color: var(--primary-brown);
-        cursor: pointer;
-    }
-
-    .filter-checkbox-item .valor-texto {
-        flex: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .filter-checkbox-item .contador {
-        background: #e2e8f0;
-        padding: 2px 8px;
-        border-radius: 20px;
-        font-size: 0.7rem;
-        color: #475569;
-    }
-
-    .filter-buttons {
-        padding: 15px;
+        gap: 15px;
+        padding: 19px;
+        border: 1px solid var(--h-border);
+        border-radius: 15px;
         background: white;
-        border-top: 1px solid #e2e8f0;
-        display: flex;
-        gap: 8px;
-        justify-content: flex-end;
+        box-shadow: 0 4px 15px rgba(15,23,42,0.05);
+        overflow: hidden;
     }
-
-    .filter-buttons button {
-        font-size: 0.85rem;
-        padding: 8px 16px;
+    .history-card::after {
+        content: "";
+        position: absolute;
+        top: 0; right: 0;
+        width: 70px; height: 70px;
+        border-radius: 0 0 0 100%;
+        opacity: 0.08;
+    }
+    .history-card.primary::after { background: var(--h-primary); }
+    .history-card.success::after { background: var(--h-success); }
+    .history-card.warning::after { background: var(--h-warning); }
+    .history-card.purple::after { background: var(--h-purple); }
+    .history-card-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 51px; height: 51px;
+        border-radius: 14px;
+        font-size: 1.25rem;
+    }
+    .history-card.primary .history-card-icon { background: #dbeafe; color: var(--h-primary); }
+    .history-card.success .history-card-icon { background: #dcfce7; color: var(--h-success); }
+    .history-card.warning .history-card-icon { background: #fef3c7; color: var(--h-warning); }
+    .history-card.purple .history-card-icon { background: #ede9fe; color: var(--h-purple); }
+    .history-card-value {
+        margin: 0;
+        color: var(--h-dark);
+        font-size: 1.65rem;
+        font-weight: 850;
+        line-height: 1;
+    }
+    .history-card-label {
+        margin-top: 7px;
+        color: var(--h-muted);
+        font-size: 0.77rem;
+        font-weight: 750;
+        text-transform: uppercase;
+        letter-spacing: 0.045em;
+    }
+    /* Filtros */
+    .history-filter-card {
+        margin-bottom: 20px;
+        border: 1px solid var(--h-border);
+        border-radius: 15px;
+        background: white;
+        box-shadow: 0 4px 15px rgba(15,23,42,0.05);
+    }
+    .history-filter-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--h-border);
+        background: #fbfdff;
+    }
+    .history-filter-title {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin: 0;
+        color: var(--h-dark);
+        font-size: 1rem;
+        font-weight: 800;
+    }
+    .history-filter-toggle {
+        display: none;
+        border: 0;
+        background: transparent;
+        color: var(--h-primary);
+        font-size: 1rem;
+        cursor: pointer;
+    }
+    .history-filter-body { padding: 18px; }
+    .history-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(180px,1fr));
+        gap: 14px;
+    }
+    .history-filter-group.search-wide { grid-column: span 2; }
+    .history-filter-label {
+        display: block;
+        margin-bottom: 6px;
+        color: #475569;
+        font-size: 0.76rem;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.035em;
+    }
+    .history-filter-control {
+        width: 100%;
+        min-height: 42px;
+        padding: 9px 11px;
+        border: 1px solid #cbd5e1;
+        border-radius: 9px;
+        background: white;
+        color: var(--h-dark);
+        font-size: 0.88rem;
+        outline: none;
+        transition: all 0.2s ease;
+    }
+    .history-filter-control:focus {
+        border-color: var(--h-primary);
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    .history-filter-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+        margin-top: 17px;
+        padding-top: 16px;
+        border-top: 1px solid #f1f5f9;
+    }
+    .btn-history {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 42px;
+        padding: 9px 16px;
+        border-radius: 9px;
+        border: 1px solid transparent;
+        font-size: 0.86rem;
+        font-weight: 800;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .btn-history-primary {
+        color: white;
+        background: var(--h-primary);
+        border-color: var(--h-primary);
+    }
+    .btn-history-primary:hover {
+        background: var(--h-primary-dark);
+        transform: translateY(-1px);
+    }
+    .btn-history-light {
+        color: var(--h-text);
+        background: white;
+        border-color: var(--h-border);
+    }
+    .btn-history-light:hover {
+        color: var(--h-danger);
+        background: #fff7f7;
+        border-color: #fecaca;
+    }
+    /* Tabela */
+    .history-table-card {
+        border: 1px solid var(--h-border);
+        border-radius: 15px;
+        background: white;
+        box-shadow: 0 5px 18px rgba(15,23,42,0.06);
+        overflow: hidden;
+    }
+    .history-table-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 15px 18px;
+        border-bottom: 1px solid var(--h-border);
+        background: #fbfdff;
+    }
+    .history-results-text { color: var(--h-muted); font-size: 0.86rem; }
+    .history-page-size-form { display: flex; align-items: center; gap: 8px; }
+    .history-page-size-label { color: var(--h-muted); font-size: 0.8rem; font-weight: 700; }
+    .history-page-size-select {
+        min-height: 35px;
+        padding: 5px 28px 5px 9px;
+        border: 1px solid var(--h-border);
         border-radius: 8px;
-        font-weight: 600;
-        border: none;
+        background: white;
+        color: var(--h-text);
+        font-size: 0.82rem;
+        cursor: pointer;
+    }
+    .history-table-responsive { width: 100%; overflow-x: auto; }
+    .history-table {
+        width: 100%;
+        min-width: 1450px;
+        border-collapse: collapse;
+    }
+    .history-table thead th {
+        padding: 13px 11px;
+        border-bottom: 1px solid var(--h-border);
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.7rem;
+        font-weight: 850;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        white-space: nowrap;
+    }
+    .history-table tbody td {
+        padding: 13px 11px;
+        border-bottom: 1px solid #edf2f7;
+        color: var(--h-text);
+        font-size: 0.82rem;
+        vertical-align: middle;
+    }
+    .history-summary-row { background: white; transition: background 0.15s; }
+    .history-summary-row:hover { background: #f8fbff; }
+    .history-summary-row.is-open { background: #eff6ff; }
+    .history-expand-cell { width: 45px; text-align: center !important; }
+    .history-expand-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 31px; height: 31px;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        background: #eff6ff;
+        color: var(--h-primary);
         cursor: pointer;
         transition: all 0.2s;
     }
-
-    .filter-buttons .btn-primary {
-        background: var(--primary-brown);
-        color: white;
-    }
-
-    .filter-buttons .btn-primary:hover {
-        background: #6b3410;
-    }
-
-    .filter-buttons .btn-light {
-        background: #f1f5f9;
-        color: #475569;
-    }
-
-    .filter-buttons .btn-light:hover {
-        background: #e2e8f0;
-    }
-
-    .filter-buttons .btn-outline-danger {
-        background: white;
-        color: #dc2626;
-        border: 1px solid #dc2626;
-    }
-
-    .filter-buttons .btn-outline-danger:hover {
-        background: #dc2626;
-        color: white;
-    }
-
-    /* Descrição */
-    .descricao-cell {
-        max-width: 350px;
-        line-height: 1.4;
-    }
-
-    /* Estilo para linha hover */
-    #tabelaHistorico tbody tr {
-        transition: background-color 0.2s;
-    }
-
-    #tabelaHistorico tbody tr:hover {
-        background-color: #f8fafc;
-    }
-
-    /* Badge de extração */
-    .quantidade-extraida-badge {
-        font-size: 0.65rem;
-        opacity: 0.7;
-        margin-top: 2px;
-    }
-
-    /* --- Mobile --- */
-    @media (max-width: 768px) {
-        .page-title { flex-direction: column; text-align: center; gap: 10px; }
-        .dataTables_filter { text-align: center; }
-        .dataTables_filter input { width: 100%; }
-        .dt-footer-wrapper { justify-content: center; text-align: center; flex-direction: column; }
-        .stats-grid { grid-template-columns: repeat(2, 1fr); }
-        
-        .excel-filter-dropdown {
-            width: 95vw;
-            max-width: 350px;
-        }
-        
-        #tabelaHistorico thead th { font-size: 0.7rem; height: 45px; }
-        .filter-header { padding: 0 5px; }
-        
-        .badge-quantidade {
-            min-width: 100%;
-            width: 100%;
-            padding: 6px 8px;
-            font-size: 0.8rem;
-        }
-        
-        .descricao-cell {
-            max-width: 200px;
-        }
-    }
-
-    #filter-overlay {
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        z-index: 9999; display: none; background: rgba(0,0,0,0.3);
-        backdrop-filter: blur(3px);
-    }
+    .history-expand-btn:hover { background: var(--h-primary); color: white; border-color: var(--h-primary); }
+    .history-expand-btn i { transition: transform 0.2s; }
+    .history-summary-row.is-open .history-expand-btn i { transform: rotate(90deg); }
+    .history-lote { display: inline-flex; align-items: center; gap: 7px; color: var(--h-dark); font-weight: 850; white-space: nowrap; }
+    .history-product { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .history-client { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-empty-value { color: #94a3b8; }
+    .history-count { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 27px; padding: 0 8px; border-radius: 999px; background: #e0e7ff; color: #4338ca; font-size: 0.75rem; font-weight: 850; }
+    .history-quantity { color: var(--h-dark); font-weight: 850; white-space: nowrap; }
+    .history-date strong { color: var(--h-dark); font-size: 0.8rem; }
+    .history-date small { color: var(--h-muted); font-size: 0.72rem; }
+    .history-address { display: block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-user { display: flex; align-items: center; gap: 7px; max-width: 170px; }
+    .history-user-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #f1f5f9; color: #64748b; }
+    .history-user-name { overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+    /* Badges */
+    .history-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 850; white-space: nowrap; }
+    .badge-entrada { background: #dcfce7; color: #166534; }
+    .badge-saida { background: #fee2e2; color: #991b1b; }
+    .badge-transferencia { background: #dbeafe; color: #1e40af; }
+    .badge-expedicao { background: #ffedd5; color: #9a3412; }
+    .badge-edicao { background: #fef3c7; color: #92400e; }
+    .badge-exclusao { background: #ffe4e6; color: #9f1239; }
+    .badge-outro { background: #f1f5f9; color: #475569; }
+    .badge-source-old { background: #e0f2fe; color: #075985; }
+    .badge-source-new { background: #ede9fe; color: #5b21b6; }
+    /* Linhas de detalhes */
+    .history-detail-row { display: none; background: #f8fafc; }
+    .history-detail-row.is-visible { display: table-row; }
+    .history-detail-row td { padding: 0 !important; border-bottom: 1px solid #cbd5e1 !important; }
+    .history-detail-container { padding: 17px 18px 19px 60px; border-left: 4px solid var(--h-primary); background: linear-gradient(90deg, rgba(37,99,235,0.04), transparent 35%); }
+    .history-detail-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .history-detail-title h4 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--h-dark); font-size: 0.92rem; font-weight: 850; }
+    .history-detail-total { color: var(--h-muted); font-size: 0.77rem; font-weight: 700; }
+    .history-detail-table-wrapper { width: 100%; overflow-x: auto; border: 1px solid var(--h-border); border-radius: 11px; background: white; }
+    .history-detail-table { width: 100%; min-width: 1750px; border-collapse: collapse; }
+    .history-detail-table thead th { padding: 10px; border-bottom: 1px solid var(--h-border); background: #f1f5f9; color: #475569; font-size: 0.66rem; font-weight: 850; text-transform: uppercase; letter-spacing: 0.035em; white-space: nowrap; }
+    .history-detail-table tbody td { padding: 11px 10px !important; border-bottom: 1px solid #f1f5f9 !important; color: var(--h-text); font-size: 0.76rem; vertical-align: top; }
+    .history-detail-table tbody tr:last-child td { border-bottom: 0 !important; }
+    .history-detail-table tbody tr:hover { background: #fbfdff; }
+    .history-description { display: block; min-width: 250px; max-width: 420px; color: #475569; line-height: 1.45; word-break: break-word; }
+    .history-info-list { display: flex; flex-direction: column; gap: 3px; min-width: 130px; }
+    .history-info-label { color: var(--h-muted); font-weight: 700; }
+    /* Estado vazio */
+    .history-empty { padding: 55px 20px !important; text-align: center; }
+    .history-empty-icon { display: inline-flex; align-items: center; justify-content: center; width: 68px; height: 68px; margin-bottom: 15px; border-radius: 50%; background: #f1f5f9; color: #94a3b8; font-size: 1.7rem; }
+    .history-empty-title { margin: 0 0 6px; color: var(--h-dark); font-size: 1rem; font-weight: 850; }
+    .history-empty-text { margin: 0; color: var(--h-muted); font-size: 0.85rem; }
+    /* Paginação */
+    .history-pagination-wrapper { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-top: 1px solid var(--h-border); background: #fbfdff; }
+    .history-pagination-info { color: var(--h-muted); font-size: 0.8rem; }
+    .history-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
+    .history-page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 35px; height: 35px; padding: 0 10px; border: 1px solid var(--h-border); border-radius: 8px; background: white; color: var(--h-text); font-size: 0.78rem; font-weight: 750; text-decoration: none; transition: all 0.18s; }
+    .history-page-link:hover { color: var(--h-primary); border-color: #bfdbfe; background: #eff6ff; }
+    .history-page-link.active { color: white; background: var(--h-primary); border-color: var(--h-primary); }
+    .history-page-link.disabled { color: #cbd5e1; pointer-events: none; background: #f8fafc; }
+    /* Responsivo */
+    @media (max-width:1200px){ .history-cards{grid-template-columns:repeat(2,1fr);} .history-filter-grid{grid-template-columns:repeat(3,1fr);} }
+    @media (max-width:900px){ .history-header{flex-direction:column;align-items:flex-start;} .history-subtitle{margin-left:0;} .history-filter-grid{grid-template-columns:repeat(2,1fr);} .history-filter-group.search-wide{grid-column:span 2;} .history-detail-container{padding-left:18px;} }
+    @media (max-width:650px){ .history-page{padding:14px 8px 28px;} .history-title{font-size:1.38rem;} .history-title-icon{width:40px;height:40px;} .history-cards{grid-template-columns:1fr;gap:10px;} .history-card{min-height:94px;padding:15px;} .history-card-value{font-size:1.4rem;} .history-filter-toggle{display:block;} .history-filter-body.mobile-hidden{display:none;} .history-filter-grid{grid-template-columns:1fr;} .history-filter-group.search-wide{grid-column:span 1;} .history-filter-actions{flex-direction:column;align-items:stretch;} .btn-history{width:100%;} .history-table-toolbar{flex-direction:column;align-items:flex-start;} .history-pagination-wrapper{flex-direction:column;align-items:flex-start;} }
 </style>
 
-<div class="container-fluid mt-3 mb-5">
-    
-    <!-- Título da Página -->
-    <div class="page-title">
-        <div>
-            <h1><i class="fas fa-history me-2"></i>Histórico Geral</h1>
-            <small class="text-muted">Gerencie e rastreie todas as movimentações</small>
-        </div>
-        <div class="d-none d-md-block">
-            <span class="badge bg-secondary"><i class="fas fa-filter me-1"></i>Filtros Avançados</span>
-        </div>
+<div class="history-page">
+<div class="history-wrapper">
+
+<!-- Cabeçalho -->
+<header class="history-header">
+  <div class="history-header-content">
+    <h1 class="history-title">
+      <span class="history-title-icon"><i class="fas fa-clock-rotate-left"></i></span>
+      Histórico geral de movimentações
+    </h1>
+    <p class="history-subtitle">Histórico completo, agrupado por lote, incluindo registros antigos e movimentações de cards.</p>
+  </div>
+  <a href="{% url 'sapp:lista_estoque' %}" class="btn-history-back"><i class="fas fa-arrow-left"></i> Voltar ao estoque</a>
+</header>
+
+<!-- Cards -->
+<section class="history-cards">
+  <article class="history-card primary">
+    <div class="history-card-icon"><i class="fas fa-list-check"></i></div>
+    <div class="history-card-info">
+      <p class="history-card-value">{{ total_movimentacoes|default:0|intcomma }}</p>
+      <div class="history-card-label">Movimentações</div>
     </div>
-
-    <!-- Cards de Estatísticas -->
-    <div class="stats-grid mb-4">
-        <div class="stats-card">
-            <div class="stats-icon total">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="stats-content">
-                <div class="stats-label">Total de Registros</div>
-                <div class="stats-value">{{ total_registros|default:"0"|intcomma }}</div>
-                <div class="stats-sub">movimentações no sistema</div>
-            </div>
-        </div>
-
-        <div class="stats-card">
-            <div class="stats-icon entradas">
-                <i class="fas fa-arrow-down"></i>
-            </div>
-            <div class="stats-content">
-                <div class="stats-label">Entradas</div>
-                <div class="stats-value">{{ total_entradas|default:"0"|intcomma }}</div>
-                <div class="stats-sub">{{ entradas_bags|default:"0" }} bags / {{ entradas_sc|default:"0" }} sc</div>
-            </div>
-        </div>
-
-        <div class="stats-card">
-            <div class="stats-icon saidas">
-                <i class="fas fa-arrow-up"></i>
-            </div>
-            <div class="stats-content">
-                <div class="stats-label">Saídas/Expedições</div>
-                <div class="stats-value">{{ total_saidas|default:"0"|intcomma }}</div>
-                <div class="stats-sub">{{ saidas_bags|default:"0" }} bags / {{ saidas_sc|default:"0" }} sc</div>
-            </div>
-        </div>
-
-        <div class="stats-card">
-            <div class="stats-icon transf">
-                <i class="fas fa-arrows-spin"></i>
-            </div>
-            <div class="stats-content">
-                <div class="stats-label">Transferências</div>
-                <div class="stats-value">{{ total_transferencias|default:"0"|intcomma }}</div>
-                <div class="stats-sub">entre endereços</div>
-            </div>
-        </div>
+  </article>
+  <article class="history-card success">
+    <div class="history-card-icon"><i class="fas fa-layer-group"></i></div>
+    <div class="history-card-info">
+      <p class="history-card-value">{{ total_lotes|default:0|intcomma }}</p>
+      <div class="history-card-label">Lotes encontrados</div>
     </div>
+  </article>
+  <article class="history-card warning">
+    <div class="history-card-icon"><i class="fas fa-truck-fast"></i></div>
+    <div class="history-card-info">
+      <p class="history-card-value">{{ total_expedicoes|default:0|intcomma }}</p>
+      <div class="history-card-label">Expedições</div>
+    </div>
+  </article>
+  <article class="history-card purple">
+    <div class="history-card-icon"><i class="fas fa-calendar-day"></i></div>
+    <div class="history-card-info">
+      <p class="history-card-value">{{ movimentacoes_hoje|default:0|intcomma }}</p>
+      <div class="history-card-label">Movimentações hoje</div>
+    </div>
+  </article>
+</section>
 
-    <!-- Tabela Card -->
-    <div class="card">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table id="tabelaHistorico" class="table table-hover align-middle" style="width:100%">
+<!-- Filtros -->
+<section class="history-filter-card">
+  <div class="history-filter-header">
+    <h2 class="history-filter-title"><i class="fas fa-filter"></i> Filtros do histórico</h2>
+    <button type="button" class="history-filter-toggle" id="historyFilterToggle" aria-label="Mostrar ou ocultar filtros"><i class="fas fa-chevron-up"></i></button>
+  </div>
+  <div class="history-filter-body" id="historyFilterBody">
+    <form method="GET" action="{% url 'sapp:historico_geral' %}">
+      <div class="history-filter-grid">
+        <div class="history-filter-group search-wide">
+          <label for="historySearch" class="history-filter-label">Busca geral</label>
+          <input type="text" name="busca" id="historySearch" class="history-filter-control" value="{{ busca|default:'' }}" placeholder="Lote, produto, cliente, carga, motorista, placa...">
+        </div>
+        <div class="history-filter-group">
+          <label for="historyLote" class="history-filter-label">Lote</label>
+          <select name="lote" id="historyLote" class="history-filter-control">
+            <option value="">Todos os lotes</option>
+            {% for l in opcoes_lotes %}<option value="{{ l }}" {% if filtro_lote == l %}selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="history-filter-group">
+          <label for="historyProduto" class="history-filter-label">Produto</label>
+          <select name="produto" id="historyProduto" class="history-filter-control">
+            <option value="">Todos os produtos</option>
+            {% for p in opcoes_produtos %}<option value="{{ p }}" {% if filtro_produto == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="history-filter-group">
+          <label for="historyCliente" class="history-filter-label">Cliente</label>
+          <select name="cliente" id="historyCliente" class="history-filter-control">
+            <option value="">Todos os clientes</option>
+            {% for c in opcoes_clientes %}<option value="{{ c }}" {% if filtro_cliente == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="history-filter-group">
+          <label for="historyTipo" class="history-filter-label">Tipo</label>
+          <select name="tipo" id="historyTipo" class="history-filter-control">
+            <option value="">Todos os tipos</option>
+            {% for tv, tn in choices_tipo %}<option value="{{ tv }}" {% if filtro_tipo == tv %}selected{% endif %}>{{ tn }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="history-filter-group">
+          <label for="historyUsuario" class="history-filter-label">Usuário</label>
+          <select name="usuario" id="historyUsuario" class="history-filter-control">
+            <option value="">Todos os usuários</option>
+            {% for u in opcoes_usuarios %}<option value="{{ u.valor }}" {% if filtro_usuario == u.valor %}selected{% endif %}>{{ u.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="history-filter-group">
+          <label for="historyDataInicial" class="history-filter-label">Data inicial</label>
+          <input type="date" name="data_inicial" id="historyDataInicial" class="history-filter-control" value="{{ data_inicial|default:'' }}">
+        </div>
+        <div class="history-filter-group">
+          <label for="historyDataFinal" class="history-filter-label">Data final</label>
+          <input type="date" name="data_final" id="historyDataFinal" class="history-filter-control" value="{{ data_final|default:'' }}">
+        </div>
+      </div>
+      <input type="hidden" name="page_size" value="{{ page_size|default:25 }}">
+      <div class="history-filter-actions">
+        <a href="{% url 'sapp:historico_geral' %}" class="btn-history btn-history-light"><i class="fas fa-eraser"></i> Limpar filtros</a>
+        <button type="submit" class="btn-history btn-history-primary"><i class="fas fa-search"></i> Aplicar filtros</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- Tabela principal -->
+<section class="history-table-card">
+  <div class="history-table-toolbar">
+    <p class="history-results-text">
+      {% if lotes.paginator.count %}
+        Exibindo lotes <strong>{{ lotes.start_index }}</strong> até <strong>{{ lotes.end_index }}</strong> de <strong>{{ lotes.paginator.count }}</strong>
+      {% else %}
+        Nenhum lote encontrado
+      {% endif %}
+    </p>
+    <form method="GET" action="{% url 'sapp:historico_geral' %}" class="history-page-size-form">
+      {% if busca %}<input type="hidden" name="busca" value="{{ busca }}">{% endif %}
+      {% if filtro_lote %}<input type="hidden" name="lote" value="{{ filtro_lote }}">{% endif %}
+      {% if filtro_produto %}<input type="hidden" name="produto" value="{{ filtro_produto }}">{% endif %}
+      {% if filtro_cliente %}<input type="hidden" name="cliente" value="{{ filtro_cliente }}">{% endif %}
+      {% if filtro_tipo %}<input type="hidden" name="tipo" value="{{ filtro_tipo }}">{% endif %}
+      {% if filtro_usuario %}<input type="hidden" name="usuario" value="{{ filtro_usuario }}">{% endif %}
+      {% if data_inicial %}<input type="hidden" name="data_inicial" value="{{ data_inicial }}">{% endif %}
+      {% if data_final %}<input type="hidden" name="data_final" value="{{ data_final }}">{% endif %}
+      <label for="historyPageSize" class="history-page-size-label">Por página:</label>
+      <select name="page_size" id="historyPageSize" class="history-page-size-select" onchange="this.form.submit()">
+        {% for s in page_sizes %}<option value="{{ s }}" {% if page_size == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </form>
+  </div>
+  <div class="history-table-responsive">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th class="history-expand-cell"></th>
+          <th>Lote</th><th>Produto</th><th>Cliente</th><th>Movimentos</th><th>Quantidade</th>
+          <th>Último tipo</th><th>Última movimentação</th><th>Origem</th><th>Destino</th><th>Usuário</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for grupo in lotes %}
+          <tr class="history-summary-row" id="summary-{{ grupo.grupo_id }}" data-history-group="{{ grupo.grupo_id }}">
+            <td class="history-expand-cell">
+              <button type="button" class="history-expand-btn" data-history-toggle="{{ grupo.grupo_id }}" aria-label="Visualizar movimentações" aria-expanded="false"><i class="fas fa-chevron-right"></i></button>
+            </td>
+            <td><span class="history-lote" title="{{ grupo.lote_ref }}"><i class="fas fa-box"></i> {{ grupo.lote_ref|default:"Sem lote" }}</span></td>
+            <td>{% if grupo.produto %}<span class="history-product" title="{{ grupo.produto }}">{{ grupo.produto }}</span>{% else %}<span class="history-empty-value">Não informado</span>{% endif %}</td>
+            <td>{% if grupo.cliente %}<span class="history-client" title="{{ grupo.cliente }}">{{ grupo.cliente }}</span>{% else %}<span class="history-empty-value">Sem cliente</span>{% endif %}</td>
+            <td><span class="history-count">{{ grupo.total_mov|default:0 }}</span></td>
+            <td><span class="history-quantity">{{ grupo.quantidade_total|default:0|intcomma }}</span></td>
+            <td>
+              {% with tipo=grupo.ultimo_tipo %}
+                {% if tipo == 'entrada' %}<span class="history-badge badge-entrada"><i class="fas fa-arrow-down"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
+                {% elif tipo == 'saida' %}<span class="history-badge badge-saida"><i class="fas fa-arrow-up"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
+                {% elif tipo == 'transferencia' %}<span class="history-badge badge-transferencia"><i class="fas fa-right-left"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
+                {% elif tipo == 'expedicao' %}<span class="history-badge badge-expedicao"><i class="fas fa-truck-fast"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
+                {% elif tipo == 'edicao' %}<span class="history-badge badge-edicao"><i class="fas fa-pen"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
+                {% elif tipo == 'exclusao' %}<span class="history-badge badge-exclusao"><i class="fas fa-trash"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
+                {% else %}<span class="history-badge badge-outro"><i class="fas fa-circle-info"></i> {{ grupo.ultimo_tipo_exibicao|default:"Outro" }}</span>{% endif %}
+              {% endwith %}
+            </td>
+            <td>{% if grupo.ultima_data %}<div class="history-date"><strong>{{ grupo.ultima_data|date:"d/m/Y" }}</strong><small>{{ grupo.ultima_data|date:"H:i:s" }}</small></div>{% else %}<span class="history-empty-value">Sem data</span>{% endif %}</td>
+            <td>{% if grupo.ultimo_end_origem %}<span class="history-address" title="{{ grupo.ultimo_end_origem }}">{{ grupo.ultimo_end_origem }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
+            <td>{% if grupo.ultimo_end_destino %}<span class="history-address" title="{{ grupo.ultimo_end_destino }}">{{ grupo.ultimo_end_destino }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
+            <td><div class="history-user"><span class="history-user-icon"><i class="fas fa-user"></i></span><span class="history-user-name" title="{{ grupo.ultimo_usuario }}">{{ grupo.ultimo_usuario|default:"Sistema" }}</span></div></td>
+          </tr>
+          <tr class="history-detail-row" id="detail-{{ grupo.grupo_id }}">
+            <td colspan="11">
+              <div class="history-detail-container">
+                <div class="history-detail-title">
+                  <h4><i class="fas fa-timeline"></i> Movimentações do lote {{ grupo.lote_ref }}</h4>
+                  <span class="history-detail-total">{{ grupo.total_mov }} registro{{ grupo.total_mov|pluralize }}</span>
+                </div>
+                <div class="history-detail-table-wrapper">
+                  <table class="history-detail-table">
                     <thead>
-                        <tr>
-                            <th style="width: 10%;">
-                                <div class="filter-header" data-column="0">
-                                    <span>DATA/HORA</span>
-                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
-                                </div>
-                            </th>
-                            <th style="width: 8%;">
-                                <div class="filter-header" data-column="1">
-                                    <span>TIPO</span>
-                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
-                                </div>
-                            </th>
-                            <th style="width: 8%;">
-                                <div class="filter-header" data-column="2">
-                                    <span>LOTE</span>
-                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
-                                </div>
-                            </th>
-                            <th style="width: 8%;">
-                                <div class="filter-header" data-column="3">
-                                    <span>ENDEREÇO</span>
-                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
-                                </div>
-                            </th>
-                            <th style="width: 12%; min-width: 130px;">
-                                <div class="filter-header" data-column="4">
-                                    <span>QUANTIDADE</span>
-                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
-                                </div>
-                            </th>
-                            <th style="width: 12%;">
-                                <div class="filter-header" data-column="5">
-                                    <span>USUÁRIO</span>
-                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
-                                </div>
-                            </th>
-                            <th style="width: auto;">
-                                <div class="filter-header" data-column="6">
-                                    <span>DETALHES</span>
-                                    <div class="filter-icon"><i class="fas fa-filter"></i></div>
-                                </div>
-                            </th>
-                        </tr>
+                      <tr>
+                        <th>Data e hora</th><th>Tipo</th><th>Quantidade</th><th>Produto</th><th>Cliente / empresa</th>
+                        <th>Origem</th><th>Destino</th><th>Carga / transporte</th><th>Usuário</th><th>Fonte</th><th>Descrição / observação</th>
+                      </tr>
                     </thead>
                     <tbody>
-                        {% for h in historico_lista %}
+                      {% for mov in grupo.movimentacoes %}
                         <tr>
-                            <!-- DATA/HORA -->
-                            <td data-order="{{ h.data_hora|date:'YmdHis' }}">
-                                <div class="fw-bold">{{ h.data_hora|date:"d/m/Y" }}</div>
-                                <div class="text-muted small">{{ h.data_hora|date:"H:i:s" }}</div>
-                            </td>
-                            
-                            <!-- TIPO -->
-                            <td data-order="{{ h.tipo }}">
-                                {% if 'Entrada' in h.tipo %}
-                                    <span class="badge badge-entrada rounded-pill px-3">ENTRADA</span>
-                                {% elif 'Saída' in h.tipo or 'Expedição' in h.tipo %}
-                                    <span class="badge badge-saida rounded-pill px-3">SAÍDA</span>
-                                {% elif 'Transferência' in h.tipo %}
-                                    <span class="badge badge-transferencia rounded-pill px-3">TRANSF.</span>
-                                {% elif 'Edição' in h.tipo %}
-                                    <span class="badge badge-edicao rounded-pill px-3">EDIÇÃO</span>
-                                {% elif 'EXCLUSÃO' in h.tipo %}
-                                    <span class="badge badge-exclusao rounded-pill px-3">EXCLUSÃO</span>
-                                {% else %}
-                                    <span class="badge bg-secondary rounded-pill px-3">{{ h.tipo|upper|truncatechars:10 }}</span>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- LOTE -->
-                            <td data-order="{{ h.lote_ref }}">
-                                {% if h.estoque %}
-                                    <span class="fw-bold">{{ h.estoque.lote }}</span>
-                                    {% if h.estoque.produto %}
-                                        <small class="d-block text-muted">{{ h.estoque.produto|truncatechars:12 }}</small>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="fw-bold">{{ h.lote_ref|default:"--" }}</span>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- ENDEREÇO -->
-                            <td data-order="{{ h.estoque.endereco|default:'' }}">
-                                {% if h.estoque and h.estoque.endereco %}
-                                    <span class="endereco-badge">
-                                        <i class="fas fa-location-dot"></i> {{ h.estoque.endereco }}
-                                    </span>
-                                    {% if h.estoque.az %}
-                                        <small class="d-block text-muted mt-1">AZ {{ h.estoque.az }}</small>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- QUANTIDADE - USANDO SAFE E FILTRO PARA EXTRAIR -->
-                            <td data-order="{{ h.quantidade|default:'0' }}" class="text-center quantidade-col">
-                                {% if h.quantidade and h.quantidade > 0 %}
-                                    <!-- QUANTIDADE DO CAMPO -->
-                                    {% if 'Entrada' in h.tipo %}
-                                        <div class="badge-quantidade entrada">
-                                            <i class="fas fa-plus-circle"></i>
-                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
-                                            {% if h.estoque.embalagem %}
-                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
-                                            {% endif %}
-                                        </div>
-                                    {% elif 'Saída' in h.tipo or 'Expedição' in h.tipo %}
-                                        <div class="badge-quantidade saida">
-                                            <i class="fas fa-minus-circle"></i>
-                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
-                                            {% if h.estoque.embalagem %}
-                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
-                                            {% endif %}
-                                        </div>
-                                    {% elif 'Transferência' in h.tipo %}
-                                        <div class="badge-quantidade transferencia">
-                                            <i class="fas fa-exchange-alt"></i>
-                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
-                                            {% if h.estoque.embalagem %}
-                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
-                                            {% endif %}
-                                        </div>
-                                    {% else %}
-                                        <div class="badge-quantidade">
-                                            <i class="fas fa-hashtag"></i>
-                                            <span>{{ h.quantidade|floatformat:0|intcomma }}</span>
-                                            {% if h.estoque.embalagem %}
-                                                <small style="font-size:0.7rem;opacity:0.8;">{{ h.estoque.embalagem }}</small>
-                                            {% endif %}
-                                        </div>
-                                    {% endif %}
-                                {% else %}
-                                    <!-- SEM QUANTIDADE - SERÁ PROCESSADO POR JAVASCRIPT -->
-                                    <div class="quantidade-pendente" 
-                                         data-descricao="{{ h.descricao|escapejs }}"
-                                         data-tipo="{{ h.tipo|escapejs }}"
-                                         data-embalagem="{% if h.estoque.embalagem %}{{ h.estoque.embalagem }}{% endif %}">
-                                        <div class="badge-quantidade sem-quantidade">
-                                            <i class="fas fa-spinner fa-pulse"></i>
-                                            <span>Carregando...</span>
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            </td>
-                            
-                            <!-- USUÁRIO -->
-                            <td data-order="{{ h.usuario.username|default:'Sistema' }}">
-                                <div class="d-flex align-items-center">
-                                    <div class="user-avatar bg-secondary bg-opacity-10 rounded-circle me-2" 
-                                         style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-                                        <i class="fas fa-user-circle text-secondary" style="font-size: 1.2rem;"></i>
-                                    </div>
-                                    <div>
-                                        <span class="fw-medium">{{ h.usuario.username|default:"Sistema" }}</span>
-                                        {% if h.usuario.first_name %}
-                                            <small class="d-block text-muted">{{ h.usuario.first_name }}</small>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </td>
-                            
-                            <!-- DETALHES -->
-                            <td>
-                                <div class="descricao-cell small">
-                                    {{ h.descricao|safe }}
-                                </div>
-                                {% if h.numero_carga or h.motorista or h.placa or h.cliente %}
-                                <div class="mt-2 pt-1 border-top small text-muted">
-                                    {% if h.numero_carga %}
-                                        <span class="me-2"><i class="fas fa-truck"></i> {{ h.numero_carga }}</span>
-                                    {% endif %}
-                                    {% if h.motorista %}
-                                        <span class="me-2"><i class="fas fa-id-card"></i> {{ h.motorista }}</span>
-                                    {% endif %}
-                                    {% if h.placa %}
-                                        <span class="me-2"><i class="fas fa-car"></i> {{ h.placa }}</span>
-                                    {% endif %}
-                                    {% if h.cliente %}
-                                        <span><i class="fas fa-building"></i> {{ h.cliente }}</span>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
-                            </td>
+                          <td>{% if mov.processado_em %}<div class="history-date"><strong>{{ mov.processado_em|date:"d/m/Y" }}</strong><small>{{ mov.processado_em|date:"H:i:s" }}</small></div>{% else %}<span class="history-empty-value">Sem data</span>{% endif %}</td>
+                          <td>
+                            {% if mov.tipo == 'entrada' %}<span class="history-badge badge-entrada"><i class="fas fa-arrow-down"></i> {{ mov.tipo_exibicao }}</span>
+                            {% elif mov.tipo == 'saida' %}<span class="history-badge badge-saida"><i class="fas fa-arrow-up"></i> {{ mov.tipo_exibicao }}</span>
+                            {% elif mov.tipo == 'transferencia' %}<span class="history-badge badge-transferencia"><i class="fas fa-right-left"></i> {{ mov.tipo_exibicao }}</span>
+                            {% elif mov.tipo == 'expedicao' %}<span class="history-badge badge-expedicao"><i class="fas fa-truck-fast"></i> {{ mov.tipo_exibicao }}</span>
+                            {% elif mov.tipo == 'edicao' %}<span class="history-badge badge-edicao"><i class="fas fa-pen"></i> {{ mov.tipo_exibicao }}</span>
+                            {% elif mov.tipo == 'exclusao' %}<span class="history-badge badge-exclusao"><i class="fas fa-trash"></i> {{ mov.tipo_exibicao }}</span>
+                            {% else %}<span class="history-badge badge-outro"><i class="fas fa-circle-info"></i> {{ mov.tipo_exibicao|default:"Outro" }}</span>{% endif %}
+                          </td>
+                          <td><span class="history-quantity">{{ mov.quantidade|default:0|intcomma }}</span>{% if mov.embalagem %}<small style="display:block;margin-top:3px;color:#64748b;">{{ mov.embalagem }}</small>{% endif %}</td>
+                          <td>
+                            {% if mov.produto %}<strong>{{ mov.produto }}</strong>{% else %}<span class="history-empty-value">Não informado</span>{% endif %}
+                            {% if mov.cultivar or mov.peneira %}<div style="margin-top:4px;color:#64748b;font-size:0.7rem;">{% if mov.cultivar %}{{ mov.cultivar }}{% endif %}{% if mov.cultivar and mov.peneira %} • {% endif %}{% if mov.peneira %}Peneira {{ mov.peneira }}{% endif %}</div>{% endif %}
+                          </td>
+                          <td>
+                            <div class="history-info-list">
+                              {% if mov.cliente_exibicao %}<span><span class="history-info-label">Cliente:</span> {{ mov.cliente_exibicao }}</span>{% endif %}
+                              {% if mov.empresa %}<span><span class="history-info-label">Empresa:</span> {{ mov.empresa }}</span>{% endif %}
+                              {% if not mov.cliente_exibicao and not mov.empresa %}<span class="history-empty-value">Não informado</span>{% endif %}
+                            </div>
+                          </td>
+                          <td>{% if mov.endereco_origem %}<span class="history-address" title="{{ mov.endereco_origem }}"><i class="fas fa-location-dot" style="color:#dc2626;"></i> {{ mov.endereco_origem }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
+                          <td>{% if mov.endereco_destino %}<span class="history-address" title="{{ mov.endereco_destino }}"><i class="fas fa-location-dot" style="color:#16a34a;"></i> {{ mov.endereco_destino }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
+                          <td>
+                            <div class="history-info-list">
+                              {% if mov.numero_carga %}<span><span class="history-info-label">Carga:</span> {{ mov.numero_carga }}</span>{% endif %}
+                              {% if mov.motorista %}<span><span class="history-info-label">Motorista:</span> {{ mov.motorista }}</span>{% endif %}
+                              {% if mov.placa %}<span><span class="history-info-label">Placa:</span> {{ mov.placa }}</span>{% endif %}
+                              {% if mov.ordem_entrega %}<span><span class="history-info-label">Ordem:</span> {{ mov.ordem_entrega }}</span>{% endif %}
+                              {% if not mov.numero_carga and not mov.motorista and not mov.placa and not mov.ordem_entrega %}<span class="history-empty-value">Não informado</span>{% endif %}
+                            </div>
+                          </td>
+                          <td><div class="history-user"><span class="history-user-icon"><i class="fas fa-user"></i></span><span class="history-user-name" title="{{ mov.usuario_exibicao }}">{{ mov.usuario_exibicao|default:"Sistema" }}</span></div></td>
+                          <td>{% if mov.origem_historico == 'Histórico geral' %}<span class="history-badge badge-source-old"><i class="fas fa-database"></i> Histórico geral</span>{% else %}<span class="history-badge badge-source-new"><i class="fas fa-table-columns"></i> Cards e empenhos</span>{% endif %}</td>
+                          <td>{% if mov.observacao %}<span class="history-description" title="{{ mov.observacao }}">{{ mov.observacao|linebreaksbr }}</span>{% else %}<span class="history-empty-value">Sem observação</span>{% endif %}</td>
                         </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center text-muted py-5">
-                                <i class="fas fa-history fa-3x mb-3 opacity-25"></i>
-                                <p class="mb-0">Nenhum registro de movimentação encontrado</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                      {% empty %}
+                        <tr><td colspan="11" style="text-align:center;">Nenhuma movimentação disponível.</td></tr>
+                      {% endfor %}
                     </tbody>
-                </table>
-            </div>
-            
-            <!-- Rodapé Personalizado -->
-            <div id="custom-footer" class="dt-footer-wrapper"></div>
-        </div>
-    </div>
+                  </table>
+                </div>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="11" class="history-empty">
+              <div class="history-empty-icon"><i class="fas fa-magnifying-glass"></i></div>
+              <h3 class="history-empty-title">Nenhum histórico encontrado</h3>
+              <p class="history-empty-text">Não existem movimentações correspondentes aos filtros selecionados.</p>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if lotes.paginator.num_pages > 1 %}
+  <div class="history-pagination-wrapper">
+    <div class="history-pagination-info">Página <strong>{{ lotes.number }}</strong> de <strong>{{ lotes.paginator.num_pages }}</strong></div>
+    <nav aria-label="Paginação do histórico">
+      <ul class="history-pagination">
+        {% if lotes.has_previous %}
+          <li><a class="history-page-link" href="?page=1{% if url_params %}&{{ url_params }}{% endif %}" title="Primeira página"><i class="fas fa-angles-left"></i></a></li>
+        {% else %}
+          <li><span class="history-page-link disabled"><i class="fas fa-angles-left"></i></span></li>
+        {% endif %}
+        {% if lotes.has_previous %}
+          <li><a class="history-page-link" href="?page={{ lotes.previous_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" title="Página anterior"><i class="fas fa-chevron-left"></i></a></li>
+        {% else %}
+          <li><span class="history-page-link disabled"><i class="fas fa-chevron-left"></i></span></li>
+        {% endif %}
+        {% for num in lotes.paginator.page_range %}
+          {% if num >= lotes.number|add:"-2" and num <= lotes.number|add:"2" %}
+            <li>
+              {% if num == lotes.number %}
+                <span class="history-page-link active">{{ num }}</span>
+              {% else %}
+                <a class="history-page-link" href="?page={{ num }}{% if url_params %}&{{ url_params }}{% endif %}">{{ num }}</a>
+              {% endif %}
+            </li>
+          {% endif %}
+        {% endfor %}
+        {% if lotes.has_next %}
+          <li><a class="history-page-link" href="?page={{ lotes.next_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" title="Próxima página"><i class="fas fa-chevron-right"></i></a></li>
+        {% else %}
+          <li><span class="history-page-link disabled"><i class="fas fa-chevron-right"></i></span></li>
+        {% endif %}
+        {% if lotes.has_next %}
+          <li><a class="history-page-link" href="?page={{ lotes.paginator.num_pages }}{% if url_params %}&{{ url_params }}{% endif %}" title="Última página"><i class="fas fa-angles-right"></i></a></li>
+        {% else %}
+          <li><span class="history-page-link disabled"><i class="fas fa-angles-right"></i></span></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</section>
+
+</div>
 </div>
 
-<div id="filter-overlay"></div>
-
-<!-- Scripts -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-
 <script>
-$(document).ready(function() {
-    
-    // Forçar renderização antes de iniciar DataTable
-    setTimeout(function() {
-        processarQuantidadesPendentes();
-    }, 100);
-    
-    // Configuração do DataTable
-    var table = $('#tabelaHistorico').DataTable({
-        language: {
-            url: "//cdn.datatables.net/plug-ins/1.13.4/i18n/pt-BR.json",
-            search: "",
-            searchPlaceholder: "Pesquisar em tudo..."
-        },
-        // HABILITAR ORDENAÇÃO E BUSCA
-        ordering: true,
-        order: [[0, 'desc']], // Ordenar por data decrescente
-        autoWidth: false,
-        pageLength: 25,
-        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
-        dom: '<"top"f>rt<"bottom"ip><"clear">',
-        
-        columnDefs: [
-            { orderable: false, targets: [1, 2, 3, 5, 6] }, // Colunas não ordenáveis
-            { orderable: true, targets: [0, 4] }, // Data e Quantidade ordenáveis
-            { type: 'num', targets: 4 } // Coluna quantidade como numérica
-        ],
-        
-        drawCallback: function() {
-            var footer = $('#custom-footer');
-            $('.dataTables_info').detach().appendTo(footer);
-            $('.dataTables_paginate').detach().appendTo(footer);
-            $('.dataTables_length').detach().appendTo(footer);
-            
-            // Reprocessar quantidades após redesenhar
-            setTimeout(function() {
-                processarQuantidadesPendentes();
-            }, 100);
-        }
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-history-toggle]").forEach(btn => {
+        btn.addEventListener("click", function () {
+            const id = this.getAttribute("data-history-toggle");
+            const detail = document.getElementById("detail-" + id);
+            const summary = document.getElementById("summary-" + id);
+            if (!detail || !summary) return;
+            const open = detail.classList.contains("is-visible");
+            detail.classList.toggle("is-visible", !open);
+            summary.classList.toggle("is-open", !open);
+            this.setAttribute("aria-expanded", String(!open));
+        });
     });
-
-    // =============================================
-    // FUNÇÃO CORRIGIDA PARA EXTRAIR QUANTIDADE
-    // =============================================
-    function extrairQuantidadeDescricao(htmlDescricao) {
-        if (!htmlDescricao) return null;
-        
-        // Criar elemento temporário para extrair texto puro
-        var tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlDescricao;
-        var textoPuro = (tempDiv.textContent || tempDiv.innerText || '').trim();
-        
-        console.log('Extraindo de:', textoPuro.substring(0, 100));
-        
-        // PRIORIDADE 1: Procurar explicitamente "Quantidade: numero"
-        var matchQuantidade = textoPuro.match(/Quantidade:\s*(\d+(?:\.\d+)?)/i);
-        if (matchQuantidade && matchQuantidade[1]) {
-            var qtd = parseFloat(matchQuantidade[1]);
-            if (qtd > 0 && qtd < 1000000) {
-                console.log('Encontrado por "Quantidade:":', qtd);
-                return qtd;
+    const toggle = document.getElementById("historyFilterToggle");
+    const body = document.getElementById("historyFilterBody");
+    if (toggle && body) {
+        toggle.addEventListener("click", () => {
+            const hidden = body.classList.toggle("mobile-hidden");
+            const icon = toggle.querySelector("i");
+            if (icon) {
+                icon.classList.toggle("fa-chevron-down", hidden);
+                icon.classList.toggle("fa-chevron-up", !hidden);
             }
-        }
-        
-        // PRIORIDADE 2: Procurar "Qtde:" ou "Qtd:"
-        var matchQtde = textoPuro.match(/Qtde?:?\s*(\d+(?:\.\d+)?)/i);
-        if (matchQtde && matchQtde[1]) {
-            var qtd2 = parseFloat(matchQtde[1]);
-            if (qtd2 > 0 && qtd2 < 1000000) {
-                console.log('Encontrado por "Qtde:":', qtd2);
-                return qtd2;
-            }
-        }
-        
-        // PRIORIDADE 3: Número seguido de BAG ou SC (mas não KG ou TON)
-        var matchUnidade = textoPuro.match(/(\d+(?:\.\d+)?)\s*(?:BAG|SC)(?!\s*(?:KG|TON))/i);
-        if (matchUnidade && matchUnidade[1]) {
-            var qtd3 = parseFloat(matchUnidade[1]);
-            if (qtd3 > 0 && qtd3 < 1000000) {
-                console.log('Encontrado por unidade BAG/SC:', qtd3);
-                return qtd3;
-            }
-        }
-        
-        // PRIORIDADE 4: Primeiro número que aparece ANTES de "KG" ou "Peso"
-        // Divide o texto em partes para pegar o número antes de mencionar peso
-        var partes = textoPuro.split(/[.,;:!?]/);
-        for (var i = 0; i < partes.length; i++) {
-            var parte = partes[i].trim();
-            // Ignora partes que contêm "KG", "Peso", "Ton"
-            if (parte.match(/(?:KG|Peso|Ton|peso|ton)/i)) {
-                continue;
-            }
-            
-            var numeros = parte.match(/\d+/g);
-            if (numeros) {
-                for (var j = 0; j < numeros.length; j++) {
-                    var num = parseInt(numeros[j]);
-                    if (num > 0 && num < 1000000) {
-                        console.log('Encontrado primeiro número válido:', num);
-                        return num;
-                    }
-                }
-            }
-        }
-        
-        console.log('Nenhuma quantidade encontrada');
-        return null;
+        });
     }
-    
-    function extrairEmbalagemDescricao(htmlDescricao) {
-        if (!htmlDescricao) return null;
-        
-        var tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlDescricao;
-        var textoPuro = (tempDiv.textContent || tempDiv.innerText || '').toUpperCase();
-        
-        // Procurar por BAG ou SC no contexto de Quantidade
-        var matchContexto = textoPuro.match(/Quantidade:\s*\d+(?:\.\d+)?\s*(BAG|SC)/i);
-        if (matchContexto) {
-            return matchContexto[1].toUpperCase();
-        }
-        
-        // Procurar em todo o texto
-        if (textoPuro.indexOf('BAG') > -1) return 'BAG';
-        if (textoPuro.indexOf('SC') > -1) return 'SC';
-        
-        return null;
-    }
-    
-    function formatarNumero(num) {
-        if (!num && num !== 0) return '0';
-        var partes = num.toString().split('.');
-        partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-        return partes.join(',');
-    }
-    
-    function processarQuantidadesPendentes() {
-        var processados = 0;
-        $('.quantidade-pendente').each(function() {
-            var $div = $(this);
-            var descricao = $div.data('descricao');
-            var tipo = $div.data('tipo') || '';
-            var embalagem = $div.data('embalagem');
-            
-            if (!descricao) {
-                $div.html(
-                    '<div class="badge-quantidade sem-quantidade">' +
-                    '<i class="fas fa-question-circle"></i>' +
-                    '<span>--</span>' +
-                    '</div>'
-                );
-                return;
-            }
-            
-            // Extrair quantidade da descrição
-            var quantidade = extrairQuantidadeDescricao(descricao);
-            
-            // Se não tem embalagem, extrair da descrição
-            if (!embalagem) {
-                embalagem = extrairEmbalagemDescricao(descricao);
-            }
-            
-            var $td = $div.closest('td');
-            
-            if (quantidade && quantidade > 0) {
-                // Determinar ícone e classe baseado no tipo
-                var icone = 'fa-hashtag';
-                var classeTipo = '';
-                var classeExtra = ' extraido';
-                
-                var tipoUpper = tipo.toUpperCase();
-                var tipoLower = tipo.toLowerCase();
-                
-                if (tipoUpper.indexOf('ENTRADA') > -1 || tipoLower.indexOf('entrada') > -1) {
-                    icone = 'fa-plus-circle';
-                    classeTipo = 'entrada';
-                    classeExtra = '';
-                } else if (tipoUpper.indexOf('SAÍDA') > -1 || tipoUpper.indexOf('SAIDA') > -1 || 
-                           tipoUpper.indexOf('EXPEDIÇÃO') > -1 || tipoUpper.indexOf('EXPEDICAO') > -1 ||
-                           tipoLower.indexOf('saída') > -1 || tipoLower.indexOf('saida') > -1 || 
-                           tipoLower.indexOf('expedição') > -1 || tipoLower.indexOf('expedicao') > -1) {
-                    icone = 'fa-minus-circle';
-                    classeTipo = 'saida';
-                    classeExtra = '';
-                } else if (tipoUpper.indexOf('TRANSFERÊNCIA') > -1 || tipoUpper.indexOf('TRANSFERENCIA') > -1 ||
-                           tipoLower.indexOf('transferência') > -1 || tipoLower.indexOf('transferencia') > -1) {
-                    icone = 'fa-exchange-alt';
-                    classeTipo = 'transferencia';
-                    classeExtra = '';
-                }
-                
-                var qtdFormatada = formatarNumero(quantidade);
-                
-                // Construir HTML do badge
-                var html = '<div class="badge-quantidade ' + classeTipo + classeExtra + '">';
-                html += '<i class="fas ' + icone + '"></i>';
-                html += '<span>' + qtdFormatada + '</span>';
-                
-                if (embalagem) {
-                    html += '<small style="font-size:0.7rem;opacity:0.8;">' + embalagem + '</small>';
-                }
-                
-                html += '</div>';
-                
-                // Se foi extraído, mostrar indicador
-                if (classeExtra.indexOf('extraido') > -1) {
-                    html += '<div class="quantidade-extraida-badge text-muted mt-1">';
-                    html += '<i class="fas fa-info-circle"></i> Extraído';
-                    html += '</div>';
-                }
-                
-                // Atualizar célula
-                $div.html(html);
-                
-                // Atualizar data-order para filtros funcionarem
-                $td.attr('data-order', quantidade);
-                
-                processados++;
-                console.log('Processado:', quantidade, embalagem);
-                
-            } else {
-                // Não encontrou nada
-                $div.html(
-                    '<div class="badge-quantidade sem-quantidade">' +
-                    '<i class="fas fa-question-circle"></i>' +
-                    '<span>--</span>' +
-                    '</div>'
-                );
-                $td.attr('data-order', '0');
-            }
-        });
-        
-        console.log('Total processados:', processados);
-    }
-    
-    // Processar quantidades ao carregar
-    setTimeout(function() {
-        processarQuantidadesPendentes();
-    }, 300);
-
-    // CORRIGIR FILTROS - Função para extrair texto puro
-    function getTextFromHtml(html) {
-        if (!html) return "";
-        var temp = document.createElement('div');
-        temp.innerHTML = html;
-        return (temp.textContent || temp.innerText || '').trim();
-    }
-
-    // Função para obter valor da célula para filtro
-    function getCellValue(cell, colIndex) {
-        if (!cell) return "";
-        
-        // Para coluna de quantidade (4), usar data-order
-        if (colIndex === 4) {
-            var orderValue = cell.getAttribute('data-order');
-            if (orderValue && orderValue !== '0') {
-                return orderValue;
-            }
-            // Tentar pegar do texto do badge
-            var badgeSpan = cell.querySelector('.badge-quantidade span');
-            if (badgeSpan) {
-                var texto = badgeSpan.textContent.trim();
-                if (texto && texto !== '--' && texto !== 'Carregando...') {
-                    return texto;
-                }
-            }
-            return '0';
-        }
-        
-        // Para outras colunas, usar data-order se existir
-        var orderAttr = cell.getAttribute('data-order');
-        if (orderAttr && orderAttr.trim() !== '') {
-            return orderAttr.trim();
-        }
-        
-        // Fallback: texto puro da célula
-        return getTextFromHtml(cell.innerHTML).trim();
-    }
-
-    // FILTRO - Abrir ao Clicar no Header
-    $(document).on('click', '.filter-header', function(e) {
-        e.stopPropagation();
-        
-        var $header = $(this);
-        var colIndex = parseInt($header.data('column'));
-        
-        console.log('Abrindo filtro para coluna:', colIndex);
-        
-        // Fechar filtros anteriores
-        $('.excel-filter-dropdown').fadeOut(100, function(){ $(this).remove(); });
-        $('#filter-overlay').fadeIn(200);
-
-        // Coletar dados únicos da coluna
-        var column = table.column(colIndex);
-        var uniqueValues = new Map();
-        
-        column.nodes().each(function(cell) {
-            var value = getCellValue(cell, colIndex);
-            console.log('Valor da célula:', value);
-            
-            if (value && value.trim() !== '' && value !== '—' && value !== '0' && value !== '--') {
-                var count = uniqueValues.get(value) || 0;
-                uniqueValues.set(value, count + 1);
-            }
-        });
-        
-        console.log('Valores únicos:', uniqueValues.size);
-        
-        // Se não houver valores, não abrir dropdown
-        if (uniqueValues.size === 0) {
-            $('#filter-overlay').fadeOut(200);
-            return;
-        }
-        
-        // Converter para array e ordenar
-        var sortedData = [];
-        uniqueValues.forEach(function(count, value) {
-            sortedData.push({value: value, count: count});
-        });
-        
-        sortedData.sort(function(a, b) {
-            // Tentar ordenar numericamente
-            var numA = parseFloat(a.value);
-            var numB = parseFloat(b.value);
-            if (!isNaN(numA) && !isNaN(numB)) {
-                return numA - numB;
-            }
-            // Ordenar alfabeticamente
-            return a.value.localeCompare(b.value);
-        });
-        
-        var currentSearch = column.search();
-        
-        // Criar dropdown
-        var dropdownHtml = `
-            <div class="excel-filter-dropdown" data-col="${colIndex}">
-                <div class="excel-filter-header">
-                    <input type="text" class="filter-search-box" placeholder="Filtrar nesta lista...">
-                </div>
-                <div class="excel-filter-content">
-                    <ul class="list-unstyled m-0">
-                        <li class="filter-checkbox-item">
-                            <label>
-                                <input type="checkbox" class="select-all" checked>
-                                <span class="valor-texto fw-bold text-primary">(Selecionar Tudo)</span>
-                                <span class="contador">${sortedData.length}</span>
-                            </label>
-                        </li>
-        `;
-
-        sortedData.forEach(function(item) {
-            var value = item.value;
-            var count = item.count;
-            
-            // Escapar valor para HTML
-            var escapedValue = value.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            var isChecked = true;
-            if (currentSearch) {
-                try {
-                    var regex = new RegExp(currentSearch.replace(/[\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&"));
-                    if (!regex.test(value)) isChecked = false;
-                } catch(err) {
-                    isChecked = false;
-                }
-            }
-
-            var displayValue = value.length > 30 ? value.substring(0, 30) + '...' : value;
-
-            dropdownHtml += `
-                <li class="filter-checkbox-item">
-                    <label>
-                        <input type="checkbox" class="val-checkbox" value="${escapedValue}" ${isChecked ? 'checked' : ''}>
-                        <span class="valor-texto" title="${escapedValue}">${displayValue}</span>
-                        <span class="contador">${count}</span>
-                    </label>
-                </li>`;
-        });
-
-        dropdownHtml += `
-                    </ul>
-                </div>
-                <div class="filter-buttons">
-                    <button class="btn btn-light close-filter">Cancelar</button>
-                    <button class="btn btn-primary apply-filter">Aplicar</button>
-                    <button class="btn btn-outline-danger clear-filter" title="Limpar Filtro"><i class="fas fa-trash"></i></button>
-                </div>
-            </div>
-        `;
-
-        $('body').append(dropdownHtml);
-
-        // Posicionar dropdown
-        var offset = $header.offset();
-        var dropdown = $('.excel-filter-dropdown');
-        var top = offset.top + $header.outerHeight() + 8;
-        var left = offset.left;
-        var screenWidth = $(window).width();
-
-        if (screenWidth < 768) {
-            left = (screenWidth - dropdown.outerWidth()) / 2;
-        } else if (left + 320 > screenWidth) {
-            left = screenWidth - 330;
-        }
-        
-        // Garantir que não fique fora da tela
-        if (left < 0) left = 10;
-        if (top < 0) top = 10;
-
-        dropdown.css({ top: top + 'px', left: left + 'px', position: 'fixed' }).show();
-        dropdown.find('.filter-search-box').focus();
-    });
-
-    // Busca dentro do filtro
-    $(document).on('keyup', '.filter-search-box', function() {
-        var term = $(this).val().toLowerCase();
-        var dropdown = $(this).closest('.excel-filter-dropdown');
-        dropdown.find('.excel-filter-content li:not(:first)').each(function() {
-            var text = $(this).find('.valor-texto').text().toLowerCase();
-            $(this).toggle(text.indexOf(term) > -1);
-        });
-    });
-
-    // Checkbox "Selecionar Tudo"
-    $(document).on('change', '.select-all', function() {
-        var checked = $(this).prop('checked');
-        var dropdown = $(this).closest('.excel-filter-dropdown');
-        dropdown.find('.val-checkbox:visible').prop('checked', checked);
-        dropdown.find('.select-all').prop('indeterminate', false);
-    });
-
-    // Quando um checkbox individual muda
-    $(document).on('change', '.val-checkbox', function() {
-        var dropdown = $(this).closest('.excel-filter-dropdown');
-        var totalVisible = dropdown.find('.val-checkbox:visible').length;
-        var checkedVisible = dropdown.find('.val-checkbox:visible:checked').length;
-        var selectAll = dropdown.find('.select-all');
-        
-        if (checkedVisible === 0) {
-            selectAll.prop('checked', false);
-            selectAll.prop('indeterminate', false);
-        } else if (checkedVisible === totalVisible) {
-            selectAll.prop('checked', true);
-            selectAll.prop('indeterminate', false);
-        } else {
-            selectAll.prop('checked', false);
-            selectAll.prop('indeterminate', true);
-        }
-    });
-
-    // Botão Aplicar Filtro
-    $(document).on('click', '.apply-filter', function() {
-        var dropdown = $(this).closest('.excel-filter-dropdown');
-        var colIndex = parseInt(dropdown.attr('data-col'));
-        
-        console.log('Aplicando filtro na coluna:', colIndex);
-        
-        var checkedValues = [];
-        
-        dropdown.find('.val-checkbox:checked').each(function() {
-            var val = $(this).val();
-            if (val && val.trim() !== '') {
-                // Escapar caracteres especiais para regex
-                var escapedVal = val.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
-                checkedValues.push(escapedVal);
-            }
-        });
-
-        console.log('Valores selecionados:', checkedValues);
-
-        var searchString = '';
-        var $icon = $(`.filter-header[data-column="${colIndex}"] .filter-icon`);
-        
-        var totalDisponiveis = dropdown.find('.val-checkbox').length;
-        
-        if (checkedValues.length > 0 && checkedValues.length < totalDisponiveis) {
-            // Regex para buscar exatamente os valores selecionados
-            searchString = '^(' + checkedValues.join('|') + ')$';
-            $icon.addClass('active');
-        } else if (checkedValues.length === 0) {
-            // Nenhum selecionado = não mostra nada
-            searchString = '^$';
-            $icon.addClass('active');
-        } else {
-            // Todos selecionados = sem filtro
-            searchString = '';
-            $icon.removeClass('active');
-        }
-
-        console.log('Search string:', searchString);
-
-        // Aplicar o filtro
-        table.column(colIndex).search(searchString, true, false).draw();
-        closeFilters();
-    });
-
-    // Botão Limpar Filtro
-    $(document).on('click', '.clear-filter', function() {
-        var dropdown = $(this).closest('.excel-filter-dropdown');
-        var colIndex = parseInt(dropdown.attr('data-col'));
-        
-        console.log('Limpando filtro da coluna:', colIndex);
-        
-        table.column(colIndex).search('').draw();
-        $(`.filter-header[data-column="${colIndex}"] .filter-icon`).removeClass('active');
-        closeFilters();
-    });
-
-    // Fechar todos os filtros
-    function closeFilters() {
-        $('.excel-filter-dropdown').fadeOut(100, function(){ 
-            $(this).remove(); 
-        });
-        $('#filter-overlay').fadeOut(200);
-    }
-
-    // Eventos de fechamento
-    $(document).on('click', '.close-filter', function(e) {
-        e.preventDefault();
-        closeFilters();
-    });
-    
-    $('#filter-overlay').on('click', function() {
-        closeFilters();
-    });
-    
-    // Prevenir fechamento ao clicar dentro do dropdown
-    $(document).on('click', '.excel-filter-dropdown', function(e) {
-        e.stopPropagation();
-    });
-    
-    // Fechar com tecla ESC
-    $(document).on('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeFilters();
-        }
-    });
-    
-    // Log para debug
-    console.log('DataTable inicializado. Linhas:', table.rows().count());
-    console.log('Colunas:', table.columns().count());
 });
 </script>
+
 {% endblock %}

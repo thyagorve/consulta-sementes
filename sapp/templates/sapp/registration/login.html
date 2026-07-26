@@ -350,28 +350,36 @@
                     <i class="bi bi-shield-lock-fill"></i> Acessar o Sistema
                 </h4>
                 
-                <!-- Exibe erros do formulário -->
-                {% if form.errors %}
-                    <div class="alert alert-danger" role="alert">
-                        <i class="bi bi-exclamation-triangle-fill"></i>
-                        <span>Usuário ou senha inválidos</span>
-                    </div>
-                {% endif %}
+                <!-- Exibe mensagem de sessão expirada ANTES do formulário -->
+{% if request.GET.expired == '1' %}
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span>Sua sessão expirou por inatividade. Faça login novamente.</span>
+    </div>
+{% endif %}
 
-                <!-- Exibe mensagens de redirecionamento -->
-                {% if next %}
-                    {% if user.is_authenticated %}
-                        <div class="alert alert-warning" role="alert">
-                            <i class="bi bi-lock-fill"></i>
-                            <span>Acesso não autorizado</span>
-                        </div>
-                    {% else %}
-                        <div class="alert alert-info" role="alert">
-                            <i class="bi bi-info-circle-fill"></i>
-                            <span>Faça login para continuar</span>
-                        </div>
-                    {% endif %}
-                {% endif %}
+<!-- Exibe erros do formulário (usuário/senha inválidos) -->
+{% if form.errors %}
+    <div class="alert alert-danger" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <span>Usuário ou senha inválidos</span>
+    </div>
+{% endif %}
+
+<!-- Exibe mensagens de redirecionamento (se houver) -->
+{% if next %}
+    {% if user.is_authenticated %}
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-lock-fill"></i>
+            <span>Acesso não autorizado</span>
+        </div>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            <i class="bi bi-info-circle-fill"></i>
+            <span>Faça login para continuar</span>
+        </div>
+    {% endif %}
+{% endif %}
 
                 <form method="post" action="{% url 'sapp:login' %}">
                     {% csrf_token %}

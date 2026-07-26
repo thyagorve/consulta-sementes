@@ -17,7 +17,7 @@ SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-sua-chave-secreta
 # SECURITY WARNING: não execute com debug ativado em produção!
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1' ])
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '*' ])
 
 # ========== APLICAÇÕES INSTALADAS ==========
 INSTALLED_APPS = [
@@ -69,7 +69,8 @@ MIDDLEWARE = [
     # Nossos middlewares personalizados
     'sapp.middleware.AutoLogoutMiddleware',
     'sapp.middleware.Smart404FallbackMiddleware',
-    'sapp.middleware.ForcePasswordChangeMiddleware',
+   
+    'sapp.middleware.ForcarTrocaSenhaMiddleware',
     'sapp.middleware.PermissionMiddleware',
 ]
 
@@ -168,9 +169,10 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # ========== AUTENTICAÇÃO E SESSÃO ==========
-LOGIN_URL = 'sapp:login'
+LOGIN_URL = '/login/?expired=1'
 LOGIN_REDIRECT_URL = 'sapp:dashboard'
 LOGOUT_REDIRECT_URL = 'sapp:login'
+
 
 # Configurações de sessão (usando banco de dados para evitar problemas com Redis)
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # IMPORTANTE: Usando DB em vez de cache
