@@ -2696,27 +2696,43 @@ def historico_geral(request):
 
 
 
+from django.contrib.auth import update_session_auth_hash
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from .forms import MudarSenhaForm
+
 @login_required
-@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def mudar_senha(request):
     if request.method == 'POST':
         form = MudarSenhaForm(request.POST)
         if form.is_valid():
-            request.user.set_password(form.cleaned_data['nova_senha'])
+            nova_senha = form.cleaned_data['nova_senha']
+            
+            # Impede que o usuário use a senha padrão novamente
+            if nova_senha == 'conceito123':
+                messages.error(request, "❌ Não utilize a senha padrão. Escolha uma senha segura.")
+                return render(request, 'sapp/mudar_senha.html', {'form': form})
+            
+            request.user.set_password(nova_senha)
             request.user.save()
+            
             try:
-                # Atualiza perfil se existir
                 perfil = request.user.perfil
                 perfil.primeiro_acesso = False
                 perfil.save()
-            except: pass
+            except:
+                pass
             
             update_session_auth_hash(request, request.user)
-            messages.success(request, "Senha atualizada com sucesso!")
-            return redirect('sapp:lista_estoque')
+            messages.success(request, "✅ Senha atualizada com sucesso!")
+            return redirect('sapp:redirecionar')
     else:
         form = MudarSenhaForm()
+    
     return render(request, 'sapp/mudar_senha.html', {'form': form})
+
+
 
 def exportar_excel(request):
     estoque = Estoque.objects.filter(saldo__gt=0).select_related(
