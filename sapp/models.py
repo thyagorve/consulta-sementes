@@ -376,27 +376,107 @@ class EmpenhoStatus(models.Model):
     def __str__(self): return self.nome
 
 class Empenho(models.Model):
-    usuario = models.ForeignKey(User, on_delete=models.CASCADE)
+    solicitacao = models.ForeignKey(
+        'Solicitacao',
+        on_delete=models.SET_NULL,
+        related_name='empenhos',
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Solicitação vinculada',
+    )
+
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE
+    )
+
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
-    status = models.ForeignKey(EmpenhoStatus, on_delete=models.PROTECT, default=1)
-    tipo_movimentacao = models.CharField(max_length=20, choices=[('EXPEDICAO', 'Expedição'), ('TRANSFERENCIA', 'Transferência'), ('EDICAO', 'Edição'), ('ENTRADA', 'Entrada')], default='EXPEDICAO')
-    observacao = models.TextField(blank=True, null=True)
-    numero_carga = models.CharField(max_length=50, blank=True, null=True)
-    motorista = models.CharField(max_length=100, blank=True, null=True)
-    placa = models.CharField(max_length=20, blank=True, null=True)
-    cliente = models.CharField(max_length=255, blank=True, null=True)
-    ordem_entrega = models.CharField(max_length=50, blank=True, null=True)
-    
-    class Meta: ordering = ['-data_criacao']
-    
-    def __str__(self): return f"Empenho #{self.id} - {self.usuario.username}"
-    
+
+    status = models.ForeignKey(
+        EmpenhoStatus,
+        on_delete=models.PROTECT,
+        default=1
+    )
+
+    tipo_movimentacao = models.CharField(
+        max_length=20,
+        choices=[
+            ('EXPEDICAO', 'Expedição'),
+            ('TRANSFERENCIA', 'Transferência'),
+            ('EDICAO', 'Edição'),
+            ('ENTRADA', 'Entrada'),
+        ],
+        default='EXPEDICAO'
+    )
+
+    # Mantemos observacao para compatibilidade e exibição do nome.
+    # Ela não será mais usada para relacionar Empenho e Solicitação.
+    observacao = models.TextField(
+        blank=True,
+        null=True
+    )
+
+    numero_carga = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True
+    )
+
+    motorista = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True
+    )
+
+    placa = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True
+    )
+
+    cliente = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
+    ordem_entrega = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True
+    )
+
+    class Meta:
+        ordering = ['-data_criacao']
+        indexes = [
+            models.Index(
+                fields=['solicitacao', 'status'],
+                name='emp_sol_status_idx'
+            ),
+        ]
+
+    def __str__(self):
+        if self.solicitacao_id:
+            return (
+                f"Empenho #{self.id} - "
+                f"Solicitação #{self.solicitacao_id} - "
+                f"{self.solicitacao.titulo}"
+            )
+
+        return f"Empenho #{self.id} - {self.usuario.username}"
+
     @property
-    def total_itens(self): return self.itens.count()
-    
+    def total_itens(self):
+        return self.itens.count()
+
     @property
-    def saldo_afetado(self): return sum(item.quantidade for item in self.itens.all())
+    def saldo_afetado(self):
+        return sum(
+            item.quantidade
+            for item in self.itens.all()
+        )
 
 class ItemEmpenho(models.Model):
     empenho = models.ForeignKey(Empenho, on_delete=models.CASCADE, related_name='itens')

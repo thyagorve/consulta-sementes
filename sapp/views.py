@@ -13,7 +13,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from .models import HistoricoMovimentacao
 from .models import OrigemDestino
 from .models import Estoque, Cultivar, Peneira, Categoria, StatusSistemico
-
+from django.db.models import Q, Sum, Prefetch, F
 # Adicione no topo com os outros imports
 import datetime
 from django import forms  #
@@ -30,6 +30,16 @@ from .models import ArmazemLayout, ElementoMapa, Estoque
 import json
 from django.utils import timezone
 
+from django.db.models import (
+    Case,
+    F,
+    IntegerField,
+    Q,
+    Sum,
+    Value,
+    When,
+)
+from django.core.cache import cache
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -167,6 +177,10 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import login_required, permission_required
 from .models import ArmazemLayout, ElementoMapa, Estoque
 import json
+
+
+
+
 # ================================================================
 # FUNÇÕES AUXILIARES (ADICIONAR NO TOPO DO ARQUIVO views.py)
 # ================================================================
@@ -6384,6 +6398,38 @@ def validar_endereco(request):
         })
     
 
+def validar_edicao_empenho_solicitacao(solicitacao):
+    """
+    Impede criação, alteração ou remoção de empenho
+    depois que a movimentação da solicitação começou.
+    """
+
+    status_bloqueados = {
+        'MOVIMENTACAO_PARCIAL',
+        'CONCLUIDO',
+        'CANCELADO',
+    }
+
+    if solicitacao.status in status_bloqueados:
+        raise ValueError(
+            'Não é possível alterar o empenho porque '
+            'a movimentação desta solicitação já foi iniciada.'
+        )
+
+    quantidade_movimentada = Decimal(
+        str(
+            solicitacao.quantidade_movimentada
+            or 0
+        )
+    )
+
+    if quantidade_movimentada > 0:
+        raise ValueError(
+            'Não é possível alterar o empenho porque '
+            'esta solicitação já possui itens movimentados.'
+        )
+
+
 @login_required
 @permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def buscar_origens(request):
@@ -7075,41 +7121,151 @@ def criar_regras_workflow_padrao():
 
 
 @login_required
-def api_remover_itens_solicitacao(request, solicitacao_id):
-    """Remove todos os itens empenhados de uma solicitação"""
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
-    
+def api_remover_itens_solicitacao(
+    request,
+    solicitacao_id
+):
+    """
+    Remove todos os itens pendentes do empenho vinculado
+    exclusivamente à solicitação informada.
+    """
+    if request.method != 'POST':
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Método não permitido.'
+            },
+            status=405
+        )
+
     try:
         with transaction.atomic():
-            # Buscar empenho vinculado
-            empenho = Empenho.objects.filter(observacao=solicitacao.titulo).first()
-            
-            if empenho:
-                # Deletar itens (já libera reserva)
-                count = empenho.itens.count()
-                empenho.itens.all().delete()
-                
-                # Resetar contagem na solicitação
-                solicitacao.quantidade_empenhada = 0
-                solicitacao.status = 'AGUARDANDO_EMPENHO'
-                solicitacao.save()
-                
-                HistoricoCard.objects.create(
-                    solicitacao=solicitacao,
-                    usuario=request.user,
-                    acao='REMOCAO_ITEM',
-                    observacao=f'{count} itens removidos'
+            solicitacao = (
+                Solicitacao.objects
+                .select_for_update()
+                .get(id=solicitacao_id)
+            )
+
+            if solicitacao.status in [
+                'CONCLUIDO',
+                'CANCELADO',
+            ]:
+                raise ValueError(
+                    'Este card já está concluído ou cancelado.'
                 )
-                
-                return JsonResponse({'success': True, 'message': f'{count} itens removidos'})
-            
-            return JsonResponse({'success': True, 'message': 'Nenhum item para remover'})
-            
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
 
+            empenho = (
+                Empenho.objects
+                .select_for_update()
+                .filter(
+                    solicitacao_id=solicitacao.id,
+                    status__nome='Rascunho'
+                )
+                .first()
+            )
 
+            if not empenho:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Nenhum item para remover.'
+                })
 
+            itens = list(
+                empenho.itens.select_related(
+                    'estoque'
+                )
+            )
+
+            quantidade_removida = sum(
+                item.quantidade
+                for item in itens
+            )
+
+            quantidade_itens = len(itens)
+
+            # Exclusão individual para executar
+            # ItemEmpenho.delete() e liberar Estoque.empenhado.
+            for item in itens:
+                item.delete()
+
+            solicitacao.quantidade_empenhada = Decimal('0')
+            solicitacao.status = 'AGUARDANDO_EMPENHO'
+
+            solicitacao.save(
+                update_fields=[
+                    'quantidade_empenhada',
+                    'status',
+                    'data_atualizacao',
+                ]
+            )
+
+            avaliar_workflow(
+                solicitacao,
+                'CRIACAO',
+                request.user
+            )
+
+            HistoricoCard.objects.create(
+                solicitacao=solicitacao,
+                usuario=request.user,
+                acao='REMOCAO_ITEM',
+                quantidade=quantidade_removida,
+                unidade=(
+                    'KG'
+                    if solicitacao.unidade_controle
+                    == 'QUILOGRAMA'
+                    else 'BAG'
+                ),
+                observacao=(
+                    f'{quantidade_itens} item(ns) removido(s) '
+                    f'do Empenho #{empenho.id}'
+                )
+            )
+
+            from django.core.cache import cache
+            cache.delete('cards_version_hash')
+
+            return JsonResponse({
+                'success': True,
+                'message': (
+                    f'{quantidade_itens} item(ns) '
+                    f'removido(s) com sucesso.'
+                ),
+                'quantidade_empenhada': 0,
+                'status': solicitacao.status,
+            })
+
+    except Solicitacao.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Solicitação não encontrada.'
+            },
+            status=404
+        )
+
+    except ValueError as erro:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=400
+        )
+
+    except Exception as erro:
+        logger.exception(
+            'Erro ao remover itens da solicitação %s',
+            solicitacao_id
+        )
+
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=500
+        )
 
 
 
@@ -7189,7 +7345,33 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
+def obter_empenho_da_solicitacao(
+    solicitacao,
+    status_nome='Rascunho'
+):
+    """
+    Retorna exclusivamente o empenho vinculado à solicitação
+    recebida.
 
+    Não utiliza título ou observação para localizar o empenho.
+    """
+
+    if not solicitacao or not solicitacao.id:
+        return None
+
+    filtros = {
+        'solicitacao_id': solicitacao.id,
+    }
+
+    if status_nome:
+        filtros['status__nome'] = status_nome
+
+    return (
+        Empenho.objects
+        .filter(**filtros)
+        .order_by('-data_criacao', '-id')
+        .first()
+    )
 # ============================================================================
 # FUNÇÃO CENTRAL DO WORKFLOW
 # ============================================================================
@@ -7390,61 +7572,122 @@ def api_listar_solicitacoes(request):
     
 
 
-
-# ============================================================================
-# API LOTES DISPONÍVEIS
-# ============================================================================
 @login_required
-def api_lotes_disponiveis_para_solicitacao(request, solicitacao_id):
+@permission_required(
+    'sapp.pode_empenhar_solicitacao',
+    raise_exception=True
+)
+def api_lotes_disponiveis_para_solicitacao(
+    request,
+    solicitacao_id
+):
     """
-    API que retorna lotes para empenho.
-    Mostra lotes com disponível > 0 OU já empenhados neste card.
+    Lista lotes compatíveis com a solicitação.
+
+    Os itens salvos no empenho do card atual aparecem primeiro.
+
+    Um item empenhado por outro card:
+    - não aparece como empenho deste card;
+    - não fica selecionado;
+    - não sobe para o topo;
+    - continua descontado do saldo disponível.
     """
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
-    
-    # Buscar empenho vinculado a esta solicitação
-    empenho = Empenho.objects.filter(
-        observacao=solicitacao.titulo, 
-        status__nome='Rascunho'
-    ).first()
-    
+
+    solicitacao = get_object_or_404(
+        Solicitacao.objects.select_related(
+            'armazem',
+            'especie',
+        ),
+        id=solicitacao_id
+    )
+
+    # Busca exclusivamente o empenho salvo deste card.
+    empenho = obter_empenho_da_solicitacao(
+        solicitacao=solicitacao,
+        status_nome='Rascunho'
+    )
+
     ids_empenhados_no_card = []
+
     if empenho:
         ids_empenhados_no_card = list(
-            empenho.itens.values_list('estoque_id', flat=True)
+            empenho.itens.values_list(
+                'estoque_id',
+                flat=True
+            )
         )
-    
-    # Query: disponivel > 0 OU já empenhado neste card
-    qs = Estoque.objects.filter(
-       Q(saldo__gt=F('empenhado')) | Q(id__in=ids_empenhados_no_card)
-    ).select_related(
-        'cultivar', 'peneira', 'categoria', 'especie', 
-        'tratamento', 'status_sistemico', 'conferente'
+
+    # Mostra:
+    # 1. lotes que ainda têm disponibilidade;
+    # 2. lotes do empenho do card atual, mesmo se a
+    #    disponibilidade geral estiver zerada.
+    qs = (
+        Estoque.objects
+        .filter(
+            Q(saldo__gt=F('empenhado'))
+            |
+            Q(id__in=ids_empenhados_no_card)
+        )
+        .select_related(
+            'cultivar',
+            'peneira',
+            'categoria',
+            'especie',
+            'tratamento',
+            'status_sistemico',
+            'conferente',
+        )
     )
-    
-    # Aplicar critérios EXATOS da solicitação
+
+    # ------------------------------------------------------------------
+    # FILTROS DA SOLICITAÇÃO
+    # ------------------------------------------------------------------
     if solicitacao.armazem:
-        qs = qs.filter(az=solicitacao.armazem.nome)
+        qs = qs.filter(
+            az=solicitacao.armazem.nome
+        )
+
     if solicitacao.produto:
-        qs = qs.filter(produto__iexact=solicitacao.produto)
+        qs = qs.filter(
+            produto__iexact=solicitacao.produto
+        )
+
     if solicitacao.especie:
-        qs = qs.filter(especie=solicitacao.especie)
+        qs = qs.filter(
+            especie=solicitacao.especie
+        )
+
     if solicitacao.cliente:
-        qs = qs.filter(cliente__iexact=solicitacao.cliente)
-    
-    # Busca textual
-    busca = request.GET.get('busca', '').strip()
+        qs = qs.filter(
+            cliente__iexact=solicitacao.cliente
+        )
+
+    # ------------------------------------------------------------------
+    # BUSCA
+    # ------------------------------------------------------------------
+    busca = request.GET.get(
+        'busca',
+        ''
+    ).strip()
+
     if busca:
         qs = qs.filter(
-            Q(lote__icontains=busca) | 
-            Q(produto__icontains=busca) |
-            Q(endereco__icontains=busca) | 
-            Q(cliente__icontains=busca) |
-            Q(cultivar__nome__icontains=busca) | 
+            Q(lote__icontains=busca)
+            |
+            Q(produto__icontains=busca)
+            |
+            Q(endereco__icontains=busca)
+            |
+            Q(cliente__icontains=busca)
+            |
+            Q(cultivar__nome__icontains=busca)
+            |
             Q(az__icontains=busca)
         )
-    
-    # Filtros encadeados
+
+    # ------------------------------------------------------------------
+    # FILTROS POR COLUNA
+    # ------------------------------------------------------------------
     filter_map = {
         'az': 'az__in',
         'lote': 'lote__in',
@@ -7460,641 +7703,2597 @@ def api_lotes_disponiveis_para_solicitacao(request, solicitacao_id):
         'empresa': 'empresa__in',
         'conferente': 'conferente__username__in',
     }
-    
+
     for param, lookup in filter_map.items():
-        values = request.GET.getlist(param)
-        values = [v for v in values if v and v.strip()]
-        if values:
-            qs = qs.filter(**{lookup: values})
-    
-    # Paginação
+        valores = [
+            valor.strip()
+            for valor in request.GET.getlist(param)
+            if valor and valor.strip()
+        ]
+
+        if valores:
+            qs = qs.filter(**{
+                lookup: valores
+            })
+
+    # ------------------------------------------------------------------
+    # MARCAR SOMENTE OS ITENS DO EMPENHO DO CARD ATUAL
+    # ------------------------------------------------------------------
+    if ids_empenhados_no_card:
+        qs = qs.annotate(
+            empenho_do_card_atual=Case(
+                When(
+                    id__in=ids_empenhados_no_card,
+                    then=Value(1)
+                ),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
+    else:
+        qs = qs.annotate(
+            empenho_do_card_atual=Value(
+                0,
+                output_field=IntegerField()
+            )
+        )
+
+    # Os itens salvos no empenho deste card ficam no topo.
+    qs = qs.order_by(
+        '-empenho_do_card_atual',
+        'lote',
+        'endereco',
+        'id',
+    )
+
+    # ------------------------------------------------------------------
+    # PAGINAÇÃO
+    # ------------------------------------------------------------------
+    try:
+        page = max(
+            1,
+            int(
+                request.GET.get(
+                    'page',
+                    1
+                )
+            )
+        )
+
+        page_size = int(
+            request.GET.get(
+                'page_size',
+                100
+            )
+        )
+
+        page_size = max(
+            1,
+            min(
+                page_size,
+                1000
+            )
+        )
+
+    except (TypeError, ValueError):
+        page = 1
+        page_size = 100
+
     total = qs.count()
-    page = int(request.GET.get('page', 1))
-    page_size = int(request.GET.get('page_size', 100))
-    start = (page - 1) * page_size
+
+    start = (
+        page - 1
+    ) * page_size
+
     end = start + page_size
-    
-    lotes_qs = qs.order_by('lote', 'endereco')[start:end]
-    
-    # Montar lista de lotes
+
+    lotes_qs = qs[start:end]
+
+    # Mapa dos itens salvos no empenho atual.
+    itens_empenhados_por_estoque = {}
+
+    if empenho:
+        itens_empenhados_por_estoque = {
+            item.estoque_id: item
+            for item in empenho.itens.all()
+        }
+
     lotes = []
+
     for lote in lotes_qs:
+        item_empenhado = (
+            itens_empenhados_por_estoque.get(
+                lote.id
+            )
+        )
+
+        pertence_ao_empenho_atual = (
+            item_empenhado is not None
+        )
+
+        # Quantidade que pertence ao empenho deste card.
+        quantidade_empenhada_card = (
+            item_empenhado.quantidade
+            if item_empenhado
+            else 0
+        )
+
+        # O disponível normal já desconta empenhos de todos os cards.
+        disponivel_geral = Decimal(
+            str(
+                lote.disponivel
+                or 0
+            )
+        )
+
+        # Para um item que já pertence ao card atual,
+        # devolvemos sua própria reserva ao limite editável.
+        disponivel_para_card = (
+            disponivel_geral
+            + Decimal(
+                str(
+                    quantidade_empenhada_card
+                    or 0
+                )
+            )
+        )
+
         lotes.append({
             'id': lote.id,
+
             'lote': lote.lote,
             'produto': lote.produto or '',
-            'cultivar': lote.cultivar.nome if lote.cultivar else '',
-            'peneira': lote.peneira.nome if lote.peneira else '',
-            'categoria': lote.categoria.nome if lote.categoria else '',
-            'especie': lote.especie.nome if lote.especie else '',
-            'tratamento': lote.tratamento.nome if lote.tratamento else '',
-            'endereco': lote.endereco,
-            'saldo': lote.saldo,
-            'empenhado': lote.empenhado,
-            'disponivel': lote.disponivel,
-            'peso_unitario': float(lote.peso_unitario) if lote.peso_unitario else 0,
-            'peso_total': float(lote.peso_total) if lote.peso_total else 0,
+
+            'cultivar': (
+                lote.cultivar.nome
+                if lote.cultivar
+                else ''
+            ),
+
+            'peneira': (
+                lote.peneira.nome
+                if lote.peneira
+                else ''
+            ),
+
+            'categoria': (
+                lote.categoria.nome
+                if lote.categoria
+                else ''
+            ),
+
+            'especie': (
+                lote.especie.nome
+                if lote.especie
+                else ''
+            ),
+
+            'tratamento': (
+                lote.tratamento.nome
+                if lote.tratamento
+                else ''
+            ),
+
+            'endereco': lote.endereco or '',
+
+            'saldo': float(
+                lote.saldo or 0
+            ),
+
+            # Quantidade reservada no estoque por todos os empenhos.
+            'empenhado': float(
+                lote.empenhado or 0
+            ),
+
+            'disponivel': float(
+                disponivel_geral
+            ),
+
+            # Limite que o card atual pode utilizar.
+            'disponivel_para_card': float(
+                disponivel_para_card
+            ),
+
+            'peso_unitario': float(
+                lote.peso_unitario or 0
+            ),
+
+            'peso_total': float(
+                lote.peso_total or 0
+            ),
+
             'embalagem': lote.embalagem or '',
             'cliente': lote.cliente or '',
             'empresa': lote.empresa or '',
             'az': lote.az or '',
-            'conferente': lote.conferente.get_full_name() if lote.conferente else '',
-            'observacao': lote.observacao or '',
-            'status_sistemico': {
-                'nome': lote.status_sistemico.nome if lote.status_sistemico else '',
-                'cor': lote.status_sistemico.cor if lote.status_sistemico else '#6c757d',
-                'icone': lote.status_sistemico.icone if lote.status_sistemico else '',
-            } if lote.status_sistemico else None,
+
+            'conferente': (
+                (
+                    lote.conferente.get_full_name()
+                    or lote.conferente.username
+                )
+                if lote.conferente
+                else ''
+            ),
+
+            'observacao': (
+                lote.observacao or ''
+            ),
+
+            'status_sistemico': (
+                {
+                    'nome': (
+                        lote.status_sistemico.nome
+                    ),
+                    'cor': (
+                        lote.status_sistemico.cor
+                    ),
+                    'icone': (
+                        lote.status_sistemico.icone
+                    ),
+                }
+                if lote.status_sistemico
+                else None
+            ),
+
+            # Estes campos dizem respeito somente
+            # ao empenho salvo do card aberto.
+            'empenho_do_card_atual': (
+                pertence_ao_empenho_atual
+            ),
+
+            'item_empenho_id': (
+                item_empenhado.id
+                if item_empenhado
+                else None
+            ),
+
+            'quantidade_empenhada_card': float(
+                quantidade_empenhada_card or 0
+            ),
         })
-    
-    # Itens já empenhados neste card
+
+    # ------------------------------------------------------------------
+    # ITENS SALVOS EXCLUSIVAMENTE NO EMPENHO DO CARD ATUAL
+    # ------------------------------------------------------------------
     itens_empenhados = []
+
     if empenho:
-        for item in empenho.itens.select_related('estoque'):
+        itens_qs = (
+            empenho.itens
+            .select_related(
+                'estoque'
+            )
+            .order_by(
+                'lote',
+                'endereco_origem',
+                'id',
+            )
+        )
+
+        for item in itens_qs:
+            estoque = item.estoque
+
             itens_empenhados.append({
                 'id': item.id,
-                'lote': item.lote,
-                'quantidade': item.quantidade,
-                'endereco': item.endereco_origem,
+                'empenho_id': empenho.id,
+                'solicitacao_id': solicitacao.id,
+
                 'estoque_id': item.estoque_id,
+                'lote': item.lote,
+
+                'quantidade': float(
+                    item.quantidade or 0
+                ),
+
+                'endereco': (
+                    item.endereco_origem
+                    or (
+                        estoque.endereco
+                        if estoque
+                        else ''
+                    )
+                ),
+
+                'peso_unitario': float(
+                    estoque.peso_unitario or 0
+                ) if estoque else 0,
+
+                'empenho_salvo': True,
+                'empenho_do_card_atual': True,
             })
-    
+
+    quantidade_movimentada = Decimal(
+        str(
+            solicitacao.quantidade_movimentada
+            or 0
+        )
+    )
+
+    empenho_bloqueado = (
+        solicitacao.status in {
+            'MOVIMENTACAO_PARCIAL',
+            'CONCLUIDO',
+            'CANCELADO',
+        }
+        or quantidade_movimentada > 0
+    )
+
     return JsonResponse({
         'success': True,
+
         'lotes': lotes,
+
         'total': total,
         'page': page,
         'page_size': page_size,
         'has_more': end < total,
+
         'solicitacao': {
             'id': solicitacao.id,
             'titulo': solicitacao.titulo,
-            'quantidade_solicitada': float(solicitacao.quantidade_solicitada),
-            'quantidade_empenhada': float(solicitacao.quantidade_empenhada),
-            'unidade_controle': solicitacao.unidade_controle,
+
+            'quantidade_solicitada': float(
+                solicitacao.quantidade_solicitada
+                or 0
+            ),
+
+            'quantidade_empenhada': float(
+                solicitacao.quantidade_empenhada
+                or 0
+            ),
+
+            'quantidade_movimentada': float(
+                solicitacao.quantidade_movimentada
+                or 0
+            ),
+
+            'unidade_controle': (
+                solicitacao.unidade_controle
+            ),
+
             'status': solicitacao.status,
             'observacao': solicitacao.observacao or '',
+
+            'empenho_bloqueado': empenho_bloqueado,
         },
+
+        'empenho_id': (
+            empenho.id
+            if empenho
+            else None
+        ),
+
+        # Somente itens do empenho salvo deste card.
         'itens_empenhados': itens_empenhados,
     })
 
 # ============================================================================
 # EMPENHAR NA SOLICITAÇÃO
 # ============================================================================
-from django.db.models import Q, Sum, Prefetch, F  # ← F deve estar aqui
-@login_required
-@permission_required('sapp.pode_empenhar_solicitacao', raise_exception=True)
-def empenhar_na_solicitacao(request, solicitacao_id):
-    """View para empenhar lotes em uma solicitação existente"""
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
 
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
+@login_required
+@permission_required(
+    'sapp.pode_empenhar_solicitacao',
+    raise_exception=True
+)
+def empenhar_na_solicitacao(
+    request,
+    solicitacao_id
+):
+    """
+    Cria ou atualiza o empenho vinculado exclusivamente
+    à solicitação informada.
+
+    Depois que existir movimentação, o empenho fica congelado.
+    """
+
+    if request.method != 'POST':
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Método não permitido.'
+            },
+            status=405
+        )
 
     try:
-        data = json.loads(request.body)
-        itens_selecionados = data.get('itens', [])
+        data = json.loads(
+            request.body or '{}'
+        )
 
-        if not itens_selecionados:
-            return JsonResponse({'success': False, 'error': 'Nenhum item selecionado'})
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'JSON inválido.'
+            },
+            status=400
+        )
 
+    itens_selecionados = data.get(
+        'itens',
+        []
+    )
+
+    if not isinstance(
+        itens_selecionados,
+        list
+    ):
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Lista de itens inválida.'
+            },
+            status=400
+        )
+
+    if not itens_selecionados:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Nenhum item selecionado.'
+            },
+            status=400
+        )
+
+    try:
         with transaction.atomic():
-            solicitacao = Solicitacao.objects.select_for_update().get(id=solicitacao_id)
 
-            status_rascunho, _ = EmpenhoStatus.objects.get_or_create(
-                nome='Rascunho', defaults={'descricao': 'Card em elaboração'}
+            # Bloqueia somente a solicitação.
+            solicitacao = (
+                Solicitacao.objects
+                .select_for_update(
+                    of=('self',)
+                )
+                .get(
+                    id=solicitacao_id
+                )
             )
 
-            empenho, created = Empenho.objects.get_or_create(
-                observacao=solicitacao.titulo,
-                status=status_rascunho,
-                defaults={'usuario': request.user}
+            # Depois que começou a movimentar,
+            # não pode criar nem atualizar empenho.
+            validar_edicao_empenho_solicitacao(
+                solicitacao
             )
 
-            total_empenhado_nesta_vez = Decimal('0')
-
-            # 🔁 KG: validação de KG se necessário
-            if solicitacao.unidade_controle == 'QUILOGRAMA':
-                total_kg_empenhado = Decimal('0')
-                # Total já empenhado em KG
-                if empenho:
-                    for item_existente in empenho.itens.all():
-                        peso = item_existente.estoque.peso_unitario or Decimal('0')
-                        total_kg_empenhado += Decimal(str(item_existente.quantidade)) * peso
-
-            for item_data in itens_selecionados:
-                lote_id = item_data.get('lote_id')
-                quantidade = int(item_data.get('quantidade', 0))
-
-                if quantidade <= 0:
-                    continue
-
-                lote = Estoque.objects.select_for_update().get(id=lote_id)
-
-                if quantidade > lote.disponivel:
-                    raise ValueError(
-                        f"Quantidade indisponível para lote {lote.lote}. "
-                        f"Disponível: {lote.disponivel}"
-                    )
-
-                # 🔁 KG: acumular KG do novo item
-                if solicitacao.unidade_controle == 'QUILOGRAMA':
-                    peso = lote.peso_unitario or Decimal('0')
-                    total_kg_empenhado += Decimal(str(quantidade)) * peso
-
-                item, item_created = ItemEmpenho.objects.get_or_create(
-                    empenho=empenho, estoque=lote,
+            status_rascunho, _ = (
+                EmpenhoStatus.objects
+                .get_or_create(
+                    nome='Rascunho',
                     defaults={
-                        'quantidade': quantidade, 'lote': lote.lote,
-                        'cultivar': lote.cultivar.nome if lote.cultivar else '',
-                        'peneira': lote.peneira.nome if lote.peneira else '',
-                        'categoria': lote.categoria.nome if lote.categoria else '',
-                        'endereco_origem': lote.endereco, 'saldo_anterior': lote.saldo,
+                        'descricao': (
+                            'Card em elaboração'
+                        )
                     }
                 )
+            )
 
-                if not item_created:
-                    item.quantidade += quantidade
-                    item.save()
+            # Busca somente o empenho deste card.
+            empenho = (
+                Empenho.objects
+                .select_for_update(
+                    of=('self',)
+                )
+                .filter(
+                    solicitacao_id=solicitacao.id,
+                    status_id=status_rascunho.id,
+                )
+                .order_by(
+                    '-data_criacao',
+                    '-id',
+                )
+                .first()
+            )
 
-                total_empenhado_nesta_vez += Decimal(str(quantidade))
-
-                HistoricoCard.objects.create(
-                    solicitacao=solicitacao, usuario=request.user,
-                    acao='EMPENHO', lote=lote.lote,
-                    quantidade=quantidade, unidade='BAG',
+            if not empenho:
+                empenho = Empenho.objects.create(
+                    solicitacao=solicitacao,
+                    usuario=request.user,
+                    status=status_rascunho,
+                    observacao=solicitacao.titulo,
                 )
 
-            # 🔁 KG: validação final de KG antes de salvar
-            if solicitacao.unidade_controle == 'QUILOGRAMA':
-                if total_kg_empenhado > solicitacao.quantidade_solicitada:
-                    raise ValueError(
-                        f"Total de {total_kg_empenhado:.2f} KG excede "
-                        f"os {solicitacao.quantidade_solicitada} KG solicitados."
+            elif (
+                empenho.observacao
+                != solicitacao.titulo
+            ):
+                empenho.observacao = (
+                    solicitacao.titulo
+                )
+
+                empenho.save(
+                    update_fields=[
+                        'observacao',
+                        'data_atualizacao',
+                    ]
+                )
+
+            # ----------------------------------------------------------
+            # TOTAL ATUAL DO EMPENHO
+            # ----------------------------------------------------------
+            total_kg_empenhado = Decimal('0')
+
+            if (
+                solicitacao.unidade_controle
+                == 'QUILOGRAMA'
+            ):
+                itens_atuais = (
+                    empenho.itens
+                    .select_related(
+                        'estoque'
+                    )
+                )
+
+                for item_existente in itens_atuais:
+                    peso = Decimal(
+                        str(
+                            item_existente
+                            .estoque
+                            .peso_unitario
+                            or 0
+                        )
                     )
 
-            # Atualizar quantidade empenhada
-            solicitacao.quantidade_empenhada += total_empenhado_nesta_vez
+                    quantidade_atual = Decimal(
+                        str(
+                            item_existente.quantidade
+                            or 0
+                        )
+                    )
 
-            # Definir status e evento corretos
-            if solicitacao.quantidade_empenhada <= 0:
-                solicitacao.status = 'AGUARDANDO_EMPENHO'
-                evento = 'CRIACAO'
-            elif solicitacao.quantidade_empenhada >= solicitacao.quantidade_solicitada:
-                solicitacao.status = 'EMPENHO_COMPLETO'
-                evento = 'EMPENHO_COMPLETO'
+                    total_kg_empenhado += (
+                        quantidade_atual
+                        * peso
+                    )
+
+            itens_validos = 0
+
+            # ----------------------------------------------------------
+            # PROCESSAR ITENS RECEBIDOS
+            # ----------------------------------------------------------
+            for item_data in itens_selecionados:
+
+                try:
+                    lote_id = int(
+                        item_data.get(
+                            'lote_id'
+                        )
+                    )
+
+                    quantidade_adicionar = Decimal(
+                        str(
+                            item_data.get(
+                                'quantidade',
+                                0
+                            )
+                        )
+                    )
+
+                except (
+                    TypeError,
+                    ValueError,
+                    ArithmeticError,
+                ):
+                    raise ValueError(
+                        'Lote ou quantidade inválidos.'
+                    )
+
+                if quantidade_adicionar <= 0:
+                    continue
+
+                # Bloqueia somente o estoque.
+                lote = (
+                    Estoque.objects
+                    .select_for_update(
+                        of=('self',)
+                    )
+                    .get(
+                        id=lote_id
+                    )
+                )
+
+                # Busca o item exclusivamente no empenho
+                # vinculado ao card atual.
+                item_existente = (
+                    ItemEmpenho.objects
+                    .select_for_update(
+                        of=('self',)
+                    )
+                    .filter(
+                        empenho_id=empenho.id,
+                        estoque_id=lote.id,
+                    )
+                    .first()
+                )
+
+                quantidade_anterior = Decimal(
+                    str(
+                        item_existente.quantidade
+                        if item_existente
+                        else 0
+                    )
+                )
+
+                saldo = Decimal(
+                    str(
+                        lote.saldo
+                        or 0
+                    )
+                )
+
+                empenhado_geral = Decimal(
+                    str(
+                        lote.empenhado
+                        or 0
+                    )
+                )
+
+                # O empenhado geral contém reservas de todos os cards.
+                # Recolocamos somente a reserva deste card para permitir
+                # editar seu próprio empenho.
+                disponivel_para_card = (
+                    saldo
+                    - empenhado_geral
+                    + quantidade_anterior
+                )
+
+                quantidade_final = (
+                    quantidade_anterior
+                    + quantidade_adicionar
+                )
+
+                if (
+                    quantidade_final
+                    > disponivel_para_card
+                ):
+                    raise ValueError(
+                        f'Quantidade indisponível para o lote '
+                        f'{lote.lote}. Disponível para este '
+                        f'card: {disponivel_para_card}.'
+                    )
+
+                # ------------------------------------------------------
+                # VALIDAÇÃO EM KG
+                # ------------------------------------------------------
+                if (
+                    solicitacao.unidade_controle
+                    == 'QUILOGRAMA'
+                ):
+                    peso = Decimal(
+                        str(
+                            lote.peso_unitario
+                            or 0
+                        )
+                    )
+
+                    if peso <= 0:
+                        raise ValueError(
+                            f'O lote {lote.lote} não possui '
+                            f'peso unitário válido.'
+                        )
+
+                    kg_adicionados = (
+                        quantidade_adicionar
+                        * peso
+                    )
+
+                    total_kg_empenhado += (
+                        kg_adicionados
+                    )
+
+                    quantidade_solicitada = Decimal(
+                        str(
+                            solicitacao
+                            .quantidade_solicitada
+                            or 0
+                        )
+                    )
+
+                    if (
+                        total_kg_empenhado
+                        > quantidade_solicitada
+                    ):
+                        raise ValueError(
+                            f'O total de '
+                            f'{total_kg_empenhado:.2f} KG '
+                            f'excede os '
+                            f'{quantidade_solicitada:.2f} KG '
+                            f'solicitados.'
+                        )
+
+                # ------------------------------------------------------
+                # SALVAR ITEM NO EMPENHO DO CARD ATUAL
+                # ------------------------------------------------------
+                if item_existente:
+                    item_existente.quantidade = (
+                        quantidade_final
+                    )
+
+                    item_existente.save(
+                        update_fields=[
+                            'quantidade',
+                        ]
+                    )
+
+                else:
+                    ItemEmpenho.objects.create(
+                        empenho=empenho,
+                        estoque=lote,
+                        quantidade=quantidade_adicionar,
+
+                        lote=lote.lote,
+
+                        cultivar=(
+                            lote.cultivar.nome
+                            if lote.cultivar
+                            else ''
+                        ),
+
+                        peneira=(
+                            lote.peneira.nome
+                            if lote.peneira
+                            else ''
+                        ),
+
+                        categoria=(
+                            lote.categoria.nome
+                            if lote.categoria
+                            else ''
+                        ),
+
+                        endereco_origem=(
+                            lote.endereco
+                        ),
+
+                        saldo_anterior=(
+                            lote.saldo
+                        ),
+                    )
+
+                itens_validos += 1
+
+                # ------------------------------------------------------
+                # HISTÓRICO
+                # ------------------------------------------------------
+                if (
+                    solicitacao.unidade_controle
+                    == 'QUILOGRAMA'
+                ):
+                    quantidade_historico = (
+                        quantidade_adicionar
+                        * Decimal(
+                            str(
+                                lote.peso_unitario
+                                or 0
+                            )
+                        )
+                    )
+
+                    unidade_historico = 'KG'
+
+                else:
+                    quantidade_historico = (
+                        quantidade_adicionar
+                    )
+
+                    unidade_historico = 'BAG'
+
+                HistoricoCard.objects.create(
+                    solicitacao=solicitacao,
+                    usuario=request.user,
+                    acao='EMPENHO',
+                    lote=lote.lote,
+
+                    quantidade=(
+                        quantidade_historico
+                    ),
+
+                    unidade=unidade_historico,
+
+                    observacao=(
+                        f'Item salvo no Empenho '
+                        f'#{empenho.id} deste card.'
+                    )
+                )
+
+            if itens_validos == 0:
+                raise ValueError(
+                    'Nenhum item possui quantidade válida.'
+                )
+
+            # ----------------------------------------------------------
+            # RECALCULAR TOTAL DO EMPENHO
+            # ----------------------------------------------------------
+            total_unidades = (
+                empenho.itens.aggregate(
+                    total=Sum(
+                        'quantidade'
+                    )
+                )['total']
+                or Decimal('0')
+            )
+
+            if (
+                solicitacao.unidade_controle
+                == 'QUILOGRAMA'
+            ):
+                total_kg_final = Decimal('0')
+
+                itens_finais = (
+                    empenho.itens
+                    .select_related(
+                        'estoque'
+                    )
+                )
+
+                for item_final in itens_finais:
+                    quantidade_item = Decimal(
+                        str(
+                            item_final.quantidade
+                            or 0
+                        )
+                    )
+
+                    peso_item = Decimal(
+                        str(
+                            item_final
+                            .estoque
+                            .peso_unitario
+                            or 0
+                        )
+                    )
+
+                    total_kg_final += (
+                        quantidade_item
+                        * peso_item
+                    )
+
+                solicitacao.quantidade_empenhada = (
+                    total_kg_final
+                )
+
+                quantidade_para_status = (
+                    total_kg_final
+                )
+
             else:
-                solicitacao.status = 'EMPENHO_PARCIAL'
+                solicitacao.quantidade_empenhada = (
+                    Decimal(
+                        str(
+                            total_unidades
+                        )
+                    )
+                )
+
+                quantidade_para_status = (
+                    solicitacao.quantidade_empenhada
+                )
+
+            quantidade_solicitada = Decimal(
+                str(
+                    solicitacao.quantidade_solicitada
+                    or 0
+                )
+            )
+
+            # ----------------------------------------------------------
+            # ATUALIZAR STATUS
+            # ----------------------------------------------------------
+            if quantidade_para_status <= 0:
+                solicitacao.status = (
+                    'AGUARDANDO_EMPENHO'
+                )
+
+                evento = 'CRIACAO'
+
+            elif (
+                quantidade_para_status
+                >= quantidade_solicitada
+            ):
+                solicitacao.status = (
+                    'EMPENHO_COMPLETO'
+                )
+
+                evento = 'EMPENHO_COMPLETO'
+
+            else:
+                solicitacao.status = (
+                    'EMPENHO_PARCIAL'
+                )
+
                 evento = 'EMPENHO_PARCIAL'
 
-            solicitacao.save()
+            solicitacao.save(
+                update_fields=[
+                    'quantidade_empenhada',
+                    'status',
+                    'data_atualizacao',
+                ]
+            )
 
-            if evento:
-                avaliar_workflow(solicitacao, evento, request.user)
+            avaliar_workflow(
+                solicitacao,
+                evento,
+                request.user
+            )
 
-            from django.core.cache import cache
-            cache.delete('cards_version_hash')
+            cache.delete(
+                'cards_version_hash'
+            )
+
+            coluna_kanban_nome = ''
+
+            if solicitacao.coluna_kanban_id:
+                coluna_kanban_nome = (
+                    ColunaKanban.objects
+                    .filter(
+                        id=solicitacao.coluna_kanban_id
+                    )
+                    .values_list(
+                        'nome',
+                        flat=True
+                    )
+                    .first()
+                    or ''
+                )
 
             return JsonResponse({
                 'success': True,
-                'message': f'{len(itens_selecionados)} item(ns) empenhado(s)!',
-                'total_empenhado': float(solicitacao.quantidade_empenhada),
-                'percentual': float(solicitacao.percentual_empenhado),
+
+                'message': (
+                    f'{itens_validos} item(ns) '
+                    f'salvo(s) no empenho deste card.'
+                ),
+
+                'empenho_id': empenho.id,
+                'solicitacao_id': solicitacao.id,
+
+                'total_empenhado': float(
+                    solicitacao.quantidade_empenhada
+                    or 0
+                ),
+
+                'percentual': float(
+                    solicitacao.percentual_empenhado
+                    or 0
+                ),
+
                 'status': solicitacao.status,
-                'coluna_kanban': solicitacao.coluna_kanban.nome if solicitacao.coluna_kanban else '',
+                'coluna_kanban': coluna_kanban_nome,
+
+                'empenho_bloqueado': False,
             })
 
-    except ValueError as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': f'Erro: {str(e)}'})
+    except Solicitacao.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Solicitação não encontrada.'
+            },
+            status=404
+        )
+
+    except Estoque.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Um dos lotes não foi encontrado.'
+            },
+            status=404
+        )
+
+    except ValueError as erro:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=400
+        )
+
+    except Exception as erro:
+        logger.exception(
+            'Erro ao empenhar solicitação %s',
+            solicitacao_id
+        )
+
+        return JsonResponse(
+            {
+                'success': False,
+                'error': f'Erro ao empenhar: {erro}'
+            },
+            status=500
+        )
 # ============================================================================
 # REMOVER ITEM DO EMPENHO
 # ============================================================================
 @login_required
-def api_remover_item_empenho(request, solicitacao_id, item_id):
-    """Remove um item específico do empenho e atualiza a solicitação"""
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
-    item = get_object_or_404(ItemEmpenho, id=item_id)
+@permission_required(
+    'sapp.pode_empenhar_solicitacao',
+    raise_exception=True
+)
+def api_remover_item_empenho(
+    request,
+    solicitacao_id,
+    item_id
+):
+    """
+    Remove um item exclusivamente do empenho do card atual.
+
+    Não permite remoção depois que a movimentação começou.
+    """
+
+    if request.method != 'POST':
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Método não permitido.'
+            },
+            status=405
+        )
 
     try:
         with transaction.atomic():
-            quantidade = item.quantidade
-            lote = item.lote
 
-            # Deletar item (já libera reserva no Estoque.empenhado)
+            solicitacao = (
+                Solicitacao.objects
+                .select_for_update(
+                    of=('self',)
+                )
+                .get(
+                    id=solicitacao_id
+                )
+            )
+
+            validar_edicao_empenho_solicitacao(
+                solicitacao
+            )
+
+            empenho = (
+                Empenho.objects
+                .select_for_update(
+                    of=('self',)
+                )
+                .filter(
+                    solicitacao_id=solicitacao.id,
+                    status__nome='Rascunho',
+                )
+                .order_by(
+                    '-data_criacao',
+                    '-id',
+                )
+                .first()
+            )
+
+            if not empenho:
+                raise ValueError(
+                    'Nenhum empenho salvo foi encontrado '
+                    'para este card.'
+                )
+
+            item = (
+                ItemEmpenho.objects
+                .select_for_update(
+                    of=('self',)
+                )
+                .get(
+                    id=item_id,
+                    empenho_id=empenho.id,
+                )
+            )
+
+            quantidade_removida = Decimal(
+                str(
+                    item.quantidade
+                    or 0
+                )
+            )
+
+            lote_nome = item.lote
+
+            estoque_id = item.estoque_id
+
+            peso_unitario = Decimal('0')
+
+            if estoque_id:
+                estoque = (
+                    Estoque.objects
+                    .select_for_update(
+                        of=('self',)
+                    )
+                    .get(
+                        id=estoque_id
+                    )
+                )
+
+                peso_unitario = Decimal(
+                    str(
+                        estoque.peso_unitario
+                        or 0
+                    )
+                )
+
+            # Executa o delete personalizado do item.
             item.delete()
 
-            # Atualizar quantidade empenhada
-            solicitacao.quantidade_empenhada = max(0, solicitacao.quantidade_empenhada - quantidade)
+            # ----------------------------------------------------------
+            # RECALCULAR EMPENHO DO CARD
+            # ----------------------------------------------------------
+            if (
+                solicitacao.unidade_controle
+                == 'QUILOGRAMA'
+            ):
+                total_restante = Decimal('0')
 
-            # Definir status e evento corretos
-            if solicitacao.quantidade_empenhada <= 0:
-                solicitacao.status = 'AGUARDANDO_EMPENHO'
-                evento = 'CRIACAO'
-            elif solicitacao.quantidade_empenhada >= solicitacao.quantidade_solicitada:
-                solicitacao.status = 'EMPENHO_COMPLETO'
-                evento = 'EMPENHO_COMPLETO'
+                itens_restantes = (
+                    empenho.itens
+                    .select_related(
+                        'estoque'
+                    )
+                )
+
+                for item_restante in itens_restantes:
+                    quantidade = Decimal(
+                        str(
+                            item_restante.quantidade
+                            or 0
+                        )
+                    )
+
+                    peso = Decimal(
+                        str(
+                            item_restante
+                            .estoque
+                            .peso_unitario
+                            or 0
+                        )
+                    )
+
+                    total_restante += (
+                        quantidade
+                        * peso
+                    )
+
+                solicitacao.quantidade_empenhada = (
+                    total_restante
+                )
+
+                quantidade_historico = (
+                    quantidade_removida
+                    * peso_unitario
+                )
+
+                unidade_historico = 'KG'
+
             else:
-                solicitacao.status = 'EMPENHO_PARCIAL'
+                total_restante = (
+                    empenho.itens.aggregate(
+                        total=Sum(
+                            'quantidade'
+                        )
+                    )['total']
+                    or Decimal('0')
+                )
+
+                solicitacao.quantidade_empenhada = (
+                    Decimal(
+                        str(
+                            total_restante
+                        )
+                    )
+                )
+
+                quantidade_historico = (
+                    quantidade_removida
+                )
+
+                unidade_historico = 'BAG'
+
+            quantidade_solicitada = Decimal(
+                str(
+                    solicitacao.quantidade_solicitada
+                    or 0
+                )
+            )
+
+            if (
+                solicitacao.quantidade_empenhada
+                <= 0
+            ):
+                solicitacao.status = (
+                    'AGUARDANDO_EMPENHO'
+                )
+
+                evento = 'CRIACAO'
+
+            elif (
+                solicitacao.quantidade_empenhada
+                >= quantidade_solicitada
+            ):
+                solicitacao.status = (
+                    'EMPENHO_COMPLETO'
+                )
+
+                evento = 'EMPENHO_COMPLETO'
+
+            else:
+                solicitacao.status = (
+                    'EMPENHO_PARCIAL'
+                )
+
                 evento = 'EMPENHO_PARCIAL'
 
-            solicitacao.save()
+            solicitacao.save(
+                update_fields=[
+                    'quantidade_empenhada',
+                    'status',
+                    'data_atualizacao',
+                ]
+            )
 
-            if evento:
-                avaliar_workflow(solicitacao, evento, request.user)
-
-            # Registrar no histórico
             HistoricoCard.objects.create(
                 solicitacao=solicitacao,
                 usuario=request.user,
-                acao='REMOCAO_ITEM',
-                lote=lote,
-                quantidade=quantidade,
-                unidade='BAG',
-                observacao='Item removido do empenho'
+                acao='REMOCAO_EMPENHO',
+                lote=lote_nome,
+                quantidade=quantidade_historico,
+                unidade=unidade_historico,
+                observacao=(
+                    f'Item removido do Empenho '
+                    f'#{empenho.id} deste card.'
+                )
             )
 
-            from django.core.cache import cache
-            cache.delete('cards_version_hash')
+            avaliar_workflow(
+                solicitacao,
+                evento,
+                request.user
+            )
+
+            cache.delete(
+                'cards_version_hash'
+            )
 
             return JsonResponse({
                 'success': True,
-                'message': f'Lote {lote} removido do empenho',
-                'novo_status': solicitacao.status,
-                'quantidade_empenhada': float(solicitacao.quantidade_empenhada),
+
+                'message': (
+                    f'Item do lote {lote_nome} '
+                    f'removido do empenho.'
+                ),
+
+                'item_id': item_id,
+                'estoque_id': estoque_id,
+
+                'total_empenhado': float(
+                    solicitacao.quantidade_empenhada
+                    or 0
+                ),
+
+                'status': solicitacao.status,
             })
 
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
+    except Solicitacao.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Solicitação não encontrada.'
+            },
+            status=404
+        )
+
+    except ItemEmpenho.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': (
+                    'Item não encontrado no empenho '
+                    'deste card.'
+                )
+            },
+            status=404
+        )
+
+    except Estoque.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Estoque do item não encontrado.'
+            },
+            status=404
+        )
+
+    except ValueError as erro:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=400
+        )
+
+    except Exception as erro:
+        logger.exception(
+            'Erro ao remover o item %s do card %s',
+            item_id,
+            solicitacao_id
+        )
+
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=500
+        )
 # ============================================================================
-# MOVIMENTAR (TRANSFERIR/EXPEDIR)
+# MOVIMENTAR SOLICITAÇÃO (TRANSFERIR / EXPEDIR)
+# ============================================================================
+# ============================================================================
+# MOVIMENTAR (TRANSFERIR / EXPEDIR)
 # ============================================================================
 @login_required
 def api_movimentar_solicitacao(request, solicitacao_id):
-    """API para transferir ou expedir itens de uma solicitação"""
+    """
+    Transfere ou expede itens pertencentes exclusivamente
+    ao empenho vinculado à solicitação informada.
+    """
+
     if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
-    
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
-    
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Método não permitido.'
+            },
+            status=405
+        )
+
+    # ------------------------------------------------------------------------
+    # LER JSON
+    # ------------------------------------------------------------------------
     try:
-        data = json.loads(request.body)
-        acao = data.get('acao')
-        itens_ids = data.get('itens_ids', [])
-        observacao = data.get('observacao', '')
-        
-        if acao not in ['transferir', 'expedir']:
-            return JsonResponse({'success': False, 'error': 'Ação inválida'})
-        if not itens_ids:
-            return JsonResponse({'success': False, 'error': 'Nenhum item selecionado'})
-        
+        data = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'JSON inválido.'
+            },
+            status=400
+        )
+
+    acao = str(data.get('acao') or '').strip().lower()
+    itens_ids = data.get('itens_ids', [])
+    observacao = str(
+        data.get('observacao') or ''
+    ).strip()
+
+    # ------------------------------------------------------------------------
+    # VALIDAR AÇÃO
+    # ------------------------------------------------------------------------
+    if acao not in [
+        'transferir',
+        'expedir',
+    ]:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Ação inválida.'
+            },
+            status=400
+        )
+
+    # ------------------------------------------------------------------------
+    # VALIDAR ITENS
+    # ------------------------------------------------------------------------
+    if not isinstance(itens_ids, list) or not itens_ids:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Nenhum item selecionado.'
+            },
+            status=400
+        )
+
+    try:
+        itens_ids = [
+            int(item_id)
+            for item_id in itens_ids
+        ]
+    except (TypeError, ValueError):
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Lista de itens inválida.'
+            },
+            status=400
+        )
+
+    # Remove IDs repetidos.
+    itens_ids = list(dict.fromkeys(itens_ids))
+
+    try:
         with transaction.atomic():
-            # Bloquear solicitação
-            solicitacao = Solicitacao.objects.select_for_update().get(id=solicitacao_id)
-            
-            # Buscar empenho vinculado
-            empenho = Empenho.objects.filter(
-                observacao=solicitacao.titulo, 
-                status__nome='Rascunho'
-            ).first()
-            
-            if not empenho:
-                return JsonResponse({'success': False, 'error': 'Nenhum empenho encontrado para esta solicitação'})
-            
-            # Buscar e bloquear itens
-            itens = list(
-                ItemEmpenho.objects.filter(
-                    id__in=itens_ids, 
-                    empenho=empenho
-                ).select_related('estoque').select_for_update()
+
+            # ================================================================
+            # BLOQUEAR SOMENTE A SOLICITAÇÃO
+            #
+            # Não utilizar select_related aqui.
+            # coluna_kanban pode aceitar NULL e gerar LEFT OUTER JOIN.
+            # ================================================================
+            solicitacao = (
+                Solicitacao.objects
+                .select_for_update(of=('self',))
+                .get(id=solicitacao_id)
             )
-            
+
+            # Impede movimentação em cards finalizados.
+            if solicitacao.status in [
+                'CONCLUIDO',
+                'CANCELADO',
+            ]:
+                raise ValueError(
+                    'Este card já está concluído ou cancelado.'
+                )
+
+            # ================================================================
+            # BLOQUEAR SOMENTE O EMPENHO
+            #
+            # of=('self',) impede que o PostgreSQL tente bloquear
+            # outras tabelas usadas na consulta.
+            # ================================================================
+            empenho = (
+                Empenho.objects
+                .select_for_update(of=('self',))
+                .filter(
+                    solicitacao_id=solicitacao.id,
+                    status__nome='Rascunho',
+                )
+                .order_by('id')
+                .first()
+            )
+
+            if not empenho:
+                raise ValueError(
+                    'Nenhum empenho em rascunho foi encontrado '
+                    'para esta solicitação.'
+                )
+
+            # ================================================================
+            # BLOQUEAR SOMENTE OS ITENS
+            #
+            # Não usar select_related junto com select_for_update.
+            # ================================================================
+            itens = list(
+                ItemEmpenho.objects
+                .select_for_update(of=('self',))
+                .filter(
+                    id__in=itens_ids,
+                    empenho_id=empenho.id,
+                )
+                .order_by('id')
+            )
+
             if not itens:
-                return JsonResponse({'success': False, 'error': 'Itens não encontrados'})
-            
-            # Verificar itens antes de processar
+                raise ValueError(
+                    'Nenhum item válido foi encontrado.'
+                )
+
+            # Confirma que todos os itens enviados pertencem
+            # ao empenho desta solicitação.
+            ids_encontrados = {
+                item.id
+                for item in itens
+            }
+
+            ids_solicitados = set(itens_ids)
+
+            if ids_encontrados != ids_solicitados:
+                raise ValueError(
+                    'Um ou mais itens não pertencem '
+                    'a esta solicitação.'
+                )
+
+            # ================================================================
+            # DADOS DA AÇÃO
+            # ================================================================
+            novo_endereco = ''
+            novo_az = ''
+            numero_carga = ''
+            cliente_expedicao = ''
+            placa = ''
+
+            if acao == 'transferir':
+                novo_endereco = str(
+                    data.get('novo_endereco') or ''
+                ).strip().upper()
+
+                novo_az = str(
+                    data.get('az') or ''
+                ).strip().upper()
+
+                if not novo_endereco:
+                    raise ValueError(
+                        'Novo endereço não informado '
+                        'para transferência.'
+                    )
+
+            else:
+                numero_carga = str(
+                    data.get('numero_carga') or ''
+                ).strip()
+
+                cliente_expedicao = str(
+                    data.get('cliente') or ''
+                ).strip()
+
+                placa = str(
+                    data.get('placa') or ''
+                ).strip().upper()
+
+            total_movimentado_unidades = Decimal('0')
+            total_movimentado_kg = Decimal('0')
+
+            # ================================================================
+            # PROCESSAR ITENS
+            # ================================================================
             for item in itens:
-                if item.quantidade <= 0:
-                    raise ValueError(f"Quantidade inválida para lote {item.lote}")
-                if item.quantidade > item.estoque.saldo:
-                    raise ValueError(f"Saldo insuficiente para lote {item.lote}. Saldo: {item.estoque.saldo}, Necessário: {item.quantidade}")
-            
-            total_movimentado = 0
-            novo_end = None
-            itens_processados = []
-            
-            for item in itens:
-                origem = item.estoque
-                qtd = item.quantidade
-                
+
+                # ------------------------------------------------------------
+                # BLOQUEAR SOMENTE O ESTOQUE DE ORIGEM
+                #
+                # Não utilizar select_related aqui.
+                # cultivar, peneira, tratamento etc. podem aceitar NULL.
+                # ------------------------------------------------------------
+                origem = (
+                    Estoque.objects
+                    .select_for_update(of=('self',))
+                    .get(id=item.estoque_id)
+                )
+
+                quantidade = Decimal(
+                    str(item.quantidade or 0)
+                )
+
+                saldo_atual = Decimal(
+                    str(origem.saldo or 0)
+                )
+
+                quantidade_reservada = Decimal(
+                    str(origem.empenhado or 0)
+                )
+
+                peso_unitario = Decimal(
+                    str(origem.peso_unitario or 0)
+                )
+
+                if quantidade <= 0:
+                    raise ValueError(
+                        f'Quantidade inválida para '
+                        f'o lote {item.lote}.'
+                    )
+
+                if quantidade > saldo_atual:
+                    raise ValueError(
+                        f'Saldo insuficiente para o lote '
+                        f'{item.lote}. Saldo atual: '
+                        f'{origem.saldo}.'
+                    )
+
+                if quantidade > quantidade_reservada:
+                    raise ValueError(
+                        f'A quantidade reservada do lote '
+                        f'{item.lote} é insuficiente.'
+                    )
+
+                # ============================================================
+                # TRANSFERÊNCIA
+                # ============================================================
                 if acao == 'transferir':
-                    novo_end = data.get('novo_endereco', '').strip().upper()
-                    novo_az = data.get('az', '').strip().upper() or origem.az
-                    
-                    if not novo_end:
-                        raise ValueError("Novo endereço não informado para transferência")
-                    
-                    # Buscar ou criar destino
-                    destino = Estoque.objects.filter(
-                        lote=origem.lote, produto=origem.produto, cultivar=origem.cultivar,
-                        peneira=origem.peneira, categoria=origem.categoria,
-                        tratamento=origem.tratamento, especie=origem.especie,
-                        endereco=novo_end, az=novo_az, empresa=origem.empresa,
-                        embalagem=origem.embalagem
-                    ).first()
-                    
+
+                    az_destino = (
+                        novo_az
+                        or origem.az
+                        or ''
+                    )
+
+                    endereco_origem = (
+                        origem.endereco or ''
+                    )
+
+                    az_origem = (
+                        origem.az or ''
+                    )
+
+                    # Impede transferência para o mesmo local.
+                    if (
+                        endereco_origem.strip().upper()
+                        == novo_endereco
+                        and
+                        az_origem.strip().upper()
+                        == az_destino.strip().upper()
+                    ):
+                        raise ValueError(
+                            f'O lote {origem.lote} já está no '
+                            f'endereço {novo_endereco}, '
+                            f'AZ {az_destino or "-"}.'
+                        )
+
+                    # --------------------------------------------------------
+                    # BUSCAR ESTOQUE DE DESTINO
+                    #
+                    # Não há select_related nesta consulta.
+                    # O bloqueio fica somente em Estoque.
+                    # --------------------------------------------------------
+                    destino = (
+                        Estoque.objects
+                        .select_for_update(of=('self',))
+                        .filter(
+                            lote=origem.lote,
+                            produto=origem.produto,
+                            cultivar=origem.cultivar,
+                            peneira=origem.peneira,
+                            categoria=origem.categoria,
+                            tratamento=origem.tratamento,
+                            especie=origem.especie,
+                            endereco=novo_endereco,
+                            az=az_destino,
+                            empresa=origem.empresa,
+                            embalagem=origem.embalagem,
+                            cliente=origem.cliente,
+                            peso_unitario=origem.peso_unitario,
+                        )
+                        .order_by('id')
+                        .first()
+                    )
+
+                    # Caso não exista estoque no destino,
+                    # cria um novo registro.
                     if not destino:
                         destino = Estoque.objects.create(
-                            lote=origem.lote, produto=origem.produto,
-                            cultivar=origem.cultivar, peneira=origem.peneira,
-                            categoria=origem.categoria, tratamento=origem.tratamento,
-                            especie=origem.especie, endereco=novo_end, az=novo_az,
-                            entrada=0, peso_unitario=origem.peso_unitario,
-                            embalagem=origem.embalagem, conferente=request.user,
-                            empresa=origem.empresa, cliente=origem.cliente
+                            lote=origem.lote,
+                            produto=origem.produto,
+                            cultivar=origem.cultivar,
+                            peneira=origem.peneira,
+                            categoria=origem.categoria,
+                            tratamento=origem.tratamento,
+                            especie=origem.especie,
+                            endereco=novo_endereco,
+                            az=az_destino,
+                            entrada=Decimal('0'),
+                            saida=Decimal('0'),
+                            empenhado=Decimal('0'),
+                            peso_unitario=origem.peso_unitario,
+                            embalagem=origem.embalagem,
+                            conferente=request.user,
+                            empresa=origem.empresa,
+                            cliente=origem.cliente,
+                            observacao=origem.observacao,
+                            status_sistemico=(
+                                origem.status_sistemico
+                            ),
                         )
-                    
-                    # Movimentar estoque
-                    destino.entrada += qtd
+
+                    # Entrada no destino.
+                    destino.entrada = (
+                        Decimal(
+                            str(destino.entrada or 0)
+                        )
+                        + quantidade
+                    )
+
+                    # Salva normalmente para o model.save()
+                    # recalcular campos derivados.
                     destino.save()
-                    origem.saida += qtd
+
+                    # Saída da origem.
+                    origem.saida = (
+                        Decimal(
+                            str(origem.saida or 0)
+                        )
+                        + quantidade
+                    )
+
                     origem.save()
-                    
-                    # Criar históricos
+
+                    # --------------------------------------------------------
+                    # HISTÓRICO DA SAÍDA
+                    # --------------------------------------------------------
                     HistoricoMovimentacao.objects.create(
-                        estoque=origem, usuario=request.user, quantidade=qtd,
+                        estoque=origem,
+                        usuario=request.user,
+                        quantidade=quantidade,
                         tipo='Transferência (Saída)',
-                        descricao=f'Transferido {qtd} un de {origem.endereco} para {novo_end}'
+                        descricao=(
+                            f'Transferido {quantidade} un '
+                            f'de {endereco_origem or "-"} '
+                            f'(AZ {az_origem or "-"}) para '
+                            f'{novo_endereco} '
+                            f'(AZ {az_destino or "-"}).'
+                        )
                     )
+
+                    # --------------------------------------------------------
+                    # HISTÓRICO DA ENTRADA
+                    # --------------------------------------------------------
                     HistoricoMovimentacao.objects.create(
-                        estoque=destino, usuario=request.user, quantidade=qtd,
+                        estoque=destino,
+                        usuario=request.user,
+                        quantidade=quantidade,
                         tipo='Transferência (Entrada)',
-                        descricao=f'Recebido {qtd} un em {novo_end}'
+                        descricao=(
+                            f'Recebido {quantidade} un '
+                            f'em {novo_endereco} '
+                            f'(AZ {az_destino or "-"}), '
+                            f'vindo de {endereco_origem or "-"} '
+                            f'(AZ {az_origem or "-"}).'
+                        )
                     )
-                    
-                    # Criar histórico do item empenhado (DADOS COMPLETOS)
+
+                    # --------------------------------------------------------
+                    # HISTÓRICO DO ITEM DO EMPENHO
+                    # --------------------------------------------------------
                     HistoricoItemEmpenho.objects.create(
                         empenho=empenho,
                         item_empenho_id_original=item.id,
                         estoque_origem=origem,
                         estoque_destino=destino,
+
                         lote=origem.lote,
                         produto=origem.produto or '',
-                        cultivar=origem.cultivar.nome if origem.cultivar else '',
-                        peneira=origem.peneira.nome if origem.peneira else '',
-                        categoria=origem.categoria.nome if origem.categoria else '',
-                        tratamento=origem.tratamento.nome if origem.tratamento else '',
-                        especie=origem.especie.nome if origem.especie else '',
+
+                        cultivar=(
+                            origem.cultivar.nome
+                            if origem.cultivar
+                            else ''
+                        ),
+
+                        peneira=(
+                            origem.peneira.nome
+                            if origem.peneira
+                            else ''
+                        ),
+
+                        categoria=(
+                            origem.categoria.nome
+                            if origem.categoria
+                            else ''
+                        ),
+
+                        tratamento=(
+                            origem.tratamento.nome
+                            if origem.tratamento
+                            else ''
+                        ),
+
+                        especie=(
+                            origem.especie.nome
+                            if origem.especie
+                            else ''
+                        ),
+
                         embalagem=origem.embalagem or '',
                         empresa=origem.empresa or '',
                         cliente=origem.cliente or '',
-                        endereco_origem=origem.endereco,
-                        endereco_destino=novo_end,
-                        quantidade=qtd,
+
+                        endereco_origem=endereco_origem,
+                        endereco_destino=novo_endereco,
+
+                        quantidade=quantidade,
                         tipo='transferencia',
                         observacao=observacao,
-                        processado_por=request.user
+                        processado_por=request.user,
                     )
-                    
-                else:  # EXPEDIÇÃO
-                    numero_carga = data.get('numero_carga', '').strip()
-                    cliente = data.get('cliente', '').strip()
-                    placa = data.get('placa', '').strip()
-                    
-                    # Movimentar estoque
-                    origem.saida += qtd
+
+                    descricao_feed = (
+                        f'Transferido {quantidade} un '
+                        f'de {endereco_origem or "-"} '
+                        f'(AZ {az_origem or "-"}) para '
+                        f'{novo_endereco} '
+                        f'(AZ {az_destino or "-"}).'
+                    )
+
+                # ============================================================
+                # EXPEDIÇÃO
+                # ============================================================
+                else:
+                    endereco_origem = (
+                        origem.endereco or ''
+                    )
+
+                    az_origem = (
+                        origem.az or ''
+                    )
+
+                    origem.saida = (
+                        Decimal(
+                            str(origem.saida or 0)
+                        )
+                        + quantidade
+                    )
+
                     origem.save()
-                    
-                    # Descrição
-                    desc = f'Expedido {qtd} un'
-                    if numero_carga: desc += f'. Carga: {numero_carga}'
-                    
-                    # Criar histórico de movimentação
-                    HistoricoMovimentacao.objects.create(
-                        estoque=origem, usuario=request.user, quantidade=qtd,
-                        tipo='Expedição', descricao=desc,
-                        numero_carga=numero_carga or None,
-                        cliente=cliente or origem.cliente,
-                        placa=placa or None
+
+                    descricao_movimentacao = (
+                        f'Expedido {quantidade} un '
+                        f'do lote {origem.lote}, '
+                        f'endereço {endereco_origem or "-"}, '
+                        f'AZ {az_origem or "-"}.'
                     )
-                    
-                    # Criar histórico do item empenhado (DADOS COMPLETOS)
+
+                    if numero_carga:
+                        descricao_movimentacao += (
+                            f' Carga: {numero_carga}.'
+                        )
+
+                    if cliente_expedicao:
+                        descricao_movimentacao += (
+                            f' Cliente: {cliente_expedicao}.'
+                        )
+
+                    if placa:
+                        descricao_movimentacao += (
+                            f' Placa: {placa}.'
+                        )
+
+                    if observacao:
+                        descricao_movimentacao += (
+                            f' Observação: {observacao}'
+                        )
+
+                    HistoricoMovimentacao.objects.create(
+                        estoque=origem,
+                        usuario=request.user,
+                        quantidade=quantidade,
+                        tipo='Expedição',
+                        descricao=descricao_movimentacao,
+                        numero_carga=(
+                            numero_carga or None
+                        ),
+                        cliente=(
+                            cliente_expedicao
+                            or origem.cliente
+                        ),
+                        placa=placa or None,
+                    )
+
                     HistoricoItemEmpenho.objects.create(
                         empenho=empenho,
                         item_empenho_id_original=item.id,
                         estoque_origem=origem,
+
                         lote=origem.lote,
                         produto=origem.produto or '',
-                        cultivar=origem.cultivar.nome if origem.cultivar else '',
-                        peneira=origem.peneira.nome if origem.peneira else '',
-                        categoria=origem.categoria.nome if origem.categoria else '',
-                        tratamento=origem.tratamento.nome if origem.tratamento else '',
-                        especie=origem.especie.nome if origem.especie else '',
+
+                        cultivar=(
+                            origem.cultivar.nome
+                            if origem.cultivar
+                            else ''
+                        ),
+
+                        peneira=(
+                            origem.peneira.nome
+                            if origem.peneira
+                            else ''
+                        ),
+
+                        categoria=(
+                            origem.categoria.nome
+                            if origem.categoria
+                            else ''
+                        ),
+
+                        tratamento=(
+                            origem.tratamento.nome
+                            if origem.tratamento
+                            else ''
+                        ),
+
+                        especie=(
+                            origem.especie.nome
+                            if origem.especie
+                            else ''
+                        ),
+
                         embalagem=origem.embalagem or '',
                         empresa=origem.empresa or '',
-                        cliente=cliente or origem.cliente or '',
-                        endereco_origem=origem.endereco,
-                        quantidade=qtd,
+
+                        cliente=(
+                            cliente_expedicao
+                            or origem.cliente
+                            or ''
+                        ),
+
+                        endereco_origem=endereco_origem,
+                        quantidade=quantidade,
                         tipo='expedicao',
                         observacao=observacao,
                         numero_carga=numero_carga or '',
                         placa=placa or '',
-                        processado_por=request.user
+                        processado_por=request.user,
                     )
-                
-                # Somar quantidade movimentada ANTES de deletar
-                total_movimentado += qtd
-                
-                # Guardar info para o feed
-                itens_processados.append({
-                    'lote': origem.lote,
-                    'qtd': qtd,
-                    'endereco': origem.endereco,
-                    'destino': novo_end if acao == 'transferir' else None,
-                })
-                
-                # Registrar no feed
+
+                    descricao_feed = (
+                        f'Expedido {quantidade} un '
+                        f'de {endereco_origem or "-"} '
+                        f'(AZ {az_origem or "-"}).'
+                    )
+
+                # ============================================================
+                # SOMAR MOVIMENTAÇÃO
+                # ============================================================
+                total_movimentado_unidades += quantidade
+
+                total_movimentado_kg += (
+                    quantidade
+                    * peso_unitario
+                )
+
+                # ------------------------------------------------------------
+                # HISTÓRICO DO CARD
+                #
+                # Para solicitação em KG, registra a quantidade em KG.
+                # ------------------------------------------------------------
+                if (
+                    solicitacao.unidade_controle
+                    == 'QUILOGRAMA'
+                ):
+                    quantidade_historico = (
+                        quantidade
+                        * peso_unitario
+                    )
+                    unidade_historico = 'KG'
+                else:
+                    quantidade_historico = quantidade
+                    unidade_historico = 'BAG'
+
                 HistoricoCard.objects.create(
                     solicitacao=solicitacao,
                     usuario=request.user,
-                    acao='TRANSFERENCIA' if acao == 'transferir' else 'EXPEDICAO',
+                    acao=(
+                        'TRANSFERENCIA'
+                        if acao == 'transferir'
+                        else 'EXPEDICAO'
+                    ),
                     lote=origem.lote,
-                    quantidade=qtd,
-                    unidade='BAG',
-                    observacao=f"{'Transferido' if acao == 'transferir' else 'Expedido'} {qtd} un de {origem.endereco}" + 
-                               (f" para {novo_end}" if acao == 'transferir' and novo_end else '')
+                    quantidade=quantidade_historico,
+                    unidade=unidade_historico,
+                    observacao=descricao_feed,
                 )
-                
-                # SÓ AGORA deletar o item (libera a reserva)
+
+                # ------------------------------------------------------------
+                # EXCLUIR ITEM DO EMPENHO
+                #
+                # Executa o delete personalizado e libera a reserva
+                # existente em Estoque.empenhado.
+                # ------------------------------------------------------------
                 item.delete()
-            
+
             # ================================================================
-            # ATUALIZAR QUANTIDADES E STATUS DA SOLICITAÇÃO
+            # QUANTIDADE MOVIMENTADA NESTA OPERAÇÃO
             # ================================================================
-            solicitacao.quantidade_movimentada += Decimal(str(total_movimentado))
-            
-            print(f"DEBUG: total_movimentado={total_movimentado}")
-            print(f"DEBUG: quantidade_movimentada={solicitacao.quantidade_movimentada}")
-            print(f"DEBUG: quantidade_solicitada={solicitacao.quantidade_solicitada}")
-            print(f"DEBUG: quantidade_empenhada={solicitacao.quantidade_empenhada}")
-            
-            # Determinar evento baseado no progresso
-            if solicitacao.quantidade_movimentada >= solicitacao.quantidade_solicitada:
-                evento = 'CONCLUSAO'
+            if (
+                solicitacao.unidade_controle
+                == 'QUILOGRAMA'
+            ):
+                quantidade_movimentada_agora = (
+                    total_movimentado_kg
+                )
+            else:
+                quantidade_movimentada_agora = (
+                    total_movimentado_unidades
+                )
+
+            solicitacao.quantidade_movimentada = (
+                Decimal(
+                    str(
+                        solicitacao.quantidade_movimentada
+                        or 0
+                    )
+                )
+                + quantidade_movimentada_agora
+            )
+
+            # ================================================================
+            # RECALCULAR QUANTIDADE AINDA EMPENHADA
+            # ================================================================
+            if (
+                solicitacao.unidade_controle
+                == 'QUILOGRAMA'
+            ):
+                total_restante_kg = Decimal('0')
+
+                itens_restantes = (
+                    ItemEmpenho.objects
+                    .filter(
+                        empenho_id=empenho.id
+                    )
+                    .values(
+                        'quantidade',
+                        'estoque__peso_unitario',
+                    )
+                )
+
+                for item_restante in itens_restantes:
+                    quantidade_restante = Decimal(
+                        str(
+                            item_restante.get(
+                                'quantidade'
+                            )
+                            or 0
+                        )
+                    )
+
+                    peso_restante = Decimal(
+                        str(
+                            item_restante.get(
+                                'estoque__peso_unitario'
+                            )
+                            or 0
+                        )
+                    )
+
+                    total_restante_kg += (
+                        quantidade_restante
+                        * peso_restante
+                    )
+
+                solicitacao.quantidade_empenhada = (
+                    total_restante_kg
+                )
+
+            else:
+                total_restante_unidades = (
+                    empenho.itens.aggregate(
+                        total=Sum('quantidade')
+                    )['total']
+                    or 0
+                )
+
+                solicitacao.quantidade_empenhada = (
+                    Decimal(
+                        str(total_restante_unidades)
+                    )
+                )
+
+            # ================================================================
+            # ATUALIZAR STATUS DA SOLICITAÇÃO
+            # ================================================================
+            quantidade_solicitada = Decimal(
+                str(
+                    solicitacao.quantidade_solicitada
+                    or 0
+                )
+            )
+
+            quantidade_movimentada = Decimal(
+                str(
+                    solicitacao.quantidade_movimentada
+                    or 0
+                )
+            )
+
+            if (
+                quantidade_movimentada
+                >= quantidade_solicitada
+            ):
+                solicitacao.quantidade_movimentada = (
+                    quantidade_solicitada
+                )
+
                 solicitacao.status = 'CONCLUIDO'
-                print(f"DEBUG: CARD CONCLUÍDO!")
-            elif solicitacao.quantidade_movimentada > 0:
+
+                evento = (
+                    'TRANSFERENCIA_COMPLETA'
+                    if acao == 'transferir'
+                    else 'EXPEDICAO_COMPLETA'
+                )
+
+            elif quantidade_movimentada > 0:
+                solicitacao.status = (
+                    'MOVIMENTACAO_PARCIAL'
+                )
+
                 evento = 'MOVIMENTACAO_PARCIAL'
-                solicitacao.status = 'MOVIMENTACAO_PARCIAL'
-                print(f"DEBUG: MOVIMENTACAO PARCIAL")
+
             else:
                 evento = None
-            
-            solicitacao.save()
-            
-            # Aplicar workflow (se houver evento)
-            if evento:
-                avaliar_workflow(solicitacao, evento, request.user)
-            
-            # Invalidar cache
-            from django.core.cache import cache
-            cache.delete('cards_version_hash')
-            
-            return JsonResponse({
-                'success': True,
-                'message': f'{len(itens)} item(ns) {acao}do(s) com sucesso! Total movimentado: {total_movimentado}',
-                'total_movimentado': float(solicitacao.quantidade_movimentada),
-                'quantidade_solicitada': float(solicitacao.quantidade_solicitada),
-                'percentual': float(solicitacao.percentual_movimentado),
-                'status': solicitacao.status,
-                'concluido': solicitacao.status == 'CONCLUIDO',
-                'coluna_kanban': solicitacao.coluna_kanban.nome if solicitacao.coluna_kanban else '',
-            })
-            
-    except ValueError as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'success': False, 'error': f'Erro: {str(e)}'})
 
-    
+            solicitacao.save(
+                update_fields=[
+                    'quantidade_movimentada',
+                    'quantidade_empenhada',
+                    'status',
+                    'data_atualizacao',
+                ]
+            )
+
+            # ================================================================
+            # EXECUTAR WORKFLOW
+            # ================================================================
+            if evento:
+                avaliar_workflow(
+                    solicitacao,
+                    evento,
+                    request.user
+                )
+
+            # ================================================================
+            # LIMPAR CACHE
+            # ================================================================
+            from django.core.cache import cache
+
+            cache.delete(
+                'cards_version_hash'
+            )
+
+            # ================================================================
+            # COLUNA DO KANBAN
+            #
+            # Ela é buscada somente agora, depois dos bloqueios.
+            # ================================================================
+            coluna_kanban_nome = ''
+
+            if solicitacao.coluna_kanban_id:
+                coluna_kanban_nome = (
+                    ColunaKanban.objects
+                    .filter(
+                        id=solicitacao.coluna_kanban_id
+                    )
+                    .values_list(
+                        'nome',
+                        flat=True
+                    )
+                    .first()
+                    or ''
+                )
+
+            return JsonResponse(
+                {
+                    'success': True,
+
+                    'message': (
+                        f'{len(itens)} item(ns) '
+                        f'{"transferido(s)" if acao == "transferir" else "expedido(s)"} '
+                        f'com sucesso.'
+                    ),
+
+                    'movimentado_agora': float(
+                        quantidade_movimentada_agora
+                    ),
+
+                    'total_movimentado': float(
+                        solicitacao.quantidade_movimentada
+                    ),
+
+                    'quantidade_empenhada': float(
+                        solicitacao.quantidade_empenhada
+                    ),
+
+                    'quantidade_solicitada': float(
+                        solicitacao.quantidade_solicitada
+                    ),
+
+                    'percentual': float(
+                        solicitacao.percentual_movimentado
+                    ),
+
+                    'status': solicitacao.status,
+
+                    'concluido': (
+                        solicitacao.status
+                        == 'CONCLUIDO'
+                    ),
+
+                    'coluna_kanban': (
+                        coluna_kanban_nome
+                    ),
+                }
+            )
+
+    except Solicitacao.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Solicitação não encontrada.'
+            },
+            status=404
+        )
+
+    except Estoque.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': (
+                    'O estoque de um dos itens '
+                    'não foi encontrado.'
+                )
+            },
+            status=404
+        )
+
+    except ValueError as erro:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=400
+        )
+
+    except Exception as erro:
+        logger.exception(
+            'Erro ao movimentar a solicitação %s',
+            solicitacao_id
+        )
+
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=500
+        )
 
 # ============================================================================
 # IMPRESSÃO
 # ============================================================================
 @login_required
-def api_dados_impressao_solicitacao(request, solicitacao_id):
-    """API que retorna dados para impressão"""
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
-    
-    empenho = Empenho.objects.filter(
-        observacao=solicitacao.titulo, status__nome='Rascunho'
-    ).first()
-    
+def api_dados_impressao_solicitacao(
+    request,
+    solicitacao_id
+):
+    """
+    Retorna dados da solicitação e do empenho vinculado
+    para impressão, incluindo itens já processados.
+    """
+    solicitacao = get_object_or_404(
+        Solicitacao.objects.select_related(
+            'criador',
+            'armazem',
+            'especie',
+        ),
+        id=solicitacao_id
+    )
+
+    empenho = (
+        Empenho.objects
+        .filter(
+            solicitacao_id=solicitacao.id
+        )
+        .order_by('-data_criacao')
+        .first()
+    )
+
     itens_pendentes = []
     itens_processados = []
-    
+
     if empenho:
-        for item in empenho.itens.select_related('estoque'):
+        itens = empenho.itens.select_related(
+            'estoque',
+            'estoque__cultivar',
+            'estoque__peneira',
+            'estoque__categoria',
+            'estoque__especie',
+            'estoque__tratamento',
+        )
+
+        for item in itens:
             estoque = item.estoque
+
             itens_pendentes.append({
-                'item_id': item.id, 'lote': item.lote,
+                'item_id': item.id,
+                'lote': item.lote,
                 'quantidade': item.quantidade,
-                'endereco': item.endereco_origem or (estoque.endereco if estoque else ''),
-                'produto': estoque.produto if estoque else '',
-                'cultivar': item.cultivar or (estoque.cultivar.nome if estoque and estoque.cultivar else ''),
-                'peneira': item.peneira or (estoque.peneira.nome if estoque and estoque.peneira else ''),
-                'categoria': item.categoria or (estoque.categoria.nome if estoque and estoque.categoria else ''),
-                'especie': estoque.especie.nome if estoque and estoque.especie else '',
-                'tratamento': estoque.tratamento.nome if estoque and estoque.tratamento else '',
-                'embalagem': estoque.embalagem if estoque else '',
-                'empresa': estoque.empresa if estoque else '',
-                'cliente': estoque.cliente if estoque else '',
-                'saldo_atual': estoque.saldo if estoque else 0,
-                'peso_unitario': str(estoque.peso_unitario) if estoque and estoque.peso_unitario else '0',
-                'peso_total': str(estoque.peso_total) if estoque and estoque.peso_total else '0',
-                'az': estoque.az if estoque else '',
-                'observacao': item.observacao or (estoque.observacao if estoque else ''),
+                'endereco': (
+                    item.endereco_origem
+                    or (
+                        estoque.endereco
+                        if estoque else ''
+                    )
+                ),
+                'produto': (
+                    estoque.produto
+                    if estoque else ''
+                ),
+                'cultivar': (
+                    item.cultivar
+                    or (
+                        estoque.cultivar.nome
+                        if estoque
+                        and estoque.cultivar
+                        else ''
+                    )
+                ),
+                'peneira': (
+                    item.peneira
+                    or (
+                        estoque.peneira.nome
+                        if estoque
+                        and estoque.peneira
+                        else ''
+                    )
+                ),
+                'categoria': (
+                    item.categoria
+                    or (
+                        estoque.categoria.nome
+                        if estoque
+                        and estoque.categoria
+                        else ''
+                    )
+                ),
+                'especie': (
+                    estoque.especie.nome
+                    if estoque
+                    and estoque.especie
+                    else ''
+                ),
+                'tratamento': (
+                    estoque.tratamento.nome
+                    if estoque
+                    and estoque.tratamento
+                    else ''
+                ),
+                'embalagem': (
+                    estoque.embalagem
+                    if estoque else ''
+                ),
+                'empresa': (
+                    estoque.empresa
+                    if estoque else ''
+                ),
+                'cliente': (
+                    estoque.cliente
+                    if estoque else ''
+                ),
+                'saldo_atual': (
+                    estoque.saldo
+                    if estoque else 0
+                ),
+                'peso_unitario': (
+                    str(estoque.peso_unitario)
+                    if estoque
+                    and estoque.peso_unitario
+                    else '0'
+                ),
+                'peso_total': (
+                    str(estoque.peso_total)
+                    if estoque
+                    and estoque.peso_total
+                    else '0'
+                ),
+                'az': (
+                    estoque.az
+                    if estoque else ''
+                ),
+                'observacao': (
+                    item.observacao
+                    or (
+                        estoque.observacao
+                        if estoque else ''
+                    )
+                ),
                 'situacao': 'pendente',
             })
-        
-        for hist in empenho.historico_itens.all():
+
+        for historico in empenho.historico_itens.all():
             itens_processados.append({
-                'item_id': hist.id, 'lote': hist.lote,
-                'quantidade': hist.quantidade,
-                'endereco': hist.endereco_origem,
-                'produto': hist.produto or '',
-                'cultivar': hist.cultivar or '',
-                'peneira': hist.peneira or '',
-                'categoria': hist.categoria or '',
-                'especie': hist.especie or '',
-                'tratamento': hist.tratamento or '',
-                'embalagem': hist.embalagem or '',
-                'empresa': hist.empresa or '',
-                'cliente': hist.cliente or '',
-                'saldo_atual': 0, 'peso_unitario': '0', 'peso_total': '0',
-                'az': hist.endereco_destino if hist.tipo == 'transferencia' else '',
-                'observacao': hist.observacao or '',
-                'tipo': hist.get_tipo_display(),
-                'processado_em': hist.processado_em.strftime('%d/%m/%Y %H:%M') if hist.processado_em else '',
-                'situacao': 'transferido' if hist.tipo == 'transferencia' else 'expedido',
-                'endereco_destino': hist.endereco_destino if hist.tipo == 'transferencia' else '',
+                'item_id': historico.id,
+                'lote': historico.lote,
+                'quantidade': historico.quantidade,
+                'endereco': historico.endereco_origem,
+                'produto': historico.produto or '',
+                'cultivar': historico.cultivar or '',
+                'peneira': historico.peneira or '',
+                'categoria': historico.categoria or '',
+                'especie': historico.especie or '',
+                'tratamento': historico.tratamento or '',
+                'embalagem': historico.embalagem or '',
+                'empresa': historico.empresa or '',
+                'cliente': historico.cliente or '',
+                'saldo_atual': 0,
+                'peso_unitario': '0',
+                'peso_total': '0',
+                'az': (
+                    historico.endereco_destino
+                    if historico.tipo == 'transferencia'
+                    else ''
+                ),
+                'observacao': (
+                    historico.observacao or ''
+                ),
+                'tipo': historico.get_tipo_display(),
+                'processado_em': (
+                    historico.processado_em.strftime(
+                        '%d/%m/%Y %H:%M'
+                    )
+                    if historico.processado_em
+                    else ''
+                ),
+                'situacao': (
+                    'transferido'
+                    if historico.tipo == 'transferencia'
+                    else 'expedido'
+                ),
+                'endereco_destino': (
+                    historico.endereco_destino
+                    if historico.tipo == 'transferencia'
+                    else ''
+                ),
             })
-    
+
     return JsonResponse({
         'success': True,
+        'empenho_id': empenho.id if empenho else None,
         'solicitacao': {
-            'id': solicitacao.id, 'titulo': solicitacao.titulo,
-            'criador': solicitacao.criador.get_full_name() or solicitacao.criador.username,
-            'data_criacao': solicitacao.data_criacao.strftime('%d/%m/%Y %H:%M'),
-            
-            'quantidade_solicitada': float(solicitacao.quantidade_solicitada),
-            'quantidade_empenhada': float(solicitacao.quantidade_empenhada),
-            'quantidade_movimentada': float(solicitacao.quantidade_movimentada),
-            'unidade_controle': solicitacao.unidade_controle,
+            'id': solicitacao.id,
+            'titulo': solicitacao.titulo,
+            'criador': (
+                solicitacao.criador.get_full_name()
+                or solicitacao.criador.username
+            ),
+            'data_criacao': (
+                solicitacao.data_criacao.strftime(
+                    '%d/%m/%Y %H:%M'
+                )
+            ),
+            'quantidade_solicitada': float(
+                solicitacao.quantidade_solicitada
+            ),
+            'quantidade_empenhada': float(
+                solicitacao.quantidade_empenhada
+            ),
+            'quantidade_movimentada': float(
+                solicitacao.quantidade_movimentada
+            ),
+            'unidade_controle': (
+                solicitacao.unidade_controle
+            ),
             'status': solicitacao.status,
             'observacao': solicitacao.observacao or '',
             'criterios': {
-                'armazem': solicitacao.armazem.nome if solicitacao.armazem else '',
+                'armazem': (
+                    solicitacao.armazem.nome
+                    if solicitacao.armazem else ''
+                ),
                 'produto': solicitacao.produto or '',
-                'especie': solicitacao.especie.nome if solicitacao.especie else '',
+                'especie': (
+                    solicitacao.especie.nome
+                    if solicitacao.especie else ''
+                ),
                 'cliente': solicitacao.cliente or '',
-            }
+            },
         },
         'itens_pendentes': itens_pendentes,
         'itens_processados': itens_processados,
     })
 
-
 # ============================================================================
 # EXCLUIR SOLICITAÇÃO
 # ============================================================================
 @login_required
-def api_excluir_solicitacao(request, solicitacao_id):
-    """Exclui uma solicitação e todos os seus itens"""
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
-    
+def api_excluir_solicitacao(
+    request,
+    solicitacao_id
+):
+    """
+    Exclui somente cards sem movimentação e sem histórico
+    processado.
+
+    Cards concluídos permanecem preservados para auditoria.
+    """
+    if request.method != 'POST':
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Método não permitido.'
+            },
+            status=405
+        )
+
     try:
         with transaction.atomic():
-            empenho = Empenho.objects.filter(observacao=solicitacao.titulo).first()
-            if empenho:
-                empenho.delete()
-            
-            HistoricoCard.objects.filter(solicitacao=solicitacao).delete()
-            
+            solicitacao = (
+                Solicitacao.objects
+                .select_for_update()
+                .get(id=solicitacao_id)
+            )
+
+            empenhos = list(
+                Empenho.objects
+                .select_for_update()
+                .filter(
+                    solicitacao_id=solicitacao.id
+                )
+            )
+
+            possui_historico_processado = any(
+                empenho.historico_itens.exists()
+                for empenho in empenhos
+            )
+
+            if solicitacao.status in [
+                'CONCLUIDO',
+                'CANCELADO',
+            ]:
+                raise ValueError(
+                    'Cards concluídos ou cancelados não '
+                    'podem ser excluídos. Eles devem '
+                    'permanecer no histórico.'
+                )
+
+            if solicitacao.quantidade_movimentada > 0:
+                raise ValueError(
+                    'Este card possui movimentações e não '
+                    'pode ser excluído.'
+                )
+
+            if possui_historico_processado:
+                raise ValueError(
+                    'Este card possui itens transferidos ou '
+                    'expedidos e não pode ser excluído.'
+                )
+
             titulo = solicitacao.titulo
+
+            # Importante:
+            # removemos um item por vez para executar
+            # ItemEmpenho.delete() e liberar Estoque.empenhado.
+            for empenho in empenhos:
+                for item in list(empenho.itens.all()):
+                    item.delete()
+
+                empenho.delete()
+
+            HistoricoCard.objects.filter(
+                solicitacao=solicitacao
+            ).delete()
+
             solicitacao.delete()
-            
+
             from django.core.cache import cache
             cache.delete('cards_version_hash')
-            
-            return JsonResponse({'success': True, 'message': f'Card "{titulo}" excluído!'})
-            
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
 
+            return JsonResponse({
+                'success': True,
+                'message': (
+                    f'Card "{titulo}" excluído com sucesso!'
+                )
+            })
+
+    except Solicitacao.DoesNotExist:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Card não encontrado.'
+            },
+            status=404
+        )
+
+    except ValueError as erro:
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=400
+        )
+
+    except Exception as erro:
+        logger.exception(
+            'Erro ao excluir solicitação %s',
+            solicitacao_id
+        )
+
+        return JsonResponse(
+            {
+                'success': False,
+                'error': str(erro)
+            },
+            status=500
+        )
 
 # ============================================================================
 # CONFIGURAÇÃO DO WORKFLOW
