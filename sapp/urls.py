@@ -117,9 +117,7 @@ urlpatterns = [
     # FASE 5 - Kanban e Workflow
     path('kanban/', views.pagina_kanban, name='pagina_kanban'),
     path('api/kanban/dados/', views.api_kanban_dados, name='api_kanban_dados'),
-    path('api/solicitacoes/<int:solicitacao_id>/mover-kanban/', 
-        views.api_mover_card_kanban, 
-        name='api_mover_card_kanban'),
+ 
     path('api/workflow/config/', views.api_config_workflow, name='api_config_workflow'),
     path('configuracao-workflow/', views.pagina_config_workflow, name='pagina_config_workflow'),
     path('api/solicitacoes/<int:solicitacao_id>/remover-itens/', 
@@ -149,7 +147,33 @@ urlpatterns = [
     path('api/workflow/config/', views.api_config_workflow, name='api_config_workflow'),
     path('api/cards/atualizacoes/', views.api_atualizacoes_recentes, name='api_atualizacoes_recentes'),
 
+    path(
+        'api/kanban/dados/',
+        views.api_kanban_dados,
+        name='api_kanban_dados',
+    ),
+    path(
+        'api/kanban/pesquisar/',
+        views.api_pesquisar_kanban,
+        name='api_pesquisar_kanban',
+    ),
 
+    path(
+        'api/solicitacoes/<int:solicitacao_id>/tags/',
+        views.api_atualizar_tags_card,
+        name='api_atualizar_tags_card',
+    ),
+    path(
+        'api/kanban/tags/criar/',
+        views.api_criar_tag_kanban,
+        name='api_criar_tag_kanban',
+    ),
+    path(
+        'api/solicitacoes/<int:solicitacao_id>/impressao/',
+        views.api_dados_impressao_solicitacao,
+        name='api_dados_impressao_solicitacao',
+    ),
+    path('api/solicitacoes/<int:solicitacao_id>/mover-kanban/', views.mover_card_kanban, name='mover_card_kanban'),
 ]
 
 # ============================================================================

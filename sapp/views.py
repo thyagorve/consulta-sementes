@@ -6932,134 +6932,6 @@ def api_html_cards_atualizados(request):
 # FASE 5 - KANBAN COMPLETO, REGRAS AUTOMÁTICAS E WORKFLOW
 # ============================================================================
 
-@login_required
-def pagina_kanban(request):
-    """Página dedicada do Kanban"""
-    colunas = ColunaKanban.objects.filter(ativa=True).order_by('ordem')
-    
-    return render(request, 'sapp/kanban.html', {
-        'colunas': colunas,
-    })
-
-
-@login_required
-def api_kanban_dados(request):
-    """API que retorna todos os dados do Kanban"""
-    colunas = ColunaKanban.objects.filter(ativa=True).order_by('ordem')
-    
-    data = []
-    for coluna in colunas:
-        solicitacoes = Solicitacao.objects.filter(
-            coluna_kanban=coluna
-        ).select_related(
-            'criador', 'armazem', 'especie', 'coluna_kanban', 'responsavel'
-        ).order_by('-prioridade', '-data_criacao')
-                
-        cards = []
-        for sol in solicitacoes:
-            if sol.unidade_controle == 'QUILOGRAMA':
-                qtd_emp = sol.quantidade_empenhada_kg or Decimal('0')
-            else:
-                qtd_emp = Decimal(str(sol.quantidade_empenhada))
-
-            if sol.quantidade_solicitada > 0:
-                percentual = (qtd_emp / sol.quantidade_solicitada) * 100
-            else:
-                percentual = 0
-
-            cards.append({
-                'id': sol.id,
-                'titulo': sol.titulo,
-                'criador_nome': sol.criador.get_full_name() or sol.criador.username,
-                'data_criacao': sol.data_criacao.strftime('%d/%m/%Y %H:%M'),
-                'status': sol.status,
-                'status_display': sol.get_status_display() if hasattr(sol, 'get_status_display') else sol.status,
-                'unidade_controle': sol.unidade_controle,
-                'quantidade_solicitada': float(sol.quantidade_solicitada),
-                'quantidade_empenhada': float(sol.quantidade_empenhada),            # bruto
-                'quantidade_empenhada_display': float(qtd_emp),                    # KG ou unidades
-                'quantidade_movimentada': float(sol.quantidade_movimentada),
-                'percentual_empenhado': float(percentual),
-                'percentual_movimentado': float(sol.percentual_movimentado),
-                'prioridade': sol.prioridade,
-                'criterios': {
-                    'armazem': sol.armazem.nome if sol.armazem else '',
-                    'produto': sol.produto or '',
-                    'especie': sol.especie.nome if sol.especie else '',
-                    'cliente': sol.cliente or '',
-                },
-                'responsavel': sol.responsavel.get_full_name() if sol.responsavel else '',
-            })
-        data.append({
-            'id': coluna.id,
-            'nome': coluna.nome,
-            'cor': coluna.cor,
-            'ordem': coluna.ordem,
-            'cards': cards,
-            'total': len(cards),
-        })
-    
-    # Também retornar colunas disponíveis para mover
-    colunas_move = [{'id': c.id, 'nome': c.nome, 'cor': c.cor} for c in colunas]
-    
-    return JsonResponse({
-        'success': True,
-        'colunas': data,
-        'colunas_disponiveis': colunas_move,
-    })
-
-
-@login_required
-@permission_required('sapp.pode_movimentar_solicitacao', raise_exception=True)
-def api_mover_card_kanban(request, solicitacao_id):
-    """
-    API para mover um card manualmente entre colunas do Kanban.
-    """
-    if request.method != 'POST':
-        return JsonResponse({'success': False, 'error': 'Método não permitido'}, status=405)
-    
-    solicitacao = get_object_or_404(Solicitacao, id=solicitacao_id)
-    
-    try:
-        data = json.loads(request.body)
-        coluna_destino_id = data.get('coluna_id')
-        observacao = data.get('observacao', '')
-        
-        if not coluna_destino_id:
-            return JsonResponse({'success': False, 'error': 'Coluna destino não informada'})
-        
-        coluna_destino = get_object_or_404(ColunaKanban, id=coluna_destino_id, ativa=True)
-        
-        coluna_anterior = solicitacao.coluna_kanban.nome if solicitacao.coluna_kanban else 'Sem coluna'
-        
-        with transaction.atomic():
-            solicitacao.coluna_kanban = coluna_destino
-            solicitacao.save(update_fields=['coluna_kanban', 'data_atualizacao'])
-            
-            # Registrar no histórico
-            HistoricoCard.objects.create(
-                solicitacao=solicitacao,
-                usuario=request.user,
-                acao='MOVIMENTACAO_KANBAN',
-                coluna_anterior=coluna_anterior,
-                coluna_nova=coluna_destino.nome,
-                observacao=observacao,
-            )
-            
-            # Invalidar cache de versão
-            from django.core.cache import cache
-            cache.delete('cards_version_hash')
-        
-        return JsonResponse({
-            'success': True,
-            'message': f'Card movido para "{coluna_destino.nome}"',
-            'coluna_anterior': coluna_anterior,
-            'coluna_nova': coluna_destino.nome,
-        })
-        
-    except Exception as e:
-        return JsonResponse({'success': False, 'error': str(e)})
-
 
 
 
@@ -7423,94 +7295,760 @@ def avaliar_workflow(solicitacao, evento, usuario=None):
         return False
 
 
-# ============================================================================
-# CRIAR SOLICITAÇÃO
-# ============================================================================
+
+# ============================================================
+# SUBSTITUA APENAS ESTAS DUAS VIEWS NO SEU views.py
+# ============================================================
+
+
+
+
+
 @login_required
-@permission_required('sapp.pode_criar_solicitacao', raise_exception=True)
+@permission_required(
+    'sapp.pode_criar_solicitacao',
+    raise_exception=True
+)
 def criar_solicitacao(request):
-    """View para criar uma nova solicitação"""
+    """
+    Cria uma nova solicitação.
+    Salva corretamente Destino, Armazém e Observação.
+    """
+
     if request.method == 'POST':
-        titulo = request.POST.get('titulo', '').strip().upper()
-        armazem_id = request.POST.get('armazem')
-        produto = request.POST.get('produto', '').strip()
-        especie_id = request.POST.get('especie')
-        cliente = request.POST.get('cliente', '').strip()
-        unidade_controle = request.POST.get('unidade_controle', 'EMBALAGEM')
-        quantidade = request.POST.get('quantidade_solicitada', '0')
-        observacao = request.POST.get('observacao', '').strip()
-        prioridade = request.POST.get('prioridade', 'MEDIA')
-        
+
+        titulo = request.POST.get(
+            'titulo',
+            ''
+        ).strip().upper()
+
+        armazem_id = request.POST.get(
+            'armazem'
+        )
+
+        produto = request.POST.get(
+            'produto',
+            ''
+        ).strip()
+
+        especie_id = request.POST.get(
+            'especie'
+        )
+
+        cliente = request.POST.get(
+            'cliente',
+            ''
+        ).strip()
+
+        destino = request.POST.get(
+            'destino',
+            ''
+        ).strip()
+
+        unidade_controle = request.POST.get(
+            'unidade_controle',
+            'EMBALAGEM'
+        )
+
+        quantidade_texto = request.POST.get(
+            'quantidade_solicitada',
+            '0'
+        )
+
+        observacao = request.POST.get(
+            'observacao',
+            ''
+        ).strip()
+
+        prioridade = request.POST.get(
+            'prioridade',
+            'MEDIA'
+        )
+
         if not titulo:
-            messages.error(request, "Título é obrigatório.")
-            return redirect('sapp:pagina_solicitacoes')
-        
+            messages.error(
+                request,
+                'Título é obrigatório.'
+            )
+
+            return redirect(
+                'sapp:pagina_solicitacoes'
+            )
+
         try:
-            quantidade = Decimal(quantidade)
+            quantidade = Decimal(
+                str(
+                    quantidade_texto
+                ).replace(',', '.')
+            )
+
             if quantidade <= 0:
-                raise ValueError("Quantidade deve ser maior que zero.")
-        except (ValueError, InvalidOperation):
-            messages.error(request, "Quantidade inválida.")
-            return redirect('sapp:pagina_solicitacoes')
-        
+                raise ValueError
+
+        except (
+            ValueError,
+            InvalidOperation
+        ):
+            messages.error(
+                request,
+                'Quantidade inválida.'
+            )
+
+            return redirect(
+                'sapp:pagina_solicitacoes'
+            )
+
         try:
             with transaction.atomic():
-                solicitacao = Solicitacao.objects.create(
-                    titulo=titulo,
-                    criador=request.user,
-                    produto=produto if produto else None,
-                    cliente=cliente if cliente else None,
-                    unidade_controle=unidade_controle,
-                    quantidade_solicitada=quantidade,
-                    observacao=observacao,
-                    prioridade=prioridade,
-                    status='AGUARDANDO_EMPENHO',
+
+                armazem = (
+                    Armazem.objects
+                    .filter(
+                        id=armazem_id
+                    )
+                    .first()
+                    if armazem_id
+                    else None
                 )
-                
-                if armazem_id:
-                    try:
-                        solicitacao.armazem = Armazem.objects.get(id=armazem_id)
-                    except Armazem.DoesNotExist:
-                        pass
-                
-                if especie_id:
-                    try:
-                        solicitacao.especie = Especie.objects.get(id=especie_id)
-                    except Especie.DoesNotExist:
-                        pass
-                
-                solicitacao.save()
-                
-                # Aplicar workflow
-                avaliar_workflow(solicitacao, 'CRIACAO', request.user)
-                
+
+                especie = (
+                    Especie.objects
+                    .filter(
+                        id=especie_id
+                    )
+                    .first()
+                    if especie_id
+                    else None
+                )
+
+                solicitacao = (
+                    Solicitacao.objects.create(
+                        titulo=titulo,
+
+                        criador=request.user,
+
+                        armazem=armazem,
+
+                        produto=(
+                            produto
+                            or None
+                        ),
+
+                        especie=especie,
+
+                        cliente=(
+                            cliente
+                            or None
+                        ),
+
+                        destino=destino,
+
+                        unidade_controle=(
+                            unidade_controle
+                        ),
+
+                        quantidade_solicitada=(
+                            quantidade
+                        ),
+
+                        observacao=(
+                            observacao
+                            or None
+                        ),
+
+                        prioridade=prioridade,
+
+                        status=(
+                            'AGUARDANDO_EMPENHO'
+                        ),
+                    )
+                )
+
+                avaliar_workflow(
+                    solicitacao,
+                    'CRIACAO',
+                    request.user
+                )
+
                 HistoricoCard.objects.create(
                     solicitacao=solicitacao,
-                    usuario=request.user,
-                    acao='CRIACAO',
-                    quantidade=float(quantidade),
-                    unidade='BAG' if unidade_controle == 'EMBALAGEM' else 'KG',
-                    observacao=f"Solicitação criada: {titulo}"
-                )
-                
-                from django.core.cache import cache
-                cache.delete('cards_version_hash')
-                
-                messages.success(request, f"Solicitação '{titulo}' criada com sucesso!")
-                return redirect('sapp:pagina_solicitacoes')
-                
-        except Exception as e:
-            messages.error(request, f"Erro ao criar solicitação: {str(e)}")
-            return redirect('sapp:pagina_solicitacoes')
-    
-    armazens = Armazem.objects.all()
-    especies = Especie.objects.all()
-    
-    return render(request, 'sapp/criar_solicitacao.html', {
-        'armazens': armazens,
-        'especies': especies,
-    })
 
+                    usuario=request.user,
+
+                    acao='CRIACAO',
+
+                    quantidade=quantidade,
+
+                    unidade=(
+                        'KG'
+                        if unidade_controle
+                        == 'QUILOGRAMA'
+                        else 'BAG'
+                    ),
+
+                    observacao=(
+                        f'Solicitação criada: '
+                        f'{titulo}'
+                        + (
+                            f' | Destino: '
+                            f'{destino}'
+                            if destino
+                            else ''
+                        )
+                    )
+                )
+
+                from django.core.cache import cache
+
+                cache.delete(
+                    'cards_version_hash'
+                )
+
+            messages.success(
+                request,
+                (
+                    f'Solicitação '
+                    f'"{titulo}" '
+                    f'criada com sucesso!'
+                )
+            )
+
+            return redirect(
+                'sapp:pagina_solicitacoes'
+            )
+
+        except Exception as erro:
+
+            logger.exception(
+                'Erro ao criar solicitação'
+            )
+
+            messages.error(
+                request,
+                (
+                    'Erro ao criar solicitação: '
+                    f'{erro}'
+                )
+            )
+
+            return redirect(
+                'sapp:pagina_solicitacoes'
+            )
+
+    return render(
+        request,
+        'sapp/criar_solicitacao.html',
+        {
+            'armazens': (
+                Armazem.objects
+                .all()
+                .order_by('nome')
+            ),
+
+            'especies': (
+                Especie.objects
+                .all()
+                .order_by('nome')
+            ),
+        }
+    )
+
+
+def _data_local_formatada(valor):
+    """
+    Converte a data para o fuso horário
+    configurado no Django.
+    """
+
+    if not valor:
+        return ''
+
+    return timezone.localtime(
+        valor
+    ).strftime(
+        '%d/%m/%Y %H:%M'
+    )
+
+
+@login_required
+def api_dados_impressao_solicitacao(
+    request,
+    solicitacao_id
+):
+    """
+    API da impressão.
+
+    A coluna Armazém de cada item usa o AZ real do lote:
+    - pendente: item.estoque.az
+    - processado: historico.estoque_origem.az
+      com fallback para estoque_destino.az
+    """
+
+    if request.method != 'GET':
+        return JsonResponse(
+            {
+                'success': False,
+                'error': 'Método não permitido.'
+            },
+            status=405
+        )
+
+    solicitacao = get_object_or_404(
+        Solicitacao.objects
+        .select_related(
+            'criador',
+            'responsavel',
+            'armazem',
+            'especie'
+        ),
+        id=solicitacao_id
+    )
+
+    empenhos = (
+        Empenho.objects
+        .filter(
+            solicitacao_id=solicitacao.id
+        )
+        .prefetch_related(
+            'itens__estoque',
+            'itens__estoque__cultivar',
+            'itens__estoque__peneira',
+            'itens__estoque__categoria',
+            'itens__estoque__especie',
+            'itens__estoque__tratamento',
+            Prefetch(
+                'historico_itens',
+                queryset=(
+                    HistoricoItemEmpenho.objects
+                    .select_related(
+                        'estoque_origem',
+                        'estoque_destino'
+                    )
+                    .order_by(
+                        'processado_em',
+                        'id'
+                    )
+                )
+            )
+        )
+        .order_by(
+            'data_criacao',
+            'id'
+        )
+    )
+
+    itens_pendentes = []
+    itens_processados = []
+
+    for empenho in empenhos:
+
+        for item in empenho.itens.all():
+
+            estoque = item.estoque
+
+            itens_pendentes.append({
+                'item_id': item.id,
+                'situacao': 'PENDENTE',
+                'lote': item.lote or '',
+                'quantidade': float(
+                    item.quantidade or 0
+                ),
+
+                # AZ REAL DO LOTE
+                'armazem': (
+                    estoque.az
+                    if (
+                        estoque
+                        and estoque.az
+                    )
+                    else ''
+                ),
+
+                'endereco': (
+                    item.endereco_origem
+                    or (
+                        estoque.endereco
+                        if estoque
+                        else ''
+                    )
+                ),
+
+                'produto': (
+                    estoque.produto
+                    if estoque
+                    else ''
+                ),
+
+                'cultivar': (
+                    item.cultivar
+                    or (
+                        estoque.cultivar.nome
+                        if (
+                            estoque
+                            and estoque.cultivar
+                        )
+                        else ''
+                    )
+                ),
+
+                'peneira': (
+                    item.peneira
+                    or (
+                        estoque.peneira.nome
+                        if (
+                            estoque
+                            and estoque.peneira
+                        )
+                        else ''
+                    )
+                ),
+
+                'categoria': (
+                    item.categoria
+                    or (
+                        estoque.categoria.nome
+                        if (
+                            estoque
+                            and estoque.categoria
+                        )
+                        else ''
+                    )
+                ),
+
+                'especie': (
+                    estoque.especie.nome
+                    if (
+                        estoque
+                        and estoque.especie
+                    )
+                    else ''
+                ),
+
+                'tratamento': (
+                    estoque.tratamento.nome
+                    if (
+                        estoque
+                        and estoque.tratamento
+                    )
+                    else ''
+                ),
+
+                'embalagem': (
+                    estoque.embalagem
+                    if estoque
+                    else ''
+                ),
+
+                'empresa': (
+                    estoque.empresa
+                    if estoque
+                    else ''
+                ),
+
+                'cliente': (
+                    estoque.cliente
+                    if estoque
+                    else ''
+                ),
+            })
+
+        for historico in empenho.historico_itens.all():
+
+            tipo = str(
+                historico.tipo or ''
+            ).lower()
+
+            if tipo == 'transferencia':
+                situacao = 'TRANSFERIDO'
+
+            elif tipo == 'expedicao':
+                situacao = 'EXPEDIDO'
+
+            else:
+                situacao = (
+                    historico.get_tipo_display()
+                    if hasattr(
+                        historico,
+                        'get_tipo_display'
+                    )
+                    else str(
+                        historico.tipo or ''
+                    )
+                ).upper()
+
+            estoque_origem = (
+                historico.estoque_origem
+                if hasattr(
+                    historico,
+                    'estoque_origem'
+                )
+                else None
+            )
+
+            estoque_destino = (
+                historico.estoque_destino
+                if hasattr(
+                    historico,
+                    'estoque_destino'
+                )
+                else None
+            )
+
+            armazem_lote = (
+                estoque_origem.az
+                if (
+                    estoque_origem
+                    and estoque_origem.az
+                )
+                else (
+                    estoque_destino.az
+                    if (
+                        estoque_destino
+                        and estoque_destino.az
+                    )
+                    else ''
+                )
+            )
+
+            itens_processados.append({
+                'item_id': historico.id,
+                'situacao': situacao,
+                'lote': historico.lote or '',
+                'quantidade': float(
+                    historico.quantidade or 0
+                ),
+
+                # AZ REAL DO LOTE ORIGINAL
+                'armazem': (
+                    armazem_lote
+                    or ''
+                ),
+
+                'endereco': (
+                    historico.endereco_origem
+                    or ''
+                ),
+
+                'endereco_destino': (
+                    historico.endereco_destino
+                    or ''
+                ),
+
+                'produto': (
+                    historico.produto
+                    or ''
+                ),
+
+                'cultivar': (
+                    historico.cultivar
+                    or ''
+                ),
+
+                'peneira': (
+                    historico.peneira
+                    or ''
+                ),
+
+                'categoria': (
+                    historico.categoria
+                    or ''
+                ),
+
+                'especie': (
+                    historico.especie
+                    or ''
+                ),
+
+                'tratamento': (
+                    historico.tratamento
+                    or ''
+                ),
+
+                'embalagem': (
+                    historico.embalagem
+                    or ''
+                ),
+
+                'empresa': (
+                    historico.empresa
+                    or ''
+                ),
+
+                'cliente': (
+                    historico.cliente
+                    or ''
+                ),
+
+                'processado_em': (
+                    _data_local_formatada(
+                        historico.processado_em
+                    )
+                ),
+            })
+
+    status_display = (
+        solicitacao.get_status_display()
+        if hasattr(
+            solicitacao,
+            'get_status_display'
+        )
+        else solicitacao.status
+    )
+
+    emitido_em = (
+        _data_local_formatada(
+            timezone.now()
+        )
+    )
+
+    if (
+        solicitacao.unidade_controle
+        == 'QUILOGRAMA'
+    ):
+        quantidade_empenhada_display = (
+            solicitacao.quantidade_empenhada_kg
+            or Decimal('0')
+        )
+    else:
+        quantidade_empenhada_display = (
+            solicitacao.quantidade_empenhada
+            or Decimal('0')
+        )
+
+    return JsonResponse({
+        'success': True,
+        'emitido_em': emitido_em,
+
+        'solicitacao': {
+            'id': solicitacao.id,
+            'titulo': solicitacao.titulo,
+
+            'criador': (
+                solicitacao.criador.get_full_name()
+                or solicitacao.criador.username
+            ),
+
+            'responsavel': (
+                (
+                    solicitacao.responsavel.get_full_name()
+                    or solicitacao.responsavel.username
+                )
+                if solicitacao.responsavel
+                else ''
+            ),
+
+            'data_criacao': (
+                _data_local_formatada(
+                    solicitacao.data_criacao
+                )
+            ),
+
+            'data_atualizacao': (
+                _data_local_formatada(
+                    solicitacao.data_atualizacao
+                )
+            ),
+
+            'data_finalizacao': (
+                _data_local_formatada(
+                    solicitacao.data_finalizacao
+                )
+                if (
+                    solicitacao.status
+                    == 'CONCLUIDO'
+                    and solicitacao.data_finalizacao
+                )
+                else ''
+            ),
+
+            'destino': (
+                solicitacao.destino
+                or ''
+            ),
+
+            'observacao': (
+                solicitacao.observacao
+                or ''
+            ),
+
+            'prioridade': (
+                solicitacao.get_prioridade_display()
+                if hasattr(
+                    solicitacao,
+                    'get_prioridade_display'
+                )
+                else solicitacao.prioridade
+            ),
+
+            'quantidade_solicitada': float(
+                solicitacao.quantidade_solicitada
+                or 0
+            ),
+
+            'quantidade_empenhada': float(
+                solicitacao.quantidade_empenhada
+                or 0
+            ),
+
+            'quantidade_empenhada_display': float(
+                quantidade_empenhada_display
+            ),
+
+            'quantidade_movimentada': float(
+                solicitacao.quantidade_movimentada
+                or 0
+            ),
+
+            'unidade_controle': (
+                solicitacao.unidade_controle
+            ),
+
+            'status': (
+                solicitacao.status
+            ),
+
+            'status_display': (
+                status_display
+            ),
+
+            'criterios': {
+                'armazem': (
+                    solicitacao.armazem.nome
+                    if solicitacao.armazem
+                    else ''
+                ),
+
+                'produto': (
+                    solicitacao.produto
+                    or ''
+                ),
+
+                'especie': (
+                    solicitacao.especie.nome
+                    if solicitacao.especie
+                    else ''
+                ),
+
+                'cliente': (
+                    solicitacao.cliente
+                    or ''
+                ),
+
+                'destino': (
+                    solicitacao.destino
+                    or ''
+                ),
+            },
+        },
+
+        'itens_pendentes': (
+            itens_pendentes
+        ),
+
+        'itens_processados': (
+            itens_processados
+        ),
+    })
 
 # ============================================================================
 # PÁGINA DE SOLICITAÇÕES
@@ -9937,238 +10475,440 @@ def api_movimentar_solicitacao(request, solicitacao_id):
         )
 
 # ============================================================================
-# IMPRESSÃO
 # ============================================================================
-@login_required
-def api_dados_impressao_solicitacao(
-    request,
-    solicitacao_id
-):
+
+
+# BLOCO COMPLETO PARA sapp/views.py
+# Remova/substitua as versões antigas das funções com o mesmo nome.
+
+import json
+from decimal import Decimal
+
+from django.contrib.auth.decorators import login_required, permission_required
+from django.db import transaction
+from django.db.models import Q, Prefetch
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from django.views.decorators.http import require_GET, require_POST
+
+from .models import (
+    ColunaKanban,
+    Empenho,
+    HistoricoCard,
+    HistoricoItemEmpenho,
+    ItemEmpenho,
+    Solicitacao,
+    TagKanban,
+)
+
+
+def _formatar_data(valor):
+    if not valor:
+        return ''
+    return timezone.localtime(valor).strftime('%d/%m/%Y %H:%M')
+
+
+def _nome_usuario(usuario):
+    if not usuario:
+        return ''
+    return usuario.get_full_name() or usuario.username
+
+
+def _lotes_da_solicitacao(solicitacao):
     """
-    Retorna dados da solicitação e do empenho vinculado
-    para impressão, incluindo itens já processados.
+    Retorna lotes pendentes e já processados usando o vínculo
+    Empenho.solicitacao. Não depende do título do card.
     """
-    solicitacao = get_object_or_404(
-        Solicitacao.objects.select_related(
+    lotes = set()
+
+    for empenho in solicitacao.empenhos.all():
+        for item in empenho.itens.all():
+            lote = str(item.lote or '').strip()
+            if lote:
+                lotes.add(lote)
+
+        for item in empenho.historico_itens.all():
+            lote = str(item.lote or '').strip()
+            if lote:
+                lotes.add(lote)
+
+    return sorted(lotes)
+
+
+def _serializar_tag(tag):
+    return {
+        'id': tag.id,
+        'nome': tag.nome,
+        'icone': tag.icone,
+        'cor': tag.cor,
+        'cor_texto': tag.cor_texto,
+    }
+
+
+def _serializar_card(solicitacao):
+    if solicitacao.unidade_controle == 'QUILOGRAMA':
+        qtd_empenhada_display = (
+            solicitacao.quantidade_empenhada_kg
+            or Decimal('0')
+        )
+    else:
+        qtd_empenhada_display = Decimal(
+            str(solicitacao.quantidade_empenhada or 0)
+        )
+
+    quantidade_solicitada = Decimal(
+        str(solicitacao.quantidade_solicitada or 0)
+    )
+
+    percentual = (
+        (qtd_empenhada_display / quantidade_solicitada) * 100
+        if quantidade_solicitada > 0
+        else Decimal('0')
+    )
+
+    return {
+        'id': solicitacao.id,
+        'titulo': solicitacao.titulo,
+        'observacao': solicitacao.observacao or '',
+        'destino': solicitacao.destino or '',
+        'criador_nome': _nome_usuario(solicitacao.criador),
+        'responsavel_nome': _nome_usuario(solicitacao.responsavel),
+        'data_criacao': _formatar_data(solicitacao.data_criacao),
+        'data_finalizacao': (
+            _formatar_data(solicitacao.data_finalizacao)
+            if solicitacao.status == 'CONCLUIDO'
+            else ''
+        ),
+        'status': solicitacao.status,
+        'status_display': (
+            solicitacao.get_status_display()
+            if hasattr(solicitacao, 'get_status_display')
+            else solicitacao.status
+        ),
+        'unidade_controle': solicitacao.unidade_controle,
+        'quantidade_solicitada': float(quantidade_solicitada),
+        'quantidade_empenhada': float(
+            solicitacao.quantidade_empenhada or 0
+        ),
+        'quantidade_empenhada_display': float(
+            qtd_empenhada_display
+        ),
+        'quantidade_movimentada': float(
+            solicitacao.quantidade_movimentada or 0
+        ),
+        'percentual_empenhado': float(percentual),
+        'percentual_movimentado': float(
+            solicitacao.percentual_movimentado
+        ),
+        'prioridade': solicitacao.prioridade,
+        'coluna_id': solicitacao.coluna_kanban_id,
+        'coluna_nome': (
+            solicitacao.coluna_kanban.nome
+            if solicitacao.coluna_kanban
+            else ''
+        ),
+        'criterios': {
+            'armazem': (
+                solicitacao.armazem.nome
+                if solicitacao.armazem else ''
+            ),
+            'produto': solicitacao.produto or '',
+            'especie': (
+                solicitacao.especie.nome
+                if solicitacao.especie else ''
+            ),
+            'cliente': solicitacao.cliente or '',
+            'destino': solicitacao.destino or '',
+        },
+        'lotes': _lotes_da_solicitacao(solicitacao),
+        'tags': [
+            _serializar_tag(tag)
+            for tag in solicitacao.tags_kanban.all()
+        ],
+    }
+
+
+def _queryset_kanban():
+    return (
+        Solicitacao.objects
+        .select_related(
             'criador',
+            'responsavel',
             'armazem',
             'especie',
-        ),
-        id=solicitacao_id
+            'coluna_kanban',
+        )
+        .prefetch_related(
+            'tags_kanban',
+            Prefetch(
+                'empenhos',
+                queryset=(
+                    Empenho.objects
+                    .prefetch_related('itens', 'historico_itens')
+                    .order_by('id')
+                ),
+            ),
+        )
     )
 
-    empenho = (
-        Empenho.objects
-        .filter(
-            solicitacao_id=solicitacao.id
-        )
-        .order_by('-data_criacao')
-        .first()
+
+@login_required
+def pagina_kanban(request):
+    return render(
+        request,
+        'sapp/kanban.html',
+        {
+            'tags_kanban': TagKanban.objects.filter(
+                ativa=True
+            ).order_by('ordem', 'nome'),
+        },
     )
 
-    itens_pendentes = []
-    itens_processados = []
 
-    if empenho:
-        itens = empenho.itens.select_related(
-            'estoque',
-            'estoque__cultivar',
-            'estoque__peneira',
-            'estoque__categoria',
-            'estoque__especie',
-            'estoque__tratamento',
-        )
+@login_required
+@require_GET
+def api_kanban_dados(request):
+    colunas = list(
+        ColunaKanban.objects
+        .filter(ativa=True)
+        .order_by('ordem', 'nome')
+    )
 
-        for item in itens:
-            estoque = item.estoque
+    solicitacoes = list(
+        _queryset_kanban()
+        .filter(coluna_kanban__in=colunas)
+        .order_by('-prioridade', '-data_criacao')
+    )
 
-            itens_pendentes.append({
-                'item_id': item.id,
-                'lote': item.lote,
-                'quantidade': item.quantidade,
-                'endereco': (
-                    item.endereco_origem
-                    or (
-                        estoque.endereco
-                        if estoque else ''
-                    )
-                ),
-                'produto': (
-                    estoque.produto
-                    if estoque else ''
-                ),
-                'cultivar': (
-                    item.cultivar
-                    or (
-                        estoque.cultivar.nome
-                        if estoque
-                        and estoque.cultivar
-                        else ''
-                    )
-                ),
-                'peneira': (
-                    item.peneira
-                    or (
-                        estoque.peneira.nome
-                        if estoque
-                        and estoque.peneira
-                        else ''
-                    )
-                ),
-                'categoria': (
-                    item.categoria
-                    or (
-                        estoque.categoria.nome
-                        if estoque
-                        and estoque.categoria
-                        else ''
-                    )
-                ),
-                'especie': (
-                    estoque.especie.nome
-                    if estoque
-                    and estoque.especie
-                    else ''
-                ),
-                'tratamento': (
-                    estoque.tratamento.nome
-                    if estoque
-                    and estoque.tratamento
-                    else ''
-                ),
-                'embalagem': (
-                    estoque.embalagem
-                    if estoque else ''
-                ),
-                'empresa': (
-                    estoque.empresa
-                    if estoque else ''
-                ),
-                'cliente': (
-                    estoque.cliente
-                    if estoque else ''
-                ),
-                'saldo_atual': (
-                    estoque.saldo
-                    if estoque else 0
-                ),
-                'peso_unitario': (
-                    str(estoque.peso_unitario)
-                    if estoque
-                    and estoque.peso_unitario
-                    else '0'
-                ),
-                'peso_total': (
-                    str(estoque.peso_total)
-                    if estoque
-                    and estoque.peso_total
-                    else '0'
-                ),
-                'az': (
-                    estoque.az
-                    if estoque else ''
-                ),
-                'observacao': (
-                    item.observacao
-                    or (
-                        estoque.observacao
-                        if estoque else ''
-                    )
-                ),
-                'situacao': 'pendente',
-            })
+    por_coluna = {coluna.id: [] for coluna in colunas}
 
-        for historico in empenho.historico_itens.all():
-            itens_processados.append({
-                'item_id': historico.id,
-                'lote': historico.lote,
-                'quantidade': historico.quantidade,
-                'endereco': historico.endereco_origem,
-                'produto': historico.produto or '',
-                'cultivar': historico.cultivar or '',
-                'peneira': historico.peneira or '',
-                'categoria': historico.categoria or '',
-                'especie': historico.especie or '',
-                'tratamento': historico.tratamento or '',
-                'embalagem': historico.embalagem or '',
-                'empresa': historico.empresa or '',
-                'cliente': historico.cliente or '',
-                'saldo_atual': 0,
-                'peso_unitario': '0',
-                'peso_total': '0',
-                'az': (
-                    historico.endereco_destino
-                    if historico.tipo == 'transferencia'
-                    else ''
-                ),
-                'observacao': (
-                    historico.observacao or ''
-                ),
-                'tipo': historico.get_tipo_display(),
-                'processado_em': (
-                    historico.processado_em.strftime(
-                        '%d/%m/%Y %H:%M'
-                    )
-                    if historico.processado_em
-                    else ''
-                ),
-                'situacao': (
-                    'transferido'
-                    if historico.tipo == 'transferencia'
-                    else 'expedido'
-                ),
-                'endereco_destino': (
-                    historico.endereco_destino
-                    if historico.tipo == 'transferencia'
-                    else ''
-                ),
-            })
+    for solicitacao in solicitacoes:
+        if solicitacao.coluna_kanban_id in por_coluna:
+            por_coluna[solicitacao.coluna_kanban_id].append(
+                _serializar_card(solicitacao)
+            )
 
     return JsonResponse({
         'success': True,
-        'empenho_id': empenho.id if empenho else None,
-        'solicitacao': {
-            'id': solicitacao.id,
-            'titulo': solicitacao.titulo,
-            'criador': (
-                solicitacao.criador.get_full_name()
-                or solicitacao.criador.username
-            ),
-            'data_criacao': (
-                solicitacao.data_criacao.strftime(
-                    '%d/%m/%Y %H:%M'
-                )
-            ),
-            'quantidade_solicitada': float(
-                solicitacao.quantidade_solicitada
-            ),
-            'quantidade_empenhada': float(
-                solicitacao.quantidade_empenhada
-            ),
-            'quantidade_movimentada': float(
-                solicitacao.quantidade_movimentada
-            ),
-            'unidade_controle': (
-                solicitacao.unidade_controle
-            ),
-            'status': solicitacao.status,
-            'observacao': solicitacao.observacao or '',
-            'criterios': {
-                'armazem': (
-                    solicitacao.armazem.nome
-                    if solicitacao.armazem else ''
-                ),
-                'produto': solicitacao.produto or '',
-                'especie': (
-                    solicitacao.especie.nome
-                    if solicitacao.especie else ''
-                ),
-                'cliente': solicitacao.cliente or '',
-            },
-        },
-        'itens_pendentes': itens_pendentes,
-        'itens_processados': itens_processados,
+        'colunas': [
+            {
+                'id': coluna.id,
+                'nome': coluna.nome,
+                'cor': coluna.cor,
+                'total': len(por_coluna[coluna.id]),
+                'cards': por_coluna[coluna.id],
+            }
+            for coluna in colunas
+        ],
+        'colunas_disponiveis': [
+            {
+                'id': coluna.id,
+                'nome': coluna.nome,
+                'cor': coluna.cor,
+            }
+            for coluna in colunas
+        ],
+        'tags_disponiveis': [
+            _serializar_tag(tag)
+            for tag in TagKanban.objects.filter(
+                ativa=True
+            ).order_by('ordem', 'nome')
+        ],
+        'timestamp': timezone.now().isoformat(),
     })
+
+
+@login_required
+@require_GET
+def api_pesquisar_kanban(request):
+    termo = request.GET.get('q', '').strip()
+
+    if len(termo) < 2:
+        return JsonResponse({
+            'success': True,
+            'resultados': [],
+        })
+
+    queryset = (
+        _queryset_kanban()
+        .filter(
+            Q(titulo__icontains=termo)
+            | Q(observacao__icontains=termo)
+            | Q(destino__icontains=termo)
+            | Q(cliente__icontains=termo)
+            | Q(produto__icontains=termo)
+            | Q(empenhos__itens__lote__icontains=termo)
+            | Q(
+                empenhos__historico_itens__lote__icontains=termo
+            )
+        )
+        .distinct()
+        .order_by('-data_criacao')[:50]
+    )
+
+    return JsonResponse({
+        'success': True,
+        'resultados': [
+            {
+                'id': solicitacao.id,
+                'titulo': solicitacao.titulo,
+                'status': solicitacao.status,
+                'coluna_id': solicitacao.coluna_kanban_id,
+                'coluna_nome': (
+                    solicitacao.coluna_kanban.nome
+                    if solicitacao.coluna_kanban else ''
+                ),
+                'lotes': _lotes_da_solicitacao(solicitacao),
+                'destino': solicitacao.destino or '',
+                'data_criacao': _formatar_data(
+                    solicitacao.data_criacao
+                ),
+            }
+            for solicitacao in queryset
+        ],
+    })
+
+
+# views.py (ou api_views.py)
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_protect
+import json
+from .models import Solicitacao, ColunaKanban, HistoricoCard
+
+@login_required
+@require_POST
+@csrf_protect
+def mover_card_kanban(request, solicitacao_id):
+    try:
+        data = json.loads(request.body)
+        coluna_id = data.get('coluna_id')
+        observacao = data.get('observacao', '')
+
+        if not coluna_id:
+            return JsonResponse({'success': False, 'error': 'ID da coluna não informado.'}, status=400)
+
+        solicitacao = get_object_or_404(Solicitacao, pk=solicitacao_id)
+        coluna_destino = get_object_or_404(ColunaKanban, pk=coluna_id, ativa=True)
+
+        coluna_anterior = solicitacao.coluna_kanban.nome if solicitacao.coluna_kanban else 'Nenhuma'
+
+        # Atualiza a coluna
+        solicitacao.coluna_kanban = coluna_destino
+        solicitacao.save(update_fields=['coluna_kanban', 'data_atualizacao'])
+
+        # Registra no histórico
+        HistoricoCard.objects.create(
+            solicitacao=solicitacao,
+            usuario=request.user,
+            acao='MOVIMENTACAO_KANBAN',
+            coluna_anterior=coluna_anterior,
+            coluna_nova=coluna_destino.nome,
+            observacao=observacao,
+        )
+
+        return JsonResponse({
+            'success': True,
+            'coluna_nova': coluna_destino.nome,
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido.'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+@login_required
+@require_POST
+def api_atualizar_tags_card(request, solicitacao_id):
+    try:
+        dados = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'success': False, 'error': 'JSON inválido.'},
+            status=400,
+        )
+
+    ids = dados.get('tags_ids', [])
+
+    if not isinstance(ids, list):
+        return JsonResponse(
+            {'success': False, 'error': 'Lista de tags inválida.'},
+            status=400,
+        )
+
+    ids_validos = [
+        int(valor)
+        for valor in ids
+        if str(valor).isdigit()
+    ]
+
+    solicitacao = get_object_or_404(
+        Solicitacao,
+        id=solicitacao_id,
+    )
+
+    tags = TagKanban.objects.filter(
+        id__in=ids_validos,
+        ativa=True,
+    )
+
+    solicitacao.tags_kanban.set(tags)
+
+    return JsonResponse({
+        'success': True,
+        'tags': [
+            _serializar_tag(tag)
+            for tag in solicitacao.tags_kanban.all()
+        ],
+    })
+
+
+@login_required
+@require_POST
+def api_criar_tag_kanban(request):
+    try:
+        dados = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'success': False, 'error': 'JSON inválido.'},
+            status=400,
+        )
+
+    nome = str(dados.get('nome', '')).strip()
+    icone = str(dados.get('icone', '')).strip()
+    cor = str(dados.get('cor', '#2f8f4e')).strip()
+
+    if not nome:
+        return JsonResponse(
+            {'success': False, 'error': 'Informe o texto da tag.'},
+            status=400,
+        )
+
+    tag, criada = TagKanban.objects.get_or_create(
+        nome=nome,
+        defaults={
+            'icone': icone,
+            'cor': cor,
+            'cor_texto': '#ffffff',
+            'ativa': True,
+        },
+    )
+
+    if not criada:
+        tag.icone = icone
+        tag.cor = cor
+        tag.ativa = True
+        tag.save(
+            update_fields=['icone', 'cor', 'ativa']
+        )
+
+    return JsonResponse({
+        'success': True,
+        'tag': _serializar_tag(tag),
+    })
+
 
 # ============================================================================
 # EXCLUIR SOLICITAÇÃO

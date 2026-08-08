@@ -788,6 +788,7 @@ class Produto(models.Model):
     ativo = models.BooleanField(default=True, verbose_name="Ativo")
     data_cadastro = models.DateTimeField(auto_now_add=True)
     data_atualizacao = models.DateTimeField(auto_now=True)
+
     
     class Meta:
         verbose_name = "Produto"
@@ -1038,162 +1039,573 @@ class ConfiguracaoLogo(models.Model):
 class Solicitacao(models.Model):
     """
     Representa uma solicitação/card no sistema.
-    Separado do Empenho para ter critérios próprios e fluxo independente.
+
+    A solicitação possui critérios próprios, controle de quantidade,
+    histórico de datas, coluna no Kanban e vínculo com empenhos.
     """
+
     UNIDADE_CHOICES = [
         ('EMBALAGEM', 'Embalagem'),
         ('QUILOGRAMA', 'Quilograma'),
     ]
-    
+
     PRIORIDADE_CHOICES = [
         ('BAIXA', 'Baixa'),
         ('MEDIA', 'Média'),
         ('ALTA', 'Alta'),
         ('URGENTE', 'Urgente'),
     ]
-    
-    # Identificação
-    titulo = models.CharField(max_length=100, verbose_name="Título do Card")
+
+    STATUS_CHOICES = [
+        (
+            'AGUARDANDO_EMPENHO',
+            'Aguardando empenho',
+        ),
+        (
+            'EMPENHO_PARCIAL',
+            'Empenho parcial',
+        ),
+        (
+            'EMPENHO_COMPLETO',
+            'Empenho completo',
+        ),
+        (
+            'MOVIMENTACAO_PARCIAL',
+            'Movimentação parcial',
+        ),
+        (
+            'CONCLUIDO',
+            'Concluído',
+        ),
+        (
+            'CANCELADO',
+            'Cancelado',
+        ),
+    ]
+
+    # ============================================================
+    # IDENTIFICAÇÃO
+    # ============================================================
+
+    titulo = models.CharField(
+        max_length=100,
+        verbose_name='Título do Card',
+    )
+
     criador = models.ForeignKey(
-        User, 
-        on_delete=models.PROTECT, 
+        User,
+        on_delete=models.PROTECT,
         related_name='solicitacoes_criadas',
-        verbose_name="Usuário criador"
+        verbose_name='Usuário criador',
     )
-    
-    # Critérios da solicitação
-    armazem = models.ForeignKey(
-        'Armazem', 
-        on_delete=models.PROTECT, 
-        null=True, 
-        blank=True,
-        verbose_name="Armazém"
-    )
-    produto = models.CharField(max_length=100, blank=True, null=True, verbose_name="Produto")
-    especie = models.ForeignKey(
-        'Especie', 
-        on_delete=models.PROTECT, 
-        null=True, 
-        blank=True,
-        verbose_name="Espécie"
-    )
-    cliente = models.CharField(max_length=255, blank=True, null=True, verbose_name="Cliente")
-    
-    # Controle de quantidade
-    unidade_controle = models.CharField(
-        max_length=20, 
-        choices=UNIDADE_CHOICES, 
-        default='EMBALAGEM',
-        verbose_name="Unidade de Controle"
-    )
-    quantidade_solicitada = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=0,
-        verbose_name="Quantidade Solicitada"
-    )
-    quantidade_empenhada = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=0,
-        verbose_name="Quantidade Empenhada"
-    )
-    quantidade_movimentada = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2, 
-        default=0,
-        verbose_name="Quantidade Movimentada"
-    )
-    
-    # Metadados
-    observacao = models.TextField(blank=True, null=True, verbose_name="Observação")
+
     responsavel = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='solicitacoes_responsavel',
-        verbose_name="Responsável"
+        verbose_name='Responsável',
     )
+
+    # ============================================================
+    # CRITÉRIOS DA SOLICITAÇÃO
+    # ============================================================
+
+    armazem = models.ForeignKey(
+        'Armazem',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name='Armazém',
+    )
+
+    produto = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name='Produto',
+    )
+
+    especie = models.ForeignKey(
+        'Especie',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        verbose_name='Espécie',
+    )
+
+    cliente = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name='Cliente',
+    )
+
+    destino = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Destino',
+        help_text=(
+            'Destino da solicitação, transferência '
+            'ou expedição.'
+        ),
+    )
+
+    observacao = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Observação',
+    )
+
+    # ============================================================
+    # CONTROLE DE QUANTIDADE
+    # ============================================================
+
+    unidade_controle = models.CharField(
+        max_length=20,
+        choices=UNIDADE_CHOICES,
+        default='EMBALAGEM',
+        verbose_name='Unidade de Controle',
+    )
+
+    quantidade_solicitada = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Quantidade Solicitada',
+    )
+
+    quantidade_empenhada = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Quantidade Empenhada',
+    )
+
+    quantidade_movimentada = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        verbose_name='Quantidade Movimentada',
+    )
+
+    # ============================================================
+    # STATUS E KANBAN
+    # ============================================================
+
     prioridade = models.CharField(
-        max_length=10, 
-        choices=PRIORIDADE_CHOICES, 
+        max_length=10,
+        choices=PRIORIDADE_CHOICES,
         default='MEDIA',
-        verbose_name="Prioridade"
+        verbose_name='Prioridade',
     )
-    
-    # Status e Kanban
+
     status = models.CharField(
-        max_length=30, 
+        max_length=30,
+        choices=STATUS_CHOICES,
         default='AGUARDANDO_EMPENHO',
-        verbose_name="Status da Solicitação"
+        db_index=True,
+        verbose_name='Status da Solicitação',
     )
+
     coluna_kanban = models.ForeignKey(
-        'ColunaKanban', 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        'ColunaKanban',
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='solicitacoes',
-        verbose_name="Coluna do Kanban"
+        verbose_name='Coluna do Kanban',
     )
-    
-    # Datas
-    data_criacao = models.DateTimeField(auto_now_add=True)
-    data_atualizacao = models.DateTimeField(auto_now=True)
-    
+
+    tags_kanban = models.ManyToManyField(
+        'TagKanban',
+        blank=True,
+        related_name='solicitacoes',
+        verbose_name='Tags do Kanban',
+    )
+
+    # ============================================================
+    # DATAS
+    # ============================================================
+
+    data_criacao = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        verbose_name='Data/hora da criação',
+    )
+
+    data_atualizacao = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Última atualização',
+    )
+
+    data_finalizacao = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name='Data/hora da finalização',
+    )
+
     class Meta:
-        verbose_name = "Solicitação"
-        verbose_name_plural = "Solicitações"
-        ordering = ['-data_criacao']
-        permissions = [
-            ("pode_criar_solicitacao", "Pode criar solicitação"),
-            ("pode_empenhar_solicitacao", "Pode empenhar itens em solicitação"),
-            ("pode_movimentar_solicitacao", "Pode transferir/expedir solicitação"),
-            ("pode_cancelar_solicitacao", "Pode cancelar solicitação"),
+        verbose_name = 'Solicitação'
+        verbose_name_plural = 'Solicitações'
+        ordering = [
+            '-data_criacao',
+            '-id',
         ]
-    
+        permissions = [
+            (
+                'pode_criar_solicitacao',
+                'Pode criar solicitação',
+            ),
+            (
+                'pode_empenhar_solicitacao',
+                'Pode empenhar itens em solicitação',
+            ),
+            (
+                'pode_movimentar_solicitacao',
+                'Pode transferir/expedir solicitação',
+            ),
+            (
+                'pode_cancelar_solicitacao',
+                'Pode cancelar solicitação',
+            ),
+        ]
+
     def __str__(self):
-        return f"Solicitação #{self.id} - {self.titulo}"
-    
+        return (
+            f'Solicitação #{self.pk or "nova"} '
+            f'- {self.titulo}'
+        )
+
+    def save(self, *args, **kwargs):
+        """
+        Registra automaticamente a primeira data em que o card
+        entra no status CONCLUIDO.
+
+        Caso o card seja reaberto, a data original permanece.
+        """
+
+        status_anterior = None
+
+        if self.pk:
+            status_anterior = (
+                type(self).objects
+                .filter(pk=self.pk)
+                .values_list(
+                    'status',
+                    flat=True,
+                )
+                .first()
+            )
+
+        entrou_em_concluido = (
+            self.status == 'CONCLUIDO'
+            and status_anterior != 'CONCLUIDO'
+        )
+
+        if (
+            entrou_em_concluido
+            and not self.data_finalizacao
+        ):
+            self.data_finalizacao = timezone.now()
+
+        update_fields = kwargs.get('update_fields')
+
+        if (
+            entrou_em_concluido
+            and update_fields is not None
+        ):
+            campos = set(update_fields)
+            campos.add('data_finalizacao')
+            kwargs['update_fields'] = list(campos)
+
+        super().save(*args, **kwargs)
+
+    # ============================================================
+    # PERCENTUAIS
+    # ============================================================
+
     @property
     def percentual_empenhado(self):
-        """Percentual da quantidade já empenhada"""
-        if self.quantidade_solicitada > 0:
-            return (self.quantidade_empenhada / self.quantidade_solicitada) * 100
-        return 0
-    
+        """
+        Retorna o percentual da quantidade empenhada.
+
+        Para solicitações controladas em KG, utiliza o peso real
+        dos itens vinculados aos empenhos.
+        """
+
+        quantidade_solicitada = Decimal(
+            str(self.quantidade_solicitada or 0)
+        )
+
+        if quantidade_solicitada <= 0:
+            return Decimal('0.00')
+
+        if self.unidade_controle == 'QUILOGRAMA':
+            quantidade_empenhada = (
+                self.quantidade_empenhada_kg
+            )
+        else:
+            quantidade_empenhada = Decimal(
+                str(self.quantidade_empenhada or 0)
+            )
+
+        percentual = (
+            quantidade_empenhada
+            / quantidade_solicitada
+        ) * Decimal('100')
+
+        return min(
+            percentual,
+            Decimal('100.00'),
+        )
+
     @property
     def percentual_movimentado(self):
-        """Percentual da quantidade já movimentada"""
-        if self.quantidade_solicitada > 0:
-            return (self.quantidade_movimentada / self.quantidade_solicitada) * 100
-        return 0
-    
+        """
+        Retorna o percentual da quantidade movimentada.
+        """
+
+        quantidade_solicitada = Decimal(
+            str(self.quantidade_solicitada or 0)
+        )
+
+        quantidade_movimentada = Decimal(
+            str(self.quantidade_movimentada or 0)
+        )
+
+        if quantidade_solicitada <= 0:
+            return Decimal('0.00')
+
+        percentual = (
+            quantidade_movimentada
+            / quantidade_solicitada
+        ) * Decimal('100')
+
+        return min(
+            percentual,
+            Decimal('100.00'),
+        )
+
+    # ============================================================
+    # QUANTIDADES PENDENTES
+    # ============================================================
+
     @property
     def quantidade_pendente_empenho(self):
-        """Quanto ainda falta empenhar"""
-        return max(0, self.quantidade_solicitada - self.quantidade_empenhada)
-    
+        """
+        Retorna quanto ainda falta empenhar.
+        """
+
+        quantidade_solicitada = Decimal(
+            str(self.quantidade_solicitada or 0)
+        )
+
+        if self.unidade_controle == 'QUILOGRAMA':
+            quantidade_empenhada = (
+                self.quantidade_empenhada_kg
+            )
+        else:
+            quantidade_empenhada = Decimal(
+                str(self.quantidade_empenhada or 0)
+            )
+
+        pendente = (
+            quantidade_solicitada
+            - quantidade_empenhada
+        )
+
+        return max(
+            Decimal('0.00'),
+            pendente,
+        )
+
     @property
     def quantidade_pendente_movimentacao(self):
-        """Quanto ainda falta movimentar"""
-        return max(0, self.quantidade_solicitada - self.quantidade_movimentada)
+        """
+        Retorna quanto ainda falta movimentar.
+        """
 
-   # No arquivo sapp/models.py, dentro da classe Solicitacao
+        quantidade_solicitada = Decimal(
+            str(self.quantidade_solicitada or 0)
+        )
+
+        quantidade_movimentada = Decimal(
+            str(self.quantidade_movimentada or 0)
+        )
+
+        pendente = (
+            quantidade_solicitada
+            - quantidade_movimentada
+        )
+
+        return max(
+            Decimal('0.00'),
+            pendente,
+        )
+
+    # ============================================================
+    # QUANTIDADE EMPENHADA EM KG
+    # ============================================================
+
     @property
     def quantidade_empenhada_kg(self):
+        """
+        Calcula o peso total dos itens ainda pendentes nos
+        empenhos vinculados a esta solicitação.
+
+        Não utiliza mais o título ou a observação do empenho.
+        O vínculo é feito pelo campo Empenho.solicitacao.
+        """
+
         if self.unidade_controle != 'QUILOGRAMA':
-            return None
-        empenho = Empenho.objects.filter(
-            observacao=self.titulo, status__nome='Rascunho'
-        ).first()
-        if not empenho:
-            return Decimal('0')
-        total = Decimal('0')
-        for item in empenho.itens.select_related('estoque'):
-            peso = item.estoque.peso_unitario or Decimal('0')
-            total += Decimal(str(item.quantidade)) * peso
-        return total
+            return Decimal('0.00')
+
+        if not self.pk:
+            return Decimal('0.00')
+
+        total = Decimal('0.00')
+
+        empenhos = (
+            Empenho.objects
+            .filter(
+                solicitacao_id=self.pk,
+            )
+            .prefetch_related(
+                'itens__estoque',
+            )
+        )
+
+        for empenho in empenhos:
+            for item in empenho.itens.all():
+                estoque = item.estoque
+
+                if not estoque:
+                    continue
+
+                quantidade = Decimal(
+                    str(item.quantidade or 0)
+                )
+
+                peso_unitario = Decimal(
+                    str(
+                        estoque.peso_unitario
+                        or 0
+                    )
+                )
+
+                total += (
+                    quantidade
+                    * peso_unitario
+                )
+
+        return total.quantize(
+            Decimal('0.01')
+        )
+
+    # ============================================================
+    # INFORMAÇÕES AUXILIARES
+    # ============================================================
+
+    @property
+    def esta_concluida(self):
+        return self.status == 'CONCLUIDO'
+
+    @property
+    def esta_cancelada(self):
+        return self.status == 'CANCELADO'
+
+    @property
+    def esta_finalizada(self):
+        return self.status in [
+            'CONCLUIDO',
+            'CANCELADO',
+        ]
+
+    @property
+    def data_finalizacao_formatada(self):
+        if (
+            self.status != 'CONCLUIDO'
+            or not self.data_finalizacao
+        ):
+            return ''
+
+        return timezone.localtime(
+            self.data_finalizacao
+        ).strftime(
+            '%d/%m/%Y %H:%M'
+        )
+
+    @property
+    def data_criacao_formatada(self):
+        if not self.data_criacao:
+            return ''
+
+        return timezone.localtime(
+            self.data_criacao
+        ).strftime(
+            '%d/%m/%Y %H:%M'
+        )
+
+class TagKanban(models.Model):
+    nome = models.CharField(
+        max_length=50,
+        unique=True,
+        verbose_name='Texto da tag',
+    )
+
+    icone = models.CharField(
+        max_length=50,
+        blank=True,
+        default='',
+        verbose_name='Ícone',
+        help_text=(
+            'Classe Font Awesome. '
+            'Ex.: fas fa-print'
+        ),
+    )
+
+    cor = models.CharField(
+        max_length=20,
+        default='#2f8f4e',
+        verbose_name='Cor de fundo',
+    )
+
+    cor_texto = models.CharField(
+        max_length=20,
+        default='#ffffff',
+        verbose_name='Cor do texto',
+    )
+
+    ativa = models.BooleanField(
+        default=True,
+        verbose_name='Ativa',
+    )
+
+    ordem = models.PositiveIntegerField(
+        default=0,
+        verbose_name='Ordem',
+    )
+
+    criado_em = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    class Meta:
+        ordering = [
+            'ordem',
+            'nome',
+        ]
+        verbose_name = 'Tag do Kanban'
+        verbose_name_plural = 'Tags do Kanban'
+
+    def __str__(self):
+        return self.nome
+
+    
 
 
 class ColunaKanban(models.Model):

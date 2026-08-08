@@ -9,33 +9,74 @@
         --verde-escuro: #1e5f34;
     }
 
+
+    .kanban-scrollbar-top::-webkit-scrollbar {
+        height: 14px;
+    }
+
+    .kanban-scrollbar-top::-webkit-scrollbar-thumb {
+    background: linear-gradient(
+        90deg,
+        #2f8f4e,
+        #4eaa68
+    );
+
+    border: 2px solid #d8e4db;
+        border-radius: 999px;
+    }
+    /* ===== BARRA DE ROLAGEM SUPERIOR ===== */
+    .kanban-scrollbar-top {
+        
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        height: 8px;
+        background: #d4e0d7;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        visibility: hidden;
+        transition: visibility 0.2s;
+    }
+    .kanban-scrollbar-top.visible {
+        visibility: visible;
+    }
+    .kanban-scrollbar-content {
+        height: 1px;
+    }
+
+    /* ===== KANBAN WRAPPER ===== */
     .kanban-wrapper {
         display: flex;
-        gap: 16px;
+        gap: 14px;
         overflow-x: auto;
-        padding: 16px 8px 24px 8px;
-        min-height: calc(100vh - 180px);
+        padding: 4px 2px 20px 16px;
+        min-height: calc(100vh - 250px);
         align-items: flex-start;
         -webkit-overflow-scrolling: touch;
         scroll-snap-type: x proximity;
-        padding-left: 16px; /* garante que a primeira coluna não fique cortada */
+        scroll-padding-left: 16px;
     }
 
     .kanban-column {
-        min-width: 300px;
-        max-width: 340px;
+        min-width: 322px;
+        max-width: 350px;
         flex: 0 0 auto;
         background: var(--kanban-bg);
-        border-radius: 16px;
+        border: 1px solid #dbe6de;
+        border-radius: 19px;
         display: flex;
         flex-direction: column;
         max-height: calc(100vh - 200px);
         scroll-snap-align: start;
         margin: 0;
+        background: rgba(247,250,248,.96);
+        box-shadow: 0 10px 30px rgba(27,52,34,.08);
+        overflow: hidden;
     }
 
     .kanban-column-header {
-        padding: 12px 16px;
+        min-height: 53px;
+        padding: 12px 15px;
         border-radius: 16px 16px 0 0;
         color: white;
         font-weight: 700;
@@ -44,33 +85,40 @@
         justify-content: space-between;
         align-items: center;
         flex-shrink: 0;
+        box-shadow: inset 0 -1px rgba(255,255,255,.24);
     }
 
     .kanban-column-body {
-        padding: 10px;
+        padding: 11px;
         overflow-y: auto;
         flex: 1;
     }
 
     .kanban-card {
         background: white;
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e1e9e3;
+        border-left-width: 5px;
+        border-radius: 15px;
+        padding: 13px;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 14px rgba(20,50,29,.075);
         cursor: grab;
         transition: all 0.2s;
-        border-left: 4px solid transparent;
         position: relative;
+        overflow: hidden;
+    }
+    .kanban-card:before {
+        content: "";
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, rgba(47,143,78,.1), rgba(47,143,78,.6), rgba(47,143,78,.1));
     }
     .kanban-card:hover {
-        box-shadow: 0 6px 20px rgba(0,0,0,0.12);
-        transform: translateY(-2px);
+        box-shadow: 0 12px 27px rgba(20,50,29,.15);
+        transform: translateY(-3px);
     }
-    .kanban-card:active {
-        cursor: grabbing;
-        opacity: 0.8;
-    }
+    .kanban-card:active { cursor: grabbing; opacity: 0.8; }
     .kanban-card.dragging {
         opacity: 0.5;
         transform: rotate(2deg) scale(0.95);
@@ -87,18 +135,17 @@
 
     .card-prioridade-badge {
         position: absolute;
-        top: 6px;
-        right: 6px;
-        font-size: 0.5rem;
-        padding: 2px 6px;
+        top: 9px; right: 9px;
+        font-size: .52rem;
+        padding: 3px 7px;
         border-radius: 8px;
         font-weight: 700;
         text-transform: uppercase;
     }
 
     .card-status-badge {
-        font-size: 0.55rem;
-        padding: 2px 6px;
+        font-size: .56rem;
+        padding: 4px 8px;
         border-radius: 8px;
         font-weight: 600;
         display: inline-block;
@@ -106,10 +153,10 @@
     }
 
     .card-progress {
-        height: 4px;
+        height: 6px;
         background: #e9ecef;
         border-radius: 2px;
-        margin: 6px 0;
+        margin: 8px 0;
         overflow: hidden;
     }
     .card-progress-bar {
@@ -123,10 +170,14 @@
         gap: 4px;
         margin-top: 6px;
         flex-wrap: wrap;
+        padding-top: 8px;
+        border-top: 1px solid #edf1ee;
     }
     .card-actions .btn {
         font-size: 0.6rem;
         padding: 3px 8px;
+        border-radius: 8px;
+        min-width: 32px;
     }
 
     .coluna-drop-zone {
@@ -147,12 +198,229 @@
         font-size: 0.75rem;
     }
 
-    /* Ajustes para telas grandes */
+    /* ===== TOPO UNIFICADO ===== */
+    body { background: #f5f8f6; }
+    .kanban-page-shell {
+        padding: 14px;
+        min-height: calc(100vh - 70px);
+        background:
+            radial-gradient(circle at 8% 0%, rgba(47,143,78,.13), transparent 30%),
+            linear-gradient(180deg,#f8fbf9,#eef4f0);
+    }
+
+    .kanban-premium-header {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 16px;
+        align-items: center;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+        border-radius: 22px;
+        color: #fff;
+        background: linear-gradient(135deg,#153e26,#2f8f4e 68%,#55ad6e);
+        box-shadow: 0 16px 38px rgba(26,91,50,.22);
+        position: relative;
+        overflow: visible;
+    }
+    .kanban-premium-header:after {
+        content: "";
+        position: absolute;
+        width: 230px;
+        height: 230px;
+        right: -80px;
+        top: -125px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.09);
+        pointer-events: none;
+    }
+
+    .kanban-premium-title h5 {
+        font-size: 1.18rem;
+        font-weight: 900;
+        margin: 0;
+    }
+    .kanban-premium-title small {
+        color: rgba(255,255,255,.78);
+    }
+
+    .kanban-search-box {
+        position: relative;
+        z-index: 5;
+        min-width: 280px;
+    }
+    .kanban-search-box input {
+        width: 100%;
+        min-height: 46px;
+        padding: 0 44px 0 43px;
+        border: 1px solid rgba(255,255,255,.42);
+        border-radius: 14px;
+        background: rgba(255,255,255,.96);
+        outline: none;
+        box-shadow: 0 8px 22px rgba(0,0,0,.12);
+    }
+    .kanban-search-box input:focus {
+        box-shadow: 0 0 0 4px rgba(255,255,255,.2), 0 10px 25px rgba(0,0,0,.16);
+    }
+    .kanban-search-box .fa-search {
+        position: absolute;
+        left: 15px;
+        top: 15px;
+        color: #2f8f4e;
+    }
+    .kanban-search-results {
+        position: absolute;
+        top: 53px;
+        left: 0;
+        right: 0;
+        z-index: 3000;
+        display: none;
+        max-height: 360px;
+        overflow: auto;
+        border-radius: 15px;
+        padding: 7px;
+        background: #fff;
+        color: #17231b;
+        box-shadow: 0 20px 55px rgba(0,0,0,.25);
+        border: 1px solid #dce7df;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+    .kanban-result-item {
+        padding: 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        border: 1px solid transparent;
+    }
+    .kanban-result-item:hover {
+        background: #eff8f2;
+        border-color: #cce3d3;
+    }
+    .kanban-result-item strong {
+        display: block;
+        font-size: .78rem;
+    }
+    .kanban-result-item small {
+        color: #748078;
+    }
+
+    .kanban-header-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+    .kanban-header-actions .btn {
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        border-radius: 10px;
+        white-space: nowrap;
+    }
+
+    .card-details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 5px;
+        margin: 8px 0;
+        font-size: .62rem;
+        color: #66766c;
+    }
+    .card-details-grid > span {
+        padding: 5px 6px;
+        border-radius: 8px;
+        background: #f6f9f7;
+        border: 1px solid #ebf0ed;
+    }
+    .card-destination {
+        margin-top: 7px;
+        padding: 7px 8px;
+        border-radius: 9px;
+        color: #175a31;
+        background: #ebf8ef;
+        border: 1px solid #cfe8d7;
+        font-size: .64rem;
+        font-weight: 750;
+    }
+    .card-tags-premium {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 8px;
+    }
+    .card-tag-premium {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 7px;
+        border-radius: 999px;
+        font-size: .54rem;
+        font-weight: 850;
+        color: #fff;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+    }
+    .kanban-card.search-highlight {
+        animation: kbPulse 1.7s ease;
+        box-shadow: 0 0 0 5px rgba(255,193,7,.28), 0 14px 28px rgba(0,0,0,.16);
+    }
+    @keyframes kbPulse {
+        0%,100% { transform: scale(1); }
+        45% { transform: scale(1.035); }
+    }
+
+    .btn-card-tag {
+        color: #7c3aed;
+        border-color: #c4b5fd;
+        background: #faf8ff;
+    }
+    .btn-card-tag:hover {
+        color: #fff;
+        border-color: #7c3aed;
+        background: #7c3aed;
+    }
+    .tag-selector-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+    }
+    .tag-selector-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 7px 11px;
+        border-radius: 999px;
+        border: 3px solid transparent;
+        cursor: pointer;
+        font-size: .7rem;
+        font-weight: 800;
+        opacity: .55;
+        transition: .18s ease;
+        user-select: none;
+    }
+    .tag-selector-item:hover {
+        opacity: .85;
+        transform: translateY(-1px);
+    }
+    .tag-selector-item.selected {
+        opacity: 1;
+        border-color: #17231b;
+        box-shadow: 0 5px 13px rgba(0,0,0,.16);
+        transform: translateY(-1px);
+    }
+    .tag-empty-state {
+        width: 100%;
+        padding: 18px;
+        text-align: center;
+        color: #76837b;
+        border: 1px dashed #cedbd2;
+        border-radius: 12px;
+        background: #f8fbf9;
+    }
+
+    /* ===== MEDIA QUERIES ===== */
     @media (min-width: 1200px) {
         .kanban-wrapper {
-            justify-content: flex-start;
             padding-left: 24px;
             padding-right: 24px;
+            scroll-padding-left: 24px;
         }
         .kanban-column {
             min-width: 320px;
@@ -160,57 +428,146 @@
         }
     }
 
-    /* Ajustes para dispositivos móveis */
-    @media (max-width: 768px) {
+    @media (min-width: 769px) and (max-width: 1199px) {
         .kanban-wrapper {
-            gap: 12px;
-            padding: 12px 6px 24px 6px;
-            padding-left: 12px;
+            gap: 14px;
+            padding-left: 14px;
+            padding-right: 14px;
+            scroll-padding-left: 14px;
         }
         .kanban-column {
-            min-width: 260px;
-            max-width: 300px;
+            min-width: 280px;
+            max-width: 320px;
         }
-        .kanban-card {
-            padding: 10px;
-        }
+        .kanban-card { padding: 11px; }
         .card-actions .btn {
             font-size: 0.55rem;
             padding: 2px 6px;
         }
     }
 
-    /* Modal de mover card (estilos simples para o modal) */
-    .modal-mover-lista .list-group-item {
-        cursor: pointer;
-        transition: background 0.2s;
+    @media (max-width: 768px) {
+        .kanban-scrollbar-top { display: none; }
+        .kanban-wrapper {
+            gap: 12px;
+            padding: 12px 6px 24px 12px;
+            scroll-padding-left: 12px;
+        }
+        .kanban-column {
+            min-width: 260px;
+            max-width: 300px;
+        }
+        .kanban-card { padding: 10px; }
+        .card-actions .btn {
+            font-size: 0.55rem;
+            padding: 2px 6px;
+        }
+        .kanban-page-shell { padding: 7px 4px 18px; }
+        .kanban-premium-header {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+        .kanban-header-actions {
+            justify-content: flex-start;
+        }
+        .card-details-grid { grid-template-columns: 1fr; }
     }
-    .modal-mover-lista .list-group-item:hover {
-        background: #f1f5f9;
+
+    table {
+    width: 100%;
+    border-collapse: collapse;
+    /* remova table-layout: fixed; */
+    font-size: 8px;
+}
+/* em vez de larguras fixas, use min-width para cada coluna */
+.c-num { min-width: 28px; text-align: center; }
+.c-status { min-width: 80px; }
+.c-lote { min-width: 108px; }
+.c-qtd { min-width: 54px; text-align: center; }
+.c-produto { min-width: 155px; }
+.c-cultivar { min-width: 130px; }
+.c-peneira { min-width: 58px; text-align: center; }
+.c-armazem { min-width: 90px; }
+.c-endereco { min-width: 122px; }
+.c-cliente { min-width: 125px; }
+
+    /* ===== CORREÇÕES DE ESTABILIDADE E ACABAMENTO ===== */
+    html, body {
+        max-width: 100%;
+        overflow-x: hidden;
     }
+
+    .kanban-page-shell {
+        width: 100%;
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+
+    .kanban-wrapper {
+        width: 100%;
+        max-width: 100%;
+        overscroll-behavior-x: contain;
+        scroll-behavior: smooth;
+        scrollbar-gutter: stable;
+    }
+
+    .kanban-scrollbar-top {
+        overscroll-behavior-x: contain;
+        scrollbar-gutter: stable;
+    }
+
+    .kanban-card.search-highlight {
+        animation: kbSearchGlow 1.55s ease;
+        box-shadow:
+            0 0 0 4px rgba(255, 193, 7, .30),
+            0 16px 32px rgba(20, 50, 29, .18);
+    }
+
+    @keyframes kbSearchGlow {
+        0%, 100% { transform: translateY(0) scale(1); }
+        45% { transform: translateY(-2px) scale(1.018); }
+    }
+
+    .report-destino {
+        border-left: 5px solid #2f8f4e !important;
+        background: linear-gradient(135deg, #ecf8f0, #ffffff) !important;
+    }
+
+    .report-observacao {
+        border-left: 5px solid #f59e0b !important;
+        background: linear-gradient(135deg, #fff8e8, #ffffff) !important;
+    }
+
 </style>
 
-
-<div class="container-fluid py-2">
-    <!-- HEADER -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-        <div>
-            <h5 class="mb-0">
-                <i class="fas fa-columns text-primary me-2"></i>Kanban
-            </h5>
-            <small class="text-muted">A movimentação dos cards entre colunas e automatica</small>
+<div class="kanban-page-shell">
+    <!-- TOPO UNIFICADO -->
+    <div class="kanban-premium-header">
+        <div class="kanban-premium-title">
+            <h5><i class="fas fa-layer-group me-2"></i>Kanban</h5>
+            <small>A movimentação dos cards entre colunas é automática</small>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{% url 'sapp:pagina_solicitacoes' %}" class="btn btn-outline-secondary btn-sm">
+        <div class="kanban-search-box">
+            <i class="fas fa-search"></i>
+            <input id="kanbanSearchInput" type="search" placeholder="Pesquisar lote, título, destino..." autocomplete="off">
+            <div id="kanbanSearchResults" class="kanban-search-results"></div>
+        </div>
+        <div class="kanban-header-actions">
+            <a href="{% url 'sapp:pagina_solicitacoes' %}" class="btn btn-light btn-sm">
                 <i class="fas fa-list me-1"></i> Lista
             </a>
-            <a href="{% url 'sapp:pagina_config_workflow' %}" class="btn btn-outline-primary btn-sm">
+            <a href="{% url 'sapp:pagina_config_workflow' %}" class="btn btn-light btn-sm">
                 <i class="fas fa-cog me-1"></i> Configurar
             </a>
-            <button class="btn btn-outline-success btn-sm" onclick="recarregarKanban()">
+            <button class="btn btn-light btn-sm" onclick="recarregarKanban()">
                 <i class="fas fa-sync-alt me-1"></i> Atualizar
             </button>
         </div>
+    </div>
+
+    <!-- BARRA DE ROLAGEM SUPERIOR -->
+    <div class="kanban-scrollbar-top" id="kanbanScrollbarTop">
+        <div class="kanban-scrollbar-content" id="kanbanScrollbarContent"></div>
     </div>
 
     <!-- KANBAN BOARD -->
@@ -235,8 +592,7 @@
                 <div class="list-group" id="listaColunasDestino"></div>
                 <div class="mt-3">
                     <label class="form-label small">Observação (opcional)</label>
-                    <textarea id="obsMoverCard" class="form-control form-control-sm" rows="2" 
-                              placeholder="Motivo da movimentação..."></textarea>
+                    <textarea id="obsMoverCard" class="form-control form-control-sm" rows="2" placeholder="Motivo da movimentação..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -249,13 +605,84 @@
     </div>
 </div>
 
-
 <audio id="audioNotificacao" preload="auto" style="display:none;" src=""></audio>
-<script>
-// ============================================================
-// KANBAN COMPLETO COM DRAG & DROP + IMPRESSÃO
-// ============================================================
 
+<!-- MODAL TAGS -->
+<div class="modal fade" id="modalTagsKanban" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0" style="border-radius:18px;overflow:hidden;">
+            <div class="modal-header text-white" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);">
+                <div>
+                    <h6 class="modal-title mb-0"><i class="fas fa-tags me-2"></i>Tags do card</h6>
+                    <small id="tagCardTitulo" style="opacity:.82;"></small>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="tagSelectorGrid" class="tag-selector-grid"></div>
+                <hr>
+                <div class="small fw-bold text-muted mb-2"><i class="fas fa-plus-circle me-1"></i>Criar nova tag</div>
+                <div class="row g-2">
+                    <div class="col-sm-5"><input id="novaTagNomeKanban" type="text" class="form-control form-control-sm" maxlength="50" placeholder="Ex.: Impresso"></div>
+                    <div class="col-sm-5"><input id="novaTagIconeKanban" type="text" class="form-control form-control-sm" maxlength="50" placeholder="fas fa-print"></div>
+                    <div class="col-sm-2"><input id="novaTagCorKanban" type="color" class="form-control form-control-color w-100" value="#2f8f4e" title="Cor da tag"></div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-success mt-2" onclick="criarTagKanban()">
+                    <i class="fas fa-plus me-1"></i>Criar e selecionar
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success btn-sm px-3" onclick="salvarTagsKanban()">
+                    <i class="fas fa-save me-1"></i>Salvar tags
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== FUNÇÕES UTILITÁRIAS =====
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function mostrarToast(mensagem) {
+    const container = document.getElementById('toastContainer') || (() => {
+        const div = document.createElement('div');
+        div.id = 'toastContainer';
+        div.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(div);
+        return div;
+    })();
+    const toastId = 'toast-' + Date.now();
+    const html = `
+        <div id="${toastId}" class="toast align-items-center text-bg-success border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">${mensagem}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+    const toastEl = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+    toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+}
+
+// ===== KANBAN PRINCIPAL =====
 let kanbanData = null;
 let cardArrastado = null;
 let colunaOrigem = null;
@@ -312,6 +739,7 @@ function renderizarKanban(colunas) {
         card.addEventListener('dragstart', handleDragStart);
         card.addEventListener('dragend', handleDragEnd);
     });
+    setTimeout(configurarScrollbarSuperior, 50);
 }
 
 function criarCardHTML(card) {
@@ -321,7 +749,6 @@ function criarCardHTML(card) {
     const percentual = card.percentual_empenhado ?? 
         (card.quantidade_solicitada > 0 ? (card.quantidade_empenhada / card.quantidade_solicitada) * 100 : 0);
     const qtdFormatada = unidade === 'QUILOGRAMA' ? Number(qtdEmp).toFixed(2) : Math.round(qtdEmp);
-    const percentualFormatado = Math.round(percentual);
     
     const statusColors = {
         'AGUARDANDO_EMPENHO': '#fff3cd',
@@ -353,18 +780,32 @@ function criarCardHTML(card) {
                 <div class="card-progress-bar ${percentual >= 100 ? 'bg-success' : percentual >= 50 ? 'bg-warning' : 'bg-danger'}" 
                      style="width: ${percentual}%"></div>
             </div>
-            <div class="small text-muted">
-                <div>📦 ${qtdFormatada}/${card.quantidade_solicitada} ${unidade === 'QUILOGRAMA' ? 'KG' : unidade}</div>
-                <div>👤 ${card.criador_nome}</div>
-                <div>📅 ${card.data_criacao}</div>
+            <div class="card-details-grid">
+                <span><i class="fas fa-box me-1"></i>${qtdFormatada}/${card.quantidade_solicitada} ${unidade === 'QUILOGRAMA' ? 'KG' : unidade}</span>
+                <span><i class="fas fa-user me-1"></i>${card.criador_nome || '-'}</span>
+                <span><i class="far fa-clock me-1"></i>${card.data_criacao || '-'}</span>
+                ${card.data_finalizacao ? `<span><i class="fas fa-check-circle me-1 text-success"></i>${card.data_finalizacao}</span>` : ''}
+                
+                ${card.criterios?.cliente ? `<span><i class="fas fa-building me-1"></i>${card.criterios.cliente}</span>` : ''}
             </div>
-            ${card.criterios.armazem ? `<span class="badge bg-light text-dark me-1">🏭 ${card.criterios.armazem}</span>` : ''}
-            ${card.criterios.cliente ? `<span class="badge bg-light text-dark">👤 ${card.criterios.cliente}</span>` : ''}
+            ${card.destino || card.criterios?.destino ? `<div class="card-destination"><i class="fas fa-location-arrow me-1"></i>Destino: ${card.destino || card.criterios.destino}</div>` : ''}
+            <div class="card-tags-premium">
+                ${(card.tags || []).map(tag => `<span class="card-tag-premium" style="background:${tag.cor || '#2f8f4e'};color:${tag.cor_texto || '#fff'}">${tag.icone ? `<i class="${tag.icone}"></i>` : ''}${tag.nome}</span>`).join('')}
+            </div>
             <div class="card-actions">
-                <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); abrirModalMover(${card.id}, '${card.titulo.replace(/'/g, "\\'")}')" title="Mover card">
+                <button class="btn btn-sm btn-outline-secondary"
+                        onclick="event.stopPropagation(); abrirModalMover(${card.id}, '${card.titulo.replace(/'/g, "\\'")}')"
+                        title="Mover card">
                     <i class="fas fa-arrows-alt"></i>
                 </button>
-                <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); imprimirCardKanban(${card.id})" title="Imprimir / Visualizar">
+                <button class="btn btn-sm btn-card-tag"
+                        onclick="event.stopPropagation(); abrirTagsKanban(${card.id})"
+                        title="Trocar tags">
+                    <i class="fas fa-tags"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-info"
+                        onclick="event.stopPropagation(); imprimirCardKanban(${card.id})"
+                        title="Imprimir / visualizar">
                     <i class="fas fa-print"></i>
                 </button>
             </div>
@@ -372,9 +813,7 @@ function criarCardHTML(card) {
     `;
 }
 
-// ============================================================
-// DRAG & DROP
-// ============================================================
+// ===== DRAG & DROP =====
 function handleDragStart(e) {
     cardArrastado = this;
     colunaOrigem = this.closest('.kanban-column').dataset.colunaId;
@@ -407,9 +846,7 @@ async function handleDrop(e) {
     setTimeout(recarregarKanban, 500);
 }
 
-// ============================================================
-// MODAL MOVER CARD
-// ============================================================
+// ===== MODAL MOVER =====
 function abrirModalMover(cardId, cardTitulo) {
     cardParaMover = cardId;
     const lista = document.getElementById('listaColunasDestino');
@@ -445,9 +882,7 @@ async function confirmarMoverCard() {
     recarregarKanban();
 }
 
-// ============================================================
-// API
-// ============================================================
+// ===== API =====
 async function moverCardAPI(cardId, colunaDestinoId, observacao = '') {
     try {
         const resp = await fetch(`/api/solicitacoes/${cardId}/mover-kanban/`, {
@@ -468,185 +903,531 @@ async function moverCardAPI(cardId, colunaDestinoId, observacao = '') {
 }
 function recarregarKanban() { carregarKanban(); }
 
-// ============================================================
-// IMPRESSÃO (MESMA FUNÇÃO DA PÁGINA DE SOLICITAÇÕES)
-// ============================================================
-function imprimirCardKanban(id) {
-    const win = window.open('', '_blank', 'width=1000,height=700');
+// ===== BARRA DE ROLAGEM SUPERIOR - ESTÁVEL =====
+let scrollbarKanbanConfigurada = false;
+let resizeObserverKanban = null;
+let sincronizandoScrollKanban = false;
+let rafScrollKanban = null;
+
+function configurarScrollbarSuperior() {
+    const wrapper = document.getElementById('kanbanBoard');
+    const scrollTop = document.getElementById('kanbanScrollbarTop');
+    const scrollContent = document.getElementById('kanbanScrollbarContent');
+
+    if (!wrapper || !scrollTop || !scrollContent) return;
+
+    function atualizarLarguraScrollbar() {
+        const largura = Math.max(
+            wrapper.scrollWidth,
+            wrapper.clientWidth
+        );
+
+        scrollContent.style.width = `${largura}px`;
+
+        scrollTop.classList.toggle(
+            'visible',
+            wrapper.scrollWidth > wrapper.clientWidth + 2
+        );
+
+        if (!sincronizandoScrollKanban) {
+            scrollTop.scrollLeft = wrapper.scrollLeft;
+        }
+    }
+
+    if (!scrollbarKanbanConfigurada) {
+        scrollbarKanbanConfigurada = true;
+
+        scrollTop.addEventListener(
+            'scroll',
+            () => {
+                if (sincronizandoScrollKanban) return;
+
+                sincronizandoScrollKanban = true;
+
+                cancelAnimationFrame(rafScrollKanban);
+                rafScrollKanban = requestAnimationFrame(() => {
+                    wrapper.scrollLeft = scrollTop.scrollLeft;
+
+                    requestAnimationFrame(() => {
+                        sincronizandoScrollKanban = false;
+                    });
+                });
+            },
+            { passive: true }
+        );
+
+        wrapper.addEventListener(
+            'scroll',
+            () => {
+                if (sincronizandoScrollKanban) return;
+
+                sincronizandoScrollKanban = true;
+
+                cancelAnimationFrame(rafScrollKanban);
+                rafScrollKanban = requestAnimationFrame(() => {
+                    scrollTop.scrollLeft = wrapper.scrollLeft;
+
+                    requestAnimationFrame(() => {
+                        sincronizandoScrollKanban = false;
+                    });
+                });
+            },
+            { passive: true }
+        );
+
+        window.addEventListener(
+            'resize',
+            atualizarLarguraScrollbar,
+            { passive: true }
+        );
+
+        if ('ResizeObserver' in window) {
+            resizeObserverKanban = new ResizeObserver(
+                atualizarLarguraScrollbar
+            );
+            resizeObserverKanban.observe(wrapper);
+        }
+    }
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(atualizarLarguraScrollbar);
+    });
+}
+
+// ===== PESQUISA =====
+let kanbanSearchTimer = null;
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('kanbanSearchInput');
+    if (!input) return;
+    input.addEventListener('input', () => {
+        clearTimeout(kanbanSearchTimer);
+        kanbanSearchTimer = setTimeout(() => pesquisarNoKanban(input.value), 280);
+    });
+    document.addEventListener('click', event => {
+        if (!event.target.closest('.kanban-search-box')) {
+            const box = document.getElementById('kanbanSearchResults');
+            if (box) box.style.display = 'none';
+        }
+    });
+});
+
+async function pesquisarNoKanban(termo) {
+    const box = document.getElementById('kanbanSearchResults');
+    termo = String(termo || '').trim();
+    if (termo.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    try {
+        const resposta = await fetch(`/api/kanban/pesquisar/?q=${encodeURIComponent(termo)}`);
+        const dados = await resposta.json();
+        const resultados = dados.resultados || [];
+        box.innerHTML = resultados.length ? resultados.map(item => `
+            <div class="kanban-result-item" onclick="localizarCardKanban(${item.id})">
+                <strong>#${item.id} · ${escaparHtmlKanban(item.titulo)}</strong>
+                <small>${escaparHtmlKanban(item.coluna_nome || 'Sem coluna')} ${item.lotes?.length ? `· Lote(s): ${item.lotes.map(escaparHtmlKanban).join(', ')}` : ''} ${item.destino ? `· Destino: ${escaparHtmlKanban(item.destino)}` : ''}</small>
+            </div>`).join('') : '<div class="p-3 small text-muted">Nenhum card encontrado.</div>';
+        box.style.display = 'block';
+    } catch (erro) {
+        console.error(erro);
+        box.innerHTML = '<div class="p-3 small text-danger">Erro ao pesquisar.</div>';
+        box.style.display = 'block';
+    }
+}
+function escaparHtmlKanban(valor) {
+    const div = document.createElement('div');
+    div.textContent = valor ?? '';
+    return div.innerHTML;
+}
+function localizarCardKanban(id) {
+    const resultados = document.getElementById(
+        'kanbanSearchResults'
+    );
+
+    if (resultados) {
+        resultados.style.display = 'none';
+    }
+
+    const wrapper = document.getElementById(
+        'kanbanBoard'
+    );
+
+    const card = document.querySelector(
+        `[data-card-id="${id}"]`
+    );
+
+    if (!wrapper || !card) return;
+
+    const coluna = card.closest(
+        '.kanban-column'
+    );
+
+    if (!coluna) return;
+
+    /*
+     * Não usamos scrollIntoView().
+     * Ele pode deslocar o BODY inteiro.
+     * Movemos somente o scroll interno do Kanban.
+     */
+    const colunaLeft = coluna.offsetLeft;
+    const colunaWidth = coluna.offsetWidth;
+    const viewportWidth = wrapper.clientWidth;
+
+    const destinoHorizontal = Math.max(
+        0,
+        colunaLeft
+        - ((viewportWidth - colunaWidth) / 2)
+    );
+
+    wrapper.scrollTo({
+        left: destinoHorizontal,
+        behavior: 'smooth'
+    });
+
+    const corpoColuna = card.closest(
+        '.kanban-column-body'
+    );
+
+    if (corpoColuna) {
+        const destinoVertical = Math.max(
+            0,
+            card.offsetTop
+            - (corpoColuna.clientHeight / 2)
+            + (card.offsetHeight / 2)
+        );
+
+        corpoColuna.scrollTo({
+            top: destinoVertical,
+            behavior: 'smooth'
+        });
+    }
+
+    card.classList.remove(
+        'search-highlight'
+    );
+
+    void card.offsetWidth;
+
+    card.classList.add(
+        'search-highlight'
+    );
+
+    setTimeout(
+        () => card.classList.remove(
+            'search-highlight'
+        ),
+        1700
+    );
+}
+
+// ===== TAGS =====
+let cardTagsKanbanId = null;
+let tagsSelecionadasKanban = new Set();
+
+function getCookieKanban(nome) { return getCookie(nome); }
+
+function todosCardsKanban() {
+    if (!kanbanData?.colunas) return [];
+    return kanbanData.colunas.flatMap(coluna => coluna.cards || []);
+}
+
+function abrirTagsKanban(cardId) {
+    const card = todosCardsKanban().find(item => Number(item.id) === Number(cardId));
+    if (!card) { alert('Card não encontrado.'); return; }
+    cardTagsKanbanId = Number(cardId);
+    tagsSelecionadasKanban = new Set((card.tags || []).map(tag => Number(tag.id)));
+    document.getElementById('tagCardTitulo').textContent = `Card #${card.id} · ${card.titulo}`;
+    renderizarTagsKanban();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalTagsKanban')).show();
+}
+
+function renderizarTagsKanban() {
+    const grid = document.getElementById('tagSelectorGrid');
+    if (!grid) return;
+    const tags = kanbanData?.tags_disponiveis || [];
+    if (!tags.length) {
+        grid.innerHTML = `<div class="tag-empty-state"><i class="fas fa-tags d-block mb-2"></i>Nenhuma tag cadastrada. Crie a primeira abaixo.</div>`;
+        return;
+    }
+    grid.innerHTML = tags.map(tag => {
+        const selecionada = tagsSelecionadasKanban.has(Number(tag.id));
+        return `<span class="tag-selector-item ${selecionada ? 'selected' : ''}" style="background:${escaparHtmlKanban(tag.cor || '#2f8f4e')};color:${escaparHtmlKanban(tag.cor_texto || '#ffffff')};" onclick="alternarTagKanban(${Number(tag.id)})" title="Clique para ${selecionada ? 'remover' : 'adicionar'}">${tag.icone ? `<i class="${escaparHtmlKanban(tag.icone)}"></i>` : ''}${escaparHtmlKanban(tag.nome)}</span>`;
+    }).join('');
+}
+
+function alternarTagKanban(tagId) {
+    tagId = Number(tagId);
+    tagsSelecionadasKanban.has(tagId) ? tagsSelecionadasKanban.delete(tagId) : tagsSelecionadasKanban.add(tagId);
+    renderizarTagsKanban();
+}
+
+async function salvarTagsKanban() {
+    if (!cardTagsKanbanId) return;
+    try {
+        const resposta = await fetch(`/api/solicitacoes/${cardTagsKanbanId}/tags/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ tags_ids: [...tagsSelecionadasKanban] }),
+        });
+        const dados = await resposta.json().catch(() => ({}));
+        if (!resposta.ok || !dados.success) throw new Error(dados.error || 'Não foi possível salvar as tags.');
+        bootstrap.Modal.getInstance(document.getElementById('modalTagsKanban'))?.hide();
+        await recarregarKanban();
+    } catch (erro) { alert(`❌ ${erro.message}`); }
+}
+
+async function criarTagKanban() {
+    const nomeInput = document.getElementById('novaTagNomeKanban');
+    const iconeInput = document.getElementById('novaTagIconeKanban');
+    const corInput = document.getElementById('novaTagCorKanban');
+    const nome = nomeInput.value.trim();
+    const icone = iconeInput.value.trim();
+    const cor = corInput.value;
+    if (!nome) { alert('Digite o texto da tag.'); nomeInput.focus(); return; }
+    try {
+        const resposta = await fetch('/api/kanban/tags/criar/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ nome, icone, cor }),
+        });
+        const dados = await resposta.json().catch(() => ({}));
+        if (!resposta.ok || !dados.success) throw new Error(dados.error || 'Não foi possível criar a tag.');
+        if (!Array.isArray(kanbanData.tags_disponiveis)) kanbanData.tags_disponiveis = [];
+        const indice = kanbanData.tags_disponiveis.findIndex(tag => Number(tag.id) === Number(dados.tag.id));
+        if (indice >= 0) kanbanData.tags_disponiveis[indice] = dados.tag;
+        else kanbanData.tags_disponiveis.push(dados.tag);
+        tagsSelecionadasKanban.add(Number(dados.tag.id));
+        nomeInput.value = ''; iconeInput.value = ''; corInput.value = '#2f8f4e';
+        renderizarTagsKanban();
+    } catch (erro) { alert(`❌ ${erro.message}`); }
+}
+
+
+
+
+
+
+
+
+// ===== IMPRESSÃO CORRIGIDA (SEM ARMazém NO TOPO, MAIS LIMPA) =====
+function gerarImpressaoSolicitacao(id) {
+    const win = window.open('', '_blank', 'width=1350,height=900');
+    if (!win) {
+        alert('Permita pop-ups para abrir a impressão.');
+        return;
+    }
+
     win.document.write(`
-        <html><head><title>Carregando...</title></head>
-        <body style="text-align:center;padding-top:50px;font-family:sans-serif;">
-            <h3>⏳ Carregando relatório...</h3>
+        <!doctype html>
+        <html lang="pt-BR">
+        <head><meta charset="utf-8"><title>Carregando...</title></head>
+        <body style="font-family:Arial;text-align:center;padding:60px;color:#1f5d35;">
+            <div style="width:42px;height:42px;margin:0 auto 14px;border:5px solid #dcece2;border-top-color:#2f8f4e;border-radius:50%;animation:girar .8s linear infinite;"></div>
+            <h3 style="margin:0">Preparando relatório...</h3>
+            <style>@keyframes girar{to{transform:rotate(360deg)}}</style>
         </body></html>
     `);
-    fetch(`/api/solicitacoes/${id}/impressao/`)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.success) { win.document.body.innerHTML = '<h3 style="color:red;">Erro ao carregar dados</h3>'; return; }
-            const sol = data.solicitacao;
-            const pendentes = data.itens_pendentes || [];
-            const processados = data.itens_processados || [];
-            const todos = [...pendentes.map(i=>({...i,situacao:'PENDENTE'})), ...processados];
-            
-            // 🔁 Calcular totais em KG se a unidade for KG
-            const isKg = sol.unidade_controle === 'QUILOGRAMA';
-            let totalUnidades = 0, totalKg = 0;
-            todos.forEach(item => {
-                const qtd = item.quantidade || 0;
-                totalUnidades += qtd;
-                if (isKg && item.peso_unitario) {
-                    totalKg += qtd * parseFloat(item.peso_unitario);
-                }
-            });
-            // Para exibição, se for KG, usar totalKg; senão, totalUnidades
-            const totalExibicao = isKg ? totalKg.toFixed(2) : totalUnidades;
-            const unidadeExibicao = isKg ? 'KG' : (sol.unidade_controle || 'un');
 
-            // Valores do resumo em KG
-            const qtdSolicitada = sol.quantidade_solicitada || 0;
-            let qtdEmpenhada = sol.quantidade_empenhada || 0;
-            let qtdMovimentada = sol.quantidade_movimentada || 0;
-            if (isKg) {
-                // Converter empenhado e movimentado para KG a partir dos itens
-                let empKg = 0, movKg = 0;
-                // Itens pendentes contribuem para o empenhado
-                pendentes.forEach(i => {
-                    const q = i.quantidade || 0;
-                    const p = parseFloat(i.peso_unitario || 0);
-                    empKg += q * p;
-                });
-                // Itens processados (transferidos/expedidos) contribuem para o movimentado e também já foram empenhados
-                processados.forEach(i => {
-                    const q = i.quantidade || 0;
-                    const p = parseFloat(i.peso_unitario || 0);
-                    movKg += q * p;
-                    empKg += q * p; // processados já estavam empenhados
-                });
-                qtdEmpenhada = empKg.toFixed(2);
-                qtdMovimentada = movKg.toFixed(2);
-            }
-
-            win.document.title = `Card #${sol.id} - ${sol.titulo}`;
-            win.document.body.innerHTML = `
-                <style>
-                    *{margin:0;padding:0;box-sizing:border-box}
-                    body{font-family:'Segoe UI',Arial,sans-serif;padding:20px;color:#1a202c;font-size:10px}
-                    .header{text-align:center;border-bottom:3px solid #2f8f4e;padding-bottom:12px;margin-bottom:15px}
-                    .header h2{color:#2f8f4e;font-size:18px}
-                    .info-box{background:#f8f9fa;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:15px}
-                    .info-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #e2e8f0;font-size:10px}
-                    .info-row strong{color:#2f8f4e;min-width:130px}
-                    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:9px}
-                    thead th{background:#2f8f4e;color:white;padding:6px 4px;text-align:left;font-weight:600;text-transform:uppercase;font-size:8px}
-                    tbody td{padding:5px 4px;border-bottom:1px solid #e2e8f0}
-                    .badge{display:inline-block;padding:2px 6px;border-radius:10px;font-size:7px;font-weight:700}
-                    .badge-pendente{background:#fff3cd;color:#856404}
-                    .badge-transferido{background:#d4edda;color:#155724}
-                    .badge-expedido{background:#d1ecf1;color:#0c5460}
-                    @media print{button{display:none!important}@page{margin:8mm}}
-                </style>
-                <div class="header"><h2>🧾 RELATÓRIO DE SOLICITAÇÃO</h2><p>Emitido em: ${new Date().toLocaleString('pt-BR')}</p></div>
-                <div class="info-box">
-                    <div class="info-row"><strong>Card:</strong><span>#${sol.id} - ${sol.titulo}</span></div>
-                    <div class="info-row"><strong>Criador:</strong><span>${sol.criador||'---'}</span></div>
-                    <div class="info-row"><strong>Data:</strong><span>${sol.data_criacao||'---'}</span></div>
-                    <div class="info-row"><strong>Unidade:</strong><span>${sol.unidade_controle||'---'}</span></div>
-                    <div class="info-row"><strong>Solicitado:</strong><span style="font-size:13px;font-weight:700;">${qtdSolicitada} ${unidadeExibicao}</span></div>
-                    <div class="info-row"><strong>Empenhado:</strong><span style="color:#f59e0b;font-weight:700;">${qtdEmpenhada} ${unidadeExibicao}</span></div>
-                    <div class="info-row"><strong>Movimentado:</strong><span style="color:#3b82f6;font-weight:700;">${qtdMovimentada} ${unidadeExibicao}</span></div>
-                    <div class="info-row"><strong>Status:</strong><span>${sol.status||'---'}</span></div>
-                </div>
-                <h3 style="color:#2f8f4e;margin-bottom:8px;">📋 Itens (${todos.length}) - Total: ${totalExibicao} ${unidadeExibicao}</h3>
-                ${todos.length>0?`<table><thead><tr><th>#</th><th>Situação</th><th>Lote</th><th>Qtd</th>${isKg?'<th>Peso Un.</th><th>Peso Total</th>':''}<th>Produto</th><th>Cultivar</th><th>Endereço</th><th>Cliente</th></tr></thead><tbody>${todos.map((item,idx)=>{ const qtd=item.quantidade||0; const peso=item.peso_unitario||0; const pesoTotal=isKg?qtd*peso:0; return `<tr><td>${idx+1}</td><td><span class="badge badge-${(item.situacao||'pendente').toLowerCase()}">${item.situacao||'PENDENTE'}</span></td><td><strong>${item.lote||'-'}</strong></td><td style="text-align:center;font-weight:700;">${qtd}</td>${isKg?`<td>${peso}</td><td>${pesoTotal.toFixed(2)}</td>`:''}<td>${item.produto||'-'}</td><td>${item.cultivar||'-'}</td><td>${item.endereco||'-'}</td><td>${item.cliente||'-'}</td></tr>`}).join('')}</tbody></table>`:'<p style="text-align:center;color:#94a3b8;padding:20px;">Nenhum item registrado</p>'}
-                <div style="text-align:center;margin-top:15px;">
-                    <button onclick="window.print()" style="padding:10px 25px;background:#2f8f4e;color:white;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">🖨️ Imprimir</button>
-                </div>
-            `;
+    fetch(`/api/solicitacoes/${Number(id)}/impressao/`)
+        .then(async response => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao carregar.');
+            return data;
         })
-        .catch(e => { win.document.body.innerHTML = '<h3 style="color:red;">Erro ao carregar relatório</h3>'; });
-}
-// ============================================================
-// TOAST
-// ============================================================
-function mostrarToast(mensagem) {
-    const toast = document.createElement('div');
-    toast.className = 'alert alert-success position-fixed bottom-0 end-0 m-3';
-    toast.style.zIndex = '99999';
-    toast.style.animation = 'slideIn 0.3s ease';
-    toast.innerHTML = mensagem;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
-}
+        .then(data => {
+            const sol = data.solicitacao || {};
+            const itens = [
+                ...(data.itens_pendentes || []).map(item => ({ ...item, situacao: item.situacao || 'PENDENTE' })),
+                ...(data.itens_processados || [])
+            ];
 
-function getCookie(name) {
-    let v = null;
-    if (document.cookie && document.cookie !== '') {
-        document.cookie.split(';').forEach(c => {
-            const cookie = c.trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                v = decodeURIComponent(cookie.substring(name.length + 1));
-            }
+            const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c]);
+            const isKg = sol.unidade_controle === 'QUILOGRAMA';
+            const unidade = isKg ? 'KG' : 'EMBALAGEM';
+            const num = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: isKg ? 2 : 0, maximumFractionDigits: 2 });
+            const qtdEmp = sol.quantidade_empenhada_display ?? sol.quantidade_empenhada ?? 0;
+            const totalItens = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
+            const destino = sol.destino || '';
+            const observacao = sol.observacao || '';
+            const criteriosSecundarios = [
+                sol.criterios?.produto ? `Produto: ${sol.criterios.produto}` : '',
+                sol.criterios?.especie ? `Espécie: ${sol.criterios.especie}` : '',
+                sol.criterios?.cliente ? `Cliente: ${sol.criterios.cliente}` : ''
+            ].filter(Boolean);
+
+            const statusClasse = sol.status === 'CONCLUIDO' ? 'status-concluido' : sol.status === 'CANCELADO' ? 'status-cancelado' : 'status-andamento';
+
+            win.document.open();
+            win.document.write(`<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Solicitação #${esc(sol.id)}</title>
+<style>
+:root { --verde: #2f8f4e; --verde-escuro: #1d5d34; --verde-claro: #e9f7ee; --azul: #2677d9; --azul-claro: #edf5ff; --amarelo: #f2b52f; --amarelo-claro: #fff8e4; --texto: #1d3024; --muted: #6e7d73; --borda: #d3dfd6; --fundo: #edf3ef; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--fundo); color: var(--texto); font-family: Arial, Helvetica, sans-serif; }
+body { padding: 14px; }
+.folha { width: 297mm; min-height: 210mm; margin: 0 auto; padding: 8mm; background: #fff; box-shadow: 0 15px 50px rgba(0,0,0,.18); }
+.topo { display: grid; grid-template-columns: 1fr 165px; overflow: hidden; border: 1px solid #256f40; border-radius: 14px 14px 0 0; page-break-inside: avoid; }
+.topo-principal { position: relative; min-width: 0; padding: 13px 16px; color: #fff; background: linear-gradient(135deg, #174d2c 0%, #2f8f4e 62%, #59b875 100%); }
+.topo-principal::after { content: ""; position: absolute; width: 145px; height: 145px; right: -55px; top: -80px; border-radius: 50%; background: rgba(255,255,255,.09); }
+.topo-principal h1 { margin: 0; font-size: 21px; font-weight: 900; letter-spacing: .45px; }
+.topo-principal p { max-width: 95%; margin: 5px 0 0; overflow: hidden; color: rgba(255,255,255,.88); font-size: 9px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
+.numero-card { display: flex; flex-direction: column; justify-content: center; padding: 10px 13px; text-align: right; border-left: 1px solid #c8dfcf; background: linear-gradient(180deg, #f3fbf6, #e9f6ed); }
+.numero-card small { color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; }
+.numero-card strong { margin-top: 2px; color: var(--verde-escuro); font-size: 22px; font-weight: 900; white-space: nowrap; }
+.resumo { display: grid; grid-template-columns: minmax(190px,1.25fr) repeat(3, minmax(135px,.55fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
+.indicador { position: relative; min-height: 64px; padding: 10px 11px; overflow: hidden; border-right: 1px solid var(--borda); background: #fff; }
+.indicador:last-child { border-right: 0; }
+.indicador::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+.indicador b { display: block; margin-bottom: 6px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .35px; text-transform: uppercase; }
+.indicador strong { display: block; overflow: hidden; color: #213b2a; font-size: 15px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
+.indicador-status { background: linear-gradient(135deg, #f4faf6, #fff); }
+.indicador-status::before { background: var(--verde); }
+.indicador-solicitado { background: linear-gradient(135deg, var(--azul-claro), #fff); }
+.indicador-solicitado::before { background: var(--azul); }
+.indicador-empenhado { background: linear-gradient(135deg, var(--amarelo-claro), #fff); }
+.indicador-empenhado::before { background: var(--amarelo); }
+.indicador-movimentado { background: linear-gradient(135deg, var(--verde-claro), #fff); }
+.indicador-movimentado::before { background: var(--verde); }
+.info-grid { display: grid; grid-template-columns: minmax(170px,1.1fr) repeat(3, minmax(145px,.62fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
+.info { min-height: 49px; padding: 8px 10px; overflow: hidden; border-right: 1px solid var(--borda); }
+.info:last-child { border-right: 0; }
+.info b { display: block; margin-bottom: 5px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .35px; text-transform: uppercase; }
+.info span { display: block; overflow: hidden; font-size: 10px; font-weight: 750; white-space: nowrap; text-overflow: ellipsis; }
+.linha-destino-obs { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
+.box-destino { position: relative; min-height: 53px; padding: 9px 11px 9px 16px; background: linear-gradient(135deg, #eaf8ef, #fff); border-right: 1px solid var(--borda); }
+.box-destino::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--verde); }
+.box-destino b, .box-obs b { display: block; margin-bottom: 5px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .35px; text-transform: uppercase; }
+.box-destino span, .box-obs span { display: block; font-size: 10px; font-weight: 800; line-height: 1.28; overflow-wrap: anywhere; }
+.box-obs { position: relative; min-height: 53px; padding: 9px 11px 9px 16px; background: linear-gradient(135deg, var(--amarelo-claro), #fff); }
+.box-obs::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--amarelo); }
+.criterios { padding: 7px 10px; border: 1px solid var(--borda); border-top: 0; color: #526159; background: #f8faf9; font-size: 9px; line-height: 1.3; page-break-inside: avoid; }
+.criterios b { color: var(--verde-escuro); }
+.titulo-itens { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 12px 0 6px; color: var(--verde-escuro); font-size: 10px; font-weight: 900; text-transform: uppercase; page-break-after: avoid; }
+.tabela-container { overflow: hidden; border: 1px solid var(--borda); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.7px; }
+thead { display: table-header-group; }
+tfoot { display: table-footer-group; }
+th { padding: 6px 4px; color: #fff; background: linear-gradient(135deg, #205f37, #2f8f4e); border-right: 1px solid #75a986; font-size: 7.3px; font-weight: 900; text-align: left; text-transform: uppercase; white-space: nowrap; }
+td { padding: 5px 4px; border-right: 1px solid #d6dfd8; border-bottom: 1px solid #d6dfd8; vertical-align: middle; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+th:last-child, td:last-child { border-right: 0; }
+tbody tr:nth-child(even) { background: #f6faf7; }
+tr { page-break-inside: avoid; }
+.col-num { width: 27px; text-align: center; } .col-status { width: 78px; } .col-lote { width: 105px; } .col-qtd { width: 52px; text-align: center; }
+.col-produto { width: 138px; } .col-cultivar { width: 113px; } .col-peneira { width: 55px; text-align: center; } .col-armazem { width: 86px; }
+.col-endereco { width: 112px; } .col-cliente { width: 116px; }
+.badge-situacao { display: inline-block; max-width: 100%; padding: 3px 6px; overflow: hidden; border-radius: 999px; font-size: 6.8px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
+.badge-pendente { color: #795900; background: #ffefad; }
+.badge-transferido { color: #176039; background: #d8f1e1; }
+.badge-expedido { color: #16536f; background: #d9edf8; }
+.total td { color: #203a29; background: #e7f3eb; font-weight: 900; }
+.status-concluido { color: #176039; } .status-cancelado { color: #a12731; } .status-andamento { color: #285b39; }
+.rodape { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--borda); color: var(--muted); font-size: 8px; white-space: nowrap; page-break-inside: avoid; }
+.acoes { margin-top: 15px; text-align: center; }
+.acoes button { margin: 3px; padding: 10px 19px; border: 0; border-radius: 9px; cursor: pointer; font-weight: 850; }
+.botao-imprimir { color: #fff; background: linear-gradient(135deg, #2f8f4e, #1d5d34); }
+.botao-fechar { color: #26372d; background: #e3ebe5; }
+@media print {
+  @page { size: A4 landscape; margin: 5mm; }
+  html, body { width: 297mm; background: #fff; }
+  body { padding: 0; }
+  .folha { width: 287mm; min-height: 0; margin: 0; padding: 0; box-shadow: none; }
+  .acoes { display: none !important; }
+  .topo, .resumo, .info-grid, .linha-destino-obs, .criterios, .rodape { break-inside: avoid !important; }
+  thead { display: table-header-group; }
+  tr, td, th { break-inside: avoid !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+</style>
+</head>
+<body>
+<main class="folha">
+  <header class="topo">
+    <div class="topo-principal">
+      <h1>RELATÓRIO DE SOLICITAÇÃO</h1>
+      <p>${esc(sol.titulo || 'Solicitação')}</p>
+    </div>
+    <div class="numero-card">
+      <small>Solicitação</small>
+      <strong>#${esc(sol.id)}</strong>
+    </div>
+  </header>
+
+  <section class="resumo">
+    <div class="indicador indicador-status"><b>Status</b><strong class="${statusClasse}">${esc(sol.status_display || sol.status || '-')}</strong></div>
+    <div class="indicador indicador-solicitado"><b>Quantidade solicitada</b><strong>${num(sol.quantidade_solicitada)} ${unidade}</strong></div>
+    <div class="indicador indicador-empenhado"><b>Quantidade empenhada</b><strong>${num(qtdEmp)} ${unidade}</strong></div>
+    <div class="indicador indicador-movimentado"><b>Quantidade movimentada</b><strong>${num(sol.quantidade_movimentada)} ${unidade}</strong></div>
+  </section>
+
+  <section class="info-grid">
+    <div class="info"><b>Criado por</b><span>${esc(sol.criador || '-')}</span></div>
+    <div class="info"><b>Criação</b><span>${esc(sol.data_criacao || '-')}</span></div>
+    <div class="info"><b>Atualização</b><span>${esc(sol.data_atualizacao || '-')}</span></div>
+    <div class="info"><b>Finalização</b><span>${esc(sol.data_finalizacao || '-')}</span></div>
+  </section>
+
+  <!-- LINHA UNICA: DESTINO E OBSERVACAO LADO A LADO -->
+  <section class="linha-destino-obs">
+    <div class="box-destino">
+      <b>Destino</b>
+      <span>${esc(destino || 'Não informado')}</span>
+    </div>
+    <div class="box-obs">
+      <b>Observação</b>
+      <span>${esc(observacao || 'Nenhuma observação.')}</span>
+    </div>
+  </section>
+
+  ${criteriosSecundarios.length ? `<section class="criterios"><b>Critérios:</b> ${esc(criteriosSecundarios.join(' · '))}</section>` : ''}
+
+  <div class="titulo-itens">
+    <span>Itens da solicitação</span>
+    <span>${itens.length} registro(s) · Total ${num(totalItens)} ${unidade}</span>
+  </div>
+
+  <div class="tabela-container">
+    ${itens.length ? `<table>
+      <thead><tr><th class="col-num">#</th><th class="col-status">Situação</th><th class="col-lote">Lote</th><th class="col-qtd">Qtd.</th><th class="col-produto">Produto</th><th class="col-cultivar">Cultivar</th><th class="col-peneira">Peneira</th><th class="col-armazem">Armazém</th><th class="col-endereco">Endereço</th><th class="col-cliente">Cliente</th></tr></thead>
+      <tbody>${itens.map((item, idx) => {
+        const situacao = String(item.situacao || 'PENDENTE').toUpperCase();
+        const classe = situacao.includes('TRANSF') ? 'badge-transferido' : situacao.includes('EXPED') ? 'badge-expedido' : 'badge-pendente';
+        const armazemItem = item.armazem || '';
+        const endereco = item.endereco_destino || item.endereco || '';
+        return `<tr>
+          <td class="col-num">${idx+1}</td>
+          <td class="col-status"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td>
+          <td class="col-lote"><strong>${esc(item.lote || '-')}</strong></td>
+          <td class="col-qtd">${num(item.quantidade)}</td>
+          <td class="col-produto">${esc(item.produto || '-')}</td>
+          <td class="col-cultivar">${esc(item.cultivar || '-')}</td>
+          <td class="col-peneira">${esc(item.peneira || '-')}</td>
+          <td class="col-armazem">${esc(armazemItem || '-')}</td>
+          <td class="col-endereco">${esc(endereco || '-')}</td>
+          <td class="col-cliente">${esc(item.cliente || '-')}</td>
+        </tr>`;
+      }).join('')}</tbody>
+      <tfoot><tr class="total"><td colspan="3" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td colspan="6"></td></tr></tfoot>
+    </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>'}
+  </div>
+
+  <footer class="rodape">
+    <span>INFINITY STOCK · Sistema de Controle de Estoque</span>
+    <span>Documento gerado em ${esc(data.emitido_em || '-')}</span>
+  </footer>
+
+  <div class="acoes">
+    <button type="button" class="botao-imprimir" onclick="window.print()">Imprimir</button>
+    <button type="button" class="botao-fechar" onclick="window.close()">Fechar</button>
+  </div>
+</main>
+</body></html>`);
+            win.document.close();
+        })
+        .catch(erro => {
+            win.document.body.innerHTML = `<div style="max-width:650px;margin:60px auto;padding:25px;border:1px solid #efc4c8;border-radius:14px;background:#fff4f5;color:#a32e39;font-family:Arial;text-align:center;"><h3>Não foi possível gerar o relatório</h3><p>${String(erro.message || erro)}</p></div>`;
         });
-    }
-    return v;
 }
-
-
-// ==================== POLLING DE ATUALIZAÇÃO AO VIVO (KANBAN) ====================
-let _ultimaVersaoKanban = null;
-let _pollingIntervalKanban = null;
-
-function iniciarPollingKanban() {
-    if (_pollingIntervalKanban) clearInterval(_pollingIntervalKanban);
-    _pollingIntervalKanban = setInterval(verificarAtualizacoesKanban, 5000); // 5 segundos
-    console.log('✅ Polling do Kanban iniciado');
-}
-
-async function verificarAtualizacoesKanban() {
-    try {
-        const resp = await fetch('/api/cards/versao/');
-        const data = await resp.json();
-        if (!data.success) return;
-
-        if (_ultimaVersaoKanban === null) {
-            _ultimaVersaoKanban = data.version;
-            return;
-        }
-
-        if (data.version !== _ultimaVersaoKanban) {
-            console.log('🔄 Alteração detectada no Kanban!');
-            _ultimaVersaoKanban = data.version;
-            carregarKanban();
-
-            // Tocar som (agora usando Web Audio API, funciona sem interação prévia)
-            tocarBeep();
-        }
-    } catch (e) {
-        console.error('Erro no polling do Kanban:', e);
-    }
-}
-
-function tocarBeep() {
-    try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const now = ctx.currentTime;
-
-        [800, 1000].forEach((freq, i) => {
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = freq;
-            gain.gain.value = 0.3;
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now + i * 0.15);
-            osc.stop(now + i * 0.15 + 0.15);
-        });
-    } catch(e) {
-        console.log('Erro ao gerar som:', e);
-    }
-}
-// Iniciar automaticamente após 5 segundos
-setTimeout(iniciarPollingKanban, 5000);
+function imprimirCardKanban(id) { gerarImpressaoSolicitacao(id); }
 </script>
 {% endblock %}
