@@ -8065,47 +8065,234 @@ def pagina_solicitacoes(request):
 # ============================================================================
 @login_required
 def api_listar_solicitacoes(request):
-    solicitacoes = Solicitacao.objects.select_related(
-        'criador', 'armazem', 'especie', 'coluna_kanban'
-    ).order_by('-data_criacao')
-    
+
+    solicitacoes = (
+        Solicitacao.objects
+        .select_related(
+            'criador',
+            'armazem',
+            'especie',
+            'coluna_kanban',
+        )
+        .prefetch_related(
+            'empenhos__itens',
+            'empenhos__historico_itens',
+        )
+        .order_by('-data_criacao')
+    )
+
     data = []
+
     for sol in solicitacoes:
+
+        # =====================================================
+        # QUANTIDADE EMPENHADA
+        # =====================================================
+
         if sol.unidade_controle == 'QUILOGRAMA':
-            qtd_emp = sol.quantidade_empenhada_kg or Decimal('0')
+            qtd_emp = (
+                sol.quantidade_empenhada_kg
+                or Decimal('0')
+            )
         else:
-            qtd_emp = Decimal(str(sol.quantidade_empenhada))
+            qtd_emp = Decimal(
+                str(sol.quantidade_empenhada)
+            )
 
         if sol.quantidade_solicitada > 0:
-            percentual = (qtd_emp / sol.quantidade_solicitada) * 100
+            percentual = (
+                qtd_emp
+                / sol.quantidade_solicitada
+            ) * 100
         else:
             percentual = 0
-        
+
+
+        # =====================================================
+        # LOTES RELACIONADOS AO CARD
+        # =====================================================
+
+        lotes = set()
+        embalagens = set()
+        # Itens que ainda estão empenhados
+        for empenho in sol.empenhos.all():
+
+            for item in empenho.itens.all():
+
+                lote = str(
+                    item.lote or ''
+                ).strip()
+
+                if lote:
+                    lotes.add(lote)
+
+                embalagem = str(
+                    getattr(
+                        item,
+                        'embalagem_snapshot',
+                        ''
+                    )
+                    or ''
+                ).strip().upper()
+
+                if embalagem:
+                    embalagens.add(embalagem)
+
+
+            # Itens que já foram transferidos ou expedidos
+            for historico in empenho.historico_itens.all():
+
+                lote = str(
+                    historico.lote or ''
+                ).strip()
+
+                if lote:
+                    lotes.add(lote)
+
+                embalagem = str(
+                    historico.embalagem
+                    or ''
+                ).strip().upper()
+
+                if embalagem:
+                    embalagens.add(embalagem)
+
+
+        # Histórico do próprio card.
+        # Também ajuda com cards antigos.
+        lotes_historico_card = (
+            HistoricoCard.objects
+            .filter(
+                solicitacao_id=sol.id
+            )
+            .exclude(
+                lote__isnull=True
+            )
+            .exclude(
+                lote=''
+            )
+            .values_list(
+                'lote',
+                flat=True
+            )
+        )
+
+        for lote in lotes_historico_card:
+
+            lote = str(
+                lote or ''
+            ).strip()
+
+            if lote:
+                lotes.add(lote)
+
+
+        # =====================================================
+        # JSON
+        # =====================================================
+
         data.append({
+
             'id': sol.id,
+
             'titulo': sol.titulo,
-            'criador_nome': sol.criador.get_full_name() or sol.criador.username,
-            'data_criacao': sol.data_criacao.strftime('%d/%m/%Y %H:%M'),
+
+            'criador_nome': (
+                sol.criador.get_full_name()
+                or sol.criador.username
+            ),
+
+            'data_criacao': (
+                sol.data_criacao.strftime(
+                    '%d/%m/%Y %H:%M'
+                )
+            ),
+
             'status': sol.status,
-            'unidade_controle': sol.unidade_controle,
-            'quantidade_solicitada': float(sol.quantidade_solicitada),
-            'quantidade_empenhada': float(sol.quantidade_empenhada),      # valor bruto (unidades)
-            'quantidade_empenhada_display': float(qtd_emp),               # valor na unidade correta
-            'quantidade_movimentada': float(sol.quantidade_movimentada),
-            'percentual_empenhado': float(percentual),
-            'percentual_movimentado': float(sol.percentual_movimentado),
-            'coluna_kanban': sol.coluna_kanban.nome if sol.coluna_kanban else 'Sem coluna',
-            'coluna_kanban_id': sol.coluna_kanban.id if sol.coluna_kanban else None,
+
+            'unidade_controle': (
+                sol.unidade_controle
+            ),
+
+            'quantidade_solicitada': float(
+                sol.quantidade_solicitada
+            ),
+
+            # Valor bruto em unidades
+            'quantidade_empenhada': float(
+                sol.quantidade_empenhada
+            ),
+
+            # Valor convertido conforme unidade
+            'quantidade_empenhada_display': float(
+                qtd_emp
+            ),
+
+            'quantidade_movimentada': float(
+                sol.quantidade_movimentada
+            ),
+
+            'percentual_empenhado': float(
+                percentual
+            ),
+
+            'percentual_movimentado': float(
+                sol.percentual_movimentado
+            ),
+
+            'coluna_kanban': (
+                sol.coluna_kanban.nome
+                if sol.coluna_kanban
+                else 'Sem coluna'
+            ),
+
+            'coluna_kanban_id': (
+                sol.coluna_kanban.id
+                if sol.coluna_kanban
+                else None
+            ),
+
             'prioridade': sol.prioridade,
+
+
+            # =============================================
+            # NOVO
+            # =============================================
+
+            'lotes': sorted(lotes),
+            'embalagens': sorted(embalagens),
+
             'criterios': {
-                'armazem': sol.armazem.nome if sol.armazem else '',
-                'produto': sol.produto or '',
-                'especie': sol.especie.nome if sol.especie else '',
-                'cliente': sol.cliente or '',
+
+                'armazem': (
+                    sol.armazem.nome
+                    if sol.armazem
+                    else ''
+                ),
+
+                'produto': (
+                    sol.produto
+                    or ''
+                ),
+
+                'especie': (
+                    sol.especie.nome
+                    if sol.especie
+                    else ''
+                ),
+
+                'cliente': (
+                    sol.cliente
+                    or ''
+                ),
             }
+
         })
-    
-    return JsonResponse({'success': True, 'solicitacoes': data})
+
+    return JsonResponse({
+        'success': True,
+        'solicitacoes': data,
+    })
 
     
 
@@ -8591,6 +8778,7 @@ def api_lotes_disponiveis_para_solicitacao(
             ),
 
             'status': solicitacao.status,
+            'destino': solicitacao.destino or '',
             'observacao': solicitacao.observacao or '',
 
             'empenho_bloqueado': empenho_bloqueado,
@@ -8605,7 +8793,6 @@ def api_lotes_disponiveis_para_solicitacao(
         # Somente itens do empenho salvo deste card.
         'itens_empenhados': itens_empenhados,
     })
-
 # ============================================================================
 # EMPENHAR NA SOLICITAÇÃO
 # ============================================================================
@@ -9757,6 +9944,42 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         'para transferência.'
                     )
 
+                # ============================================================
+                # VALIDAR ENDEREÇO NO BACKEND
+                #
+                # Não confiar apenas no JavaScript.
+                # Transferência só pode ir para um endereço cadastrado.
+                # O AZ também é obtido do cadastro e não do valor enviado
+                # pelo navegador.
+                # ============================================================
+                endereco_destino = (
+                    Endereco.objects
+                    .select_related('armazem')
+                    .filter(
+                        codigo__iexact=novo_endereco
+                    )
+                    .first()
+                )
+
+                if not endereco_destino:
+                    raise ValueError(
+                        f'O endereço "{novo_endereco}" não está '
+                        'cadastrado no sistema. '
+                        'Cadastre o endereço antes de transferir.'
+                    )
+
+                novo_endereco = (
+                    endereco_destino.codigo
+                    .strip()
+                    .upper()
+                )
+
+                novo_az = (
+                    endereco_destino.armazem.nome
+                    if endereco_destino.armazem
+                    else ''
+                )
+
             else:
                 numero_carga = str(
                     data.get('numero_carga') or ''
@@ -9775,6 +9998,11 @@ def api_movimentar_solicitacao(request, solicitacao_id):
 
             # ================================================================
             # PROCESSAR ITENS
+            #
+            # IMPORTANTE:
+            # - origem (Estoque) é usada para movimentar o saldo físico atual.
+            # - item (ItemEmpenho) é usado para auditoria/impressão, pois guarda
+            #   o retrato do lote no momento em que foi empenhado.
             # ================================================================
             for item in itens:
 
@@ -9978,49 +10206,124 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         estoque_origem=origem,
                         estoque_destino=destino,
 
-                        lote=origem.lote,
-                        produto=origem.produto or '',
+                        # SNAPSHOT DO MOMENTO DO EMPENHO.
+                        lote=(
+                            item.lote
+                            or origem.lote
+                            or ''
+                        ),
+
+                        produto=(
+                            item.produto_snapshot
+                            or origem.produto
+                            or ''
+                        ),
 
                         cultivar=(
-                            origem.cultivar.nome
-                            if origem.cultivar
-                            else ''
+                            item.cultivar
+                            or (
+                                origem.cultivar.nome
+                                if origem.cultivar
+                                else ''
+                            )
                         ),
 
                         peneira=(
-                            origem.peneira.nome
-                            if origem.peneira
-                            else ''
+                            item.peneira
+                            or (
+                                origem.peneira.nome
+                                if origem.peneira
+                                else ''
+                            )
                         ),
 
                         categoria=(
-                            origem.categoria.nome
-                            if origem.categoria
-                            else ''
+                            item.categoria
+                            or (
+                                origem.categoria.nome
+                                if origem.categoria
+                                else ''
+                            )
                         ),
 
                         tratamento=(
-                            origem.tratamento.nome
-                            if origem.tratamento
-                            else ''
+                            item.tratamento_snapshot
+                            or (
+                                origem.tratamento.nome
+                                if origem.tratamento
+                                else ''
+                            )
                         ),
 
                         especie=(
-                            origem.especie.nome
-                            if origem.especie
-                            else ''
+                            item.especie_snapshot
+                            or (
+                                origem.especie.nome
+                                if origem.especie
+                                else ''
+                            )
                         ),
 
-                        embalagem=origem.embalagem or '',
-                        empresa=origem.empresa or '',
-                        cliente=origem.cliente or '',
+                        embalagem=(
+                            item.embalagem_snapshot
+                            or origem.embalagem
+                            or ''
+                        ),
 
-                        endereco_origem=endereco_origem,
+                        empresa=(
+                            item.empresa_snapshot
+                            or origem.empresa
+                            or ''
+                        ),
+
+                        cliente=(
+                            item.cliente_snapshot
+                            or origem.cliente
+                            or ''
+                        ),
+
+                        endereco_origem=(
+                            item.endereco_origem
+                            or origem.endereco
+                            or ''
+                        ),
+
+                        az_origem=(
+                            item.az_origem
+                            or origem.az
+                            or ''
+                        ),
+
+                        saldo_anterior=(
+                            item.saldo_anterior
+                            or 0
+                        ),
+
+                        peso_unitario=(
+                            item.peso_unitario_snapshot
+                            or origem.peso_unitario
+                            or 0
+                        ),
+
+                        observacao_origem=(
+                            item.observacao_snapshot
+                            or ''
+                        ),
+
+                        conferente=(
+                            item.conferente_snapshot
+                            or ''
+                        ),
+
+                        # Dado da movimentação posterior.
                         endereco_destino=novo_endereco,
 
                         quantidade=quantidade,
                         tipo='transferencia',
+
+                        # Observação digitada na transferência.
                         observacao=observacao,
+
                         processado_por=request.user,
                     )
 
@@ -10031,6 +10334,11 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         f'{novo_endereco} '
                         f'(AZ {az_destino or "-"}).'
                     )
+
+                    if observacao:
+                        descricao_feed += (
+                            f' Observação: {observacao}'
+                        )
 
                 # ============================================================
                 # EXPEDIÇÃO
@@ -10101,52 +10409,124 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         item_empenho_id_original=item.id,
                         estoque_origem=origem,
 
-                        lote=origem.lote,
-                        produto=origem.produto or '',
+                        # SNAPSHOT DO MOMENTO DO EMPENHO.
+                        lote=(
+                            item.lote
+                            or origem.lote
+                            or ''
+                        ),
+
+                        produto=(
+                            item.produto_snapshot
+                            or origem.produto
+                            or ''
+                        ),
 
                         cultivar=(
-                            origem.cultivar.nome
-                            if origem.cultivar
-                            else ''
+                            item.cultivar
+                            or (
+                                origem.cultivar.nome
+                                if origem.cultivar
+                                else ''
+                            )
                         ),
 
                         peneira=(
-                            origem.peneira.nome
-                            if origem.peneira
-                            else ''
+                            item.peneira
+                            or (
+                                origem.peneira.nome
+                                if origem.peneira
+                                else ''
+                            )
                         ),
 
                         categoria=(
-                            origem.categoria.nome
-                            if origem.categoria
-                            else ''
+                            item.categoria
+                            or (
+                                origem.categoria.nome
+                                if origem.categoria
+                                else ''
+                            )
                         ),
 
                         tratamento=(
-                            origem.tratamento.nome
-                            if origem.tratamento
-                            else ''
+                            item.tratamento_snapshot
+                            or (
+                                origem.tratamento.nome
+                                if origem.tratamento
+                                else ''
+                            )
                         ),
 
                         especie=(
-                            origem.especie.nome
-                            if origem.especie
-                            else ''
+                            item.especie_snapshot
+                            or (
+                                origem.especie.nome
+                                if origem.especie
+                                else ''
+                            )
                         ),
 
-                        embalagem=origem.embalagem or '',
-                        empresa=origem.empresa or '',
+                        embalagem=(
+                            item.embalagem_snapshot
+                            or origem.embalagem
+                            or ''
+                        ),
 
+                        empresa=(
+                            item.empresa_snapshot
+                            or origem.empresa
+                            or ''
+                        ),
+
+                        # Cliente abaixo é o cliente original do empenho.
+                        # O cliente informado na expedição continua no
+                        # HistoricoMovimentacao/feed.
                         cliente=(
-                            cliente_expedicao
+                            item.cliente_snapshot
                             or origem.cliente
                             or ''
                         ),
 
-                        endereco_origem=endereco_origem,
+                        endereco_origem=(
+                            item.endereco_origem
+                            or origem.endereco
+                            or ''
+                        ),
+
+                        az_origem=(
+                            item.az_origem
+                            or origem.az
+                            or ''
+                        ),
+
+                        saldo_anterior=(
+                            item.saldo_anterior
+                            or 0
+                        ),
+
+                        peso_unitario=(
+                            item.peso_unitario_snapshot
+                            or origem.peso_unitario
+                            or 0
+                        ),
+
+                        observacao_origem=(
+                            item.observacao_snapshot
+                            or ''
+                        ),
+
+                        conferente=(
+                            item.conferente_snapshot
+                            or ''
+                        ),
+
                         quantidade=quantidade,
                         tipo='expedicao',
+
+                        # Observação da operação.
                         observacao=observacao,
+
                         numero_carga=numero_carga or '',
                         placa=placa or '',
                         processado_por=request.user,
@@ -10157,6 +10537,26 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         f'de {endereco_origem or "-"} '
                         f'(AZ {az_origem or "-"}).'
                     )
+
+                    if numero_carga:
+                        descricao_feed += (
+                            f' Carga: {numero_carga}.'
+                        )
+
+                    if cliente_expedicao:
+                        descricao_feed += (
+                            f' Cliente: {cliente_expedicao}.'
+                        )
+
+                    if placa:
+                        descricao_feed += (
+                            f' Placa: {placa}.'
+                        )
+
+                    if observacao:
+                        descricao_feed += (
+                            f' Observação: {observacao}'
+                        )
 
                 # ============================================================
                 # SOMAR MOVIMENTAÇÃO
@@ -10474,6 +10874,623 @@ def api_movimentar_solicitacao(request, solicitacao_id):
             status=500
         )
 
+
+@login_required
+def api_dados_impressao_solicitacao(
+    request,
+    solicitacao_id
+):
+    """
+    Dados para:
+    - impressão da Solicitação;
+    - modal de Transferência/Expedição.
+
+    REGRA DE AUDITORIA:
+    os dados exibidos representam o estado do lote no momento
+    do EMPENHO.
+
+    Nunca usamos o endereço de destino da transferência como
+    endereço original do item.
+    """
+
+    solicitacao = get_object_or_404(
+        Solicitacao.objects.select_related(
+            'criador',
+            'armazem',
+            'especie',
+        ),
+        id=solicitacao_id
+    )
+
+    empenho = (
+        Empenho.objects
+        .filter(
+            solicitacao_id=solicitacao.id
+        )
+        .order_by('-data_criacao')
+        .first()
+    )
+
+    itens_pendentes = []
+    itens_processados = []
+
+    def nome_usuario(usuario):
+        if not usuario:
+            return ''
+
+        return (
+            usuario.get_full_name()
+            or usuario.username
+            or ''
+        )
+
+    if empenho:
+        # ----------------------------------------------------
+        # PENDENTES
+        #
+        # A FK estoque continua disponível para operação
+        # física, mas a exibição usa prioritariamente snapshot.
+        # ----------------------------------------------------
+        itens = (
+            empenho.itens
+            .select_related(
+                'estoque',
+                'estoque__cultivar',
+                'estoque__peneira',
+                'estoque__categoria',
+                'estoque__especie',
+                'estoque__tratamento',
+                'estoque__conferente',
+            )
+            .order_by('id')
+        )
+
+        for item in itens:
+            estoque = item.estoque
+
+            peso_unitario = Decimal(
+                str(
+                    item.peso_unitario_snapshot
+                    or 0
+                )
+            )
+
+            if (
+                peso_unitario <= 0
+                and estoque
+            ):
+                peso_unitario = Decimal(
+                    str(
+                        estoque.peso_unitario
+                        or 0
+                    )
+                )
+
+            saldo_no_empenho = Decimal(
+                str(
+                    item.saldo_anterior
+                    or 0
+                )
+            )
+
+            endereco_empenho = (
+                item.endereco_origem
+                or (
+                    estoque.endereco
+                    if estoque
+                    else ''
+                )
+            )
+
+            armazem_empenho = (
+                item.az_origem
+                or (
+                    estoque.az
+                    if estoque
+                    else ''
+                )
+            )
+
+            produto_empenho = (
+                item.produto_snapshot
+                or (
+                    estoque.produto
+                    if estoque
+                    else ''
+                )
+            )
+
+            especie_empenho = (
+                item.especie_snapshot
+                or (
+                    estoque.especie.nome
+                    if (
+                        estoque
+                        and estoque.especie
+                    )
+                    else ''
+                )
+            )
+
+            tratamento_empenho = (
+                item.tratamento_snapshot
+                or (
+                    estoque.tratamento.nome
+                    if (
+                        estoque
+                        and estoque.tratamento
+                    )
+                    else ''
+                )
+            )
+
+            embalagem_empenho = (
+                item.embalagem_snapshot
+                or (
+                    estoque.embalagem
+                    if estoque
+                    else ''
+                )
+            )
+
+            empresa_empenho = (
+                item.empresa_snapshot
+                or (
+                    estoque.empresa
+                    if estoque
+                    else ''
+                )
+            )
+
+            cliente_empenho = (
+                item.cliente_snapshot
+                or (
+                    estoque.cliente
+                    if estoque
+                    else ''
+                )
+            )
+
+            observacao_empenho = (
+                item.observacao_snapshot
+                or item.observacao
+                or ''
+            )
+
+            conferente_empenho = (
+                item.conferente_snapshot
+                or (
+                    nome_usuario(
+                        estoque.conferente
+                    )
+                    if estoque
+                    else ''
+                )
+            )
+
+            quantidade = Decimal(
+                str(
+                    item.quantidade
+                    or 0
+                )
+            )
+
+            itens_pendentes.append({
+                'item_id': item.id,
+
+                'lote': (
+                    item.lote
+                    or (
+                        estoque.lote
+                        if estoque
+                        else ''
+                    )
+                ),
+
+                'quantidade': float(
+                    quantidade
+                ),
+
+                # "saldo_atual" é mantido por compatibilidade
+                # com o JS antigo, mas agora significa
+                # SALDO NO MOMENTO DO EMPENHO.
+                'saldo_atual': float(
+                    saldo_no_empenho
+                ),
+
+                'saldo_empenho': float(
+                    saldo_no_empenho
+                ),
+
+                'endereco': endereco_empenho,
+
+                # Dois nomes para compatibilidade.
+                'az': armazem_empenho,
+                'armazem': armazem_empenho,
+
+                'produto': produto_empenho,
+
+                'cultivar': (
+                    item.cultivar
+                    or (
+                        estoque.cultivar.nome
+                        if (
+                            estoque
+                            and estoque.cultivar
+                        )
+                        else ''
+                    )
+                ),
+
+                'peneira': (
+                    item.peneira
+                    or (
+                        estoque.peneira.nome
+                        if (
+                            estoque
+                            and estoque.peneira
+                        )
+                        else ''
+                    )
+                ),
+
+                'categoria': (
+                    item.categoria
+                    or (
+                        estoque.categoria.nome
+                        if (
+                            estoque
+                            and estoque.categoria
+                        )
+                        else ''
+                    )
+                ),
+
+                'especie': especie_empenho,
+                'tratamento': tratamento_empenho,
+                'embalagem': embalagem_empenho,
+                'empresa': empresa_empenho,
+                'cliente': cliente_empenho,
+
+                'peso_unitario': str(
+                    peso_unitario
+                ),
+
+                'peso_total': str(
+                    quantidade
+                    * peso_unitario
+                ),
+
+                'observacao': (
+                    observacao_empenho
+                ),
+
+                'conferente': (
+                    conferente_empenho
+                ),
+
+                'situacao': 'pendente',
+
+                'data_empenho': (
+                    item.data_criacao.strftime(
+                        '%d/%m/%Y %H:%M'
+                    )
+                    if item.data_criacao
+                    else ''
+                ),
+            })
+
+        # ----------------------------------------------------
+        # PROCESSADOS
+        #
+        # Estes registros já são históricos. Não usamos
+        # estoque_destino para substituir o endereço original.
+        # ----------------------------------------------------
+        historicos = (
+            empenho.historico_itens
+            .select_related(
+                'estoque_origem',
+                'estoque_origem__conferente',
+            )
+            .order_by(
+                'processado_em',
+                'id',
+            )
+        )
+
+        for historico in historicos:
+            origem_legada = (
+                historico.estoque_origem
+            )
+
+            peso_unitario = Decimal(
+                str(
+                    historico.peso_unitario
+                    or 0
+                )
+            )
+
+            if (
+                peso_unitario <= 0
+                and origem_legada
+            ):
+                peso_unitario = Decimal(
+                    str(
+                        origem_legada.peso_unitario
+                        or 0
+                    )
+                )
+
+            saldo_no_empenho = Decimal(
+                str(
+                    historico.saldo_anterior
+                    or 0
+                )
+            )
+
+            armazem_empenho = (
+                historico.az_origem
+                or (
+                    origem_legada.az
+                    if origem_legada
+                    else ''
+                )
+            )
+
+            observacao_origem = (
+                historico.observacao_origem
+                or ''
+            )
+
+            quantidade = Decimal(
+                str(
+                    historico.quantidade
+                    or 0
+                )
+            )
+
+            itens_processados.append({
+                'item_id': historico.id,
+
+                'lote': (
+                    historico.lote
+                    or ''
+                ),
+
+                'quantidade': float(
+                    quantidade
+                ),
+
+                'saldo_atual': float(
+                    saldo_no_empenho
+                ),
+
+                'saldo_empenho': float(
+                    saldo_no_empenho
+                ),
+
+                # ORIGEM DO EMPENHO.
+                'endereco': (
+                    historico.endereco_origem
+                    or ''
+                ),
+
+                'az': armazem_empenho,
+                'armazem': armazem_empenho,
+
+                'produto': (
+                    historico.produto
+                    or ''
+                ),
+
+                'cultivar': (
+                    historico.cultivar
+                    or ''
+                ),
+
+                'peneira': (
+                    historico.peneira
+                    or ''
+                ),
+
+                'categoria': (
+                    historico.categoria
+                    or ''
+                ),
+
+                'especie': (
+                    historico.especie
+                    or ''
+                ),
+
+                'tratamento': (
+                    historico.tratamento
+                    or ''
+                ),
+
+                'embalagem': (
+                    historico.embalagem
+                    or ''
+                ),
+
+                'empresa': (
+                    historico.empresa
+                    or ''
+                ),
+
+                'cliente': (
+                    historico.cliente
+                    or ''
+                ),
+
+                'peso_unitario': str(
+                    peso_unitario
+                ),
+
+                'peso_total': str(
+                    quantidade
+                    * peso_unitario
+                ),
+
+                # Observação original do lote no empenho.
+                'observacao': (
+                    observacao_origem
+                ),
+
+                # Observação digitada na operação.
+                'observacao_movimentacao': (
+                    historico.observacao
+                    or ''
+                ),
+
+                'conferente': (
+                    historico.conferente
+                    or ''
+                ),
+
+                'tipo': (
+                    historico.get_tipo_display()
+                ),
+
+                'processado_em': (
+                    historico.processado_em.strftime(
+                        '%d/%m/%Y %H:%M'
+                    )
+                    if historico.processado_em
+                    else ''
+                ),
+
+                'situacao': (
+                    'transferido'
+                    if (
+                        historico.tipo
+                        == 'transferencia'
+                    )
+                    else 'expedido'
+                ),
+
+                # Destino continua disponível separadamente
+                # para auditoria, mas NÃO substitui endereço.
+                'endereco_destino': (
+                    historico.endereco_destino
+                    if (
+                        historico.tipo
+                        == 'transferencia'
+                    )
+                    else ''
+                ),
+            })
+
+    return JsonResponse({
+        'success': True,
+
+        'empenho_id': (
+            empenho.id
+            if empenho
+            else None
+        ),
+
+        'solicitacao': {
+            'id': solicitacao.id,
+            'titulo': solicitacao.titulo,
+
+            'criador': (
+                solicitacao.criador.get_full_name()
+                or solicitacao.criador.username
+            ),
+
+            'data_criacao': (
+                solicitacao.data_criacao.strftime(
+                    '%d/%m/%Y %H:%M'
+                )
+            ),
+
+            'data_atualizacao': (
+                solicitacao.data_atualizacao.strftime(
+                    '%d/%m/%Y %H:%M'
+                )
+                if solicitacao.data_atualizacao
+                else ''
+            ),
+
+            'data_finalizacao': (
+                solicitacao.data_finalizacao.strftime(
+                    '%d/%m/%Y %H:%M'
+                )
+                if getattr(
+                    solicitacao,
+                    'data_finalizacao',
+                    None
+                )
+                else ''
+            ),
+
+            'quantidade_solicitada': float(
+                solicitacao.quantidade_solicitada
+            ),
+
+            'quantidade_empenhada': float(
+                solicitacao.quantidade_empenhada
+            ),
+
+            'quantidade_movimentada': float(
+                solicitacao.quantidade_movimentada
+            ),
+
+            'unidade_controle': (
+                solicitacao.unidade_controle
+            ),
+
+            'status': solicitacao.status,
+
+            'destino': (
+                getattr(
+                    solicitacao,
+                    'destino',
+                    ''
+                )
+                or ''
+            ),
+
+            'observacao': (
+                solicitacao.observacao
+                or ''
+            ),
+
+            'criterios': {
+                'armazem': (
+                    solicitacao.armazem.nome
+                    if solicitacao.armazem
+                    else ''
+                ),
+
+                'produto': (
+                    solicitacao.produto
+                    or ''
+                ),
+
+                'especie': (
+                    solicitacao.especie.nome
+                    if solicitacao.especie
+                    else ''
+                ),
+
+                'cliente': (
+                    solicitacao.cliente
+                    or ''
+                ),
+            },
+        },
+
+        'itens_pendentes': (
+            itens_pendentes
+        ),
+
+        'itens_processados': (
+            itens_processados
+        ),
+    })
+
 # ============================================================================
 # ============================================================================
 
@@ -10567,6 +11584,32 @@ def _serializar_card(solicitacao):
         else Decimal('0')
     )
 
+    embalagens = set()
+
+    for empenho in solicitacao.empenhos.all():
+
+        for item in empenho.itens.all():
+            embalagem = str(
+                getattr(
+                    item,
+                    'embalagem_snapshot',
+                    ''
+                )
+                or ''
+            ).strip().upper()
+
+            if embalagem:
+                embalagens.add(embalagem)
+
+        for historico in empenho.historico_itens.all():
+            embalagem = str(
+                historico.embalagem
+                or ''
+            ).strip().upper()
+
+            if embalagem:
+                embalagens.add(embalagem)
+                
     return {
         'id': solicitacao.id,
         'titulo': solicitacao.titulo,
@@ -10622,6 +11665,12 @@ def _serializar_card(solicitacao):
             'destino': solicitacao.destino or '',
         },
         'lotes': _lotes_da_solicitacao(solicitacao),
+
+
+        'embalagens': sorted(
+            embalagens
+        ),
+
         'tags': [
             _serializar_tag(tag)
             for tag in solicitacao.tags_kanban.all()

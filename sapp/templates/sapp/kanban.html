@@ -743,12 +743,64 @@ function renderizarKanban(colunas) {
 }
 
 function criarCardHTML(card) {
-    const prioridadeClass = `prioridade-${card.prioridade}`;
-    const unidade = card.unidade_controle || 'UN';
-    const qtdEmp = card.quantidade_empenhada_display ?? card.quantidade_empenhada ?? 0;
-    const percentual = card.percentual_empenhado ?? 
-        (card.quantidade_solicitada > 0 ? (card.quantidade_empenhada / card.quantidade_solicitada) * 100 : 0);
-    const qtdFormatada = unidade === 'QUILOGRAMA' ? Number(qtdEmp).toFixed(2) : Math.round(qtdEmp);
+    const prioridadeClass =
+        `prioridade-${card.prioridade}`;
+
+    const qtdEmp =
+        card.quantidade_empenhada_display
+        ?? card.quantidade_empenhada
+        ?? 0;
+
+    const embalagens = [
+        ...new Set(
+            (card.embalagens || [])
+                .map(v =>
+                    String(v || '')
+                        .trim()
+                        .toUpperCase()
+                )
+                .filter(Boolean)
+        )
+    ];
+
+    embalagens.sort((a, b) => {
+        const ordem = {
+            BAG: 1,
+            SC: 2
+        };
+
+        return (
+            (ordem[a] ?? 99)
+            - (ordem[b] ?? 99)
+        );
+    });
+
+    const unidade = (
+        card.unidade_controle === 'QUILOGRAMA'
+            ? 'KG'
+            : (
+                embalagens.length
+                    ? embalagens.join('/')
+                    : 'BAGS/SC'
+            )
+    );
+
+    const qtdFormatada = (
+        card.unidade_controle === 'QUILOGRAMA'
+            ? Number(qtdEmp).toFixed(2)
+            : Math.round(qtdEmp)
+    );
+
+    const percentual =
+        card.percentual_empenhado ??
+        (
+            card.quantidade_solicitada > 0
+                ? (
+                    card.quantidade_empenhada
+                    / card.quantidade_solicitada
+                ) * 100
+                : 0
+        );
     
     const statusColors = {
         'AGUARDANDO_EMPENHO': '#fff3cd',
@@ -781,7 +833,7 @@ function criarCardHTML(card) {
                      style="width: ${percentual}%"></div>
             </div>
             <div class="card-details-grid">
-                <span><i class="fas fa-box me-1"></i>${qtdFormatada}/${card.quantidade_solicitada} ${unidade === 'QUILOGRAMA' ? 'KG' : unidade}</span>
+                <span><i class="fas fa-box me-1"></i>${qtdFormatada}/${card.quantidade_solicitada} ${unidade}</span>
                 <span><i class="fas fa-user me-1"></i>${card.criador_nome || '-'}</span>
                 <span><i class="far fa-clock me-1"></i>${card.data_criacao || '-'}</span>
                 ${card.data_finalizacao ? `<span><i class="fas fa-check-circle me-1 text-success"></i>${card.data_finalizacao}</span>` : ''}
@@ -1240,8 +1292,98 @@ function gerarImpressaoSolicitacao(id) {
 
             const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c]);
             const isKg = sol.unidade_controle === 'QUILOGRAMA';
-            const unidade = isKg ? 'KG' : 'EMBALAGEM';
-            const num = v => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: isKg ? 2 : 0, maximumFractionDigits: 2 });
+
+            /*
+             * Unidade exibida no relatório:
+             *
+             * - somente BAG  -> BAG
+             * - somente SC   -> SC
+             * - BAG + SC     -> BAG/SC
+             *
+             * A informação vem dos próprios itens selecionados,
+             * preservando a embalagem registrada no empenho.
+             */
+            const normalizarEmbalagem = valor => {
+                const texto = String(
+                    valor ?? ''
+                )
+                    .trim()
+                    .toUpperCase();
+
+                if (
+                    texto === 'BAG'
+                    || texto === 'BAGS'
+                    || texto === 'BIG BAG'
+                    || texto === 'BIGBAG'
+                ) {
+                    return 'BAG';
+                }
+
+                if (
+                    texto === 'SC'
+                    || texto === 'SACO'
+                    || texto === 'SACOS'
+                ) {
+                    return 'SC';
+                }
+
+                return texto;
+            };
+
+            const embalagensEncontradas = [
+                ...new Set(
+                    itens
+                        .map(item => (
+                            normalizarEmbalagem(
+                                item.embalagem
+                            )
+                        ))
+                        .filter(Boolean)
+                )
+            ];
+
+            /*
+             * Garante sempre BAG antes de SC:
+             * BAG/SC
+             * e não SC/BAG dependendo da ordem dos itens.
+             */
+            embalagensEncontradas.sort(
+                (a, b) => {
+                    const ordem = {
+                        'BAG': 1,
+                        'SC': 2
+                    };
+
+                    return (
+                        (ordem[a] ?? 99)
+                        - (ordem[b] ?? 99)
+                    );
+                }
+            );
+
+            const unidadeEmbalagem = (
+                embalagensEncontradas.length
+                    ? embalagensEncontradas.join('/')
+                    : 'BAGS/SC'
+            );
+
+            const unidade = (
+                isKg
+                    ? 'KG'
+                    : unidadeEmbalagem
+            );
+
+            const num = v => Number(v || 0).toLocaleString(
+                'pt-BR',
+                {
+                    minimumFractionDigits: (
+                        isKg
+                            ? 2
+                            : 0
+                    ),
+                    maximumFractionDigits: 2
+                }
+            );
             const qtdEmp = sol.quantidade_empenhada_display ?? sol.quantidade_empenhada ?? 0;
             const totalItens = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
             const destino = sol.destino || '';
@@ -1428,6 +1570,8 @@ tr { page-break-inside: avoid; }
             win.document.body.innerHTML = `<div style="max-width:650px;margin:60px auto;padding:25px;border:1px solid #efc4c8;border-radius:14px;background:#fff4f5;color:#a32e39;font-family:Arial;text-align:center;"><h3>Não foi possível gerar o relatório</h3><p>${String(erro.message || erro)}</p></div>`;
         });
 }
-function imprimirCardKanban(id) { gerarImpressaoSolicitacao(id); }
+function imprimirCardKanban(id) {
+    gerarImpressaoSolicitacao(id);
+}
 </script>
 {% endblock %}

@@ -5,6 +5,9 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from decimal import Decimal, InvalidOperation
 import json  # <-- ADICIONE ESTA LINHA
+from django.db import models
+from django.conf import settings
+from django.contrib.auth.models import User
 
 # ============================================================================
 # TABELAS AUXILIARES (Cadastros Básicos)
@@ -477,121 +480,403 @@ class Empenho(models.Model):
             item.quantidade
             for item in self.itens.all()
         )
-
 class ItemEmpenho(models.Model):
-    empenho = models.ForeignKey(Empenho, on_delete=models.CASCADE, related_name='itens')
-    estoque = models.ForeignKey(Estoque, on_delete=models.CASCADE, related_name='empenhos')
-    quantidade = models.IntegerField(default=0)
-    endereco_origem = models.CharField(max_length=20)
-    endereco_destino = models.CharField(max_length=20, blank=True, null=True)
-    observacao = models.CharField(max_length=255, blank=True, null=True)
-    lote = models.CharField(max_length=50)
-    cultivar = models.CharField(max_length=100)
-    peneira = models.CharField(max_length=50)
-    categoria = models.CharField(max_length=50)
-    saldo_anterior = models.IntegerField(default=0)
-    data_criacao = models.DateTimeField(auto_now_add=True)
-    
-    class Meta: 
+    """
+    Item reservado para um Empenho.
+
+    Além da FK para Estoque, guarda um SNAPSHOT dos dados do lote
+    no momento em que ele foi empenhado.
+
+    Regra:
+    alterações futuras no Estoque NÃO podem alterar o que aparece
+    no card, na transferência ou na impressão do empenho antigo.
+    """
+
+    empenho = models.ForeignKey(
+        Empenho,
+        on_delete=models.CASCADE,
+        related_name='itens',
+    )
+
+    estoque = models.ForeignKey(
+        Estoque,
+        on_delete=models.CASCADE,
+        related_name='empenhos',
+    )
+
+    quantidade = models.IntegerField(
+        default=0,
+    )
+
+    # ---------------------------------------------------------
+    # SNAPSHOT ORIGINAL JÁ EXISTENTE
+    # ---------------------------------------------------------
+    endereco_origem = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    endereco_destino = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+    )
+
+    observacao = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+    )
+
+    lote = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    cultivar = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    peneira = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    categoria = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    saldo_anterior = models.IntegerField(
+        default=0,
+    )
+
+    # ---------------------------------------------------------
+    # SNAPSHOT COMPLETO DO MOMENTO DO EMPENHO
+    # ---------------------------------------------------------
+    produto_snapshot = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    especie_snapshot = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    tratamento_snapshot = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    embalagem_snapshot = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    empresa_snapshot = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    cliente_snapshot = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    az_origem = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='Armazém/AZ no momento do empenho',
+    )
+
+    peso_unitario_snapshot = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=0,
+    )
+
+    observacao_snapshot = models.TextField(
+        blank=True,
+        default='',
+    )
+
+    conferente_snapshot = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    data_criacao = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    class Meta:
         ordering = ['-data_criacao']
         unique_together = ['empenho', 'estoque']
 
-    def __str__(self): return f"{self.lote} - {self.quantidade} unidades"
-    
-    # ← SUBSTITUIR ESTE MÉTODO
+    def __str__(self):
+        return (
+            f'{self.lote} - '
+            f'{self.quantidade} unidades'
+        )
+
+    def _preencher_snapshot_inicial(self):
+        """
+        Copia os dados do Estoque SOMENTE quando o ItemEmpenho
+        está sendo criado.
+
+        Depois disso, esses campos são históricos e não devem
+        acompanhar mudanças no cadastro/estoque atual.
+        """
+        if not self.estoque_id:
+            return
+
+        estoque = self.estoque
+
+        self.lote = (
+            self.lote
+            or estoque.lote
+            or ''
+        )
+
+        self.endereco_origem = (
+            self.endereco_origem
+            or estoque.endereco
+            or ''
+        )
+
+        self.cultivar = (
+            self.cultivar
+            or (
+                estoque.cultivar.nome
+                if estoque.cultivar
+                else ''
+            )
+        )
+
+        self.peneira = (
+            self.peneira
+            or (
+                estoque.peneira.nome
+                if estoque.peneira
+                else ''
+            )
+        )
+
+        self.categoria = (
+            self.categoria
+            or (
+                estoque.categoria.nome
+                if estoque.categoria
+                else ''
+            )
+        )
+
+        self.saldo_anterior = (
+            self.saldo_anterior
+            or estoque.saldo
+            or 0
+        )
+
+        self.produto_snapshot = (
+            estoque.produto
+            or ''
+        )
+
+        self.especie_snapshot = (
+            estoque.especie.nome
+            if estoque.especie
+            else ''
+        )
+
+        self.tratamento_snapshot = (
+            estoque.tratamento.nome
+            if estoque.tratamento
+            else ''
+        )
+
+        self.embalagem_snapshot = (
+            estoque.embalagem
+            or ''
+        )
+
+        self.empresa_snapshot = (
+            estoque.empresa
+            or ''
+        )
+
+        self.cliente_snapshot = (
+            estoque.cliente
+            or ''
+        )
+
+        self.az_origem = (
+            estoque.az
+            or ''
+        )
+
+        self.peso_unitario_snapshot = (
+            estoque.peso_unitario
+            or 0
+        )
+
+        self.observacao_snapshot = (
+            estoque.observacao
+            or ''
+        )
+
+        self.conferente_snapshot = (
+            (
+                estoque.conferente.get_full_name()
+                or estoque.conferente.username
+            )
+            if estoque.conferente
+            else ''
+        )
+
     def save(self, *args, **kwargs):
         from django.db import transaction
-        
+
         is_new = self.pk is None
         old_quantidade = 0
-        
+
         if not is_new:
             try:
-                old = ItemEmpenho.objects.get(pk=self.pk)
-                old_quantidade = old.quantidade
+                old = ItemEmpenho.objects.get(
+                    pk=self.pk
+                )
+                old_quantidade = (
+                    old.quantidade
+                    or 0
+                )
             except ItemEmpenho.DoesNotExist:
                 pass
-        
-        # Preencher dados do estoque se necessário
-        if self.estoque:
-            if not self.lote:
-                self.lote = self.estoque.lote
-            if not self.cultivar:
-                self.cultivar = self.estoque.cultivar.nome if self.estoque.cultivar else ''
-            if not self.peneira:
-                self.peneira = self.estoque.peneira.nome if self.estoque.peneira else ''
-            if not self.categoria:
-                self.categoria = self.estoque.categoria.nome if self.estoque.categoria else ''
-            if not self.saldo_anterior:
-                self.saldo_anterior = self.estoque.saldo
-            if not self.endereco_origem:
-                self.endereco_origem = self.estoque.endereco
-        
+
+        if is_new:
+            self._preencher_snapshot_inicial()
+
         with transaction.atomic():
-            # Bloquear o estoque para evitar concorrência
-            if self.estoque:
-                estoque = Estoque.objects.select_for_update().get(pk=self.estoque.pk)
-                
-                # Calcular quanto vai mudar no empenhado
-                delta = self.quantidade - old_quantidade
-                
-                # Validar se não ultrapassa o saldo físico
-                novo_empenhado = estoque.empenhado + delta
+            if self.estoque_id:
+                estoque = (
+                    Estoque.objects
+                    .select_for_update()
+                    .get(pk=self.estoque_id)
+                )
+
+                delta = (
+                    self.quantidade
+                    - old_quantidade
+                )
+
+                novo_empenhado = (
+                    estoque.empenhado
+                    + delta
+                )
+
                 if novo_empenhado > estoque.saldo:
                     raise ValueError(
-                        f"Saldo insuficiente para o lote {estoque.lote}. "
-                        f"Disponível: {estoque.saldo - estoque.empenhado}, "
-                        f"Tentando empenhar: {self.quantidade}"
+                        f'Saldo insuficiente para o lote '
+                        f'{estoque.lote}. '
+                        f'Disponível: '
+                        f'{estoque.saldo - estoque.empenhado}, '
+                        f'Tentando empenhar: '
+                        f'{self.quantidade}'
                     )
-                
-                # Atualizar empenhado no estoque
-                estoque.empenhado = novo_empenhado
-                estoque.save(update_fields=['empenhado'])
-            
-            super().save(*args, **kwargs)
-    
-    # ← ADICIONAR ESTE MÉTODO
+
+                if novo_empenhado < 0:
+                    novo_empenhado = 0
+
+                estoque.empenhado = (
+                    novo_empenhado
+                )
+
+                estoque.save(
+                    update_fields=[
+                        'empenhado',
+                    ]
+                )
+
+            super().save(
+                *args,
+                **kwargs
+            )
+
     def delete(self, *args, **kwargs):
-        """Libera a reserva ao excluir um item empenhado"""
+        """
+        Libera a reserva ao excluir um item empenhado.
+        """
         from django.db import transaction
-        
+
         with transaction.atomic():
-            if self.estoque:
-                estoque = Estoque.objects.select_for_update().get(pk=self.estoque.pk)
-                estoque.empenhado = max(0, estoque.empenhado - self.quantidade)
-                estoque.save(update_fields=['empenhado'])
-            
-            super().delete(*args, **kwargs)
-    
+            if self.estoque_id:
+                estoque = (
+                    Estoque.objects
+                    .select_for_update()
+                    .get(pk=self.estoque_id)
+                )
+
+                estoque.empenhado = max(
+                    0,
+                    estoque.empenhado
+                    - self.quantidade
+                )
+
+                estoque.save(
+                    update_fields=[
+                        'empenhado',
+                    ]
+                )
+
+            super().delete(
+                *args,
+                **kwargs
+            )
+
     @property
-    def saldo_disponivel(self): return self.estoque.saldo - self.quantidade
+    def saldo_disponivel(self):
+        return (
+            self.estoque.saldo
+            - self.quantidade
+        )
 
-    ##===========================================================================
-# PRODUTO
-# ============================================================================
 
-# sapp/models.py - Classe Produto CORRIGIDA
-
-# No início de models.py
-from django.conf import settings
-from django.db import models
 
 
 class HistoricoItemEmpenho(models.Model):
     """
-    Preserva os dados dos itens de um card que já foram
-    transferidos ou expedidos.
+    Histórico imutável do item que foi transferido ou expedido.
 
-    Esses registros não entram no cálculo de quantidade empenhada.
-    Eles são utilizados para auditoria, consulta e impressão.
+    Os campos abaixo representam o estado do item no momento do
+    EMPENHO, e não o estoque atual e nem o endereço de destino
+    após uma transferência.
     """
 
     TIPO_TRANSFERENCIA = 'transferencia'
     TIPO_EXPEDICAO = 'expedicao'
 
     TIPO_CHOICES = [
-        (TIPO_TRANSFERENCIA, 'Transferência'),
-        (TIPO_EXPEDICAO, 'Expedição'),
+        (
+            TIPO_TRANSFERENCIA,
+            'Transferência',
+        ),
+        (
+            TIPO_EXPEDICAO,
+            'Expedição',
+        ),
     ]
 
     empenho = models.ForeignKey(
@@ -601,11 +886,16 @@ class HistoricoItemEmpenho(models.Model):
         verbose_name='Card de empenho',
     )
 
-    item_empenho_id_original = models.PositiveBigIntegerField(
-        null=True,
-        blank=True,
-        db_index=True,
-        help_text='ID do ItemEmpenho removido após o processamento.',
+    item_empenho_id_original = (
+        models.PositiveBigIntegerField(
+            null=True,
+            blank=True,
+            db_index=True,
+            help_text=(
+                'ID do ItemEmpenho removido '
+                'após o processamento.'
+            ),
+        )
     )
 
     estoque_origem = models.ForeignKey(
@@ -622,8 +912,7 @@ class HistoricoItemEmpenho(models.Model):
         related_name='historicos_itens_destino',
     )
 
-    # Cópia dos dados no momento do processamento.
-    # Isso evita que alterações futuras no estoque modifiquem a impressão antiga.
+    # Snapshot do momento do EMPENHO.
     lote = models.CharField(
         max_length=100,
         db_index=True,
@@ -689,6 +978,36 @@ class HistoricoItemEmpenho(models.Model):
         default='',
     )
 
+    az_origem = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    saldo_anterior = models.DecimalField(
+        max_digits=14,
+        decimal_places=3,
+        default=0,
+    )
+
+    peso_unitario = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        default=0,
+    )
+
+    observacao_origem = models.TextField(
+        blank=True,
+        default='',
+    )
+
+    conferente = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    # Destino é informação da movimentação posterior.
     endereco_destino = models.CharField(
         max_length=100,
         blank=True,
@@ -703,6 +1022,7 @@ class HistoricoItemEmpenho(models.Model):
         db_index=True,
     )
 
+    # Observação digitada ao transferir/expedir.
     observacao = models.TextField(
         blank=True,
         default='',
@@ -723,7 +1043,9 @@ class HistoricoItemEmpenho(models.Model):
     processado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
-        related_name='historicos_itens_empenhados_processados',
+        related_name=(
+            'historicos_itens_empenhados_processados'
+        ),
     )
 
     processado_em = models.DateTimeField(
@@ -732,48 +1054,74 @@ class HistoricoItemEmpenho(models.Model):
     )
 
     class Meta:
-        verbose_name = 'Histórico de item empenhado'
-        verbose_name_plural = 'Históricos de itens empenhados'
-        ordering = ['-processado_em', '-id']
+        verbose_name = (
+            'Histórico de item empenhado'
+        )
+        verbose_name_plural = (
+            'Históricos de itens empenhados'
+        )
+        ordering = [
+            '-processado_em',
+            '-id',
+        ]
 
         indexes = [
             models.Index(
-                fields=['empenho', '-processado_em'],
+                fields=[
+                    'empenho',
+                    '-processado_em',
+                ],
                 name='hist_emp_data_idx',
             ),
             models.Index(
-                fields=['estoque_origem', '-processado_em'],
+                fields=[
+                    'estoque_origem',
+                    '-processado_em',
+                ],
                 name='hist_origem_data_idx',
             ),
         ]
 
         constraints = [
             models.CheckConstraint(
-                condition=models.Q(quantidade__gt=0),
-                name='hist_item_quantidade_maior_zero',
+                condition=models.Q(
+                    quantidade__gt=0
+                ),
+                name=(
+                    'hist_item_quantidade_maior_zero'
+                ),
             ),
         ]
 
     def __str__(self):
         data = (
-            self.processado_em.strftime('%d/%m/%Y %H:%M')
+            self.processado_em.strftime(
+                '%d/%m/%Y %H:%M'
+            )
             if self.processado_em
             else 'não processado'
         )
 
         return (
-            f'{self.lote} - {self.quantidade} un - '
-            f'{self.get_tipo_display()} em {data}'
+            f'{self.lote} - '
+            f'{self.quantidade} un - '
+            f'{self.get_tipo_display()} '
+            f'em {data}'
         )
 
     @property
     def foi_transferido(self):
-        return self.tipo == self.TIPO_TRANSFERENCIA
+        return (
+            self.tipo
+            == self.TIPO_TRANSFERENCIA
+        )
 
     @property
     def foi_expedido(self):
-        return self.tipo == self.TIPO_EXPEDICAO
-
+        return (
+            self.tipo
+            == self.TIPO_EXPEDICAO
+        )
 
 class Produto(models.Model):
     cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT, verbose_name="Cultivar")
