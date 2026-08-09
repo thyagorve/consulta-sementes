@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include, re_path
 from django.views.static import serve
+from django.views.generic import TemplateView
 
 app_name = 'sapp'
 
@@ -174,6 +175,15 @@ urlpatterns = [
         name='api_dados_impressao_solicitacao',
     ),
     path('api/solicitacoes/<int:solicitacao_id>/mover-kanban/', views.mover_card_kanban, name='mover_card_kanban'),
+
+    path(
+        'service-worker.js',
+        TemplateView.as_view(
+            template_name='service-worker.js',
+            content_type='application/javascript',
+        ),
+        name='service_worker',
+    ),
 ]
 
 # ============================================================================
