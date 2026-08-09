@@ -5212,307 +5212,301 @@ def api_editar_status(request, status_id):
     return JsonResponse({'success': False, 'error': 'Método não permitido'})
 
 
+######################################################################################################################################
+######################################################################################################################################
+######################################################################################################################################
+################# dashboard ##########################################################################################################
 
-################# dashboard ###########################################
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import JsonResponse
-from django.db.models import Sum, Count, Q, Avg
-from django.utils import timezone
-from datetime import timedelta
-import json
-from .models import (
-    Estoque, Cultivar, Peneira, Categoria, Especie, Tratamento, Produto,
-    DashboardConfig, HistoricoMovimentacao, ArmazemLayout
-)
+from datetime import datetime, timedelta
+
 from django.contrib import messages
+from django.contrib.auth.decorators import (
+    login_required,
+    permission_required,
+    user_passes_test,
+)
+from django.db.models import (
+    Count,
+    Q,
+    Sum,
+)
+from django.db.models.functions import TruncDate
+from django.http import JsonResponse
+from django.shortcuts import redirect, render
+from django.utils import timezone
+
+from .models import (
+    DashboardConfig,
+    Estoque,
+    HistoricoMovimentacao,
+)
+
+
+# ================================================================
+# PERMISSÕES
+# ================================================================
 
 def is_admin(user):
-    return user.is_superuser or user.groups.filter(name='Administradores').exists()
+    """
+    Considera administrador:
+    - superusuário;
+    - usuário pertencente ao grupo Administradores.
+    """
+    return (
+        user.is_superuser
+        or user.groups.filter(
+            name='Administradores'
+        ).exists()
+    )
+
+
+# ================================================================
+# PÁGINA PRINCIPAL DO DASHBOARD
+# ================================================================
 
 @login_required
 def dashboard(request):
-    """Dashboard principal com gráficos dinâmicos"""
-    
-    if not request.user.is_superuser and not request.user.has_perm('sapp.pode_ver_dashboard') and not request.user.has_perm('sapp.pode_ver_estoque'):
-        # Redireciona para a primeira página que o usuário tem permissão
-        return redirect('sapp:redirecionar')
-    
-    # ==================== CONFIGURAÇÃO DO DASHBOARD ====================
-    try:
-        config = DashboardConfig.objects.get(criado_por=request.user)
-    except DashboardConfig.DoesNotExist:
-        config = DashboardConfig.objects.create(criado_por=request.user)
-    
-    # ==================== QUERYSET BASE COM FILTROS ====================
-    queryset = Estoque.objects.all()
-    
-    # APLICAR FILTRO PL (peneira é null ou nome='sp')
-    tipo_filtro = request.GET.get('tipo', 'todos')
-    if tipo_filtro == 'pl':
-        # PL = Sem peneira (peneira_id is null) OU peneira.nome = 'sp'
-        queryset = queryset.filter(
-            Q(peneira__isnull=True) | 
-            Q(peneira__nome__iexact='sp')
-        )
-    elif tipo_filtro == 'nao_pl':
-        # Não PL = Tem peneira e não é 'sp'
-        queryset = queryset.filter(
-            peneira__isnull=False
-        ).exclude(peneira__nome__iexact='sp')
-    
-    # Outros filtros
-    if request.GET.get('cultivar'):
-        queryset = queryset.filter(cultivar_id=request.GET.get('cultivar'))
-    if request.GET.get('peneira') and request.GET.get('peneira') != 'sp':
-        queryset = queryset.filter(peneira_id=request.GET.get('peneira'))
-    if request.GET.get('armazem'):
-        queryset = queryset.filter(az=request.GET.get('armazem'))
-    if request.GET.get('especie'):
-        queryset = queryset.filter(especie_id=request.GET.get('especie'))
-    
-    # ==================== DADOS PARA O TEMPLATE ====================
-    
-    # KPIs principais
-    total_sc = queryset.aggregate(total=Sum('saldo'))['total'] or 0
-    total_bag = queryset.filter(embalagem='BAG').aggregate(total=Sum('saldo'))['total'] or 0
-    peso_total = queryset.aggregate(total=Sum('peso_total'))['total'] or 0
-    
-    # Totais PL e Não PL
-    total_pl_geral = Estoque.objects.filter(
-        Q(peneira__isnull=True) | Q(peneira__nome__iexact='sp')
-    ).count()
-    total_nao_pl_geral = Estoque.objects.filter(
-        peneira__isnull=False
-    ).exclude(peneira__nome__iexact='sp').count()
-    
-    # Lotes ativos e esgotados
-    itens_ativos = queryset.filter(saldo__gt=0).count()
-    itens_esgotados = queryset.filter(saldo=0).count()
-    
-    # Movimentação do mês
-    inicio_mes = timezone.now().replace(day=1, hour=0, minute=0, second=0)
-    movimentacao_mes = HistoricoMovimentacao.objects.filter(data_hora__gte=inicio_mes).count()
-    
-    # TOP CULTIVARES
-    top_cultivares = list(queryset.filter(
-        saldo__gt=0, cultivar__isnull=False
-    ).values('cultivar__nome').annotate(
-        total_saldo=Sum('saldo')
-    ).order_by('-total_saldo')[:10])
-    
-    # Dados para gráfico de ESPÉCIE
-    dados_especie = list(queryset.filter(
-        especie__isnull=False, saldo__gt=0
-    ).values('especie__nome').annotate(
-        total=Sum('saldo')
-    ).order_by('-total')[:10])
-    
-    # Dados para gráfico de PENEIRA
-    categorias_distribuicao = list(queryset.filter(
-        saldo__gt=0, peneira__isnull=False
-    ).exclude(peneira__nome__iexact='sp').values('peneira__nome').annotate(
-        total=Sum('saldo')
-    ).order_by('-total'))
-    
-    # ==================== GRÁFICO DE ARMAZÉM COM FILTROS ====================
-    # Aplicar filtros ao queryset de armazém
-    armazem_queryset = queryset.filter(az__isnull=False).exclude(az='')
-    
-    # Aplicar filtro por espécie no armazém
-    if request.GET.get('armazem_especie'):
-        armazem_queryset = armazem_queryset.filter(especie_id=request.GET.get('armazem_especie'))
-    
-    # Aplicar filtro por peneira no armazém
-    if request.GET.get('armazem_peneira'):
-        if request.GET.get('armazem_peneira') == 'pl':
-            armazem_queryset = armazem_queryset.filter(
-                Q(peneira__isnull=True) | Q(peneira__nome__iexact='sp')
-            )
-        elif request.GET.get('armazem_peneira') == 'nao_pl':
-            armazem_queryset = armazem_queryset.filter(
-                peneira__isnull=False
-            ).exclude(peneira__nome__iexact='sp')
-        else:
-            armazem_queryset = armazem_queryset.filter(peneira_id=request.GET.get('armazem_peneira'))
-    
-    # Dados para gráfico de ARMAZÉM
-    capacidade_armazem = list(armazem_queryset.values('az').annotate(
-        total_sc=Sum('saldo'),
-        total_lotes=Count('id'),
-        peso_total=Sum('peso_total')
-    ).order_by('az'))
-    
-    # ==================== GRÁFICO DE TENDÊNCIA CORRIGIDO ====================
-    # Período baseado na configuração ou parâmetro da URL
-    dias_tendencia = int(request.GET.get('tendencia_dias', 7))
-    data_limite = timezone.now() - timedelta(days=dias_tendencia)
-    
-    from django.db.models.functions import TruncDate
-    
-    # Base queryset para tendência
-    tendencia_queryset = HistoricoMovimentacao.objects.filter(
-        data_hora__gte=data_limite
-    )
-    
-    # Aplicar filtros à tendência
-    if request.GET.get('tendencia_tipo'):
-        if request.GET.get('tendencia_tipo') == 'pl':
-            tendencia_queryset = tendencia_queryset.filter(
-                Q(estoque__peneira__isnull=True) | 
-                Q(estoque__peneira__nome__iexact='sp')
-            )
-        elif request.GET.get('tendencia_tipo') == 'nao_pl':
-            tendencia_queryset = tendencia_queryset.filter(
-                estoque__peneira__isnull=False
-            ).exclude(estoque__peneira__nome__iexact='sp')
-    
-    if request.GET.get('tendencia_especie'):
-        tendencia_queryset = tendencia_queryset.filter(
-            estoque__especie_id=request.GET.get('tendencia_especie')
-        )
-    
-    # Entradas por dia
-    entradas = tendencia_queryset.filter(
-        tipo__icontains='Entrada'
-    ).annotate(
-        dia=TruncDate('data_hora')
-    ).values('dia').annotate(
-        total=Count('id')
-    ).order_by('dia')
-    
-    # Saídas por dia
-    saidas = tendencia_queryset.filter(
-        Q(tipo__icontains='Saída') | Q(tipo__icontains='Expedição')
-    ).annotate(
-        dia=TruncDate('data_hora')
-    ).values('dia').annotate(
-        total=Count('id')
-    ).order_by('dia')
-    
-    # Criar dicionários para fácil acesso
-    entradas_dict = {item['dia']: item['total'] for item in entradas}
-    saidas_dict = {item['dia']: item['total'] for item in saidas}
-    
-    # Gerar lista de dias do período
-    dias = []
-    for i in range(dias_tendencia):
-        dia = (timezone.now() - timedelta(days=i)).date()
-        dias.append(dia)
-    dias.reverse()
-    
-    movimentacoes_diarias = []
-    for dia in dias:
-        movimentacoes_diarias.append({
-            'dia': dia.strftime('%d/%m'),
-            'entradas': entradas_dict.get(dia, 0),
-            'saidas': saidas_dict.get(dia, 0)
-        })
-    
-    # Clientes únicos
-    clientes_unicos = queryset.exclude(
-        cliente__isnull=True
-    ).exclude(cliente='').values('cliente').distinct().count()
-    
-    # Taxa de ocupação
-    total_armazens = ArmazemLayout.objects.filter(ativo=True).count()
-    if capacidade_armazem and total_armazens > 0:
-        total_ocupado = sum([item['total_sc'] for item in capacidade_armazem])
-        # Considerando capacidade média de 1000 SC por armazém
-        taxa_ocupacao = min(round((total_ocupado / (total_armazens * 1000)) * 100), 100)
-    else:
-        taxa_ocupacao = 0
-    
-    # Movimentações recentes
-    movimentacao_recente = HistoricoMovimentacao.objects.select_related(
-        'usuario', 'estoque'
-    ).order_by('-data_hora')[:10]
-    
-    # ==================== CONTEXTO ====================
-    context = {
-        # Configuração
-        'config': config,
-        'is_admin': is_admin(request.user),
-        
-        # KPIs principais
-        'total_sc': total_sc,
-        'total_sc_convertido': total_sc,
-        'total_bag': total_bag,
-        'peso_total': peso_total,
-        'itens_ativos': itens_ativos,
-        'itens_esgotados': itens_esgotados,
-        'movimentacao_mes': movimentacao_mes,
-        'clientes_unicos': clientes_unicos,
-        'taxa_ocupacao': taxa_ocupacao,
-        
-        # Totais PL/Não PL
-        'total_pl': total_pl_geral,
-        'total_nao_pl': total_nao_pl_geral,
-        
-        # Dados para gráficos
-        'top_cultivares': top_cultivares,
-        'dados_especie': dados_especie,
-        'categorias_distribuicao': categorias_distribuicao,
-        'capacidade_armazem': capacidade_armazem,
-        'movimentacoes_diarias': movimentacoes_diarias,
-        'movimentacao_recente': movimentacao_recente,
-        
-        # Dados para filtros
-        'cultivares': Cultivar.objects.all().order_by('nome'),
-        'peneiras': Peneira.objects.all().order_by('nome'),
-        'armazens': ArmazemLayout.objects.filter(ativo=True).order_by('numero'),
-        'especies': Especie.objects.all().order_by('nome'),
-        
-        # Filtro ativo
-        'tipo_filtro_ativo': tipo_filtro,
-        'tendencia_dias_atual': dias_tendencia,
-        
-        'page_title': 'Dashboard Analítico',
-    }
-    
-    return render(request, 'sapp/dashboard.html', context)
+    """
+    Renderiza a página do Dashboard.
 
+    O Dashboard V2/V3 carrega KPIs, gráficos, filtros e movimentações
+    pelo endpoint AJAX dashboard_data. Portanto não precisamos repetir
+    todas as consultas pesadas aqui.
+    """
+
+    tem_permissao = (
+        request.user.is_superuser
+        or request.user.has_perm(
+            'sapp.pode_ver_dashboard'
+        )
+        or request.user.has_perm(
+            'sapp.pode_ver_estoque'
+        )
+    )
+
+    if not tem_permissao:
+        return redirect(
+            'sapp:redirecionar'
+        )
+
+    config, _ = (
+        DashboardConfig.objects
+        .get_or_create(
+            criado_por=request.user
+        )
+    )
+
+    context = {
+        'config': config,
+        'is_admin': is_admin(
+            request.user
+        ),
+        'page_title': (
+            'Dashboard Analítico'
+        ),
+    }
+
+    return render(
+        request,
+        'sapp/dashboard.html',
+        context,
+    )
+
+
+# ================================================================
+# CONFIGURAÇÃO DO DASHBOARD
+# ================================================================
 
 @login_required
 @user_passes_test(is_admin)
 def salvar_config_dashboard(request):
-    """Salva configurações do dashboard (apenas admin)"""
-    if request.method == 'POST':
-        config, created = DashboardConfig.objects.update_or_create(
-            criado_por=request.user,
-            defaults={
-                'cultivar_tipo': request.POST.get('cultivar_tipo', 'doughnut'),
-                'cultivar_qtd': int(request.POST.get('cultivar_qtd', 10)),
-                'cultivar_ordem': request.POST.get('cultivar_ordem', 'valor_desc'),
-                'cultivar_zerados': request.POST.get('cultivar_zerados') == 'on',
-                'cultivar_agrupar_outros': request.POST.get('cultivar_agrupar_outros') == 'on',
-                'peneira_tipo': request.POST.get('peneira_tipo', 'pie'),
-                'peneira_qtd': int(request.POST.get('peneira_qtd', 8)),
-                'peneira_ordem': request.POST.get('peneira_ordem', 'valor_desc'),
-                'armazem_tipo': request.POST.get('armazem_tipo', 'bar'),
-                'armazem_ordem': request.POST.get('armazem_ordem', 'nome_asc'),
-                'armazem_metrica': request.POST.get('armazem_metrica', 'volume'),
-                'tendencia_periodo': int(request.POST.get('tendencia_periodo', 7)),
-                'tendencia_saidas': request.POST.get('tendencia_saidas') == 'on',
-                'tendencia_transferencias': request.POST.get('tendencia_transferencias') == 'on',
-                'tendencia_agrupamento': request.POST.get('tendencia_agrupamento', 'day'),
-                'auto_refresh': int(request.POST.get('auto_refresh', 0)),
-                'unidade_padrao': request.POST.get('unidade_padrao', 'sc'),
-                'tema_cores': request.POST.get('tema_cores', 'default'),
-                'mostrar_legendas': request.POST.get('mostrar_legendas') == 'on',
-                'mostrar_percentuais': request.POST.get('mostrar_percentuais') == 'on',
-                'filtro_cultivar': request.POST.get('filtro_cultivar') == 'on',
-                'filtro_peneira': request.POST.get('filtro_peneira') == 'on',
-                'filtro_armazem': request.POST.get('filtro_armazem') == 'on',
-                'filtro_periodo': request.POST.get('filtro_periodo') == 'on',
-            }
-        )
-        
-        messages.success(request, 'Configurações salvas com sucesso!')
-        return redirect('sapp:dashboard')
-    
-    return redirect('sapp:dashboard')
+    """
+    Salva configurações visuais/operacionais do Dashboard.
+    """
 
+    if request.method != 'POST':
+        return redirect(
+            'sapp:dashboard'
+        )
+
+    def inteiro(
+        nome,
+        padrao,
+        minimo=None,
+        maximo=None,
+    ):
+        try:
+            valor = int(
+                request.POST.get(
+                    nome,
+                    padrao,
+                )
+            )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            valor = padrao
+
+        if minimo is not None:
+            valor = max(
+                minimo,
+                valor,
+            )
+
+        if maximo is not None:
+            valor = min(
+                maximo,
+                valor,
+            )
+
+        return valor
+
+    DashboardConfig.objects.update_or_create(
+        criado_por=request.user,
+        defaults={
+            'cultivar_tipo': request.POST.get(
+                'cultivar_tipo',
+                'doughnut',
+            ),
+            'cultivar_qtd': inteiro(
+                'cultivar_qtd',
+                10,
+                1,
+                50,
+            ),
+            'cultivar_ordem': request.POST.get(
+                'cultivar_ordem',
+                'valor_desc',
+            ),
+            'cultivar_zerados': (
+                request.POST.get(
+                    'cultivar_zerados'
+                )
+                == 'on'
+            ),
+            'cultivar_agrupar_outros': (
+                request.POST.get(
+                    'cultivar_agrupar_outros'
+                )
+                == 'on'
+            ),
+            'peneira_tipo': request.POST.get(
+                'peneira_tipo',
+                'pie',
+            ),
+            'peneira_qtd': inteiro(
+                'peneira_qtd',
+                8,
+                1,
+                50,
+            ),
+            'peneira_ordem': request.POST.get(
+                'peneira_ordem',
+                'valor_desc',
+            ),
+            'armazem_tipo': request.POST.get(
+                'armazem_tipo',
+                'bar',
+            ),
+            'armazem_ordem': request.POST.get(
+                'armazem_ordem',
+                'nome_asc',
+            ),
+            'armazem_metrica': request.POST.get(
+                'armazem_metrica',
+                'volume',
+            ),
+            'tendencia_periodo': inteiro(
+                'tendencia_periodo',
+                15,
+                7,
+                90,
+            ),
+            'tendencia_saidas': (
+                request.POST.get(
+                    'tendencia_saidas'
+                )
+                == 'on'
+            ),
+            'tendencia_transferencias': (
+                request.POST.get(
+                    'tendencia_transferencias'
+                )
+                == 'on'
+            ),
+            'tendencia_agrupamento': (
+                request.POST.get(
+                    'tendencia_agrupamento',
+                    'day',
+                )
+            ),
+            'auto_refresh': inteiro(
+                'auto_refresh',
+                0,
+                0,
+                3600,
+            ),
+            'unidade_padrao': request.POST.get(
+                'unidade_padrao',
+                'sc',
+            ),
+            'tema_cores': request.POST.get(
+                'tema_cores',
+                'default',
+            ),
+            'mostrar_legendas': (
+                request.POST.get(
+                    'mostrar_legendas'
+                )
+                == 'on'
+            ),
+            'mostrar_percentuais': (
+                request.POST.get(
+                    'mostrar_percentuais'
+                )
+                == 'on'
+            ),
+            'filtro_cultivar': (
+                request.POST.get(
+                    'filtro_cultivar'
+                )
+                == 'on'
+            ),
+            'filtro_peneira': (
+                request.POST.get(
+                    'filtro_peneira'
+                )
+                == 'on'
+            ),
+            'filtro_armazem': (
+                request.POST.get(
+                    'filtro_armazem'
+                )
+                == 'on'
+            ),
+            'filtro_periodo': (
+                request.POST.get(
+                    'filtro_periodo'
+                )
+                == 'on'
+            ),
+        },
+    )
+
+    messages.success(
+        request,
+        'Configurações salvas com sucesso!',
+    )
+
+    return redirect(
+        'sapp:dashboard'
+    )
+
+
+# ================================================================
+# HELPERS DE FILTRO
+# ================================================================
 
 def _dashboard_aplicar_filtros_estoque(
     queryset,
@@ -5525,53 +5519,88 @@ def _dashboard_aplicar_filtros_estoque(
     search='',
 ):
     """
-    Aplica filtros aos registros de estoque.
+    Aplica filtros ao estoque.
 
-    Importante:
-    esta função NÃO força saldo > 0.
-    Quem chama decide se quer estoque atual ou universo histórico.
+    Esta função não força saldo > 0.
+    Quem chama decide se quer somente estoque ativo.
     """
 
-    tipos_semente = tipos_semente or []
-    cultivares = cultivares or []
-    peneiras = peneiras or []
-    unidades = unidades or []
-    armazens = armazens or []
+    tipos_semente = (
+        tipos_semente or []
+    )
+    cultivares = (
+        cultivares or []
+    )
+    peneiras = (
+        peneiras or []
+    )
+    unidades = (
+        unidades or []
+    )
+    armazens = (
+        armazens or []
+    )
 
     if tipos_semente:
         queryset = queryset.filter(
-            especie__nome__in=tipos_semente
+            especie__nome__in=
+                tipos_semente
         )
 
     if cultivares:
         queryset = queryset.filter(
-            cultivar_id__in=cultivares
+            cultivar_id__in=
+                cultivares
         )
 
     if peneiras:
         queryset = queryset.filter(
-            peneira_id__in=peneiras
+            peneira_id__in=
+                peneiras
         )
 
     if unidades:
         queryset = queryset.filter(
-            embalagem__in=unidades
+            embalagem__in=
+                unidades
         )
 
     if armazens:
         queryset = queryset.filter(
-            az__in=armazens
+            az__in=
+                armazens
         )
 
     if search:
         queryset = queryset.filter(
-            Q(lote__icontains=search)
-            | Q(produto__icontains=search)
-            | Q(cultivar__nome__icontains=search)
-            | Q(especie__nome__icontains=search)
-            | Q(cliente__icontains=search)
-            | Q(endereco__icontains=search)
-            | Q(az__icontains=search)
+            Q(
+                lote__icontains=
+                    search
+            )
+            | Q(
+                produto__icontains=
+                    search
+            )
+            | Q(
+                cultivar__nome__icontains=
+                    search
+            )
+            | Q(
+                especie__nome__icontains=
+                    search
+            )
+            | Q(
+                cliente__icontains=
+                    search
+            )
+            | Q(
+                endereco__icontains=
+                    search
+            )
+            | Q(
+                az__icontains=
+                    search
+            )
         )
 
     return queryset
@@ -5588,72 +5617,140 @@ def _dashboard_aplicar_filtros_movimentacao(
     search='',
 ):
     """
-    Filtra o histórico diretamente pelos dados relacionados ao estoque.
+    Aplica filtros ao histórico usando os dados relacionados ao estoque.
 
-    Não usa:
-        mov_qs.filter(estoque__in=Estoque.objects.filter(saldo__gt=0))
-
-    porque isso fazia desaparecer do gráfico justamente os lotes
-    que saíram totalmente e ficaram com saldo zero.
+    Importante:
+    NÃO restringe o histórico aos lotes que ainda possuem saldo positivo.
+    Assim um lote totalmente expedido continua aparecendo nos gráficos.
     """
 
-    tipos_semente = tipos_semente or []
-    cultivares = cultivares or []
-    peneiras = peneiras or []
-    unidades = unidades or []
-    armazens = armazens or []
+    tipos_semente = (
+        tipos_semente or []
+    )
+    cultivares = (
+        cultivares or []
+    )
+    peneiras = (
+        peneiras or []
+    )
+    unidades = (
+        unidades or []
+    )
+    armazens = (
+        armazens or []
+    )
 
     if tipos_semente:
         queryset = queryset.filter(
-            estoque__especie__nome__in=tipos_semente
+            estoque__especie__nome__in=
+                tipos_semente
         )
 
     if cultivares:
         queryset = queryset.filter(
-            estoque__cultivar_id__in=cultivares
+            estoque__cultivar_id__in=
+                cultivares
         )
 
     if peneiras:
         queryset = queryset.filter(
-            estoque__peneira_id__in=peneiras
+            estoque__peneira_id__in=
+                peneiras
         )
 
     if unidades:
         queryset = queryset.filter(
-            estoque__embalagem__in=unidades
+            estoque__embalagem__in=
+                unidades
         )
 
     if armazens:
         queryset = queryset.filter(
-            estoque__az__in=armazens
+            estoque__az__in=
+                armazens
         )
 
     if search:
         queryset = queryset.filter(
-            Q(lote_ref__icontains=search)
-            | Q(estoque__lote__icontains=search)
-            | Q(estoque__produto__icontains=search)
-            | Q(estoque__cultivar__nome__icontains=search)
-            | Q(estoque__especie__nome__icontains=search)
-            | Q(estoque__cliente__icontains=search)
-            | Q(estoque__endereco__icontains=search)
-            | Q(descricao__icontains=search)
+            Q(
+                lote_ref__icontains=
+                    search
+            )
+            | Q(
+                estoque__lote__icontains=
+                    search
+            )
+            | Q(
+                estoque__produto__icontains=
+                    search
+            )
+            | Q(
+                estoque__cultivar__nome__icontains=
+                    search
+            )
+            | Q(
+                estoque__especie__nome__icontains=
+                    search
+            )
+            | Q(
+                estoque__cliente__icontains=
+                    search
+            )
+            | Q(
+                estoque__endereco__icontains=
+                    search
+            )
+            | Q(
+                descricao__icontains=
+                    search
+            )
         )
 
     return queryset
 
 
-def _dashboard_filtro_tipo_movimentacao(queryset, tipo_mov):
+def _dashboard_q_entrada():
     """
-    Aceita tanto os nomes simples usados no filtro quanto
-    os tipos reais gravados no histórico.
+    Entradas comuns e Transferência (Entrada).
+    """
+    return (
+        Q(
+            tipo__icontains='Entrada'
+        )
+    )
 
-    Exemplos reais do sistema:
-    - Entrada
+
+def _dashboard_q_saida():
+    """
+    Saídas reconhecidas pelo sistema:
     - Saída
-    - Expedição
-    - Transferência (Entrada)
     - Transferência (Saída)
+    - Expedição
+
+    Inclui também versões sem acento para proteger dados antigos.
+    """
+    return (
+        Q(
+            tipo__icontains='Saída'
+        )
+        | Q(
+            tipo__icontains='Saida'
+        )
+        | Q(
+            tipo__icontains='Expedição'
+        )
+        | Q(
+            tipo__icontains='Expedicao'
+        )
+    )
+
+
+def _dashboard_filtro_tipo_movimentacao(
+    queryset,
+    tipo_mov,
+):
+    """
+    Traduz o filtro da tela para os tipos gravados no histórico.
     """
 
     tipo_mov = str(
@@ -5668,7 +5765,7 @@ def _dashboard_filtro_tipo_movimentacao(queryset, tipo_mov):
         'entradas',
     }:
         return queryset.filter(
-            tipo__icontains='Entrada'
+            _dashboard_q_entrada()
         )
 
     if tipo_mov in {
@@ -5678,8 +5775,7 @@ def _dashboard_filtro_tipo_movimentacao(queryset, tipo_mov):
         'saídas',
     }:
         return queryset.filter(
-            Q(tipo__icontains='Saída')
-            | Q(tipo__icontains='Expedição')
+            _dashboard_q_saida()
         )
 
     if tipo_mov in {
@@ -5687,7 +5783,14 @@ def _dashboard_filtro_tipo_movimentacao(queryset, tipo_mov):
         'expedição',
     }:
         return queryset.filter(
-            tipo__icontains='Expedição'
+            Q(
+                tipo__icontains=
+                    'Expedição'
+            )
+            | Q(
+                tipo__icontains=
+                    'Expedicao'
+            )
         )
 
     if tipo_mov in {
@@ -5695,20 +5798,60 @@ def _dashboard_filtro_tipo_movimentacao(queryset, tipo_mov):
         'transferência',
     }:
         return queryset.filter(
-            tipo__icontains='Transferência'
+            Q(
+                tipo__icontains=
+                    'Transferência'
+            )
+            | Q(
+                tipo__icontains=
+                    'Transferencia'
+            )
         )
 
     return queryset.filter(
-        tipo__icontains=tipo_mov
+        tipo__icontains=
+            tipo_mov
     )
 
 
-def _dashboard_decimal_para_float(valor):
+def _dashboard_numero(valor):
+    """
+    Converte Decimal/int/None para float seguro.
+    """
     try:
-        return float(valor or 0)
-    except (TypeError, ValueError):
+        return float(
+            valor or 0
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
         return 0.0
 
+
+def _dashboard_data_segura(
+    valor,
+):
+    """
+    Converte YYYY-MM-DD para date.
+    Retorna None se inválido.
+    """
+
+    if not valor:
+        return None
+
+    try:
+        return datetime.strptime(
+            valor,
+            '%Y-%m-%d',
+        ).date()
+    except ValueError:
+        return None
+
+
+# ================================================================
+# API DO DASHBOARD
+# ================================================================
 
 @login_required
 @permission_required(
@@ -5717,68 +5860,82 @@ def _dashboard_decimal_para_float(valor):
 )
 def dashboard_data(request):
     """
-    Endpoint AJAX do Dashboard Analítico V2.
+    Endpoint AJAX do Dashboard Analítico.
 
-    CORREÇÕES PRINCIPAIS:
-    1. Saídas reconhecem:
-       - Saída
-       - Transferência (Saída)
-       - Expedição
-
-    2. Tendência usa QUANTIDADE movimentada, não quantidade de registros.
-
-    3. Histórico não é limitado a estoques com saldo > 0.
-       Um lote totalmente expedido continua aparecendo no gráfico.
-
-    4. Preenche todos os dias do período, inclusive dias zerados.
-
-    5. Filtros encadeados são calculados respeitando os outros filtros,
-       mas ignorando o próprio filtro ao montar suas opções.
+    Principais regras:
+    - estoque atual usa saldo > 0;
+    - histórico não é apagado da análise quando saldo zera;
+    - gráfico de tendência usa quantidade movimentada;
+    - saída inclui Saída, Transferência (Saída) e Expedição;
+    - dias sem movimento aparecem como zero;
+    - filtros disponíveis são encadeados.
     """
 
     try:
-        # ------------------------------------------------------------
-        # FILTROS
-        # ------------------------------------------------------------
-        tipos_semente = request.GET.getlist(
-            'tipo_semente[]'
+        # --------------------------------------------------------
+        # PARÂMETROS
+        # --------------------------------------------------------
+        tipos_semente = (
+            request.GET.getlist(
+                'tipo_semente[]'
+            )
         )
 
-        cultivares = request.GET.getlist(
-            'cultivar[]'
+        cultivares = (
+            request.GET.getlist(
+                'cultivar[]'
+            )
         )
 
-        peneiras = request.GET.getlist(
-            'peneira[]'
+        peneiras = (
+            request.GET.getlist(
+                'peneira[]'
+            )
         )
 
-        unidades = request.GET.getlist(
-            'unidade[]'
+        unidades = (
+            request.GET.getlist(
+                'unidade[]'
+            )
         )
 
-        armazens = request.GET.getlist(
-            'armazem[]'
+        armazens = (
+            request.GET.getlist(
+                'armazem[]'
+            )
         )
 
-        data_inicio = request.GET.get(
-            'data_inicio',
-            '',
-        ).strip()
+        data_inicio = (
+            _dashboard_data_segura(
+                request.GET.get(
+                    'data_inicio',
+                    ''
+                ).strip()
+            )
+        )
 
-        data_fim = request.GET.get(
-            'data_fim',
-            '',
-        ).strip()
+        data_fim = (
+            _dashboard_data_segura(
+                request.GET.get(
+                    'data_fim',
+                    ''
+                ).strip()
+            )
+        )
 
-        tipo_mov = request.GET.get(
-            'tipo_mov',
-            '',
-        ).strip()
+        tipo_mov = (
+            request.GET.get(
+                'tipo_mov',
+                ''
+            ).strip()
+        )
 
-        search = request.GET.get(
-            'search',
-            '',
-        ).strip()
+        search = (
+            request.GET.get(
+                'search',
+                ''
+            ).strip()
+        )
 
         try:
             periodo_dias = int(
@@ -5787,7 +5944,10 @@ def dashboard_data(request):
                     15,
                 )
             )
-        except (TypeError, ValueError):
+        except (
+            TypeError,
+            ValueError,
+        ):
             periodo_dias = 15
 
         periodo_dias = max(
@@ -5798,39 +5958,42 @@ def dashboard_data(request):
             ),
         )
 
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         # ESTOQUE ATUAL
-        # ------------------------------------------------------------
-        estoque_universo = (
+        # --------------------------------------------------------
+        est_qs = (
             Estoque.objects
             .select_related(
                 'cultivar',
                 'peneira',
                 'especie',
             )
-            .all()
-        )
-
-        est_qs = (
-            estoque_universo
             .filter(
                 saldo__gt=0
             )
         )
 
-        est_qs = _dashboard_aplicar_filtros_estoque(
-            est_qs,
-            tipos_semente=tipos_semente,
-            cultivares=cultivares,
-            peneiras=peneiras,
-            unidades=unidades,
-            armazens=armazens,
-            search=search,
+        est_qs = (
+            _dashboard_aplicar_filtros_estoque(
+                est_qs,
+                tipos_semente=
+                    tipos_semente,
+                cultivares=
+                    cultivares,
+                peneiras=
+                    peneiras,
+                unidades=
+                    unidades,
+                armazens=
+                    armazens,
+                search=
+                    search,
+            )
         )
 
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         # HISTÓRICO
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         mov_qs = (
             HistoricoMovimentacao.objects
             .select_related(
@@ -5843,42 +6006,35 @@ def dashboard_data(request):
             .all()
         )
 
-        mov_qs = _dashboard_aplicar_filtros_movimentacao(
-            mov_qs,
-            tipos_semente=tipos_semente,
-            cultivares=cultivares,
-            peneiras=peneiras,
-            unidades=unidades,
-            armazens=armazens,
-            search=search,
+        mov_qs = (
+            _dashboard_aplicar_filtros_movimentacao(
+                mov_qs,
+                tipos_semente=
+                    tipos_semente,
+                cultivares=
+                    cultivares,
+                peneiras=
+                    peneiras,
+                unidades=
+                    unidades,
+                armazens=
+                    armazens,
+                search=
+                    search,
+            )
         )
 
-        # Datas aplicadas ao histórico.
         if data_inicio:
-            try:
-                data_inicio_obj = datetime.strptime(
-                    data_inicio,
-                    '%Y-%m-%d',
-                ).date()
-
-                mov_qs = mov_qs.filter(
-                    data_hora__date__gte=data_inicio_obj
-                )
-            except ValueError:
-                pass
+            mov_qs = mov_qs.filter(
+                data_hora__date__gte=
+                    data_inicio
+            )
 
         if data_fim:
-            try:
-                data_fim_obj = datetime.strptime(
-                    data_fim,
-                    '%Y-%m-%d',
-                ).date()
-
-                mov_qs = mov_qs.filter(
-                    data_hora__date__lte=data_fim_obj
-                )
-            except ValueError:
-                pass
+            mov_qs = mov_qs.filter(
+                data_hora__date__lte=
+                    data_fim
+            )
 
         mov_qs_filtrado_tipo = (
             _dashboard_filtro_tipo_movimentacao(
@@ -5887,13 +6043,14 @@ def dashboard_data(request):
             )
         )
 
-        # ------------------------------------------------------------
-        # KPIs DE ESTOQUE
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
+        # KPIs
+        # --------------------------------------------------------
         bags = (
             est_qs
             .filter(
-                embalagem__iexact='BAG'
+                embalagem__iexact=
+                    'BAG'
             )
             .aggregate(
                 total=Sum('saldo')
@@ -5904,7 +6061,8 @@ def dashboard_data(request):
         scs = (
             est_qs
             .filter(
-                embalagem__iexact='SC'
+                embalagem__iexact=
+                    'SC'
             )
             .aggregate(
                 total=Sum('saldo')
@@ -5912,8 +6070,8 @@ def dashboard_data(request):
             or 0
         )
 
-        # Mantém a regra já utilizada pelo seu dashboard:
-        # 1 BAG = 25 SC para o indicador consolidado.
+        # Regra utilizada no seu projeto:
+        # 1 BAG = 25 SC.
         total_sc = (
             (bags * 25)
             + scs
@@ -5922,14 +6080,18 @@ def dashboard_data(request):
         peso = (
             est_qs
             .aggregate(
-                total=Sum('peso_total')
+                total=Sum(
+                    'peso_total'
+                )
             )['total']
             or 0
         )
 
         limite_parado = (
             timezone.now()
-            - timedelta(days=30)
+            - timedelta(
+                days=30
+            )
         )
 
         parados = (
@@ -5937,96 +6099,114 @@ def dashboard_data(request):
             .filter(
                 Q(
                     data_ultima_movimentacao__lt=
-                    limite_parado
+                        limite_parado
                 )
                 | Q(
-                    data_ultima_movimentacao__isnull=True
+                    data_ultima_movimentacao__isnull=
+                        True
                 )
             )
             .count()
         )
 
-        # ------------------------------------------------------------
-        # MOVIMENTAÇÃO DO PERÍODO
-        # ------------------------------------------------------------
-        hoje = timezone.localdate()
+        hoje = (
+            timezone.localdate()
+        )
 
         data_limite = (
             hoje
             - timedelta(
-                days=periodo_dias - 1
+                days=
+                    periodo_dias - 1
             )
         )
 
         tendencia_qs = (
             mov_qs
             .filter(
-                data_hora__date__gte=data_limite,
-                data_hora__date__lte=hoje,
+                data_hora__date__gte=
+                    data_limite,
+                data_hora__date__lte=
+                    hoje,
             )
         )
 
-        q_entrada = Q(
-            tipo__icontains='Entrada'
+        q_entrada = (
+            _dashboard_q_entrada()
         )
 
         q_saida = (
-            Q(
-                tipo__icontains='Saída'
-            )
-            | Q(
-                tipo__icontains='Expedição'
-            )
+            _dashboard_q_saida()
         )
 
         entradas_periodo = (
             tendencia_qs
-            .filter(q_entrada)
+            .filter(
+                q_entrada
+            )
             .aggregate(
-                total=Sum('quantidade')
+                total=Sum(
+                    'quantidade'
+                )
             )['total']
             or 0
         )
 
         saidas_periodo = (
             tendencia_qs
-            .filter(q_saida)
+            .filter(
+                q_saida
+            )
             .aggregate(
-                total=Sum('quantidade')
+                total=Sum(
+                    'quantidade'
+                )
             )['total']
             or 0
         )
 
-        eventos_periodo = (
-            tendencia_qs.count()
-        )
-
         kpis = {
-            'total_sc': int(total_sc),
-            'bags': int(bags),
-            'scs': int(scs),
-            'peso': _dashboard_decimal_para_float(
-                peso
+            'total_sc': int(
+                total_sc
             ),
-            'ativos': est_qs.count(),
-            'parados': parados,
+            'bags': int(
+                bags
+            ),
+            'scs': int(
+                scs
+            ),
+            'peso': (
+                _dashboard_numero(
+                    peso
+                )
+            ),
+            'ativos': (
+                est_qs.count()
+            ),
+            'parados': (
+                parados
+            ),
             'entradas_periodo': (
-                _dashboard_decimal_para_float(
+                _dashboard_numero(
                     entradas_periodo
                 )
             ),
             'saidas_periodo': (
-                _dashboard_decimal_para_float(
+                _dashboard_numero(
                     saidas_periodo
                 )
             ),
-            'eventos_periodo': eventos_periodo,
-            'periodo_dias': periodo_dias,
+            'eventos_periodo': (
+                tendencia_qs.count()
+            ),
+            'periodo_dias': (
+                periodo_dias
+            ),
         }
 
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         # GRÁFICO CULTIVAR
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         cultivares_data = list(
             est_qs
             .filter(
@@ -6036,7 +6216,9 @@ def dashboard_data(request):
                 'cultivar__nome'
             )
             .annotate(
-                volume=Sum('saldo')
+                volume=Sum(
+                    'saldo'
+                )
             )
             .filter(
                 volume__gt=0
@@ -6046,9 +6228,9 @@ def dashboard_data(request):
             )[:10]
         )
 
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         # GRÁFICO PENEIRA
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         peneiras_data = list(
             est_qs
             .filter(
@@ -6058,7 +6240,9 @@ def dashboard_data(request):
                 'peneira__nome'
             )
             .annotate(
-                volume=Sum('saldo')
+                volume=Sum(
+                    'saldo'
+                )
             )
             .filter(
                 volume__gt=0
@@ -6068,9 +6252,9 @@ def dashboard_data(request):
             )
         )
 
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         # GRÁFICO ARMAZÉM
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         armazens_data = list(
             est_qs
             .exclude(
@@ -6083,7 +6267,9 @@ def dashboard_data(request):
                 'az'
             )
             .annotate(
-                volume=Sum('saldo')
+                volume=Sum(
+                    'saldo'
+                )
             )
             .filter(
                 volume__gt=0
@@ -6093,7 +6279,7 @@ def dashboard_data(request):
             )
         )
 
-        cores_padrao = [
+        cores = [
             '#2f8f4e',
             '#3b82f6',
             '#f59e0b',
@@ -6108,9 +6294,26 @@ def dashboard_data(request):
             '#64748b',
         ]
 
-        # ------------------------------------------------------------
-        # TENDÊNCIA DIÁRIA POR QUANTIDADE
-        # ------------------------------------------------------------
+        def cores_para(
+            quantidade,
+        ):
+            if quantidade <= 0:
+                return []
+
+            repeticoes = (
+                quantidade
+                // len(cores)
+                + 1
+            )
+
+            return (
+                cores
+                * repeticoes
+            )[:quantidade]
+
+        # --------------------------------------------------------
+        # TENDÊNCIA POR DIA
+        # --------------------------------------------------------
         tendencia_agregada = list(
             tendencia_qs
             .annotate(
@@ -6124,13 +6327,17 @@ def dashboard_data(request):
             .annotate(
                 entradas=Sum(
                     'quantidade',
-                    filter=q_entrada,
+                    filter=
+                        q_entrada,
                 ),
                 saidas=Sum(
                     'quantidade',
-                    filter=q_saida,
+                    filter=
+                        q_saida,
                 ),
-                eventos=Count('id'),
+                eventos=Count(
+                    'id'
+                ),
             )
             .order_by(
                 'dia'
@@ -6140,21 +6347,28 @@ def dashboard_data(request):
         tendencia_por_dia = {
             item['dia']: {
                 'entradas': (
-                    _dashboard_decimal_para_float(
-                        item['entradas']
+                    _dashboard_numero(
+                        item[
+                            'entradas'
+                        ]
                     )
                 ),
                 'saidas': (
-                    _dashboard_decimal_para_float(
-                        item['saidas']
+                    _dashboard_numero(
+                        item[
+                            'saidas'
+                        ]
                     )
                 ),
                 'eventos': int(
-                    item['eventos']
+                    item[
+                        'eventos'
+                    ]
                     or 0
                 ),
             }
-            for item in tendencia_agregada
+            for item
+            in tendencia_agregada
         }
 
         labels_tendencia = []
@@ -6172,13 +6386,15 @@ def dashboard_data(request):
                 )
             )
 
-            valores = tendencia_por_dia.get(
-                dia,
-                {
-                    'entradas': 0,
-                    'saidas': 0,
-                    'eventos': 0,
-                },
+            valores = (
+                tendencia_por_dia.get(
+                    dia,
+                    {
+                        'entradas': 0,
+                        'saidas': 0,
+                        'eventos': 0,
+                    },
+                )
             )
 
             labels_tendencia.append(
@@ -6188,15 +6404,21 @@ def dashboard_data(request):
             )
 
             entradas_tendencia.append(
-                valores['entradas']
+                valores[
+                    'entradas'
+                ]
             )
 
             saidas_tendencia.append(
-                valores['saidas']
+                valores[
+                    'saidas'
+                ]
             )
 
             eventos_tendencia.append(
-                valores['eventos']
+                valores[
+                    'eventos'
+                ]
             )
 
         graficos = {
@@ -6209,24 +6431,19 @@ def dashboard_data(request):
                     in cultivares_data
                 ],
                 'values': [
-                    _dashboard_decimal_para_float(
-                        item['volume']
+                    _dashboard_numero(
+                        item[
+                            'volume'
+                        ]
                     )
                     for item
                     in cultivares_data
                 ],
-                'colors': (
-                    cores_padrao
-                    * (
-                        (
-                            len(cultivares_data)
-                            // len(cores_padrao)
-                        )
-                        + 1
+                'colors': cores_para(
+                    len(
+                        cultivares_data
                     )
-                )[
-                    :len(cultivares_data)
-                ],
+                ),
             },
 
             'peneira': {
@@ -6238,120 +6455,130 @@ def dashboard_data(request):
                     in peneiras_data
                 ],
                 'values': [
-                    _dashboard_decimal_para_float(
-                        item['volume']
+                    _dashboard_numero(
+                        item[
+                            'volume'
+                        ]
                     )
                     for item
                     in peneiras_data
                 ],
-                'colors': (
-                    cores_padrao
-                    * (
-                        (
-                            len(peneiras_data)
-                            // len(cores_padrao)
-                        )
-                        + 1
+                'colors': cores_para(
+                    len(
+                        peneiras_data
                     )
-                )[
-                    :len(peneiras_data)
-                ],
+                ),
             },
 
             'armazem': {
                 'labels': [
-                    item['az']
+                    item[
+                        'az'
+                    ]
                     for item
                     in armazens_data
                 ],
                 'values': [
-                    _dashboard_decimal_para_float(
-                        item['volume']
+                    _dashboard_numero(
+                        item[
+                            'volume'
+                        ]
                     )
                     for item
                     in armazens_data
                 ],
-                'colors': (
-                    cores_padrao
-                    * (
-                        (
-                            len(armazens_data)
-                            // len(cores_padrao)
-                        )
-                        + 1
+                'colors': cores_para(
+                    len(
+                        armazens_data
                     )
-                )[
-                    :len(armazens_data)
-                ],
+                ),
             },
 
             'tendencia': {
-                'labels': labels_tendencia,
-                'entradas': entradas_tendencia,
-                'saidas': saidas_tendencia,
-                'eventos': eventos_tendencia,
+                'labels': (
+                    labels_tendencia
+                ),
+                'entradas': (
+                    entradas_tendencia
+                ),
+                'saidas': (
+                    saidas_tendencia
+                ),
+                'eventos': (
+                    eventos_tendencia
+                ),
             },
         }
 
-        # ------------------------------------------------------------
-        # FILTROS ENCADEADOS
-        #
-        # Cada filtro é calculado aplicando TODOS os outros filtros,
-        # exceto ele mesmo.
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
+        # OPÇÕES DE FILTROS ENCADEADOS
+        # --------------------------------------------------------
         def estoque_para_opcao(
             ignorar,
         ):
-            return _dashboard_aplicar_filtros_estoque(
-                Estoque.objects.filter(
-                    saldo__gt=0
-                ),
-                tipos_semente=(
-                    []
-                    if ignorar == 'tipo'
-                    else tipos_semente
-                ),
-                cultivares=(
-                    []
-                    if ignorar == 'cultivar'
-                    else cultivares
-                ),
-                peneiras=(
-                    []
-                    if ignorar == 'peneira'
-                    else peneiras
-                ),
-                unidades=(
-                    []
-                    if ignorar == 'unidade'
-                    else unidades
-                ),
-                armazens=(
-                    []
-                    if ignorar == 'armazem'
-                    else armazens
-                ),
-                search=search,
+            return (
+                _dashboard_aplicar_filtros_estoque(
+                    Estoque.objects
+                    .filter(
+                        saldo__gt=0
+                    ),
+                    tipos_semente=(
+                        []
+                        if ignorar == 'tipo'
+                        else tipos_semente
+                    ),
+                    cultivares=(
+                        []
+                        if ignorar == 'cultivar'
+                        else cultivares
+                    ),
+                    peneiras=(
+                        []
+                        if ignorar == 'peneira'
+                        else peneiras
+                    ),
+                    unidades=(
+                        []
+                        if ignorar == 'unidade'
+                        else unidades
+                    ),
+                    armazens=(
+                        []
+                        if ignorar == 'armazem'
+                        else armazens
+                    ),
+                    search=search,
+                )
             )
 
-        qs_tipo = estoque_para_opcao(
-            'tipo'
+        qs_tipo = (
+            estoque_para_opcao(
+                'tipo'
+            )
         )
 
-        qs_cultivar = estoque_para_opcao(
-            'cultivar'
+        qs_cultivar = (
+            estoque_para_opcao(
+                'cultivar'
+            )
         )
 
-        qs_peneira = estoque_para_opcao(
-            'peneira'
+        qs_peneira = (
+            estoque_para_opcao(
+                'peneira'
+            )
         )
 
-        qs_unidade = estoque_para_opcao(
-            'unidade'
+        qs_unidade = (
+            estoque_para_opcao(
+                'unidade'
+            )
         )
 
-        qs_armazem = estoque_para_opcao(
-            'armazem'
+        qs_armazem = (
+            estoque_para_opcao(
+                'armazem'
+            )
         )
 
         opcoes_filtros = {
@@ -6440,17 +6667,19 @@ def dashboard_data(request):
             ),
         }
 
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         # MOVIMENTAÇÕES RECENTES
-        # ------------------------------------------------------------
+        # --------------------------------------------------------
         movimentacoes = []
 
-        for mov in (
+        recentes_qs = (
             mov_qs_filtrado_tipo
             .order_by(
                 '-data_hora'
             )[:12]
-        ):
+        )
+
+        for mov in recentes_qs:
             estoque = mov.estoque
 
             lote = (
@@ -6464,19 +6693,21 @@ def dashboard_data(request):
             )
 
             unidade = (
-                estoque.embalagem
-                if estoque
-                else ''
-            ) or '--'
-
-            usuario = (
                 (
+                    estoque.embalagem
+                    if estoque
+                    else ''
+                )
+                or '--'
+            )
+
+            if mov.usuario:
+                usuario = (
                     mov.usuario.get_full_name()
                     or mov.usuario.username
                 )
-                if mov.usuario
-                else 'Sistema'
-            )
+            else:
+                usuario = 'Sistema'
 
             movimentacoes.append({
                 'dt': (
@@ -6488,11 +6719,14 @@ def dashboard_data(request):
                     if mov.data_hora
                     else '--'
                 ),
-                'tp': mov.tipo or '--',
+                'tp': (
+                    mov.tipo
+                    or '--'
+                ),
                 'lt': lote,
                 'unidade': unidade,
                 'qtd': (
-                    _dashboard_decimal_para_float(
+                    _dashboard_numero(
                         getattr(
                             mov,
                             'quantidade',
@@ -6508,7 +6742,9 @@ def dashboard_data(request):
             'kpis': kpis,
             'graficos': graficos,
             'recentes': movimentacoes,
-            'opcoes_filtros': opcoes_filtros,
+            'opcoes_filtros': (
+                opcoes_filtros
+            ),
         })
 
     except Exception as erro:
@@ -6519,7 +6755,9 @@ def dashboard_data(request):
         return JsonResponse(
             {
                 'success': False,
-                'error': str(erro),
+                'error': str(
+                    erro
+                ),
             },
             status=500,
         )
