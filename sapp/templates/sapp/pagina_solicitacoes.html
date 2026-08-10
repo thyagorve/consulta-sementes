@@ -7096,14 +7096,49 @@ function gerarImpressaoSolicitacao(id) {
 html, body { margin: 0; padding: 0; background: var(--fundo); color: var(--texto); font-family: Arial, Helvetica, sans-serif; }
 body { padding: 14px; }
 .folha { width: 297mm; min-height: 210mm; margin: 0 auto; padding: 8mm; background: #fff; box-shadow: 0 15px 50px rgba(0,0,0,.18); }
-.topo { display: grid; grid-template-columns: 1fr 165px; overflow: hidden; border: 1px solid #256f40; border-radius: 14px 14px 0 0; page-break-inside: avoid; }
+.topo {
+    display: grid;
+    grid-template-columns: 1fr minmax(100px, 220px);
+    overflow: hidden;
+    border: 1px solid #256f40;
+    border-radius: 14px 14px 0 0;
+    page-break-inside: avoid;
+}
 .topo-principal { position: relative; min-width: 0; padding: 13px 16px; color: #fff; background: linear-gradient(135deg, #174d2c 0%, #2f8f4e 62%, #59b875 100%); }
 .topo-principal::after { content: ""; position: absolute; width: 145px; height: 145px; right: -55px; top: -80px; border-radius: 50%; background: rgba(255,255,255,.09); }
 .topo-principal h1 { margin: 0; font-size: 21px; font-weight: 900; letter-spacing: .45px; }
-.topo-principal p { max-width: 95%; margin: 5px 0 0; overflow: hidden; color: rgba(255,255,255,.88); font-size: 9px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
-.numero-card { display: flex; flex-direction: column; justify-content: center; padding: 10px 13px; text-align: right; border-left: 1px solid #c8dfcf; background: linear-gradient(180deg, #f3fbf6, #e9f6ed); }
+.topo-principal p {
+    max-width: 100%;
+    margin: 5px 0 0;
+    color: rgba(255,255,255,.88);
+    font-size: 9px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.numero-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 13px;
+    text-align: right;
+    border-left: 1px solid #c8dfcf;
+    background: linear-gradient(180deg, #f3fbf6, #e9f6ed);
+    min-width: 200px;        /* largura mínima para caber 11 caracteres */
+    max-width: 300px;        /* evita que o card cresça exageradamente */
+}
 .numero-card small { color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; }
-.numero-card strong { margin-top: 2px; color: var(--verde-escuro); font-size: 22px; font-weight: 900; white-space: nowrap; }
+.numero-card strong {
+    margin-top: 2px;
+    color: var(--verde-escuro);
+    font-size: 22px;
+    font-weight: 900;
+    white-space: nowrap;
+    overflow: hidden;          /* <- novo */
+    text-overflow: ellipsis;   /* <- novo */
+    max-width: 100%;           /* <- novo */
+}
 .resumo { display: grid; grid-template-columns: minmax(190px,1.25fr) repeat(3, minmax(135px,.55fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
 .indicador { position: relative; min-height: 64px; padding: 10px 11px; overflow: hidden; border-right: 1px solid var(--borda); background: #fff; }
 .indicador:last-child { border-right: 0; }
@@ -7178,10 +7213,10 @@ tr { page-break-inside: avoid; }
     box-shadow: none;
   }
 
-  .topo {
-    grid-template-columns: minmax(0,1fr) 92px;
+ .topo {
+    grid-template-columns: minmax(0,1fr) minmax(92px, auto);
     border-radius: 10px 10px 0 0;
-  }
+}
 
   .topo-principal {
     padding: 10px;
@@ -7293,14 +7328,14 @@ tr { page-break-inside: avoid; }
 </head>
 <body>
 <main class="folha">
-  <header class="topo">
+ <header class="topo">
     <div class="topo-principal">
       <h1>RELATÓRIO DE SOLICITAÇÃO</h1>
-      <p>${esc(sol.titulo || 'Solicitação')}</p>
+      <p>#${esc(sol.id)}</p>
     </div>
     <div class="numero-card">
-      <small>Solicitação</small>
-      <strong>#${esc(sol.id)}</strong>
+      <small>ID</small>
+      <strong>${esc(sol.titulo || 'Solicitação')}</strong>
     </div>
   </header>
 
