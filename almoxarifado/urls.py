@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from django.urls import include, path
 
 app_name = 'almoxarifado'
 
@@ -44,4 +45,14 @@ urlpatterns = [
     path('api/agendamentos/', views.listar_agendamentos, name='listar_agendamentos'),
     path('api/agendamentos/criar/', views.criar_agendamento, name='criar_agendamento'),
     path('api/agendamentos/<int:agendamento_id>/deletar/', views.deletar_agendamento, name='deletar_agendamento'),
+    
+
+    path(
+           'inventario/',
+           include(
+               'almoxarifado.urls_inventario',
+               namespace='inventario'
+           ),
+       ),
+
 ]

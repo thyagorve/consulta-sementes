@@ -374,3 +374,7 @@ def get_notificacao_service():
     if _notificacao_service is None:
         _notificacao_service = WhatsAppNotificacaoService()
     return _notificacao_service
+
+
+
+

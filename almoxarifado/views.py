@@ -27,6 +27,7 @@ from .models import (
     EntradaNotaFiscal, ItemEntrada, InstanciaWhatsApp  # <-- ADICIONE ESTE
 )
 
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -1011,3 +1012,7 @@ def api_enviar_notificacao_agora(request):
         return JsonResponse({'success': True, 'message': 'Notificações enviadas com sucesso!'})
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)})
+
+
+
+

@@ -385,3 +385,216 @@ class InstanciaWhatsApp(models.Model):
     
     def __str__(self):
         return f"{self.nome} - {self.status}"
+
+
+
+
+# ADICIONAR AO FINAL DE almoxarifado/models.py
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+
+
+class DadosValidadeItem(models.Model):
+    item = models.OneToOneField(
+        'Item',
+        on_delete=models.CASCADE,
+        related_name='dados_validade',
+    )
+    data_fabricacao = models.DateField(null=True, blank=True)
+    data_vencimento = models.DateField(null=True, blank=True, db_index=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['data_vencimento', 'item__nome']
+
+    @property
+    def dias_para_vencer(self):
+        if not self.data_vencimento:
+            return None
+        return (self.data_vencimento - timezone.localdate()).days
+
+    @property
+    def status_vencimento(self):
+        dias = self.dias_para_vencer
+        if dias is None:
+            return 'sem_data'
+        if dias < 0:
+            return 'vencido'
+        if dias <= 30:
+            return 'proximo'
+        return 'em_dia'
+
+    def __str__(self):
+        return f'{self.item} - {self.data_vencimento or "sem vencimento"}'
+
+
+class ImportacaoInventario(models.Model):
+    TIPO_CHOICES = [
+        ('PLANILHA', 'Planilha'),
+        ('NFE_XML', 'NF-e XML'),
+    ]
+    MODO_CHOICES = [
+        ('COM_LOTE', 'Código + lote'),
+        ('SEM_LOTE', 'Somente código'),
+    ]
+    STATUS_CHOICES = [
+        ('PROCESSANDO', 'Processando'),
+        ('PRONTA', 'Pronta'),
+        ('APLICADA', 'Aplicada'),
+        ('CANCELADA', 'Cancelada'),
+        ('ERRO', 'Erro'),
+    ]
+
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    modo_comparacao = models.CharField(
+        max_length=20,
+        choices=MODO_CHOICES,
+        default='COM_LOTE',
+    )
+    nome_arquivo = models.CharField(max_length=255, blank=True, default='')
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    aplicado_em = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='PROCESSANDO',
+    )
+    total_linhas = models.PositiveIntegerField(default=0)
+    resumo = models.JSONField(default=dict, blank=True)
+    erro = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-criado_em']
+
+
+class LinhaComparacaoInventario(models.Model):
+    STATUS_CHOICES = [
+        ('IGUAL', 'Sistema = arquivo'),
+        ('SALDO_DIVERGENTE', 'Saldo divergente'),
+        ('UNIDADE_DIVERGENTE', 'Unidade divergente'),
+        ('DADOS_DIVERGENTES', 'Dados divergentes'),
+        ('SO_SISTEMA', 'Somente no sistema'),
+        ('SO_ARQUIVO', 'Somente no arquivo'),
+        ('AMBIGUO', 'Ambíguo'),
+    ]
+    ACAO_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('MANTER_SISTEMA', 'Manter sistema'),
+        ('USAR_ARQUIVO', 'Usar arquivo'),
+        ('CRIAR_ITEM', 'Criar item'),
+        ('IGNORAR', 'Ignorar'),
+    ]
+
+    importacao = models.ForeignKey(
+        ImportacaoInventario,
+        on_delete=models.CASCADE,
+        related_name='linhas',
+    )
+    item = models.ForeignKey(
+        'Item',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    chave = models.CharField(max_length=500, db_index=True)
+    codigo = models.CharField(max_length=100, blank=True, default='')
+    lote = models.CharField(max_length=200, blank=True, default='')
+    nome_arquivo = models.CharField(max_length=500, blank=True, default='')
+    quantidade_sistema = models.DecimalField(
+        max_digits=18, decimal_places=4, null=True, blank=True
+    )
+    quantidade_arquivo = models.DecimalField(
+        max_digits=18, decimal_places=4, null=True, blank=True
+    )
+    unidade_sistema = models.CharField(max_length=50, blank=True, default='')
+    unidade_arquivo = models.CharField(max_length=50, blank=True, default='')
+    dados_arquivo = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES)
+    acao = models.CharField(
+        max_length=30,
+        choices=ACAO_CHOICES,
+        default='PENDENTE',
+    )
+    aplicado = models.BooleanField(default=False)
+    mensagem = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['status', 'codigo', 'lote', 'id']
+
+
+class RegraNotificacaoAlmoxarifado(models.Model):
+    TIPO_CHOICES = [
+        ('ESTOQUE_BAIXO', 'Estoque abaixo do mínimo'),
+        ('ESTOQUE_ABAIXO_X', 'Estoque abaixo de X'),
+        ('ESTOQUE_ZERADO', 'Estoque zerado'),
+        ('ESTOQUE_REPOSTO', 'Estoque reposto'),
+        ('VENCE_EM', 'Vencimento antecipado'),
+        ('VENCE_HOJE', 'Vence hoje'),
+        ('VENCIDO', 'Produto vencido'),
+    ]
+
+    nome = models.CharField(max_length=120)
+    tipo = models.CharField(max_length=30, choices=TIPO_CHOICES)
+    ativo = models.BooleanField(default=True)
+    quantidade_limite = models.DecimalField(
+        max_digits=18, decimal_places=4, null=True, blank=True
+    )
+    dias_antes_vencimento = models.JSONField(default=list, blank=True)
+    departamentos = models.JSONField(default=list, blank=True)
+    repetir = models.BooleanField(default=False)
+    intervalo_repeticao_horas = models.PositiveIntegerField(default=24)
+    template_mensagem = models.TextField(
+        blank=True,
+        default=(
+            '🔔 *ALMOXARIFADO*\n'
+            '{evento}\n\n'
+            '📦 {nome}\n'
+            '🔢 Código: {codigo}\n'
+            '🏷️ Lote: {lote}\n'
+            '📊 Saldo: {quantidade} {unidade}\n'
+            '📅 Vencimento: {vencimento}\n'
+            '⏳ Dias: {dias}\n'
+        ),
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+
+class EstadoNotificacaoItem(models.Model):
+    item = models.OneToOneField(
+        'Item',
+        on_delete=models.CASCADE,
+        related_name='estado_notificacao',
+    )
+    quantidade_anterior = models.DecimalField(
+        max_digits=18, decimal_places=4, default=0
+    )
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+
+class DisparoRegraNotificacao(models.Model):
+    regra = models.ForeignKey(
+        RegraNotificacaoAlmoxarifado,
+        on_delete=models.CASCADE,
+        related_name='disparos',
+    )
+    item = models.ForeignKey(
+        'Item',
+        on_delete=models.CASCADE,
+        related_name='disparos_regras',
+    )
+    chave_evento = models.CharField(max_length=255, db_index=True)
+    destinatario = models.CharField(max_length=40, blank=True, default='')
+    enviado_em = models.DateTimeField(auto_now_add=True)
+    sucesso = models.BooleanField(default=False)
+    resposta = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-enviado_em']

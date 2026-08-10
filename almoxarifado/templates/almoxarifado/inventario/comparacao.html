@@ -1,0 +1,2209 @@
+{% extends "almoxarifado/base_almoxarifado.html" %}
+
+{% block title %}
+Inventário e Comparação
+{% endblock %}
+
+
+{% block content %}
+
+<div class="inv-page">
+
+    <!-- ======================================================
+         HEADER
+         ====================================================== -->
+    <div class="inv-header">
+
+        <div>
+            <span class="inv-kicker">
+                INVENTÁRIO INTELIGENTE
+            </span>
+
+            <h1>
+                ⚖️ Sistema × Arquivo
+            </h1>
+
+            <p>
+                Compare o estoque do sistema com Excel,
+                CSV ou NF-e XML e escolha qual informação
+                deve prevalecer.
+            </p>
+        </div>
+
+        <a
+            href="{% url 'almoxarifado:lista_itens' %}"
+            class="inv-back"
+        >
+            ← Voltar ao estoque
+        </a>
+
+    </div>
+
+
+    <!-- ======================================================
+         IMPORTAÇÃO
+         ====================================================== -->
+    <div class="inv-import-card">
+
+        <div
+            class="inv-drop"
+            id="invDrop"
+        >
+
+            <input
+                type="file"
+                id="invArquivo"
+                accept=".xlsx,.xlsm,.csv,.xml"
+                hidden
+            >
+
+            <div class="inv-drop-icon">
+                ⇧
+            </div>
+
+            <strong id="invNomeArquivo">
+                Arraste ou selecione um arquivo
+            </strong>
+
+            <small>
+                Excel, CSV ou XML de NF-e
+            </small>
+
+            <button
+                type="button"
+                onclick="
+                    document
+                    .getElementById(
+                        'invArquivo'
+                    )
+                    .click()
+                "
+            >
+                Selecionar arquivo
+            </button>
+
+        </div>
+
+
+        <div class="inv-import-options">
+
+            <label>
+                Tipo
+
+                <select id="invTipo">
+                    <option value="PLANILHA">
+                        Planilha
+                    </option>
+
+                    <option value="NFE_XML">
+                        NF-e XML
+                    </option>
+                </select>
+            </label>
+
+
+            <label>
+                Comparar por
+
+                <select id="invModo">
+                    <option value="COM_LOTE">
+                        Código + lote
+                    </option>
+
+                    <option value="SEM_LOTE">
+                        Somente código
+                    </option>
+                </select>
+            </label>
+
+
+            <button
+                type="button"
+                class="inv-primary"
+                id="btnComparar"
+                onclick="compararArquivo()"
+            >
+                Comparar agora
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- ======================================================
+         LEGENDA
+         ====================================================== -->
+    <div class="inv-legend">
+
+        <span class="inv-badge igual">
+            ✓ Igual
+        </span>
+
+        <span class="inv-badge saldo">
+            ↕ Saldo divergente
+        </span>
+
+        <span class="inv-badge unidade">
+            ≠ Unidade
+        </span>
+
+        <span class="inv-badge sistema">
+            S Só no sistema
+        </span>
+
+        <span class="inv-badge arquivo">
+            A Só no arquivo
+        </span>
+
+        <span class="inv-badge ambiguo">
+            ! Ambíguo
+        </span>
+
+        <div class="inv-safe-note">
+            🛡️ Importar não altera o estoque.
+            As alterações só acontecem quando você
+            confirma uma decisão.
+        </div>
+
+    </div>
+
+
+    <!-- ======================================================
+         RESULTADO
+         ====================================================== -->
+    <section
+        class="inv-result"
+        id="invResultado"
+        hidden
+    >
+
+        <div
+            class="inv-summary"
+            id="invSummary"
+        ></div>
+
+
+        <div class="inv-toolbar">
+
+            <input
+                type="search"
+                id="invBusca"
+                placeholder="Buscar código, item ou lote..."
+                oninput="renderLinhas()"
+            >
+
+
+            <select
+                id="invFiltroStatus"
+                onchange="renderLinhas()"
+            >
+                <option value="">
+                    Todos os status
+                </option>
+
+                <option value="SALDO_DIVERGENTE">
+                    Saldo divergente
+                </option>
+
+                <option value="UNIDADE_DIVERGENTE">
+                    Unidade divergente
+                </option>
+
+                <option value="DADOS_DIVERGENTES">
+                    Dados divergentes
+                </option>
+
+                <option value="SO_SISTEMA">
+                    Só no sistema
+                </option>
+
+                <option value="SO_ARQUIVO">
+                    Só no arquivo
+                </option>
+
+                <option value="IGUAL">
+                    Iguais
+                </option>
+
+                <option value="AMBIGUO">
+                    Ambíguos
+                </option>
+            </select>
+
+        </div>
+
+
+        <div class="inv-table-wrap">
+
+            <table class="inv-table">
+
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Código</th>
+                        <th>Lote</th>
+                        <th>Sistema</th>
+                        <th>Arquivo</th>
+                        <th>Diferença</th>
+                        <th>Status</th>
+                        <th>Decisão</th>
+                    </tr>
+                </thead>
+
+                <tbody id="invBody"></tbody>
+
+            </table>
+
+        </div>
+
+
+        <div class="inv-footer">
+
+            <div>
+                <strong id="invContador">
+                    0 decisões
+                </strong>
+
+                <small id="invPendentes"></small>
+            </div>
+
+
+            <button
+                type="button"
+                class="inv-primary"
+                id="btnAplicar"
+                onclick="aplicarDecisoes()"
+            >
+                Aplicar decisões
+            </button>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+<style>
+
+/* ============================================================
+   BASE
+   ============================================================ */
+
+.inv-page {
+    max-width: 1650px;
+    margin: 0 auto;
+    padding: 18px;
+    color: #172033;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+.inv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.inv-kicker {
+    color: #059669;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+}
+
+.inv-header h1 {
+    margin: 4px 0;
+    font-size: clamp(
+        25px,
+        4vw,
+        38px
+    );
+}
+
+.inv-header p {
+    margin: 0;
+    color: #64748b;
+}
+
+.inv-back {
+    text-decoration: none;
+    color: #172033;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    padding: 10px 14px;
+    border-radius: 11px;
+}
+
+
+/* ============================================================
+   IMPORTAÇÃO
+   ============================================================ */
+
+.inv-import-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    box-shadow:
+        0 8px 30px
+        rgba(20, 35, 60, 0.06);
+    overflow: hidden;
+}
+
+.inv-drop {
+    margin: 16px;
+    min-height: 180px;
+    border: 2px dashed #a7d9bb;
+    border-radius: 16px;
+    background: #f4fcf7;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    gap: 7px;
+    text-align: center;
+}
+
+.inv-drop.drag {
+    background: #e9f9ef;
+    border-color: #059669;
+}
+
+.inv-drop-icon {
+    color: #059669;
+    font-size: 34px;
+}
+
+.inv-drop small {
+    color: #64748b;
+}
+
+.inv-drop button {
+    border: none;
+    background: #ffffff;
+    border-radius: 9px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border: 1px solid #dbe5df;
+}
+
+.inv-import-options {
+    display: grid;
+    grid-template-columns:
+        1fr
+        1fr
+        auto;
+
+    gap: 10px;
+    padding:
+        0
+        16px
+        16px;
+}
+
+.inv-import-options label {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.inv-import-options select {
+    width: 100%;
+    display: block;
+    margin-top: 5px;
+    padding: 10px;
+    background: white;
+    border: 1px solid #dfe4ea;
+    border-radius: 9px;
+}
+
+
+/* ============================================================
+   BOTÕES
+   ============================================================ */
+
+.inv-primary {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 15px;
+
+    background:
+        linear-gradient(
+            135deg,
+            #059669,
+            #047857
+        );
+
+    color: white;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.inv-primary:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+
+
+/* ============================================================
+   LEGENDA
+   ============================================================ */
+
+.inv-legend {
+    margin-top: 12px;
+
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+
+    gap: 7px;
+}
+
+.inv-badge {
+    display: inline-flex;
+    align-items: center;
+
+    padding: 5px 8px;
+    border-radius: 999px;
+
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+.inv-badge.igual {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.inv-badge.saldo {
+    background: #ffedd5;
+    color: #9a3412;
+}
+
+.inv-badge.unidade {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.inv-badge.sistema {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.inv-badge.arquivo {
+    background: #f3e8ff;
+    color: #7e22ce;
+}
+
+.inv-badge.ambiguo {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.inv-safe-note {
+    margin-left: auto;
+    padding: 7px 10px;
+    border-radius: 9px;
+
+    color: #475569;
+    background: #f8fafc;
+
+    font-size: 11px;
+}
+
+
+/* ============================================================
+   RESULTADO
+   ============================================================ */
+
+.inv-result {
+    margin-top: 14px;
+
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+
+    box-shadow:
+        0 8px 30px
+        rgba(20, 35, 60, 0.06);
+
+    overflow: hidden;
+}
+
+
+/* ============================================================
+   RESUMO
+   ============================================================ */
+
+.inv-summary {
+    display: grid;
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(
+                100px,
+                1fr
+            )
+        );
+
+    gap: 8px;
+    padding: 12px;
+    background: #f8fafc;
+}
+
+.inv-stat {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 11px;
+    padding: 10px;
+}
+
+.inv-stat strong {
+    display: block;
+    font-size: 20px;
+}
+
+.inv-stat span {
+    color: #64748b;
+    font-size: 11px;
+}
+
+
+/* ============================================================
+   TOOLBAR
+   ============================================================ */
+
+.inv-toolbar {
+    display: grid;
+    grid-template-columns:
+        1fr
+        230px;
+
+    gap: 8px;
+    padding: 11px;
+
+    border-top:
+        1px solid #e5e7eb;
+
+    border-bottom:
+        1px solid #e5e7eb;
+}
+
+.inv-toolbar input,
+.inv-toolbar select {
+    width: 100%;
+    padding: 10px;
+
+    border:
+        1px solid #dfe4ea;
+
+    border-radius: 9px;
+    background: white;
+}
+
+
+/* ============================================================
+   TABELA
+   ============================================================ */
+
+.inv-table-wrap {
+    overflow: auto;
+    max-height: 65vh;
+}
+
+.inv-table {
+    width: 100%;
+    min-width: 1180px;
+
+    border-collapse:
+        separate;
+
+    border-spacing: 0;
+}
+
+.inv-table th {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+
+    background: #172033;
+    color: white;
+
+    padding: 10px;
+
+    text-align: left;
+    font-size: 11px;
+
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+
+.inv-table td {
+    padding: 9px;
+    vertical-align: middle;
+
+    border-bottom:
+        1px solid #edf1f5;
+
+    font-size: 13px;
+}
+
+.inv-table tr:hover td {
+    background: #fbfdfc;
+}
+
+
+/* ============================================================
+   ITEM
+   ============================================================ */
+
+.inv-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+
+    min-width: 230px;
+}
+
+.inv-avatar {
+    width: 42px;
+    height: 42px;
+
+    flex:
+        0
+        0
+        42px;
+
+    border-radius: 10px;
+    object-fit: cover;
+
+    background: #f1f5f9;
+    border: 1px solid #e5e7eb;
+}
+
+.inv-avatar-placeholder {
+    display: grid;
+    place-items: center;
+}
+
+.inv-code {
+    display: inline-flex;
+    padding: 4px 6px;
+
+    border-radius: 6px;
+    background: #f1f5f9;
+
+    font-family:
+        ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        monospace;
+}
+
+
+/* ============================================================
+   SALDOS
+   ============================================================ */
+
+.inv-qty {
+    display: inline-flex;
+    justify-content: center;
+    gap: 4px;
+
+    min-width: 95px;
+
+    padding: 7px 9px;
+
+    background: #f8fafc;
+    border-radius: 8px;
+
+    font-weight: 800;
+}
+
+.inv-diff-positive {
+    color: #047857;
+    font-weight: 900;
+}
+
+.inv-diff-negative {
+    color: #b91c1c;
+    font-weight: 900;
+}
+
+
+/* ============================================================
+   DECISÃO / AMBÍGUO
+   ============================================================ */
+
+.inv-decision-area {
+    min-width: 285px;
+}
+
+.inv-select {
+    width: 100%;
+    padding: 8px;
+
+    border:
+        1px solid #dfe4ea;
+
+    border-radius: 8px;
+    background: white;
+}
+
+.inv-select + .inv-select {
+    margin-top: 6px;
+}
+
+.inv-candidate-select {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.inv-ambiguous-box {
+    margin-bottom: 7px;
+    padding: 8px;
+
+    border:
+        1px solid #f6c35b;
+
+    border-radius: 10px;
+
+    background: #fff8e8;
+}
+
+.inv-ambiguous-title {
+    margin-bottom: 5px;
+    color: #92400e;
+
+    font-size: 11px;
+    font-weight: 900;
+}
+
+
+/* ============================================================
+   RODAPÉ
+   ============================================================ */
+
+.inv-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    gap: 12px;
+    padding: 12px;
+
+    background: white;
+
+    box-shadow:
+        0 -8px 20px
+        rgba(0, 0, 0, .06);
+}
+
+.inv-footer small {
+    display: block;
+    margin-top: 2px;
+    color: #64748b;
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (
+    max-width: 900px
+) {
+
+    .inv-header {
+        flex-direction: column;
+    }
+
+    .inv-import-options {
+        grid-template-columns: 1fr;
+    }
+
+    .inv-summary {
+        grid-template-columns:
+            repeat(
+                2,
+                1fr
+            );
+    }
+
+    .inv-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    .inv-safe-note {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .inv-footer {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .inv-footer button {
+        width: 100%;
+    }
+}
+
+</style>
+
+
+<script>
+
+/* ============================================================
+   ESTADO
+   ============================================================ */
+
+let importacaoAtual = null;
+
+let linhasComparacao = [];
+
+/*
+decisoes:
+
+linhaId => {
+    acao: 'USAR_ARQUIVO',
+    item_id: 123
+}
+*/
+const decisoes = new Map();
+
+const CSRF_INVENTARIO =
+    '{{ csrf_token }}';
+
+
+/* ============================================================
+   UPLOAD
+   ============================================================ */
+
+const invDrop =
+    document.getElementById(
+        'invDrop'
+    );
+
+const invArquivo =
+    document.getElementById(
+        'invArquivo'
+    );
+
+
+invArquivo.addEventListener(
+    'change',
+    atualizarArquivoSelecionado
+);
+
+
+[
+    'dragenter',
+    'dragover'
+].forEach(
+    evento => {
+
+        invDrop.addEventListener(
+            evento,
+            e => {
+
+                e.preventDefault();
+
+                invDrop.classList.add(
+                    'drag'
+                );
+            }
+        );
+    }
+);
+
+
+[
+    'dragleave',
+    'drop'
+].forEach(
+    evento => {
+
+        invDrop.addEventListener(
+            evento,
+            e => {
+
+                e.preventDefault();
+
+                invDrop.classList.remove(
+                    'drag'
+                );
+            }
+        );
+    }
+);
+
+
+invDrop.addEventListener(
+    'drop',
+    e => {
+
+        if (
+            !e.dataTransfer
+            .files
+            .length
+        ) {
+            return;
+        }
+
+        invArquivo.files =
+            e.dataTransfer.files;
+
+        atualizarArquivoSelecionado();
+    }
+);
+
+
+invDrop.addEventListener(
+    'click',
+    e => {
+
+        if (
+            e.target.tagName
+            !== 'BUTTON'
+        ) {
+            invArquivo.click();
+        }
+    }
+);
+
+
+function atualizarArquivoSelecionado() {
+
+    const arquivo =
+        invArquivo.files[0];
+
+    if (!arquivo) {
+        return;
+    }
+
+    document.getElementById(
+        'invNomeArquivo'
+    ).textContent =
+        arquivo.name;
+
+    if (
+        arquivo.name
+        .toLowerCase()
+        .endsWith(
+            '.xml'
+        )
+    ) {
+        document.getElementById(
+            'invTipo'
+        ).value = 'NFE_XML';
+
+    } else {
+        document.getElementById(
+            'invTipo'
+        ).value = 'PLANILHA';
+    }
+}
+
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+function esc(valor) {
+
+    const div =
+        document.createElement(
+            'div'
+        );
+
+    div.textContent =
+        valor ?? '';
+
+    return div.innerHTML;
+}
+
+
+function statusTexto(status) {
+
+    const mapa = {
+        IGUAL:
+            '✓ Igual',
+
+        SALDO_DIVERGENTE:
+            '↕ Saldo',
+
+        UNIDADE_DIVERGENTE:
+            '≠ Unidade',
+
+        DADOS_DIVERGENTES:
+            '⚠ Dados',
+
+        SO_SISTEMA:
+            'S Só sistema',
+
+        SO_ARQUIVO:
+            'A Só arquivo',
+
+        AMBIGUO:
+            '! Ambíguo'
+    };
+
+    return (
+        mapa[status]
+        || status
+    );
+}
+
+
+function statusClasse(status) {
+
+    const mapa = {
+        IGUAL:
+            'igual',
+
+        SALDO_DIVERGENTE:
+            'saldo',
+
+        UNIDADE_DIVERGENTE:
+            'unidade',
+
+        DADOS_DIVERGENTES:
+            'saldo',
+
+        SO_SISTEMA:
+            'sistema',
+
+        SO_ARQUIVO:
+            'arquivo',
+
+        AMBIGUO:
+            'ambiguo'
+    };
+
+    return (
+        mapa[status]
+        || ''
+    );
+}
+
+
+function decisaoAtual(
+    linhaId
+) {
+
+    return (
+        decisoes.get(
+            linhaId
+        )
+        || {
+            acao: '',
+            item_id: null
+        }
+    );
+}
+
+
+/* ============================================================
+   IMPORTAR
+   ============================================================ */
+
+async function compararArquivo() {
+
+    const arquivo =
+        invArquivo.files[0];
+
+    if (!arquivo) {
+
+        alert(
+            'Selecione um arquivo.'
+        );
+
+        return;
+    }
+
+    const botao =
+        document.getElementById(
+            'btnComparar'
+        );
+
+    const textoOriginal =
+        botao.textContent;
+
+    botao.disabled = true;
+    botao.textContent =
+        'Comparando...';
+
+    try {
+
+        const formData =
+            new FormData();
+
+        formData.append(
+            'arquivo',
+            arquivo
+        );
+
+        formData.append(
+            'tipo',
+            document.getElementById(
+                'invTipo'
+            ).value
+        );
+
+        formData.append(
+            'modo',
+            document.getElementById(
+                'invModo'
+            ).value
+        );
+
+        const response =
+            await fetch(
+                '/almoxarifado/inventario/api/importar/',
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'X-CSRFToken':
+                            CSRF_INVENTARIO
+                    },
+
+                    body:
+                        formData
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (
+            !response.ok
+            || !data.success
+        ) {
+            throw new Error(
+                data.error
+                || 'Erro ao comparar.'
+            );
+        }
+
+        importacaoAtual =
+            data.importacao_id;
+
+        decisoes.clear();
+
+        await carregarLinhas();
+
+    } catch (erro) {
+
+        console.error(
+            erro
+        );
+
+        alert(
+            '❌ '
+            + erro.message
+        );
+
+    } finally {
+
+        botao.disabled =
+            false;
+
+        botao.textContent =
+            textoOriginal;
+    }
+}
+
+
+/* ============================================================
+   CARREGAR RESULTADO
+   ============================================================ */
+
+async function carregarLinhas() {
+
+    if (!importacaoAtual) {
+        return;
+    }
+
+    const response =
+        await fetch(
+            `/almoxarifado/inventario/api/${importacaoAtual}/linhas/`
+        );
+
+    const data =
+        await response.json();
+
+    if (
+        !response.ok
+        || !data.success
+    ) {
+
+        alert(
+            data.error
+            || 'Erro ao carregar comparação.'
+        );
+
+        return;
+    }
+
+    linhasComparacao =
+        data.linhas || [];
+
+    renderResumo(
+        data.importacao.resumo
+        || {}
+    );
+
+    renderLinhas();
+
+    const resultado =
+        document.getElementById(
+            'invResultado'
+        );
+
+    resultado.hidden = false;
+
+    resultado.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+    });
+}
+
+
+/* ============================================================
+   RESUMO
+   ============================================================ */
+
+function renderResumo(resumo) {
+
+    const itens = [
+        [
+            'iguais',
+            'Iguais'
+        ],
+        [
+            'saldo_divergente',
+            'Saldo'
+        ],
+        [
+            'unidade_divergente',
+            'Unidade'
+        ],
+        [
+            'so_sistema',
+            'Só sistema'
+        ],
+        [
+            'so_arquivo',
+            'Só arquivo'
+        ],
+        [
+            'ambiguos',
+            'Ambíguos'
+        ]
+    ];
+
+    document.getElementById(
+        'invSummary'
+    ).innerHTML =
+        itens.map(
+            ([chave, nome]) => {
+
+                return `
+                    <div class="inv-stat">
+                        <strong>
+                            ${resumo[chave] || 0}
+                        </strong>
+
+                        <span>
+                            ${nome}
+                        </span>
+                    </div>
+                `;
+            }
+        ).join('');
+}
+
+
+/* ============================================================
+   SELEÇÃO DO ITEM AMBÍGUO
+   ============================================================ */
+
+function selecionarItemAmbiguo(
+    linhaId,
+    itemId
+) {
+
+    const atual =
+        decisaoAtual(
+            linhaId
+        );
+
+    atual.item_id =
+        itemId
+        ? Number(
+            itemId
+        )
+        : null;
+
+    if (
+        !atual.acao
+        && !atual.item_id
+    ) {
+
+        decisoes.delete(
+            linhaId
+        );
+
+    } else {
+
+        decisoes.set(
+            linhaId,
+            atual
+        );
+    }
+
+    atualizarContador();
+}
+
+
+/* ============================================================
+   SELEÇÃO DA AÇÃO
+   ============================================================ */
+
+function definirDecisao(
+    linhaId,
+    acao
+) {
+
+    const linha =
+        linhasComparacao.find(
+            item =>
+                item.id
+                === linhaId
+        );
+
+    const atual =
+        decisaoAtual(
+            linhaId
+        );
+
+    if (
+        acao === 'USAR_ARQUIVO'
+        && linha
+        && linha.status === 'AMBIGUO'
+        && !atual.item_id
+    ) {
+
+        alert(
+            '⚠️ Esta linha possui mais de ' +
+            'um item correspondente.\n\n' +
+            'Escolha primeiro o item ' +
+            'do sistema.'
+        );
+
+        // Re-renderiza para
+        // voltar o select da ação.
+        renderLinhas();
+
+        return;
+    }
+
+    atual.acao =
+        acao || '';
+
+    if (
+        !atual.acao
+        && !atual.item_id
+    ) {
+
+        decisoes.delete(
+            linhaId
+        );
+
+    } else {
+
+        decisoes.set(
+            linhaId,
+            atual
+        );
+    }
+
+    atualizarContador();
+}
+
+
+/* ============================================================
+   RENDERIZAÇÃO
+   ============================================================ */
+
+function renderLinhas() {
+
+    const busca =
+        (
+            document
+            .getElementById(
+                'invBusca'
+            )
+            .value
+            || ''
+        )
+        .trim()
+        .toLowerCase();
+
+    const filtro =
+        document
+        .getElementById(
+            'invFiltroStatus'
+        )
+        .value;
+
+    let html = '';
+
+    for (
+        const linha
+        of linhasComparacao
+    ) {
+
+        if (
+            filtro
+            && linha.status
+            !== filtro
+        ) {
+            continue;
+        }
+
+        const haystack = [
+            linha.codigo,
+            linha.lote,
+            linha.nome,
+            linha.nome_arquivo
+        ]
+        .join(' ')
+        .toLowerCase();
+
+        if (
+            busca
+            && !haystack.includes(
+                busca
+            )
+        ) {
+            continue;
+        }
+
+        const decisao =
+            decisaoAtual(
+                linha.id
+            );
+
+        const qs =
+            linha.quantidade_sistema;
+
+        const qa =
+            linha.quantidade_arquivo;
+
+        const diferenca =
+            (
+                qs === null
+                || qs === undefined
+                || qa === null
+                || qa === undefined
+            )
+            ? null
+            : (
+                Number(qa)
+                - Number(qs)
+            );
+
+        const avatar =
+            linha.foto_url
+            ? `
+                <img
+                    src="${esc(linha.foto_url)}"
+                    class="inv-avatar"
+                    alt=""
+                >
+            `
+            : `
+                <span
+                    class="
+                        inv-avatar
+                        inv-avatar-placeholder
+                    "
+                >
+                    📦
+                </span>
+            `;
+
+        /* ====================================================
+           CANDIDATOS AMBÍGUOS
+           ==================================================== */
+
+        let blocoAmbiguo = '';
+
+        if (
+            linha.status
+            === 'AMBIGUO'
+        ) {
+
+            const candidatos =
+                Array.isArray(
+                    linha.candidatos
+                )
+                ? linha.candidatos
+                : [];
+
+            if (
+                candidatos.length
+            ) {
+
+                const options =
+                    candidatos
+                    .map(
+                        candidato => {
+
+                            const selected =
+                                Number(
+                                    decisao.item_id
+                                )
+                                === Number(
+                                    candidato.id
+                                )
+                                ? 'selected'
+                                : '';
+
+                            return `
+                                <option
+                                    value="${candidato.id}"
+                                    ${selected}
+                                >
+                                    #${candidato.id}
+                                    • ${esc(candidato.nome)}
+                                    • ${candidato.quantidade}
+                                    ${esc(candidato.unidade)}
+                                    • ${esc(
+                                        candidato.localizacao
+                                        || 'Sem local'
+                                    )}
+                                </option>
+                            `;
+                        }
+                    )
+                    .join('');
+
+                blocoAmbiguo = `
+                    <div
+                        class="inv-ambiguous-box"
+                    >
+                        <div
+                            class="inv-ambiguous-title"
+                        >
+                            ⚠️ Existem
+                            ${candidatos.length}
+                            itens correspondentes
+                        </div>
+
+                        <select
+                            class="
+                                inv-select
+                                inv-candidate-select
+                            "
+                            onchange="
+                                selecionarItemAmbiguo(
+                                    ${linha.id},
+                                    this.value
+                                )
+                            "
+                        >
+                            <option value="">
+                                Escolha o item do sistema
+                            </option>
+
+                            ${options}
+                        </select>
+                    </div>
+                `;
+
+            } else {
+
+                blocoAmbiguo = `
+                    <div
+                        class="inv-ambiguous-box"
+                    >
+                        <div
+                            class="inv-ambiguous-title"
+                        >
+                            ⚠️ Nenhum candidato
+                            foi retornado.
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+
+        /* ====================================================
+           OPÇÕES DA DECISÃO
+           ==================================================== */
+
+        let opcoes = `
+            <option value="">
+                Escolha...
+            </option>
+
+            <option
+                value="MANTER_SISTEMA"
+                ${
+                    decisao.acao
+                    === 'MANTER_SISTEMA'
+                    ? 'selected'
+                    : ''
+                }
+            >
+                Manter sistema
+            </option>
+
+            <option
+                value="USAR_ARQUIVO"
+                ${
+                    decisao.acao
+                    === 'USAR_ARQUIVO'
+                    ? 'selected'
+                    : ''
+                }
+            >
+                Usar arquivo
+            </option>
+
+            <option
+                value="IGNORAR"
+                ${
+                    decisao.acao
+                    === 'IGNORAR'
+                    ? 'selected'
+                    : ''
+                }
+            >
+                Ignorar
+            </option>
+        `;
+
+        if (
+            linha.status
+            === 'SO_ARQUIVO'
+        ) {
+
+            opcoes += `
+                <option
+                    value="CRIAR_ITEM"
+                    ${
+                        decisao.acao
+                        === 'CRIAR_ITEM'
+                        ? 'selected'
+                        : ''
+                    }
+                >
+                    Criar novo item
+                </option>
+            `;
+        }
+
+
+        /* ====================================================
+           DIFERENÇA
+           ==================================================== */
+
+        let diferencaHtml = '—';
+
+        if (
+            diferenca !== null
+        ) {
+
+            const classe =
+                diferenca >= 0
+                ? 'inv-diff-positive'
+                : 'inv-diff-negative';
+
+            const sinal =
+                diferenca > 0
+                ? '+'
+                : '';
+
+            diferencaHtml = `
+                <span class="${classe}">
+                    ${sinal}${diferenca}
+                </span>
+            `;
+        }
+
+
+        /* ====================================================
+           LINHA
+           ==================================================== */
+
+        html += `
+            <tr>
+
+                <td>
+                    <div class="inv-item">
+
+                        ${avatar}
+
+                        <div>
+                            <strong>
+                                ${
+                                    esc(
+                                        linha.nome
+                                        || linha.nome_arquivo
+                                        || 'Sem nome'
+                                    )
+                                }
+                            </strong>
+
+                            ${
+                                linha.nome_arquivo
+                                && linha.nome_arquivo
+                                !== linha.nome
+                                ? `
+                                    <br>
+                                    <small>
+                                        Arquivo:
+                                        ${esc(linha.nome_arquivo)}
+                                    </small>
+                                `
+                                : ''
+                            }
+
+                        </div>
+
+                    </div>
+                </td>
+
+
+                <td>
+                    <span class="inv-code">
+                        ${esc(linha.codigo || '—')}
+                    </span>
+                </td>
+
+
+                <td>
+                    ${esc(linha.lote || '—')}
+                </td>
+
+
+                <td>
+                    <span class="inv-qty">
+
+                        ${
+                            qs === null
+                            || qs === undefined
+                            ? '—'
+                            : qs
+                        }
+
+                        ${esc(
+                            linha.unidade_sistema
+                            || ''
+                        )}
+
+                    </span>
+                </td>
+
+
+                <td>
+                    <span class="inv-qty">
+
+                        ${
+                            qa === null
+                            || qa === undefined
+                            ? '—'
+                            : qa
+                        }
+
+                        ${esc(
+                            linha.unidade_arquivo
+                            || ''
+                        )}
+
+                    </span>
+                </td>
+
+
+                <td>
+                    ${diferencaHtml}
+                </td>
+
+
+                <td>
+                    <span
+                        class="
+                            inv-badge
+                            ${statusClasse(
+                                linha.status
+                            )}
+                        "
+                    >
+                        ${
+                            statusTexto(
+                                linha.status
+                            )
+                        }
+                    </span>
+
+                    ${
+                        linha.mensagem
+                        ? `
+                            <br>
+                            <small>
+                                ${esc(linha.mensagem)}
+                            </small>
+                        `
+                        : ''
+                    }
+                </td>
+
+
+                <td>
+                    <div class="inv-decision-area">
+
+                        ${blocoAmbiguo}
+
+                        <select
+                            class="inv-select"
+                            onchange="
+                                definirDecisao(
+                                    ${linha.id},
+                                    this.value
+                                )
+                            "
+                        >
+                            ${opcoes}
+                        </select>
+
+                    </div>
+                </td>
+
+            </tr>
+        `;
+    }
+
+
+    document.getElementById(
+        'invBody'
+    ).innerHTML =
+        html
+        || `
+            <tr>
+                <td
+                    colspan="8"
+                    style="
+                        text-align:center;
+                        padding:30px;
+                    "
+                >
+                    Nenhum resultado encontrado.
+                </td>
+            </tr>
+        `;
+
+    atualizarContador();
+}
+
+
+/* ============================================================
+   CONTADOR
+   ============================================================ */
+
+function atualizarContador() {
+
+    let total = 0;
+
+    decisoes.forEach(
+        decisao => {
+
+            if (
+                decisao.acao
+            ) {
+                total++;
+            }
+        }
+    );
+
+    document.getElementById(
+        'invContador'
+    ).textContent =
+        `${total} decisões`;
+
+    const pendentes =
+        linhasComparacao.filter(
+            linha =>
+                !linha.aplicado
+        ).length;
+
+    document.getElementById(
+        'invPendentes'
+    ).textContent =
+        `${pendentes} linha(s) ainda não aplicada(s)`;
+}
+
+
+/* ============================================================
+   APLICAR
+   ============================================================ */
+
+async function aplicarDecisoes() {
+
+    const payloadDecisoes = [
+        ...decisoes
+    ]
+    .filter(
+        (
+            [
+                linhaId,
+                decisao
+            ]
+        ) => {
+            return Boolean(
+                decisao.acao
+            );
+        }
+    )
+    .map(
+        (
+            [
+                linhaId,
+                decisao
+            ]
+        ) => ({
+            linha_id:
+                linhaId,
+
+            acao:
+                decisao.acao,
+
+            item_id:
+                decisao.item_id
+                || null
+        })
+    );
+
+
+    if (
+        !payloadDecisoes.length
+    ) {
+
+        alert(
+            'Selecione pelo menos uma decisão.'
+        );
+
+        return;
+    }
+
+
+    /* ========================================================
+       VALIDA AMBÍGUOS ANTES DE ENVIAR
+       ======================================================== */
+
+    for (
+        const decisao
+        of payloadDecisoes
+    ) {
+
+        const linha =
+            linhasComparacao.find(
+                item =>
+                    item.id
+                    === decisao.linha_id
+            );
+
+        if (
+            linha
+            && linha.status
+            === 'AMBIGUO'
+            && decisao.acao
+            === 'USAR_ARQUIVO'
+            && !decisao.item_id
+        ) {
+
+            alert(
+                '⚠️ Há uma linha ambígua '
+                + 'sem item selecionado.\n\n'
+                + `Código: ${linha.codigo}\n`
+                + `Lote: ${linha.lote || '-'}\n\n`
+                + 'Escolha o item do sistema '
+                + 'antes de usar o arquivo.'
+            );
+
+            return;
+        }
+    }
+
+
+    if (
+        !confirm(
+            `Aplicar ${payloadDecisoes.length} decisão(ões)?`
+        )
+    ) {
+        return;
+    }
+
+
+    const botao =
+        document.getElementById(
+            'btnAplicar'
+        );
+
+    const textoOriginal =
+        botao.textContent;
+
+    botao.disabled = true;
+    botao.textContent =
+        'Aplicando...';
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/almoxarifado/inventario/api/${importacaoAtual}/aplicar/`,
+                {
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type':
+                            'application/json',
+
+                        'X-CSRFToken':
+                            CSRF_INVENTARIO
+                    },
+
+                    body:
+                        JSON.stringify({
+                            decisoes:
+                                payloadDecisoes
+                        })
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        console.log(
+            'RESULTADO INVENTÁRIO:',
+            data
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error
+                || `Erro HTTP ${response.status}`
+            );
+        }
+
+
+        if (
+            data.erros
+            && data.erros.length
+        ) {
+
+            const mensagens =
+                data.erros.map(
+                    (
+                        erro,
+                        indice
+                    ) => {
+
+                        const linha =
+                            erro.linha
+                            || {};
+
+                        return (
+                            `${indice + 1}. `
+                            + `Linha #${erro.linha_id}\n`
+                            + `Código: ${linha.codigo || '-'}\n`
+                            + `Lote: ${linha.lote || '-'}\n`
+                            + `Ação: ${erro.acao || '-'}\n`
+                            + `Item escolhido: ${erro.item_id || '-'}\n`
+                            + `Tipo: ${erro.tipo_erro || '-'}\n`
+                            + `Erro: ${erro.erro || 'Erro desconhecido'}`
+                        );
+                    }
+                )
+                .join(
+                    '\n\n'
+                );
+
+
+            alert(
+                `⚠️ Aplicadas: ${data.aplicadas}\n`
+                + `❌ Erros: ${data.erros.length}\n\n`
+                + mensagens
+            );
+
+
+            // Remove somente as decisões
+            // que realmente foram aplicadas
+            // na próxima carga.
+            await carregarLinhas();
+
+            return;
+        }
+
+
+        alert(
+            `✅ ${data.aplicadas} decisão(ões) `
+            + `aplicada(s) com sucesso.`
+        );
+
+
+        decisoes.clear();
+
+        await carregarLinhas();
+
+
+    } catch (erro) {
+
+        console.error(
+            'Erro ao aplicar inventário:',
+            erro
+        );
+
+
+        alert(
+            '❌ Erro ao aplicar:\n\n'
+            + erro.message
+        );
+
+
+    } finally {
+
+        botao.disabled =
+            false;
+
+        botao.textContent =
+            textoOriginal;
+    }
+}
+
+</script>
+
+{% endblock %}
