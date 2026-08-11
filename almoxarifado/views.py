@@ -152,6 +152,9 @@ def saidas_list(request):
     }
     return render(request, 'almoxarifado/saidas_list.html', context)
 
+from datetime import date
+from django.db.models import OuterRef, Subquery
+from .models import DadosValidadeItem
 
 def buscar_itens_ajax(request):
     busca = request.GET.get('busca', '')
@@ -183,20 +186,53 @@ def buscar_itens_ajax(request):
     if departamento:
         itens = itens.filter(departamento=departamento)
     
-    ordenacao_map = {'nome': 'nome', '-quantidade': '-quantidade', 'quantidade': 'quantidade', 'recente': '-updated_at'}
+    # Ordenação incluindo 'vencimento'
+    ordenacao_map = {
+        'nome': 'nome',
+        '-quantidade': '-quantidade',
+        'quantidade': 'quantidade',
+        'recente': '-updated_at',
+        'vencimento': 'data_vencimento__isnull',  # NULL por último
+        '-vencimento': '-data_vencimento',
+    }
     itens = itens.order_by(ordenacao_map.get(ordenar, 'nome'))
+    
+    # ===== ADICIONAR DADOS DE VALIDADE =====
+    # Subquery para buscar dados de validade
+    validade_subquery = DadosValidadeItem.objects.filter(item=OuterRef('id'))
+    itens = itens.annotate(
+        data_fabricacao=Subquery(validade_subquery.values('data_fabricacao')[:1]),
+        data_vencimento=Subquery(validade_subquery.values('data_vencimento')[:1]),
+    )
+    
+    hoje = date.today()
     
     data = {
         'itens': [{
-            'id': i.id, 'codigo': i.codigo, 'nome': i.nome,
-            'quantidade': float(i.quantidade), 'unidade': i.get_unidade_display(),
-            'localizacao': i.localizacao or '-', 'departamento': i.get_departamento_display(),
-            'status_estoque': i.status_estoque, 'lote': i.lote or '-', 'ca': i.ca or '-',
+            'id': i.id,
+            'codigo': i.codigo,
+            'nome': i.nome,
+            'quantidade': float(i.quantidade),
+            'unidade': i.get_unidade_display(),
+            'localizacao': i.localizacao or '-',
+            'departamento': i.get_departamento_display(),
+            'status_estoque': i.status_estoque,
+            'lote': i.lote or '-',
+            'ca': i.ca or '-',
             'tamanho': i.tamanho or '-',
+            # --- CAMPOS DE VALIDADE ---
+            'data_fabricacao': i.data_fabricacao.strftime('%Y-%m-%d') if i.data_fabricacao else None,
+            'data_vencimento': i.data_vencimento.strftime('%Y-%m-%d') if i.data_vencimento else None,
+            'dias_para_vencer': (i.data_vencimento - hoje).days if i.data_vencimento else None,
+            'status_vencimento': (
+                'vencido' if (i.data_vencimento and (i.data_vencimento - hoje).days < 0) else
+                'proximo' if (i.data_vencimento and (i.data_vencimento - hoje).days <= 30) else
+                'em_dia' if i.data_vencimento else
+                'sem_data'
+            ),
         } for i in itens],
     }
     return JsonResponse(data)
-
 
 @require_http_methods(["GET"])
 def buscar_por_codigo(request):
