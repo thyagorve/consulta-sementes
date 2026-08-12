@@ -2,1114 +2,1208 @@
 
 {% block title %}Almoxarifado{% endblock %}
 
-{% block content %}
+{% block extra_css %}
 <style>
-/* ============================================================
-   RESET E VARIÁVEIS
-   ============================================================ */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-:root {
-  --primary: #059669;
-  --primary-dark: #047857;
-  --primary-light: #10b981;
-  --secondary: #6366f1;
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --info: #3b82f6;
-  --success: #10b981;
-  --dark: #1f2937;
-  --gray: #6b7280;
-  --gray-light: #9ca3af;
-  --light: #f3f4f6;
-  --border: #e5e7eb;
-  --white: #ffffff;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-lg: 16px;
-  --zebra-width: 100mm;
-  --zebra-height: 50mm;
-  --zebra-padding: 3mm;
-}
-body {
-  background: #f9fafb;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
+  /* ============================================================
+     RESET & VARIÁVEIS (mobile-first)
+     ============================================================ */
+  :root {
+    --primary: #059669;
+    --primary-dark: #047857;
+    --primary-light: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --info: #3b82f6;
+    --success: #10b981;
+    --dark: #1f2937;
+    --gray: #6b7280;
+    --gray-light: #9ca3af;
+    --light: #f3f4f6;
+    --border: #e5e7eb;
+    --white: #ffffff;
+    --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --zebra-width: 100mm;
+    --zebra-height: 50mm;
+    --zebra-padding: 3mm;
+    --font-xs: clamp(0.625rem, 1.5vw, 0.75rem);
+    --font-sm: clamp(0.7rem, 1.7vw, 0.8rem);
+    --font-md: clamp(0.8rem, 2vw, 0.9rem);
+    --font-lg: clamp(1rem, 3vw, 1.3rem);
+    --font-xl: clamp(1.2rem, 4vw, 2rem);
+    --touch-target: 44px;
+  }
 
-/* ============================================================
-   CONTAINER PRINCIPAL
-   ============================================================ */
-.almox-container {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: clamp(10px, 2vw, 30px);
-}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* ============================================================
-   HEADER
-   ============================================================ */
-.dashboard-header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
-  padding: 16px 20px;
-  background: linear-gradient(125deg, #0b5f49 0%, #087f5b 48%, #176a7f 100%);
-  border-radius: 26px;
-  box-shadow: 0 24px 55px rgba(4, 78, 57, 0.22);
-}
-.dashboard-header .header-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1 1 200px;
-}
-.dashboard-header .title-icon {
-  width: 52px;
-  height: 52px;
-  background: rgba(255, 255, 255, 0.16);
-  border-radius: 19px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2rem;
-  flex-shrink: 0;
-}
-.dashboard-header h1 {
-  font-size: clamp(1.3rem, 3vw, 2rem);
-  font-weight: 700;
-  color: #fff;
-  margin: 0;
-}
-.dashboard-header .header-subtitle {
-  color: rgba(255, 255, 255, 0.76);
-  font-size: clamp(0.7rem, 1vw, 0.9rem);
-}
-.dashboard-header .header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-  flex: 1 1 auto;
-}
-.dashboard-header .action-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.11);
-  border: 1px solid rgba(255, 255, 255, 0.20);
-  border-radius: 40px;
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.8rem;
-  cursor: pointer;
-  transition: 0.2s;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.dashboard-header .action-chip:hover {
-  background: #fff;
-  color: #075f48;
-  transform: translateY(-2px);
-}
-.dashboard-header .cart-badge {
-  background: #f4a51c;
-  border-color: #ffc75e;
-  color: #392400;
-}
+  body {
+    background: #f9fafb;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: var(--font-sm);
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
 
-/* ============================================================
-   STATS CARDS
-   ============================================================ */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.stat-card {
-  background: #fff;
-  border-radius: var(--radius);
-  padding: 18px 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  transition: 0.2s;
-  cursor: pointer;
-}
-.stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
-}
-.stat-card-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.6rem;
-  flex-shrink: 0;
-  background: rgba(5, 150, 105, 0.1);
-}
-.stat-card-content {
-  flex: 1;
-  min-width: 0;
-}
-.stat-card-label {
-  font-size: 0.65rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
-  color: var(--gray);
-  display: block;
-}
-.stat-card-value {
-  font-size: clamp(1.2rem, 3vw, 1.8rem);
-  font-weight: 700;
-  color: var(--dark);
-  line-height: 1.2;
-}
-.stat-meta {
-  display: block;
-  font-size: 0.65rem;
-  color: var(--gray-light);
-}
-.stat-card-success .stat-card-icon { background: rgba(16, 185, 129, 0.1); }
-.stat-card-info .stat-card-icon { background: rgba(59, 130, 246, 0.1); }
-.stat-card-warning .stat-card-icon { background: rgba(245, 158, 11, 0.1); }
-.stat-card-danger .stat-card-icon { background: rgba(239, 68, 68, 0.1); }
+  .almox-container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: clamp(8px, 2vw, 24px);
+  }
 
-/* ============================================================
-   BUSCA E FILTROS
-   ============================================================ */
-.search-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.91);
-  border-radius: 18px;
-  border: 1px solid var(--border);
-}
-.search-wrapper {
-  flex: 2 1 260px;
-  min-width: 180px;
-  position: relative;
-}
-.search-icon {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 1rem;
-  opacity: 0.6;
-}
-.search-input-modern {
-  width: 100%;
-  padding: 12px 16px 12px 40px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 0.9rem;
-  background: #fff;
-  transition: 0.2s;
-}
-.search-input-modern:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
-}
-.filters-group {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  flex: 3 1 auto;
-}
-.filter-select {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: #fff;
-  font-size: 0.85rem;
-  cursor: pointer;
-  flex: 1 1 120px;
-  min-width: 100px;
-}
-.checkbox-filter-modern {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-.btn-clear-filters {
-  padding: 8px 16px;
-  background: var(--danger);
-  color: white;
-  border: none;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.filter-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #eff6ff;
-  color: #1e40af;
-  padding: 4px 12px;
-  border-radius: 40px;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
+  /* ============================================================
+     HEADER (mobile-first: coluna)
+     ============================================================ */
+  .dashboard-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+    background: linear-gradient(125deg, #0b5f49 0%, #087f5b 48%, #176a7f 100%);
+    border-radius: 18px;
+    margin-bottom: 20px;
+    box-shadow: 0 20px 40px rgba(4,78,57,0.2);
+  }
 
-/* ============================================================
-   LEGENDA DE VALIDADE
-   ============================================================ */
-.validade-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  margin-bottom: 16px;
-}
-.validade-legend-title {
-  font-weight: 800;
-  font-size: 0.8rem;
-  color: var(--dark);
-}
-.validade-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #475569;
-}
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.dot.vencido { background: #ef4444; }
-.dot.proximo { background: #f59e0b; }
-.dot.em-dia { background: #10b981; }
-.dot.sem-data { background: #94a3b8; }
-.validade-legend small {
-  margin-left: auto;
-  color: #94a3b8;
-  font-size: 0.7rem;
-}
+  .dashboard-header .header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
 
-/* ============================================================
-   TABELA
-   ============================================================ */
-.table-wrapper-modern {
-  background: #fff;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-}
-.table-scroll {
-  overflow-x: auto;
-  overflow-y: auto;
-  max-height: calc(100vh - 520px);
-  min-height: 300px;
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 900px;
-}
-.data-table thead {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.data-table th {
-  background: #f8fafc;
-  padding: 12px 10px;
-  text-align: left;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--gray);
-  border-bottom: 2px solid var(--border);
-  white-space: nowrap;
-}
-.data-table td {
-  padding: 12px 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.8rem;
-  color: var(--dark);
-}
-.data-row {
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.data-row:hover {
-  background: #f0fdf4;
-}
-.item-avatar-mini {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  object-fit: cover;
-  border: 1px solid #dfe7e2;
-}
-.avatar-placeholder {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  background: #f1f5f9;
-  border-radius: 10px;
-  font-size: 1.2rem;
-}
-.item-code {
-  font-weight: 600;
-  color: var(--primary);
-  font-size: 0.75rem;
-  background: rgba(5, 150, 105, 0.1);
-  padding: 2px 8px;
-  border-radius: 20px;
-  display: inline-block;
-  white-space: nowrap;
-}
-.item-name {
-  font-weight: 500;
-}
-.item-row-sub {
-  display: block;
-  font-size: 0.6rem;
-  color: #94a3b8;
-  margin-top: 2px;
-}
-.stock-badge {
-  display: inline-block;
-  padding: 3px 10px;
-  border-radius: 40px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.stock-alto { background: #d1fae5; color: #065f46; }
-.stock-medio { background: #dbeafe; color: #1e40af; }
-.stock-baixo { background: #fef3c7; color: #92400e; }
-.stock-zerado { background: #fee2e2; color: #991b1b; }
-.validade-badge {
-  display: inline-block;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.validade-badge.vencido { background: #fee2e2; color: #991b1b; }
-.validade-badge.proximo { background: #fef3c7; color: #92400e; }
-.validade-badge.em-dia { background: #dcfce7; color: #166534; }
-.validade-badge.sem-data { background: #e2e8f0; color: #475569; }
-.filter-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-left: 4px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.65rem;
-  transition: 0.2s;
-}
-.filter-icon:hover,
-.filter-icon.active {
-  background: var(--primary);
-  color: white;
-}
-.row-vencido td { background: #fff5f5; }
-.row-vencido:hover td { background: #feecec; }
-.row-proximo td { background: #fffdf3; }
-.row-proximo:hover td { background: #fff8dc; }
-.row-em-dia td { background: #fbfffc; }
-.row-sem-data td { background: #fafafa; color: #64748b; }
+  .dashboard-header .title-icon {
+    width: clamp(40px, 8vw, 52px);
+    height: clamp(40px, 8vw, 52px);
+    background: rgba(255,255,255,0.16);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    flex-shrink: 0;
+  }
 
-/* ============================================================
-   PAINEL DE FILTRO POR COLUNA
-   ============================================================ */
-.filter-panel {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 90%;
-  max-width: 400px;
-  max-height: 80vh;
-  background: #fff;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  z-index: 1100;
-  display: none;
-  flex-direction: column;
-  overflow: hidden;
-}
-.filter-panel.open { display: flex; }
-.filter-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 18px;
-  background: var(--primary);
-  color: white;
-}
-.filter-panel-body {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
-}
-.filter-panel-search {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-bottom: 12px;
-}
-.filter-values-list {
-  max-height: 250px;
-  overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.filter-value-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-}
-.filter-value-item:hover { background: var(--light); }
-.filter-panel-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-top: 1px solid var(--border);
-}
+  .dashboard-header h1 {
+    font-size: var(--font-xl);
+    font-weight: 700;
+    color: #fff;
+    margin: 0;
+  }
 
-/* ============================================================
-   SIDE PANELS
-   ============================================================ */
-.side-panel-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1040;
-  opacity: 0;
-  visibility: hidden;
-  transition: 0.3s;
-}
-.side-panel-overlay.active {
-  opacity: 1;
-  visibility: visible;
-}
-.side-panel {
-  position: fixed;
-  top: 0;
-  right: -100%;
-  width: 100%;
-  max-width: 550px;
-  height: 100vh;
-  background: #fff;
-  box-shadow: -4px 0 30px rgba(0, 0, 0, 0.15);
-  z-index: 1050;
-  transition: right 0.3s ease;
-  display: flex;
-  flex-direction: column;
-}
-.side-panel.open { right: 0; }
-.side-panel-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(125deg, #064e3b, #0f766e);
-  color: #fff;
-}
-.side-panel-header h3 {
-  font-size: 1.1rem;
-  margin: 0;
-}
-.panel-header-danger { background: linear-gradient(125deg, #991b1b, #dc2626); }
-.panel-header-warning { background: linear-gradient(125deg, #92400e, #d97706); }
-.panel-header-success { background: linear-gradient(125deg, #065f46, #059669); }
-.btn-close-panel {
-  background: rgba(255, 255, 255, 0.15);
-  border: none;
-  color: #fff;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-.side-panel-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
-}
-.side-panel-footer {
-  padding: 12px 20px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 10px;
-  background: #fff;
-}
-.side-panel-footer .btn-block { flex: 1; }
+  .dashboard-header .header-subtitle {
+    color: rgba(255,255,255,0.76);
+    font-size: var(--font-xs);
+  }
 
-/* ============================================================
-   FORMULÁRIOS
-   ============================================================ */
-.modern-form .form-group { margin-bottom: 14px; }
-.modern-form label {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--gray);
-  margin-bottom: 4px;
-}
-.modern-form input,
-.modern-form select,
-.modern-form textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  background: #fff;
-}
-.modern-form input:focus,
-.modern-form select:focus,
-.modern-form textarea:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
-}
-.form-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
-}
-.input-group { display: flex; gap: 8px; }
-.input-group-btn {
-  padding: 0 16px;
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.photo-upload {
-  border: 2px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  text-align: center;
-}
-.photo-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-.photo-btn {
-  padding: 6px 16px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.photo-preview { position: relative; margin-top: 12px; }
-.photo-preview img { max-width: 100%; max-height: 180px; border-radius: var(--radius); }
-.photo-remove {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  background: var(--danger);
-  color: #fff;
-  border: none;
-  border-radius: 50%;
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-}
+  .header-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.3) transparent;
+  }
 
-/* ============================================================
-   BOTÕES GERAIS
-   ============================================================ */
-.btn-primary {
-  background: var(--primary);
-  color: #fff;
-  border: none;
-  padding: 10px 18px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.2s;
-}
-.btn-primary:hover { background: var(--primary-dark); }
-.btn-secondary {
-  background: #fff;
-  color: var(--dark);
-  border: 1px solid var(--border);
-  padding: 10px 18px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-  cursor: pointer;
-}
-.btn-danger {
-  background: var(--danger);
-  color: #fff;
-  border: none;
-  padding: 10px 18px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-.btn-danger:hover { background: #dc2626; }
-.btn-block { width: 100%; }
+  .header-actions::-webkit-scrollbar { height: 4px; }
+  .header-actions::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
 
-/* ============================================================
-   MODALS (WhatsApp e Preview)
-   ============================================================ */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(3px);
-  z-index: 1200;
-  opacity: 0;
-  visibility: hidden;
-  transition: 0.3s;
-}
-.modal-overlay.active {
-  opacity: 1;
-  visibility: visible;
-}
-.modal-container {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 95%;
-  max-width: 750px;
-  max-height: 90vh;
-  background: #fff;
-  border-radius: 20px;
-  box-shadow: var(--shadow-lg);
-  z-index: 1201;
-  display: none;
-  flex-direction: column;
-  overflow: hidden;
-}
-.modal-container.open { display: flex; }
-.modal-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  border-bottom: 1px solid var(--border);
-}
-.modal-header-wa {
-  background: linear-gradient(135deg, #25D366, #128C7E);
-  color: #fff;
-}
-.modal-header-icon {
-  width: 44px;
-  height: 44px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-}
-.modal-header-title { flex: 1; }
-.modal-header-title h3 { margin: 0; font-size: 1.1rem; }
-.modal-header-title p { margin: 2px 0 0; font-size: 0.75rem; opacity: 0.8; }
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1.4rem;
-  cursor: pointer;
-  color: #666;
-}
-.modal-body { flex: 1; overflow-y: auto; padding: 20px; }
-.modal-footer {
-  padding: 12px 20px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  background: #fff;
-}
-.modal-preview { max-width: 450px; }
-.modal-preview .modal-body { background: #e5ddd5; }
-.whatsapp-message {
-  background: #fff;
-  padding: 12px;
-  border-radius: 12px;
-  max-width: 90%;
-  margin: 0 auto;
-}
+  .action-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.11);
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 40px;
+    color: #fff;
+    font-weight: 600;
+    font-size: var(--font-xs);
+    cursor: pointer;
+    transition: 0.2s;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: var(--touch-target);
+  }
 
-/* ============================================================
-   WHATSAPP TABS
-   ============================================================ */
-.wa-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px;
-  background: #eaf2ef;
-  border-radius: 14px;
-  margin-bottom: 16px;
-}
-.wa-tab {
-  padding: 8px 14px;
-  background: none;
-  border: none;
-  border-radius: 10px;
-  font-weight: 600;
-  font-size: 0.75rem;
-  color: var(--gray);
-  cursor: pointer;
-  transition: 0.2s;
-  white-space: nowrap;
-}
-.wa-tab.active {
-  background: #fff;
-  color: var(--primary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-.wa-tab-content { display: none; }
-.wa-tab-content.active { display: block; }
+  .action-chip:hover {
+    background: #fff;
+    color: #075f48;
+    transform: translateY(-2px);
+  }
 
-/* ============================================================
-   INSTÂNCIAS E LISTAS
-   ============================================================ */
-.instancias-list,
-.numeros-list {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-.instancia-item,
-.numero-item {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-}
-.instancia-item.selected { background: #d1fae5; border-left: 3px solid var(--primary); }
-.instancia-status {
-  font-size: 0.65rem;
-  padding: 2px 8px;
-  border-radius: 20px;
-}
-.status-connected { background: #d1fae5; color: #065f46; }
-.status-disconnected { background: #fee2e2; color: #991b1b; }
+  .cart-badge { background: #f4a51c; border-color: #ffc75e; color: #392400; }
 
-/* ============================================================
-   TOAST
-   ============================================================ */
-.toast-modern {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  padding: 12px 20px;
-  background: var(--dark);
-  color: #fff;
-  border-radius: var(--radius);
-  font-weight: 500;
-  z-index: 2000;
-  opacity: 0;
-  transform: translateY(20px);
-  transition: 0.3s;
-  pointer-events: none;
-  box-shadow: var(--shadow-lg);
-}
-.toast-modern.show { opacity: 1; transform: translateY(0); }
-.toast-modern.success { background: var(--success); }
-.toast-modern.error { background: var(--danger); }
+  /* ============================================================
+     STATS CARDS (grid responsivo)
+     ============================================================ */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
 
-/* ============================================================
-   FAB BUTTON
-   ============================================================ */
-.fab-modern {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary), var(--primary-light));
-  color: #fff;
-  border: none;
-  font-size: 2rem;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(5, 150, 105, 0.4);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.fab-modern:hover { transform: scale(1.08); }
+  .stat-card {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 12px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    transition: 0.2s;
+    cursor: pointer;
+    min-height: var(--touch-target);
+  }
 
-/* ============================================================
-   ZEBRA STUDIO
-   ============================================================ */
-.zebra-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.68);
-  backdrop-filter: blur(4px);
-  z-index: 1400;
-  opacity: 0;
-  visibility: hidden;
-  transition: 0.25s;
-}
-.zebra-overlay.active {
-  opacity: 1;
-  visibility: visible;
-}
-.zebra-studio {
-  position: fixed;
-  inset: 4vh 3vw;
-  display: none;
-  flex-direction: column;
-  background: #fff;
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.35);
-  z-index: 1410;
-}
-.zebra-studio.open { display: flex; }
-.zebra-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #0f172a, #1e293b 60%, #065f46);
-  color: #fff;
-}
-.zebra-header h3 { font-size: 1.1rem; margin: 0; }
-.zebra-header p { font-size: 0.75rem; margin: 0; color: #cbd5e1; }
-.zebra-close {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: #fff;
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-.zebra-body {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  flex: 1;
-  min-height: 0;
-}
-.zebra-controls {
-  padding: 16px;
-  overflow-y: auto;
-  border-right: 1px solid var(--border);
-  background: #fbfdfc;
-}
-.zebra-controls select,
-.zebra-controls input,
-.zebra-controls textarea {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #fff;
-}
-.zebra-controls textarea { min-height: 120px; font-family: monospace; }
-.zebra-toolbar {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr) 8px repeat(3, 1fr);
-  gap: 6px;
-  margin: 10px 0;
-}
-.zebra-toolbar button {
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: #f8fafc;
-  cursor: pointer;
-}
-.zebra-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 14px;
-}
-.zebra-preview-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: #e2e8f0;
-  overflow: auto;
-}
-.zebra-ruler {
-  margin-bottom: 10px;
-  padding: 4px 12px;
-  border-radius: 20px;
-  background: rgba(15, 23, 42, 0.78);
-  color: #fff;
-  font-size: 0.7rem;
-}
-.zebra-label {
-  width: var(--zebra-width);
-  height: var(--zebra-height);
-  padding: var(--zebra-padding);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.22);
-  overflow: hidden;
-}
-.zebra-label-text {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: pre;
-  text-align: center;
-  font-family: Arial, sans-serif;
-  font-weight: 800;
-  line-height: 1.06;
-}
+  .stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
-/* ============================================================
-   RESPONSIVIDADE
-   ============================================================ */
-@media (max-width: 992px) {
-  .dashboard-header { padding: 16px; }
-  .zebra-body { grid-template-columns: 1fr; }
-  .zebra-controls { border-right: 0; border-bottom: 1px solid var(--border); }
-  .zebra-preview-area { min-height: 300px; }
-  .table-scroll { max-height: 60vh; }
-}
+  .stat-card-icon {
+    width: clamp(32px, 7vw, 42px);
+    height: clamp(32px, 7vw, 42px);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    background: rgba(5,150,105,0.1);
+  }
 
-@media (max-width: 768px) {
-  .almox-container { padding: 8px; }
-  .dashboard-header { flex-direction: column; align-items: stretch; border-radius: 18px; }
-  .dashboard-header .header-actions { justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
-  .dashboard-header .action-chip { white-space: nowrap; flex: 0 0 auto; font-size: 0.7rem; padding: 6px 12px; }
-  .dashboard-header .title-icon { width: 44px; height: 44px; font-size: 1.6rem; }
-  
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .stat-card { padding: 12px; gap: 10px; }
-  .stat-card-icon { width: 38px; height: 38px; font-size: 1.2rem; }
-  .stat-card-value { font-size: 1.2rem; }
-  
-  .search-filters { flex-direction: column; padding: 12px; }
-  .search-wrapper { flex: 1 1 auto; }
-  .filters-group { flex-wrap: wrap; }
-  .filter-select { flex: 1 1 140px; min-width: 120px; }
-  .checkbox-filter-modern { flex: 0 1 auto; }
-  
-  .side-panel { max-width: 100%; width: 100%; }
-  .side-panel-footer { flex-direction: column; }
-  .side-panel-footer .btn-block { width: 100%; }
-  
-  .modal-container { width: 98%; max-height: 95vh; }
-  .form-row { grid-template-columns: 1fr; }
-  
-  .fab-modern { width: 48px; height: 48px; font-size: 1.6rem; bottom: 16px; right: 16px; }
-  
-  .zebra-studio { inset: 0; border-radius: 0; }
-}
+  .stat-card-content { flex: 1; min-width: 0; }
 
-@media (max-width: 480px) {
-  .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-  .stat-card { flex-direction: column; align-items: flex-start; padding: 12px; }
-  .stat-card-icon { width: 34px; height: 34px; font-size: 1rem; }
-  .stat-card-value { font-size: 1.1rem; }
-  .stat-meta { font-size: 0.55rem; }
-  
-  .dashboard-header .action-chip { font-size: 0.65rem; padding: 4px 8px; }
-  .dashboard-header h1 { font-size: 1.2rem; }
-  
-  .filter-select { flex: 1 1 100%; }
-  .checkbox-filter-modern { flex: 1 1 100%; justify-content: center; }
-  
-  .data-table { font-size: 0.7rem; min-width: 700px; }
-  .data-table th, .data-table td { padding: 6px 6px; }
-  .item-avatar-mini, .avatar-placeholder { width: 28px; height: 28px; font-size: 0.8rem; }
-  .stock-badge { font-size: 0.6rem; padding: 2px 6px; }
-  .validade-badge { font-size: 0.55rem; padding: 2px 6px; }
-  
-  .wa-tabs { flex-wrap: nowrap; overflow-x: auto; }
-  .wa-tab { font-size: 0.65rem; padding: 6px 10px; }
-  
-  .zebra-toolbar { grid-template-columns: repeat(3, 1fr); gap: 4px; }
-  .zebra-actions { grid-template-columns: 1fr; }
-  .zebra-dimensions { grid-template-columns: 1fr; }
-  
-  .modal-header { flex-wrap: wrap; }
+  .stat-card-label {
+    font-size: 0.55rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    color: var(--gray);
+    display: block;
+  }
+
+  .stat-card-value {
+    font-size: clamp(1rem, 3vw, 1.6rem);
+    font-weight: 700;
+    color: var(--dark);
+    line-height: 1.2;
+  }
+
+  .stat-meta { font-size: 0.55rem; color: var(--gray-light); display: block; }
+
+  .stat-card-success .stat-card-icon { background: rgba(16,185,129,0.1); }
+  .stat-card-info .stat-card-icon { background: rgba(59,130,246,0.1); }
+  .stat-card-warning .stat-card-icon { background: rgba(245,158,11,0.1); }
+  .stat-card-danger .stat-card-icon { background: rgba(239,68,68,0.1); }
+
+  /* ============================================================
+     BUSCA E FILTROS (mobile-first: coluna)
+     ============================================================ */
+  .search-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: rgba(255,255,255,0.91);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .search-wrapper { width: 100%; position: relative; }
+
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1rem;
+    opacity: 0.6;
+  }
+
+  .search-input-modern {
+    width: 100%;
+    padding: 10px 16px 10px 38px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: var(--font-sm);
+    background: #fff;
+    transition: 0.2s;
+    min-height: var(--touch-target);
+  }
+
+  .search-input-modern:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(5,150,105,0.1); }
+
+  .filters-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+  .filter-select {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #fff;
+    font-size: var(--font-xs);
+    cursor: pointer;
+    flex: 1 1 120px;
+    min-width: 100px;
+    min-height: var(--touch-target);
+  }
+
+  .checkbox-filter-modern {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: var(--font-xs);
+    white-space: nowrap;
+    min-height: var(--touch-target);
+  }
+
+  .btn-clear-filters {
+    padding: 8px 14px;
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-weight: 500;
+    white-space: nowrap;
+    min-height: var(--touch-target);
+  }
+
+  .active-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+
+  .filter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eff6ff;
+    color: #1e40af;
+    padding: 4px 12px;
+    border-radius: 40px;
+    font-size: 0.65rem;
+    font-weight: 500;
+  }
+
+  .filter-badge button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #1e40af;
+    font-size: 0.9rem;
+    padding: 2px;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  /* ============================================================
+     LEGENDA VALIDADE
+     ============================================================ */
+  .validade-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 14px;
+  }
+
+  .validade-legend-title {
+    font-weight: 800;
+    font-size: var(--font-xs);
+    color: var(--dark);
+    width: 100%;
+  }
+
+  .validade-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #475569;
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.vencido { background: #ef4444; }
+  .dot.proximo { background: #f59e0b; }
+  .dot.em-dia { background: #10b981; }
+  .dot.sem-data { background: #94a3b8; }
+
+  .validade-legend small { display: none; }
+
+  /* ============================================================
+     TABELA (scroll horizontal com colunas ocultas no mobile)
+     ============================================================ */
+  .table-wrapper-modern {
+    background: #fff;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 400px);
+    min-height: 280px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gray-light) transparent;
+    position: relative;
+  }
+
+  .table-scroll::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 20px;
+    height: 100%;
+    background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 750px;
+    font-size: var(--font-xs);
+  }
+
+  .data-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #f8fafc;
+  }
+
+  .data-table th {
+    padding: 8px 6px;
+    text-align: left;
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--gray);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+
+  .data-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.7rem;
+    color: var(--dark);
+  }
+
+  .col-fabricacao,
+  .col-unidade,
+  .col-dept { display: none; }
+
+  .data-row { cursor: pointer; transition: 0.15s; }
+  .data-row:hover { background: #f0fdf4; }
+
+  .item-avatar-mini {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    object-fit: cover;
+    border: 1px solid #dfe7e2;
+  }
+
+  .avatar-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    font-size: 0.8rem;
+  }
+
+  .item-code {
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 0.65rem;
+    background: rgba(5,150,105,0.1);
+    padding: 1px 6px;
+    border-radius: 20px;
+    display: inline-block;
+    white-space: nowrap;
+  }
+
+  .item-name { font-weight: 500; }
+
+  .item-row-sub {
+    display: block;
+    font-size: 0.5rem;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+
+  .stock-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 40px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .validade-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 0.55rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .validade-badge.vencido { background: #fee2e2; color: #991b1b; }
+  .validade-badge.proximo { background: #fef3c7; color: #92400e; }
+  .validade-badge.em-dia { background: #dcfce7; color: #166534; }
+  .validade-badge.sem-data { background: #e2e8f0; color: #475569; }
+
+  .filter-icon { display: none; }
+
+  .row-vencido td { background: #fff5f5; }
+  .row-vencido:hover td { background: #feecec; }
+  .row-proximo td { background: #fffdf3; }
+  .row-proximo:hover td { background: #fff8dc; }
+  .row-em-dia td { background: #fbfffc; }
+  .row-sem-data td { background: #fafafa; color: #64748b; }
+
+  /* ============================================================
+     SIDE PANELS E OVERLAY (100% largura no mobile)
+     ============================================================ */
+  .side-panel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1040;
+    opacity: 0;
+    visibility: hidden;
+    transition: 0.3s;
+  }
+
+  .side-panel-overlay.active { opacity: 1; visibility: visible; }
+
+  .side-panel {
+    position: fixed;
+    top: 0;
+    right: -100%;
+    width: 100%;
+    max-width: 100%;
+    height: 100vh;
+    background: #fff;
+    box-shadow: -4px 0 30px rgba(0,0,0,0.15);
+    z-index: 1050;
+    transition: right 0.3s ease;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-panel.open { right: 0; }
+
+  .side-panel-header {
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(125deg, #064e3b, #0f766e);
+    color: #fff;
+  }
+
+  .side-panel-header h3 {
+    font-size: var(--font-md);
+    margin: 0;
+  }
+
+  .btn-close-panel {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: #fff;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .side-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: #fff;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .side-panel-footer {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: #fff;
+  }
+
+  .btn-block {
+    flex: 1 1 100%;
+    min-height: var(--touch-target);
+  }
+
+  /* ============================================================
+     FORMULÁRIOS (mobile-friendly)
+     ============================================================ */
+  .modern-form .form-group { margin-bottom: 10px; }
+
+  .modern-form label {
+    display: block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--gray);
+    margin-bottom: 4px;
+  }
+
+  .modern-form input,
+  .modern-form select,
+  .modern-form textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-sm);
+    background: #fff;
+    min-height: var(--touch-target);
+  }
+
+  .modern-form input:focus,
+  .modern-form select:focus,
+  .modern-form textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(5,150,105,0.1);
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .input-group { display: flex; gap: 6px; }
+
+  .input-group-btn {
+    padding: 0 14px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    min-height: var(--touch-target);
+    min-width: var(--touch-target);
+  }
+
+  .photo-upload {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    text-align: center;
+  }
+
+  .photo-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  .photo-btn {
+    padding: 8px 14px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    min-height: var(--touch-target);
+  }
+
+  .photo-preview { position: relative; margin-top: 10px; }
+
+  .photo-preview img {
+    max-width: 100%;
+    max-height: 160px;
+    border-radius: var(--radius);
+  }
+
+  .photo-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--danger);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+  }
+
+  /* ============================================================
+     BOTÕES
+     ============================================================ */
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger {
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+    font-size: var(--font-sm);
+    min-height: var(--touch-target);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-primary { background: var(--primary); color: #fff; border: none; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-secondary { background: #fff; color: var(--dark); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--light); }
+  .btn-danger { background: var(--danger); color: #fff; border: none; }
+  .btn-danger:hover { background: #dc2626; }
+
+  /* ============================================================
+     FILTER PANEL (centralizado no mobile)
+     ============================================================ */
+  .filter-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 95%;
+    max-width: 360px;
+    max-height: 80vh;
+    background: #fff;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    z-index: 1100;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .filter-panel.open { display: flex; }
+
+  .filter-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .filter-panel-close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+
+  .filter-panel-body { flex: 1; padding: 12px; overflow-y: auto; }
+
+  .filter-panel-search {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 10px;
+    font-size: var(--font-xs);
+  }
+
+  .filter-actions { display: flex; gap: 6px; margin-bottom: 10px; }
+
+  .filter-action-btn {
+    flex: 1;
+    padding: 8px;
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.65rem;
+    min-height: var(--touch-target);
+  }
+
+  .filter-values-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+
+  .filter-value-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  .filter-value-item:hover { background: var(--light); }
+  .filter-value-item input { width: 18px; height: 18px; }
+
+  .filter-panel-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-filter-cancel,
+  .btn-filter-apply {
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-xs);
+    min-height: var(--touch-target);
+  }
+
+  .btn-filter-cancel { background: var(--light); border: 1px solid var(--border); }
+  .btn-filter-apply { background: var(--primary); color: #fff; border: none; }
+
+  /* ============================================================
+     WHATSAPP MODAL (tela cheia no mobile)
+     ============================================================ */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(3px);
+    z-index: 1200;
+    opacity: 0;
+    visibility: hidden;
+    transition: 0.3s;
+  }
+
+  .modal-overlay.active { opacity: 1; visibility: visible; }
+
+  .modal-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    background: #fff;
+    border-radius: 0;
+    box-shadow: var(--shadow-lg);
+    z-index: 1201;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-container.open { display: flex; }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: #fff;
+  }
+
+  .modal-header-icon {
+    width: 36px;
+    height: 36px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+  }
+
+  .modal-header-title h3 { font-size: var(--font-md); margin: 0; }
   .modal-header-title p { display: none; }
-  .modal-footer { flex-wrap: wrap; }
-  .modal-footer button { flex: 1 1 100%; }
-}
 
-@media (max-width: 380px) {
-  .stats-grid { grid-template-columns: 1fr; }
-  .dashboard-header .header-actions { gap: 4px; }
-}
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #fff;
+    width: var(--touch-target);
+    height: var(--touch-target);
+  }
+
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    background: #fff;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-footer {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    background: #fff;
+  }
+
+  .modal-footer button { flex: 1 1 100%; min-height: var(--touch-target); }
+
+  .whatsapp-message {
+    background: #fff;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ============================================================
+     ZEBRA STUDIO (tela cheia no mobile)
+     ============================================================ */
+  .zebra-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 1400;
+    opacity: 0;
+    visibility: hidden;
+    transition: 0.25s;
+  }
+
+  .zebra-overlay.active { opacity: 1; visibility: visible; }
+
+  .zebra-studio {
+    position: fixed;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 0;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(15,23,42,0.4);
+    z-index: 1410;
+  }
+
+  .zebra-studio.open { display: flex; }
+
+  .zebra-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #0f172a, #1e293b 60%, #065f46);
+    color: #fff;
+  }
+
+  .zebra-header h3 { font-size: var(--font-md); margin: 0; }
+  .zebra-header p { font-size: 0.6rem; margin: 0; color: #cbd5e1; }
+
+  .zebra-close {
+    width: var(--touch-target);
+    height: var(--touch-target);
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+  }
+
+  .zebra-body {
+    display: grid;
+    grid-template-columns: 1fr;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .zebra-controls {
+    padding: 12px;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--border);
+    background: #fbfdfc;
+  }
+
+  .zebra-controls select,
+  .zebra-controls input,
+  .zebra-controls textarea {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    font: inherit;
+    font-size: var(--font-xs);
+  }
+
+  .zebra-controls textarea { min-height: 80px; font-family: monospace; resize: vertical; }
+  .zebra-dimensions { grid-template-columns: repeat(3, 1fr); }
+
+  .zebra-toolbar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) 8px repeat(3, 1fr);
+    gap: 4px;
+    margin: 8px 0;
+  }
+
+  .zebra-toolbar button {
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #f8fafc;
+    cursor: pointer;
+    min-height: var(--touch-target);
+  }
+
+  .zebra-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .zebra-preview-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background: #e2e8f0;
+    overflow: auto;
+  }
+
+  .zebra-ruler {
+    margin-bottom: 8px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(15,23,42,0.78);
+    color: #fff;
+    font-size: 0.6rem;
+  }
+
+  .zebra-label {
+    width: var(--zebra-width);
+    height: var(--zebra-height);
+    padding: var(--zebra-padding);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15,23,42,0.25);
+    overflow: hidden;
+  }
+
+  .zebra-label-text {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: pre;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    font-weight: 800;
+    line-height: 1.06;
+  }
+
+  /* ============================================================
+     FAB BUTTON (menor e reposicionado)
+     ============================================================ */
+  .fab-modern {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: #fff;
+    border: none;
+    font-size: 1.6rem;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(5,150,105,0.4);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fab-modern:hover { transform: scale(1.08); }
+
+  /* ============================================================
+     TOAST (menor e centralizado)
+     ============================================================ */
+  .toast-modern {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 8px 16px;
+    background: var(--dark);
+    color: #fff;
+    border-radius: var(--radius);
+    font-weight: 500;
+    font-size: var(--font-xs);
+    z-index: 2000;
+    opacity: 0;
+    transition: 0.3s;
+    box-shadow: var(--shadow-lg);
+    white-space: nowrap;
+    max-width: 90%;
+    text-align: center;
+  }
+
+  .toast-modern.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .toast-modern.success { background: var(--success); }
+  .toast-modern.error { background: var(--danger); }
+  .toast-modern.info { background: var(--info); }
+
+  /* ============================================================
+     MEDIA QUERIES - TABLET (≥481px)
+     ============================================================ */
+  @media (min-width: 481px) {
+    .dashboard-header {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      border-radius: 22px;
+    }
+
+    .header-actions {
+      overflow-x: auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .stats-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .search-filters {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .search-wrapper { flex: 2 1 200px; }
+    .filters-group { flex: 3 1 auto; }
+    .validade-legend-title { width: auto; }
+    .validade-legend small { display: inline; }
+
+    .col-fabricacao,
+    .col-unidade,
+    .col-dept { display: table-cell; }
+
+    .data-table th,
+    .data-table td {
+      padding: 10px 8px;
+      font-size: 0.75rem;
+    }
+
+    .filter-icon { display: inline-flex; }
+
+    .side-panel { max-width: 450px; }
+
+    .form-row {
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+
+    .modal-container {
+      width: 90%;
+      max-width: 700px;
+      height: auto;
+      max-height: 85vh;
+      border-radius: 18px;
+    }
+
+    .modal-header-title p { display: block; }
+    .modal-footer button { flex: 1 1 auto; }
+
+    .zebra-studio {
+      inset: 3vh 3vw;
+      border-radius: 20px;
+    }
+
+    .zebra-body { grid-template-columns: 1fr 1.2fr; }
+    .zebra-controls { border-right: 1px solid var(--border); border-bottom: 0; }
+    .zebra-actions { grid-template-columns: 1fr 1fr; }
+    .btn-block { flex: 1; }
+
+    .toast-modern {
+      left: auto;
+      right: 20px;
+      transform: translateY(20px);
+    }
+
+    .toast-modern.show { transform: translateY(0); }
+  }
+
+  /* ============================================================
+     MEDIA QUERIES - DESKTOP (≥992px)
+     ============================================================ */
+  @media (min-width: 992px) {
+    .dashboard-header { padding: 16px 20px; border-radius: 26px; }
+
+    .stats-grid {
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+    }
+
+    .data-table { font-size: var(--font-sm); }
+
+    .item-avatar-mini { width: 34px; height: 34px; }
+    .avatar-placeholder { width: 34px; height: 34px; }
+
+    .table-scroll { max-height: calc(100vh - 520px); }
+
+    .side-panel { max-width: 550px; }
+    .modal-container { max-width: 750px; }
+    .zebra-studio { inset: 4vh 3vw; }
+  }
 </style>
+{% endblock %}
 
-<!-- ==================== HTML ==================== -->
+{% block content %}
+<!-- ==================== HTML ORIGINAL COMPLETO ==================== -->
 <div class="almox-container">
 
   <!-- MODAL WHATSAPP -->
@@ -1142,10 +1236,10 @@ body {
               <input type="checkbox" id="wa-ativo" onchange="toggleSistema()">
               <span class="toggle-slider"></span>
             </label>
-            <span id="status-label" style="margin-left: 10px;">Desativado</span>
+            <span id="status-label" style="margin-left:10px;">Desativado</span>
           </div>
         </div>
-        <hr style="margin:20px 0;">
+        <hr style="margin:16px 0;">
         <div class="form-group">
           <label>🔌 URL da Evolution API</label>
           <input type="url" id="wa-api-url" class="form-control" placeholder="https://evolutionapi.tlsprimesolutions.com.br">
@@ -1156,7 +1250,7 @@ body {
           <input type="text" id="wa-api-key" class="form-control" placeholder="Sua chave global">
           <small>Configure na Evolution API → Configurações → API Key</small>
         </div>
-        <hr style="margin:20px 0;">
+        <hr style="margin:16px 0;">
         <div class="form-group">
           <label>📱 Gerenciar Instâncias</label>
           <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -1185,8 +1279,8 @@ body {
           <div id="pairing-code-area" style="display:none;">
             <div style="background:linear-gradient(135deg,#075E54,#128C7E); padding:30px; border-radius:20px; color:white;">
               <div style="font-size:20px; margin-bottom:10px;">🔐 Conexão WhatsApp</div>
-              <div id="pairing-code-display" style="font-size:48px; font-weight:bold; letter-spacing:5px; background:white; color:#075E54; padding:20px; border-radius:15px; margin:15px 0; font-family:monospace;"></div>
-              <p style="font-size:14px; margin-top:10px;">
+              <div id="pairing-code-display" style="font-size:40px; font-weight:bold; letter-spacing:5px; background:white; color:#075E54; padding:16px; border-radius:15px; margin:12px 0; font-family:monospace;"></div>
+              <p style="font-size:13px; margin-top:10px;">
                 1. Abra o WhatsApp no seu celular<br>
                 2. Toque nos três pontos ⋮ → <strong>Dispositivos vinculados</strong><br>
                 3. Toque em <strong>Vincular um dispositivo</strong><br>
@@ -1194,10 +1288,10 @@ body {
                 5. Pronto! WhatsApp conectado automaticamente
               </p>
             </div>
-            <button class="btn-secondary" onclick="gerarPairingCode()" style="margin-top:15px;">🔄 Gerar Novo Código</button>
+            <button class="btn-secondary" onclick="gerarPairingCode()" style="margin-top:12px;">🔄 Gerar Novo Código</button>
           </div>
-          <div id="qr-connected-info" style="display:none; padding:30px; background:#d1fae5; border-radius:12px;">
-            <div style="font-size:48px; margin-bottom:10px;">✅</div>
+          <div id="qr-connected-info" style="display:none; padding:24px; background:#d1fae5; border-radius:12px;">
+            <div style="font-size:40px; margin-bottom:8px;">✅</div>
             <h3 style="color:#065f46;">WhatsApp Conectado!</h3>
             <p>A instância está pronta para enviar mensagens</p>
           </div>
@@ -1207,7 +1301,7 @@ body {
 
       <!-- ABA NÚMEROS -->
       <div id="wa-tab-numeros" class="wa-tab-content">
-        <div style="margin-bottom:20px;">
+        <div style="margin-bottom:16px;">
           <label>📞 Números Padrão (todos departamentos)</label>
           <div style="display:flex; gap:10px; margin-bottom:10px;">
             <input type="text" id="novo-numero-padrao" class="form-control" placeholder="5511999999999" style="flex:1;">
@@ -1216,23 +1310,23 @@ body {
           <div id="lista-numeros-padrao" class="numeros-list" style="margin-bottom:10px;"></div>
           <small>Números que recebem notificações de TODOS os departamentos</small>
         </div>
-        <hr style="margin:20px 0;">
-        <div style="margin-bottom:15px;">
+        <hr style="margin:16px 0;">
+        <div style="margin-bottom:12px;">
           <label>🏢 Números por Departamento</label>
-          <div style="display:flex; gap:10px; margin-bottom:10px;">
-            <select id="dept-select" class="filter-select" style="flex:1;">
+          <div style="display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+            <select id="dept-select" class="filter-select" style="flex:1; min-width:150px;">
               <option value="">Selecione o departamento</option>
               {% for key, name in departamentos %}
-              <option value="{{ key }}">{{ name }}</option>
+                <option value="{{ key }}">{{ name }}</option>
               {% endfor %}
             </select>
-            <input type="text" id="novo-numero-dept" class="form-control" placeholder="5511999999999" style="flex:1;">
-            <button class="btn-primary" onclick="adicionarNumeroDepartamento()">➕ Adicionar</button>
+            <input type="text" id="novo-numero-dept" class="form-control" placeholder="5511999999999" style="flex:1; min-width:150px;">
+            <button class="btn-primary" onclick="adicionarNumeroDepartamento()" style="white-space:nowrap;">➕ Adicionar</button>
           </div>
           <div id="lista-numeros-departamento" class="numeros-list"></div>
           <small>Notificações de um departamento específico vão apenas para os números cadastrados aqui</small>
         </div>
-        <div class="alert-info" style="margin-top:15px;">
+        <div class="alert-info" style="margin-top:12px;">
           💡 <strong>Como funciona:</strong><br>
           • Se um departamento tem números específicos, apenas eles recebem as notificações<br>
           • Se não houver números específicos, os números padrão recebem<br>
@@ -1254,9 +1348,9 @@ body {
         <div id="opcoes-agendamento" style="display:none;">
           <div class="form-group">
             <label>📅 Horários Agendados</label>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-              <input type="time" id="novo-horario-agendado" class="form-control" style="flex:1;">
-              <select id="novo-dias-semana" multiple size="3" style="flex:1;">
+            <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+              <input type="time" id="novo-horario-agendado" class="form-control" style="flex:1; min-width:120px;">
+              <select id="novo-dias-semana" multiple size="3" style="flex:1; min-width:140px;">
                 <option value="0">Domingo</option>
                 <option value="1">Segunda</option>
                 <option value="2">Terça</option>
@@ -1265,7 +1359,7 @@ body {
                 <option value="5">Sexta</option>
                 <option value="6">Sábado</option>
               </select>
-              <button class="btn-primary" onclick="adicionarAgendamento()">➕ Adicionar</button>
+              <button class="btn-primary" onclick="adicionarAgendamento()" style="white-space:nowrap;">➕ Adicionar</button>
             </div>
             <div id="lista-agendamentos" class="numeros-list" style="max-height:200px;">
               <div class="loading-small">Carregando agendamentos...</div>
@@ -1277,18 +1371,18 @@ body {
             </small>
           </div>
 
-          <hr style="margin:20px 0;">
+          <hr style="margin:16px 0;">
 
           <div class="form-group">
             <label>📋 Tipos de Notificação a Enviar</label>
-            <div style="margin-top:10px;">
-              <label class="checkbox-label"><input type="checkbox" id="notif-baixo" checked> 🔴 Estoque Baixo (abaixo do mínimo)</label><br>
-              <label class="checkbox-label"><input type="checkbox" id="notif-zerado" checked> 🔴 Estoque Zerado</label><br>
-              <label class="checkbox-label"><input type="checkbox" id="notif-reposicao" checked> ✅ Reposição (entrada de estoque)</label>
+            <div style="margin-top:8px;">
+              <label class="checkbox-label"><input type="checkbox" id="notif-baixo" checked> 🔴 Estoque Baixo</label>
+              <label class="checkbox-label"><input type="checkbox" id="notif-zerado" checked> 🔴 Estoque Zerado</label>
+              <label class="checkbox-label"><input type="checkbox" id="notif-reposicao" checked> ✅ Reposição</label>
             </div>
           </div>
 
-          <hr style="margin:20px 0;">
+          <hr style="margin:16px 0;">
 
           <div class="form-group">
             <label>🔄 Repetir Notificações</label>
@@ -1297,7 +1391,7 @@ body {
                 <input type="checkbox" id="repetir-notificacoes">
                 <span class="toggle-slider"></span>
               </label>
-              <span style="margin-left:10px;">Repetir enquanto o estoque estiver baixo</span>
+              <span>Repetir enquanto o estoque estiver baixo</span>
             </div>
           </div>
 
@@ -1305,11 +1399,10 @@ body {
             <div class="form-group">
               <label>⏱️ Intervalo de Repetição (horas)</label>
               <input type="number" id="intervalo-repeticao" class="form-control" value="24" min="1" max="168">
-              <small>Intervalo entre repetições da mesma notificação</small>
             </div>
           </div>
 
-          <hr style="margin:20px 0;">
+          <hr style="margin:16px 0;">
 
           <div class="form-group">
             <label>📊 Notificações por Departamento</label>
@@ -1327,9 +1420,12 @@ body {
 
       <!-- ABA REGRAS -->
       <div id="wa-tab-regras" class="wa-tab-content">
-        <div class="rules-hero" style="display:flex; align-items:center; gap:12px; padding:13px; border:1px solid #cce9d6; background:linear-gradient(135deg,#f0fdf4,#ecfeff); border-radius:14px; margin-bottom:15px;">
-          <div style="font-size:1.6rem;">🎯</div>
-          <div><strong>Regras inteligentes</strong><small style="display:block; font-size:.75rem; color:#64748b; margin-top:2px;">Crie alertas de estoque e vencimento sem alterar a conexão do WhatsApp.</small></div>
+        <div style="display:flex; align-items:center; gap:12px; padding:12px; border:1px solid #cce9d6; background:linear-gradient(135deg,#f0fdf4,#ecfeff); border-radius:14px; margin-bottom:12px;">
+          <div style="font-size:1.4rem;">🎯</div>
+          <div>
+            <strong>Regras inteligentes</strong>
+            <small style="display:block; font-size:0.7rem; color:#64748b;">Crie alertas de estoque e vencimento sem alterar a conexão do WhatsApp.</small>
+          </div>
         </div>
 
         <div class="form-row">
@@ -1375,7 +1471,7 @@ body {
 
         <div class="form-group">
           <label>Mensagem</label>
-          <textarea id="regra-template" rows="8" class="form-control" style="font-family:monospace; font-size:.78rem;">🔔 *ALMOXARIFADO*
+          <textarea id="regra-template" rows="6" class="form-control" style="font-family:monospace; font-size:0.75rem;">🔔 *ALMOXARIFADO*
 {evento}
 
 📦 {nome}
@@ -1387,7 +1483,7 @@ body {
           <small>Variáveis: {evento}, {nome}, {codigo}, {lote}, {quantidade}, {minimo}, {unidade}, {localizacao}, {departamento}, {vencimento}, {dias}</small>
         </div>
 
-        <div class="rule-actions" style="display:flex; justify-content:flex-end; gap:9px;">
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
           <button type="button" class="btn-secondary" onclick="previewRegraAvancada()">👁️ Preview</button>
           <button type="button" class="btn-primary" id="btn-salvar-regra" onclick="salvarRegraAvancada()">💾 Salvar regra</button>
         </div>
@@ -1399,7 +1495,7 @@ body {
           <label>🔴 Estoque Baixo</label>
           <div class="template-preview">
             <button type="button" class="template-preview-btn" onclick="previewTemplate('baixo')">👁️ Preview</button>
-            <textarea id="wa-template-baixo" rows="6" class="form-control" style="font-family:monospace; font-size:12px;"></textarea>
+            <textarea id="wa-template-baixo" rows="4" class="form-control" style="font-family:monospace; font-size:0.7rem;"></textarea>
           </div>
           <small>Variáveis: {nome}, {codigo}, {quantidade}, {minimo}, {unidade}, {localizacao}, {departamento}</small>
         </div>
@@ -1407,7 +1503,7 @@ body {
           <label>🔴 Estoque Zerado</label>
           <div class="template-preview">
             <button type="button" class="template-preview-btn" onclick="previewTemplate('zerado')">👁️ Preview</button>
-            <textarea id="wa-template-zerado" rows="6" class="form-control" style="font-family:monospace; font-size:12px;"></textarea>
+            <textarea id="wa-template-zerado" rows="4" class="form-control" style="font-family:monospace; font-size:0.7rem;"></textarea>
           </div>
           <small>Variáveis: {nome}, {codigo}, {minimo}, {unidade}, {localizacao}</small>
         </div>
@@ -1415,7 +1511,7 @@ body {
           <label>✅ Reposição</label>
           <div class="template-preview">
             <button type="button" class="template-preview-btn" onclick="previewTemplate('reposicao')">👁️ Preview</button>
-            <textarea id="wa-template-reposicao" rows="6" class="form-control" style="font-family:monospace; font-size:12px;"></textarea>
+            <textarea id="wa-template-reposicao" rows="4" class="form-control" style="font-family:monospace; font-size:0.7rem;"></textarea>
           </div>
           <small>Variáveis: {nome}, {codigo}, {nova_quantidade}, {adicionado}, {unidade}</small>
         </div>
@@ -1423,7 +1519,7 @@ body {
           <label>📊 Resumo Agendado</label>
           <div class="template-preview">
             <button type="button" class="template-preview-btn" onclick="previewTemplate('resumo')">👁️ Preview</button>
-            <textarea id="wa-template-resumo" rows="8" class="form-control" style="font-family:monospace; font-size:12px;">📊 *RESUMO DIÁRIO DE ESTOQUE*
+            <textarea id="wa-template-resumo" rows="6" class="form-control" style="font-family:monospace; font-size:0.7rem;">📊 *RESUMO DIÁRIO DE ESTOQUE*
 
 📅 Data: {data}
 🏢 Departamento: {departamento}
@@ -1468,21 +1564,21 @@ body {
     <div class="header-title">
       <div class="title-icon">📦</div>
       <div>
-        <span class="header-eyebrow" style="display:block; margin-bottom:5px; color:#bdf6df; font-size:.69rem; font-weight:800; letter-spacing:.16em; text-transform:uppercase;">Central operacional</span>
+        <span style="display:block; color:#bdf6df; font-size:0.65rem; font-weight:800; letter-spacing:0.16em; text-transform:uppercase;">Central operacional</span>
         <h1>Almoxarifado</h1>
         <p class="header-subtitle">Controle de estoque, solicitações e etiquetas em um só lugar</p>
-        <span class="header-live" style="display:inline-flex; align-items:center; gap:7px; margin-top:10px; padding:5px 10px; border:1px solid rgba(255,255,255,.19); border-radius:999px; background:rgba(2,42,32,.18); color:#eafff6; font-size:.72rem; font-weight:700;">Sistema operacional</span>
+        <span style="display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:4px 10px; border:1px solid rgba(255,255,255,0.19); border-radius:999px; background:rgba(2,42,32,0.18); color:#eafff6; font-size:0.65rem; font-weight:700;">Sistema operacional</span>
       </div>
     </div>
     <div class="header-actions">
-      <button class="action-chip" onclick="exportarExcel()"><span>📥</span><span class="action-label">Exportar</span></button>
-      <button class="action-chip" onclick="baixarModelo()"><span>📋</span><span class="action-label">Modelo</span></button>
-      <a href="{% url 'almoxarifado:inventario:comparacao' %}" class="action-chip"><span>⚖️</span><span class="action-label">Inventário</span></a>
+      <button class="action-chip" onclick="exportarExcel()"><span>📥</span><span>Exportar</span></button>
+      <button class="action-chip" onclick="baixarModelo()"><span>📋</span><span>Modelo</span></button>
+      <a href="{% url 'almoxarifado:inventario:comparacao' %}" class="action-chip"><span>⚖️</span><span>Inventário</span></a>
       <button class="action-chip cart-badge" id="carrinho-badge" onclick="abrirCarrinho()" style="display:{% if carrinho_count > 0 %}flex{% else %}none{% endif %};">
         🛒 Carrinho <span id="carrinho-count-badge">{{ carrinho_count }}</span>
       </button>
-      <button class="action-chip" onclick="abrirModalWhatsApp()"><span>📱</span><span class="action-label">WhatsApp</span></button>
-      <a href="{% url 'almoxarifado:saidas_list' %}" class="action-chip"><span>📋</span><span class="action-label">Histórico</span></a>
+      <button class="action-chip" onclick="abrirModalWhatsApp()"><span>📱</span><span>WhatsApp</span></button>
+      <a href="{% url 'almoxarifado:saidas_list' %}" class="action-chip"><span>📋</span><span>Histórico</span></a>
     </div>
   </div>
 
@@ -1491,43 +1587,49 @@ body {
     <div class="stat-card stat-card-success">
       <div class="stat-card-icon">📦</div>
       <div class="stat-card-content">
-        <span class="stat-card-label">Itens em Estoque</span>
-        <span class="stat-card-value">{{ total_itens }}</span><small class="stat-meta">cadastros disponíveis</small>
+        <span class="stat-card-label">Itens</span>
+        <span class="stat-card-value">{{ total_itens }}</span>
+        <small class="stat-meta">cadastros</small>
       </div>
     </div>
     <div class="stat-card stat-card-info">
       <div class="stat-card-icon">📊</div>
       <div class="stat-card-content">
-        <span class="stat-card-label">Unidades Totais</span>
-        <span class="stat-card-value">{{ total_quantidade|floatformat:"-3" }}</span><small class="stat-meta">saldo consolidado</small>
+        <span class="stat-card-label">Unidades</span>
+        <span class="stat-card-value">{{ total_quantidade|floatformat:"-3" }}</span>
+        <small class="stat-meta">saldo total</small>
       </div>
     </div>
     <div class="stat-card stat-card-warning" onclick="filtrarPorStatus('baixo')" style="cursor:pointer;">
       <div class="stat-card-icon">⚠️</div>
       <div class="stat-card-content">
         <span class="stat-card-label">Estoque Baixo</span>
-        <span class="stat-card-value">{{ baixo_count }}</span><small class="stat-meta">exigem atenção</small>
+        <span class="stat-card-value">{{ baixo_count }}</span>
+        <small class="stat-meta">exigem atenção</small>
       </div>
     </div>
     <div class="stat-card stat-card-danger" onclick="filtrarPorStatus('zerados')" style="cursor:pointer;">
       <div class="stat-card-icon">📭</div>
       <div class="stat-card-content">
         <span class="stat-card-label">Zerados</span>
-        <span class="stat-card-value">{{ zerados_count }}</span><small class="stat-meta">sem saldo disponível</small>
+        <span class="stat-card-value">{{ zerados_count }}</span>
+        <small class="stat-meta">sem saldo</small>
       </div>
     </div>
     <div class="stat-card stat-card-danger" onclick="filtrarPorStatus('vencidos')" style="cursor:pointer;">
       <div class="stat-card-icon">⏳</div>
       <div class="stat-card-content">
         <span class="stat-card-label">Vencidos</span>
-        <span class="stat-card-value">{{ vencidos_count }}</span><small class="stat-meta">itens vencidos</small>
+        <span class="stat-card-value">{{ vencidos_count }}</span>
+        <small class="stat-meta">vencidos</small>
       </div>
     </div>
     <div class="stat-card stat-card-warning" onclick="filtrarPorStatus('proximos')" style="cursor:pointer;">
       <div class="stat-card-icon">📅</div>
       <div class="stat-card-content">
-        <span class="stat-card-label">Próximos 30 dias</span>
-        <span class="stat-card-value">{{ proximos_count }}</span><small class="stat-meta">alertas de vencimento</small>
+        <span class="stat-card-label">Próximos 30d</span>
+        <span class="stat-card-value">{{ proximos_count }}</span>
+        <small class="stat-meta">alertas</small>
       </div>
     </div>
   </div>
@@ -1536,11 +1638,11 @@ body {
   <section class="search-filters">
     <div class="search-wrapper">
       <span class="search-icon">🔍</span>
-      <input type="text" id="busca" class="search-input-modern" placeholder="Buscar por nome, código, lote, fornecedor..." value="{{ busca }}" autocomplete="off">
+      <input type="text" id="busca" class="search-input-modern" placeholder="Buscar por nome, código, lote..." value="{{ busca }}" autocomplete="off">
     </div>
     <div class="filters-group">
       <select id="filtro-departamento" class="filter-select">
-        <option value="">📁 Todos departamentos</option>
+        <option value="">📁 Todos</option>
         {% for key, name in departamentos %}
         <option value="{{ key }}" {% if departamento == key %}selected{% endif %}>{{ name }}</option>
         {% endfor %}
@@ -1563,7 +1665,7 @@ body {
         <button onclick="limparFiltroStatus()">✕</button>
       </div>
       {% endif %}
-      <button class="btn-clear-filters" id="btn-limpar-filtros" onclick="limparTodosFiltros()" style="display:none;">🗑️ Limpar Filtros</button>
+      <button class="btn-clear-filters" id="btn-limpar-filtros" onclick="limparTodosFiltros()" style="display:none;">🗑️ Limpar</button>
     </div>
   </section>
 
@@ -1571,12 +1673,12 @@ body {
 
   <!-- LEGENDA DE VALIDADE -->
   <div class="validade-legend">
-    <div class="validade-legend-title">📅 Validade</div>
+    <span class="validade-legend-title">📅 Validade</span>
     <span><i class="dot vencido"></i> Vencido</span>
     <span><i class="dot proximo"></i> Até 30 dias</span>
     <span><i class="dot em-dia"></i> Em dia</span>
     <span><i class="dot sem-data"></i> Sem data</span>
-    <small>Itens sem vencimento cadastrado ficam por último na ordenação por validade.</small>
+    <small>Sem data ficam por último</small>
   </div>
 
   <!-- TABELA -->
@@ -1642,10 +1744,9 @@ body {
             {% endwith %}
             {% empty %}
             <tr>
-              <td colspan="11" class="empty-state-row">
-                <div class="empty-state">📦</div>
-                <div class="empty-state-text">Nenhum item encontrado</div>
-                <div class="empty-state-hint">Clique no botão <strong>+</strong> para adicionar um item</div>
+              <td colspan="11" style="text-align:center; padding:40px;">
+                <div style="font-size:3rem;">📦</div>
+                <div style="font-size:1rem; color:var(--gray);">Nenhum item encontrado</div>
               </td>
             </tr>
             {% endfor %}
@@ -1949,7 +2050,7 @@ body {
     <aside class="zebra-controls">
       <div class="form-group"><label>Tamanho da etiqueta</label><select id="zebra-layout" onchange="alterarTamanhoZebra()"><option value="100x50">10 × 5 cm</option><option value="34x22">3,4 × 2,2 cm</option><option value="138x100">13,8 × 10 cm</option><option value="personalizado">Personalizado</option></select></div>
       <div class="form-row zebra-dimensions"><div class="form-group"><label>Largura (mm)</label><input id="zebra-largura" type="number" min="10" step="0.1" value="100" oninput="aplicarTamanhoZebra()"></div><div class="form-group"><label>Altura (mm)</label><input id="zebra-altura" type="number" min="10" step="0.1" value="50" oninput="aplicarTamanhoZebra()"></div><div class="form-group"><label>Margem (mm)</label><input id="zebra-margem" type="number" min="0" step="0.5" value="3" oninput="aplicarTamanhoZebra()"></div></div>
-      <div class="form-group"><label>Conteúdo da etiqueta</label><textarea id="zebra-texto" rows="8" spellcheck="false" oninput="ajustarFonteZebra()"></textarea><small>As quebras feitas com ENTER são preservadas.</small></div>
+      <div class="form-group"><label>Conteúdo da etiqueta</label><textarea id="zebra-texto" rows="6" spellcheck="false" oninput="ajustarFonteZebra()"></textarea><small>As quebras feitas com ENTER são preservadas.</small></div>
       <div class="zebra-toolbar"><button onclick="alinharZebra('left')">⬅</button><button onclick="alinharZebra('center')">↔</button><button onclick="alinharZebra('right')">➡</button><span></span><button onclick="alinharVerticalZebra('flex-start')">⬆</button><button onclick="alinharVerticalZebra('center')">↕</button><button onclick="alinharVerticalZebra('flex-end')">⬇</button></div>
       <div class="zebra-actions"><button type="button" class="btn-secondary" onclick="preencherEtiquetaZebra()">↺ Restaurar</button><button type="button" class="btn-primary" onclick="imprimirEtiquetaZebra()">🖨️ Imprimir</button></div>
     </aside>
@@ -1959,8 +2060,9 @@ body {
 
 <!-- TOAST -->
 <div id="toast" class="toast-modern"></div>
+{% endblock %}
 
-<!-- ==================== JAVASCRIPT COMPLETO ==================== -->
+{% block extra_js %}
 <script>
   const CSRF_TOKEN = '{{ csrf_token }}';
   let filtroStatusAtual = '{{ filtro_status }}';
@@ -2037,9 +2139,8 @@ body {
 
   function formatarDataBR(valor) {
     if (!valor) return '';
-    const texto = String(valor).slice(0, 10);
-    const partes = texto.split('-');
-    if (partes.length !== 3) return texto;
+    const partes = valor.split('-');
+    if (partes.length !== 3) return valor;
     return partes[2] + '/' + partes[1] + '/' + partes[0];
   }
 
@@ -2079,7 +2180,6 @@ body {
   // EXPORTAÇÃO
   // ============================================================
   function exportarExcel() { window.location.href = '/almoxarifado/exportar/'; }
-
   function baixarModelo() { window.location.href = '/almoxarifado/baixar-modelo/'; }
 
   // ============================================================
@@ -2088,16 +2188,23 @@ body {
   function filtrarPorStatus(status) {
     if (filtroStatusAtual === status) filtroStatusAtual = '';
     else filtroStatusAtual = status;
+    const url = new URL(window.location.href);
+    if (filtroStatusAtual) url.searchParams.set('status', filtroStatusAtual);
+    else url.searchParams.delete('status');
+    window.history.pushState({}, '', url);
     atualizarTabela();
   }
 
   function limparFiltroStatus() {
     filtroStatusAtual = '';
+    const url = new URL(window.location.href);
+    url.searchParams.delete('status');
+    window.history.pushState({}, '', url);
     atualizarTabela();
   }
 
   // ============================================================
-  // ATUALIZAR TABELA (somente quando houver filtros ativos)
+  // ATUALIZAR TABELA (AJAX)
   // ============================================================
   function atualizarTabela() {
     if (isUpdating) return;
@@ -2123,8 +2230,7 @@ body {
         const tbody = document.getElementById('tabela-body');
         if (!tbody) return;
         if (!data.itens || !data.itens.length) {
-          tbody.innerHTML =
-            `<tr><td colspan="11" class="empty-state-row"><div class="empty-state">📦</div><div class="empty-state-text">Nenhum item encontrado</div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:40px;">📦 Nenhum item encontrado</td></tr>`;
         } else {
           let html = '';
           data.itens.forEach(item => {
@@ -2395,10 +2501,10 @@ body {
       let html = '';
       if (d.foto_url && d.foto_url !== 'null') {
         html +=
-          `<div style="text-align:center;margin-bottom:20px;"><img src="${d.foto_url}" style="max-width:100%;max-height:200px;border-radius:12px;"></div>`;
+          `<div style="text-align:center;margin-bottom:16px;"><img src="${d.foto_url}" style="max-width:100%;max-height:180px;border-radius:12px;"></div>`;
       } else {
         html +=
-          `<div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:40px;text-align:center;border-radius:12px;"><span style="font-size:4rem;">📦</span></div>`;
+          `<div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:32px;text-align:center;border-radius:12px;"><span style="font-size:3.5rem;">📦</span></div>`;
       }
 
       html += `<div class="info-grid">
@@ -2611,17 +2717,17 @@ body {
       const data = await resp.json();
       if (!data.itens || !data.itens.length) {
         document.getElementById('carrinho-conteudo').innerHTML =
-          '<div class="empty-state-text" style="text-align:center;padding:40px;">🛒 Carrinho vazio</div>';
+          '<div class="empty-state-text" style="text-align:center;padding:32px;">🛒 Carrinho vazio</div>';
         document.getElementById('carrinho-footer').style.display = 'none';
       } else {
         let html = '';
         data.itens.forEach(item => {
-          html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid var(--border);">
+          html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border-bottom:1px solid var(--border);">
               <div>
                 <strong>${escapeHtml(item.codigo)} - ${escapeHtml(item.nome)}</strong><br>
                 <small>${formatNumber(item.quantidade)} ${escapeHtml(item.unidade)} | Estoque: ${formatNumber(item.estoque)}</small>
               </div>
-              <button class="btn-secondary" style="padding:6px 12px;" onclick="removerDoCarrinho(${item.id})">🗑️</button>
+              <button class="btn-secondary" style="padding:4px 10px;" onclick="removerDoCarrinho(${item.id})">🗑️</button>
             </div>`;
         });
         document.getElementById('carrinho-conteudo').innerHTML = html;
@@ -2674,7 +2780,7 @@ body {
       let resumo = '<strong>Itens a serem retirados:</strong>';
       data.itens.forEach(item => {
         resumo +=
-          `<div style="margin:6px 0;">• ${escapeHtml(item.codigo)} - ${escapeHtml(item.nome)}: ${formatNumber(item.quantidade)}</div>`;
+          `<div style="margin:4px 0;">• ${escapeHtml(item.codigo)} - ${escapeHtml(item.nome)}: ${formatNumber(item.quantidade)}</div>`;
       });
       document.getElementById('resumo-carrinho').innerHTML = resumo;
       fecharTodosPanels();
@@ -2729,11 +2835,18 @@ body {
   // ============================================================
   // FILTROS POR COLUNA
   // ============================================================
-  function getColunaIndex(coluna) {
-    const mapa = { 'codigo': 0, 'nome': 1, 'lote': 2, 'tamanho': 3, 'ca': 4, 'quantidade': 5, 'unidade': 6,
-      'localizacao': 7, 'departamento': 8 };
-    return mapa[coluna] || 0;
-  }
+function getColunaIndex(coluna) {
+
+  const mapa = {
+    'codigo': 1,
+    'nome': 2,
+    'lote': 3,
+    'quantidade': 7,
+    'localizacao': 9,
+    'departamento': 10
+  };
+  return mapa[coluna] || 0;
+}
 
   function abrirFiltroColuna(elemento, coluna) {
     event.stopPropagation();
@@ -2759,7 +2872,7 @@ body {
     });
 
     document.getElementById('filtro-coluna-lista').innerHTML = listaHtml ||
-      '<div style="padding:20px;text-align:center;">Nenhum valor</div>';
+      '<div style="padding:16px;text-align:center;">Nenhum valor</div>';
     document.getElementById('filtro-coluna-panel').style.display = 'flex';
   }
 
@@ -2990,8 +3103,8 @@ body {
                 <div class="instancia-nome">📱 ${nome}</div>
                 <div class="instancia-status ${statusClass}">${statusText}</div>
                 <div class="instancia-actions">
-                  <button onclick="event.stopPropagation(); conectarInstancia('${nome}')" title="Conectar" style="background:#10b981; color:white; border-radius:6px;">🔌 Conectar</button>
-                  <button onclick="event.stopPropagation(); deletarInstancia('${nome}')" title="Excluir" style="background:#ef4444; color:white; border-radius:6px;">🗑️ Excluir</button>
+                  <button onclick="event.stopPropagation(); conectarInstancia('${nome}')" title="Conectar" style="background:#10b981; color:white; border-radius:4px; padding:4px 10px; border:none; cursor:pointer;">🔌</button>
+                  <button onclick="event.stopPropagation(); deletarInstancia('${nome}')" title="Excluir" style="background:#ef4444; color:white; border-radius:4px; padding:4px 10px; border:none; cursor:pointer;">🗑️</button>
                 </div>
               </div>`;
           });
@@ -3144,8 +3257,7 @@ body {
 
       if (data.success && data.pairingCode && data.pairingCode !== 'null') {
         if (pairingCodeDisplay) {
-          pairingCodeDisplay.innerHTML =
-            `<div style="background:#075E54; color:white; padding:20px; border-radius:12px;"><div style="font-size:32px; letter-spacing:5px; font-family:monospace; background:white; color:#075E54; padding:15px; border-radius:10px;">${data.pairingCode}</div></div>`;
+          pairingCodeDisplay.innerHTML = `<div style="font-size:32px; letter-spacing:4px; font-family:monospace; background:white; color:#075E54; padding:12px; border-radius:10px;">${data.pairingCode}</div>`;
         }
         mostrarToast('✅ Código de pareamento gerado!', 'success');
       } else if (data.success && data.qrcode) {
@@ -3155,19 +3267,19 @@ body {
         }
         if (pairingCodeDisplay) {
           pairingCodeDisplay.innerHTML =
-            `<div style="text-align:center;"><img src="${qrImageSrc}" style="max-width:250px; margin:10px auto; border:3px solid #25D366; border-radius:12px;"><p style="margin-top:10px; color:#666;">Escaneie o QR Code com o WhatsApp</p></div>`;
+            `<div style="text-align:center;"><img src="${qrImageSrc}" style="max-width:200px; margin:8px auto; border:2px solid #25D366; border-radius:10px;"><p style="margin-top:8px; color:#666; font-size:0.8rem;">Escaneie o QR Code com o WhatsApp</p></div>`;
         }
         mostrarToast('✅ QR Code gerado! Escaneie com o WhatsApp', 'success');
       } else {
         if (pairingCodeDisplay) pairingCodeDisplay.innerHTML =
-          `<div style="color:red;">❌ ${data.error || 'Erro ao gerar código'}</div>`;
+          `<div style="color:red; font-size:0.9rem;">❌ ${data.error || 'Erro ao gerar código'}</div>`;
         mostrarToast('❌ ' + (data.error || 'Erro ao gerar código'), 'error');
       }
       iniciarVerificacaoConexao(instanceName);
     } catch (e) {
       if (loadingDiv) loadingDiv.style.display = 'none';
       if (pairingCodeDisplay) pairingCodeDisplay.innerHTML =
-        `<div style="color:red;">❌ Erro de conexão: ${e.message}</div>`;
+        `<div style="color:red; font-size:0.9rem;">❌ Erro de conexão: ${e.message}</div>`;
       mostrarToast('Erro ao gerar código: ' + e.message, 'error');
     }
   }
@@ -3260,7 +3372,7 @@ body {
       container.innerHTML = `<div class="loading-small">📭 Nenhum número para ${deptName}</div>`;
       return;
     }
-    let html = `<div style="padding:8px; background:var(--light); font-weight:bold;">${deptName}:</div>`;
+    let html = `<div style="padding:6px; background:var(--light); font-weight:bold; border-radius:4px;">${deptName}:</div>`;
     numeros.forEach((numero, index) => {
       html += `<div class="numero-item">
           <div><span class="numero">${numero}</span></div>
@@ -3322,12 +3434,12 @@ body {
       html += `
         <div class="numero-item" style="flex-wrap:wrap;">
           <div style="flex:1;">
-            <span class="numero" style="font-size:1.1rem; font-weight:bold;">🕐 ${ag.horario}</span>
-            <div style="margin-top:5px;"><span class="badge" style="background:#e0e7ff; color:#1e40af;">📅 ${diasStr}</span></div>
-            ${ag.descricao ? `<div class="badge" style="background:#e5e7eb; margin-top:5px;">📝 ${escapeHtml(ag.descricao)}</div>` : ''}
+            <span class="numero" style="font-size:1rem; font-weight:bold;">🕐 ${ag.horario}</span>
+            <div style="margin-top:4px;"><span class="badge" style="background:#e0e7ff; color:#1e40af; font-size:0.6rem; padding:2px 6px; border-radius:12px;">📅 ${diasStr}</span></div>
+            ${ag.descricao ? `<div class="badge" style="background:#e5e7eb; font-size:0.6rem; padding:2px 6px; border-radius:12px; margin-top:4px;">📝 ${escapeHtml(ag.descricao)}</div>` : ''}
           </div>
           <div>
-            <button class="btn-remove-numero" onclick="deletarAgendamento(${ag.id})" title="Excluir" style="background:#fee2e2; border-radius:8px; padding:6px 12px;">🗑️ Excluir</button>
+            <button class="btn-remove-numero" onclick="deletarAgendamento(${ag.id})" title="Excluir" style="background:#fee2e2; border-radius:6px; padding:4px 10px; border:none; cursor:pointer;">🗑️</button>
           </div>
         </div>`;
     });
@@ -3477,7 +3589,7 @@ body {
     }
     const previewContent = document.getElementById('preview-content');
     if (previewContent) {
-      previewContent.innerHTML = `<div class="whatsapp-message"><pre style="white-space:pre-wrap">${escapeHtml(preview)}</pre></div>`;
+      previewContent.innerHTML = `<div class="whatsapp-message"><pre style="white-space:pre-wrap; font-size:0.8rem;">${escapeHtml(preview)}</pre></div>`;
     }
     const overlay = document.getElementById('modal-preview-overlay');
     const container = document.getElementById('modal-preview-container');
@@ -3495,7 +3607,7 @@ body {
   function abrirPreview(texto) {
     const previewContent = document.getElementById('preview-content');
     if (previewContent) {
-      previewContent.innerHTML = `<div class="whatsapp-message"><pre style="white-space:pre-wrap">${escapeHtml(texto)}</pre></div>`;
+      previewContent.innerHTML = `<div class="whatsapp-message"><pre style="white-space:pre-wrap; font-size:0.8rem;">${escapeHtml(texto)}</pre></div>`;
     }
     const overlay = document.getElementById('modal-preview-overlay');
     const container = document.getElementById('modal-preview-container');
@@ -3660,10 +3772,9 @@ body {
   }
 
   // ============================================================
-  // INICIALIZAÇÃO (somente carrega a tabela se houver filtros)
+  // INICIALIZAÇÃO
   // ============================================================
   document.addEventListener('DOMContentLoaded', function() {
-    // Event listeners para filtros
     const buscaInput = document.getElementById('busca');
     if (buscaInput) {
       buscaInput.addEventListener('input', function() {
@@ -3671,19 +3782,23 @@ body {
         buscaTimeout = setTimeout(atualizarTabela, 500);
       });
     }
-    const filtroDept = document.getElementById('filtro-departamento');
-    if (filtroDept) filtroDept.addEventListener('change', atualizarTabela);
-    const filtroOrdenar = document.getElementById('filtro-ordenar');
-    if (filtroOrdenar) filtroOrdenar.addEventListener('change', atualizarTabela);
-    const mostrarTodos = document.getElementById('mostrar-todos');
-    if (mostrarTodos) mostrarTodos.addEventListener('change', atualizarTabela);
+
+
+
+
+    document.getElementById('filtro-departamento')?.addEventListener('change', atualizarTabela);
+    document.getElementById('filtro-ordenar')?.addEventListener('change', atualizarTabela);
+    document.getElementById('mostrar-todos')?.addEventListener('change', atualizarTabela);
 
     const deptSelect = document.getElementById('dept-select');
     if (deptSelect) deptSelect.addEventListener('change', renderNumerosDepartamento);
+
     const repetirNotif = document.getElementById('repetir-notificacoes');
     if (repetirNotif) repetirNotif.addEventListener('change', toggleOpcoesEnvio);
+
     const vencimentoInput = document.getElementById('form-data-vencimento');
     if (vencimentoInput) vencimentoInput.addEventListener('change', atualizarFeedbackValidade);
+
     const tipoEnvio = document.getElementById('tipo-envio');
     if (tipoEnvio) tipoEnvio.addEventListener('change', toggleOpcoesEnvio);
 
@@ -3723,16 +3838,29 @@ body {
       ordenarSelect.value = 'vencimento';
     }
 
-    // SÓ atualiza a tabela via AJAX se houver algum filtro ativo
-    const buscaVal = document.getElementById('busca')?.value || '';
-    const deptVal = document.getElementById('filtro-departamento')?.value || '';
-    const mostrarTodosChecked = document.getElementById('mostrar-todos')?.checked || false;
-    const statusVal = filtroStatusAtual;
-
-    if (buscaVal || deptVal || statusVal || mostrarTodosChecked) {
+    const busca = document.getElementById('busca')?.value || '';
+    const dept = document.getElementById('filtro-departamento')?.value || '';
+    const status = filtroStatusAtual;
+    if (busca || dept || status) {
       atualizarTabela();
     }
-    // Caso contrário, mantém a renderização inicial do Django com todas as datas
   });
+
+
+  // Filtro de busca dentro do painel de coluna
+const filtroColunaBusca = document.getElementById('filtro-coluna-busca');
+if (filtroColunaBusca) {
+  filtroColunaBusca.addEventListener('input', function () {
+    const termo = this.value.toLowerCase().trim();
+    const items = document.querySelectorAll('#filtro-coluna-lista .filter-value-item');
+    items.forEach(item => {
+      const label = item.querySelector('label');
+      if (label) {
+        const texto = label.textContent.toLowerCase();
+        item.style.display = texto.includes(termo) ? '' : 'none';
+      }
+    });
+  });
+}
 </script>
 {% endblock %}

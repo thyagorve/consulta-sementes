@@ -1,33 +1,24 @@
 import json
 import csv
 import io
-import xmltodict
-import requests
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-from django.db.models import Q, Sum, F
+from django.db.models import Q, Sum, F, OuterRef, Subquery, Case, When, Value, IntegerField
 from django.contrib import messages
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils import get_column_letter
+
 from .models import (
     Item, Saida, CarrinhoSolicitacao, Departamento, UnidadeMedida,
     ConfiguracaoWhatsApp, HistoricoNotificacaoAlmoxarifado, AgendamentoNotificacao,
-    EntradaNotaFiscal, ItemEntrada
+    EntradaNotaFiscal, ItemEntrada, InstanciaWhatsApp, DadosValidadeItem
 )
 from django.contrib.auth.decorators import login_required, permission_required
-from .models import (
-    Item, Saida, CarrinhoSolicitacao, Departamento, UnidadeMedida,
-    ConfiguracaoWhatsApp, HistoricoNotificacaoAlmoxarifado, AgendamentoNotificacao,
-    EntradaNotaFiscal, ItemEntrada, InstanciaWhatsApp  # <-- ADICIONE ESTE
-)
-
-from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -44,27 +35,47 @@ def parse_decimal(value, default=None):
         return default
 
 
+# ============================
+# VIEWS PRINCIPAIS
+# ============================
+
 @login_required
 @permission_required('almoxarifado.pode_ver_almoxarifado', raise_exception=True)
 def lista_itens(request):
     mostrar_todos = request.GET.get('todos', '0') == '1'
     filtro_status = request.GET.get('status', '')
-    
+    ordenar = request.GET.get('ordenar', 'vencimento')  # padrão vencimento
+
     itens = Item.objects.filter(ativo=True)
-    
-    # Filtro por status (Zerados ou Estoque Baixo)
+    hoje = date.today()
+
+    # Anotar dados de validade
+    validade_subquery = DadosValidadeItem.objects.filter(item=OuterRef('id'))
+    itens = itens.annotate(
+        data_vencimento=Subquery(validade_subquery.values('data_vencimento')[:1]),
+        data_fabricacao=Subquery(validade_subquery.values('data_fabricacao')[:1]),
+    )
+
+    # Filtros de status (incluindo vencimento)
     if filtro_status == 'zerados':
         itens = itens.filter(quantidade__lte=0)
     elif filtro_status == 'baixo':
         itens = itens.filter(quantidade__gt=0, quantidade__lte=F('estoque_minimo'))
-    
+    elif filtro_status == 'vencidos':
+        itens = itens.filter(data_vencimento__lt=hoje)
+    elif filtro_status == 'proximos':
+        itens = itens.filter(
+            data_vencimento__gte=hoje,
+            data_vencimento__lte=hoje + timedelta(days=30)
+        )
+
     if not mostrar_todos:
         itens = itens.filter(quantidade__gt=0)
-    
+
     busca = request.GET.get('busca', '')
     if busca:
         itens = itens.filter(
-            Q(nome__icontains=busca) | 
+            Q(nome__icontains=busca) |
             Q(codigo__icontains=busca) |
             Q(localizacao__icontains=busca) |
             Q(fornecedor__icontains=busca) |
@@ -73,30 +84,58 @@ def lista_itens(request):
             Q(descricao__icontains=busca) |
             Q(marca__icontains=busca)
         )
-    
+
     departamento = request.GET.get('departamento', '')
     if departamento:
         itens = itens.filter(departamento=departamento)
-    
-    ordenar = request.GET.get('ordenar', 'nome')
-    ordenacao_map = {
-        'nome': 'nome',
-        '-quantidade': '-quantidade',
-        'quantidade': 'quantidade',
-        'recente': '-updated_at',
-    }
-    itens = itens.order_by(ordenacao_map.get(ordenar, 'nome'))
-    
+
+    # ===== ORDENAÇÃO COM NULLS LAST =====
+    if ordenar == 'vencimento':
+        itens = itens.order_by(
+            Case(
+                When(data_vencimento__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField()
+            ),
+            F('data_vencimento').asc(nulls_last=True)
+        )
+    elif ordenar == '-vencimento':
+        itens = itens.order_by(
+            Case(
+                When(data_vencimento__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField()
+            ),
+            F('data_vencimento').desc(nulls_last=True)
+        )
+    else:
+        ordenacao_map = {
+            'nome': 'nome',
+            '-quantidade': '-quantidade',
+            'quantidade': 'quantidade',
+            'recente': '-updated_at',
+        }
+        itens = itens.order_by(ordenacao_map.get(ordenar, 'nome'))
+
     usuario = request.session.get('usuario_carrinho', request.user.username if request.user.is_authenticated else 'anonimo')
     carrinho_count = CarrinhoSolicitacao.objects.filter(usuario=usuario).count()
-    
+
     total_itens = itens.count()
     total_quantidade = itens.aggregate(Sum('quantidade'))['quantidade__sum'] or 0
-    
-    # Contagem de zerados e baixo para o filtro
+
+    # Contagens para os cards (itens ativos)
     zerados_count = Item.objects.filter(ativo=True, quantidade__lte=0).count()
     baixo_count = Item.objects.filter(ativo=True, quantidade__gt=0, quantidade__lte=F('estoque_minimo')).count()
-    
+    vencidos_count = DadosValidadeItem.objects.filter(
+        item__ativo=True,
+        data_vencimento__lt=hoje
+    ).count()
+    proximos_count = DadosValidadeItem.objects.filter(
+        item__ativo=True,
+        data_vencimento__gte=hoje,
+        data_vencimento__lte=hoje + timedelta(days=30)
+    ).count()
+
     context = {
         'itens': itens,
         'busca': busca,
@@ -110,103 +149,84 @@ def lista_itens(request):
         'carrinho_count': carrinho_count,
         'zerados_count': zerados_count,
         'baixo_count': baixo_count,
+        'vencidos_count': vencidos_count,
+        'proximos_count': proximos_count,
         'filtro_status': filtro_status,
     }
     return render(request, 'almoxarifado/lista_itens.html', context)
 
 
-def saidas_list(request):
-    saidas = Saida.objects.select_related('item').all().order_by('-data', '-hora')
-    
-    busca = request.GET.get('busca', '')
-    if busca:
-        saidas = saidas.filter(
-            Q(solicitante__icontains=busca) | 
-            Q(item_nome__icontains=busca) |
-            Q(item_codigo__icontains=busca)
-        )
-    
-    data_inicio = request.GET.get('data_inicio', '')
-    data_fim = request.GET.get('data_fim', '')
-    if data_inicio:
-        saidas = saidas.filter(data__gte=data_inicio)
-    if data_fim:
-        saidas = saidas.filter(data__lte=data_fim)
-    
-    dept = request.GET.get('dept', '')
-    if dept:
-        saidas = saidas.filter(departamento=dept)
-    
-    total_saidas = saidas.count()
-    total_retirado = saidas.aggregate(Sum('quantidade'))['quantidade__sum'] or 0
-    
-    context = {
-        'saidas': saidas,
-        'busca': busca,
-        'data_inicio': data_inicio,
-        'data_fim': data_fim,
-        'dept': dept,
-        'departamentos': Departamento.choices,
-        'total_saidas': total_saidas,
-        'total_retirado': total_retirado,
-    }
-    return render(request, 'almoxarifado/saidas_list.html', context)
-
-from datetime import date
-from django.db.models import OuterRef, Subquery
-from .models import DadosValidadeItem
-
 def buscar_itens_ajax(request):
     busca = request.GET.get('busca', '')
     departamento = request.GET.get('departamento', '')
     mostrar_todos = request.GET.get('todos', '0') == '1'
-    ordenar = request.GET.get('ordenar', 'nome')
+    ordenar = request.GET.get('ordenar', 'vencimento')
     filtro_status = request.GET.get('status', '')
-    
+
     itens = Item.objects.filter(ativo=True)
-    
+    hoje = date.today()
+
+    validade_subquery = DadosValidadeItem.objects.filter(item=OuterRef('id'))
+    itens = itens.annotate(
+        data_vencimento=Subquery(validade_subquery.values('data_vencimento')[:1]),
+        data_fabricacao=Subquery(validade_subquery.values('data_fabricacao')[:1]),
+    )
+
     if filtro_status == 'zerados':
         itens = itens.filter(quantidade__lte=0)
     elif filtro_status == 'baixo':
         itens = itens.filter(quantidade__gt=0, quantidade__lte=F('estoque_minimo'))
-    
+    elif filtro_status == 'vencidos':
+        itens = itens.filter(data_vencimento__lt=hoje)
+    elif filtro_status == 'proximos':
+        itens = itens.filter(
+            data_vencimento__gte=hoje,
+            data_vencimento__lte=hoje + timedelta(days=30)
+        )
+
     if not mostrar_todos:
         itens = itens.filter(quantidade__gt=0)
-    
+
     if busca:
         itens = itens.filter(
-            Q(nome__icontains=busca) | 
+            Q(nome__icontains=busca) |
             Q(codigo__icontains=busca) |
             Q(localizacao__icontains=busca) |
             Q(fornecedor__icontains=busca) |
             Q(lote__icontains=busca) |
             Q(ca__icontains=busca)
         )
-    
+
     if departamento:
         itens = itens.filter(departamento=departamento)
-    
-    # Ordenação incluindo 'vencimento'
-    ordenacao_map = {
-        'nome': 'nome',
-        '-quantidade': '-quantidade',
-        'quantidade': 'quantidade',
-        'recente': '-updated_at',
-        'vencimento': 'data_vencimento__isnull',  # NULL por último
-        '-vencimento': '-data_vencimento',
-    }
-    itens = itens.order_by(ordenacao_map.get(ordenar, 'nome'))
-    
-    # ===== ADICIONAR DADOS DE VALIDADE =====
-    # Subquery para buscar dados de validade
-    validade_subquery = DadosValidadeItem.objects.filter(item=OuterRef('id'))
-    itens = itens.annotate(
-        data_fabricacao=Subquery(validade_subquery.values('data_fabricacao')[:1]),
-        data_vencimento=Subquery(validade_subquery.values('data_vencimento')[:1]),
-    )
-    
-    hoje = date.today()
-    
+
+    if ordenar == 'vencimento':
+        itens = itens.order_by(
+            Case(
+                When(data_vencimento__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField()
+            ),
+            F('data_vencimento').asc(nulls_last=True)
+        )
+    elif ordenar == '-vencimento':
+        itens = itens.order_by(
+            Case(
+                When(data_vencimento__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField()
+            ),
+            F('data_vencimento').desc(nulls_last=True)
+        )
+    else:
+        ordenacao_map = {
+            'nome': 'nome',
+            '-quantidade': '-quantidade',
+            'quantidade': 'quantidade',
+            'recente': '-updated_at',
+        }
+        itens = itens.order_by(ordenacao_map.get(ordenar, 'nome'))
+
     data = {
         'itens': [{
             'id': i.id,
@@ -220,7 +240,6 @@ def buscar_itens_ajax(request):
             'lote': i.lote or '-',
             'ca': i.ca or '-',
             'tamanho': i.tamanho or '-',
-            # --- CAMPOS DE VALIDADE ---
             'data_fabricacao': i.data_fabricacao.strftime('%Y-%m-%d') if i.data_fabricacao else None,
             'data_vencimento': i.data_vencimento.strftime('%Y-%m-%d') if i.data_vencimento else None,
             'dias_para_vencer': (i.data_vencimento - hoje).days if i.data_vencimento else None,
@@ -233,6 +252,46 @@ def buscar_itens_ajax(request):
         } for i in itens],
     }
     return JsonResponse(data)
+
+
+def saidas_list(request):
+    saidas = Saida.objects.select_related('item').all().order_by('-data', '-hora')
+
+    busca = request.GET.get('busca', '')
+    if busca:
+        saidas = saidas.filter(
+            Q(solicitante__icontains=busca) |
+            Q(item_nome__icontains=busca) |
+            Q(item_codigo__icontains=busca)
+        )
+
+    data_inicio = request.GET.get('data_inicio', '')
+    data_fim = request.GET.get('data_fim', '')
+    if data_inicio:
+        saidas = saidas.filter(data__gte=data_inicio)
+    if data_fim:
+        saidas = saidas.filter(data__lte=data_fim)
+
+    dept = request.GET.get('dept', '')
+    if dept:
+        saidas = saidas.filter(departamento=dept)
+
+    total_saidas = saidas.count()
+    total_retirado = saidas.aggregate(Sum('quantidade'))['quantidade__sum'] or 0
+
+    context = {
+        'saidas': saidas,
+        'busca': busca,
+        'data_inicio': data_inicio,
+        'data_fim': data_fim,
+        'dept': dept,
+        'departamentos': Departamento.choices,
+        'total_saidas': total_saidas,
+        'total_retirado': total_retirado,
+    }
+    return render(request, 'almoxarifado/saidas_list.html', context)
+
+
 
 @require_http_methods(["GET"])
 def buscar_por_codigo(request):
