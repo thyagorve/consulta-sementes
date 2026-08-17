@@ -37,7 +37,7 @@ urlpatterns = [
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     path('historico-geral/', views.historico_geral, name='historico_geral'),
     
-    #path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
+    path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
     path('salvar-config-dashboard/', views.salvar_config_dashboard, name='salvar_config_dashboard'),
