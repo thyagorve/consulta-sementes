@@ -1,4 +1,5 @@
 from . import views
+from . import views_inventario
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
@@ -19,6 +20,8 @@ urlpatterns = [
     path('dashboard-data/', views.dashboard_data, name='dashboard_data'),   
     
     path('estoque/', views.lista_estoque, name='lista_estoque'),
+    path('estoque/inventario/', views_inventario.inventario_estoque, name='inventario_estoque'),
+    path('estoque/inventario/modelo/', views_inventario.baixar_modelo_inventario, name='baixar_modelo_inventario'),
     path('estoque/gestao/', views.gestao_estoque, name='gestao_estoque'),
     path('mapa-armazem/', views.lista_armazens, name='lista_armazens'),
     path('mapa-armazem/<int:armazem_numero>/', views.mapa_ocupacao_canvas, name='mapa_canvas'),
@@ -34,7 +37,7 @@ urlpatterns = [
     path('configuracoes/', views.configuracoes, name='configuracoes'),
     path('historico-geral/', views.historico_geral, name='historico_geral'),
     
-    path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
+    #path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
     path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
     path('salvar-config-dashboard/', views.salvar_config_dashboard, name='salvar_config_dashboard'),

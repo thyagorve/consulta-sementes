@@ -993,12 +993,29 @@
                         </div>
                     </div>
 
-                    <!-- SALDO DESTAQUE -->
-                    <div class="text-center py-2 bg-light rounded border mb-3">
-                        <small class="text-muted text-uppercase fw-bold">Saldo Atual</small>
-                        <div class="fs-2 fw-bold text-dark" id="transf_saldo_atual">0</div>
-                        <small class="text-muted" id="transf_endereco_atual">Endereço: </small>
+                    <!-- RESUMO DE SALDO / RESERVA / DISPONÍVEL -->
+                    <div class="row g-2 mb-2">
+                        <div class="col-4">
+                            <div class="text-center py-2 bg-light rounded border h-100">
+                                <small class="text-muted text-uppercase fw-bold">Saldo físico</small>
+                                <div class="fs-4 fw-bold text-dark" id="transf_saldo_atual">0</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center py-2 rounded border h-100" style="background:#fff8e1;border-color:#f3d37a!important;">
+                                <small class="text-muted text-uppercase fw-bold">Empenhado no lote</small>
+                                <div class="fs-4 fw-bold text-warning-emphasis" id="transf_empenhado_atual">0</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-center py-2 availability-card rounded h-100">
+                                <small class="text-muted text-uppercase fw-bold">Disponível</small>
+                                <div class="fs-4 fw-bold text-success" id="transf_disponivel_atual">0</div>
+                            </div>
+                        </div>
                     </div>
+                    <div class="text-center mb-3"><small class="text-muted" id="transf_endereco_atual">Endereço: </small></div>
+                    <div class="commitment-alert" id="transf_empenho_alerta"></div>
 
                     <!-- DESTINO - SEÇÃO QUE MUDA CONFORME O TIPO -->
                     <div class="row mb-3 p-3 bg-opacity-10 rounded border" id="destino_section">
@@ -1093,7 +1110,7 @@
                             </select>
                         </div>
                         <div class="col-sm-3">
-                            <label>Saldo Atual</label>
+                            <label>Saldo físico</label>
                             <input type="text" id="transf_saldo" class="form-control bg-light" readonly>
                         </div>
                         <div class="col-sm-3">
@@ -1328,6 +1345,13 @@
                     EnderecoValidatorTransf.validar();
                 }
             }
+
+            const qtdInput = document.getElementById('transf_quantidade');
+            if (qtdInput) {
+                const saldo = parseInt(qtdInput.dataset.saldo || '0', 10) || 0;
+                const disponivel = parseInt(qtdInput.dataset.disponivel || '0', 10) || 0;
+                qtdInput.max = tipoBeneficiamento.checked ? disponivel : saldo;
+            }
         }
 
         // PREVENÇÃO DE DUPLO ENVIO
@@ -1339,7 +1363,9 @@
 
             // Validar quantidade
             const quantidade = document.getElementById('transf_quantidade');
-            const saldoAtual = parseInt(document.getElementById('transf_saldo_atual').textContent) || 0;
+            const saldoAtual = parseInt(quantidade.dataset.saldo || document.getElementById('transf_saldo_atual').textContent) || 0;
+            const disponivelAtual = parseInt(quantidade.dataset.disponivel || document.getElementById('transf_disponivel_atual').textContent) || 0;
+            const limiteOperacao = tipoBeneficiamento.checked ? disponivelAtual : saldoAtual;
             const qtdValue = parseInt(quantidade.value) || 0;
             
             if (qtdValue <= 0) {
@@ -1350,9 +1376,10 @@
                 return false;
             }
             
-            if (qtdValue > saldoAtual) {
+            if (qtdValue > limiteOperacao) {
                 e.preventDefault();
-                alert(`Quantidade não pode ser maior que o saldo atual (${saldoAtual})`);
+                const textoLimite = tipoBeneficiamento.checked ? 'disponível' : 'saldo físico';
+                alert(`Quantidade não pode ser maior que o ${textoLimite} (${limiteOperacao}).`);
                 quantidade.focus();
                 quantidade.classList.add('is-invalid');
                 return false;
@@ -1374,6 +1401,24 @@
                     e.preventDefault();
                     alert('Endereço inválido! O endereço deve estar no formato R-C LN01 P03 e existir no sistema.');
                     enderecoInput.focus();
+                    return false;
+                }
+            }
+
+            // Transferência avulsa de lote empenhado: permite, mas exige ciência.
+            const empenhadoLote = parseInt(quantidade.dataset.empenhadoLote || '0', 10) || 0;
+            if (tipoNormal.checked && empenhadoLote > 0) {
+                const ok = confirm(
+                    `⚠️ ATENÇÃO: este lote possui ${empenhadoLote} unidade(s) empenhada(s).
+
+` +
+                    `A transferência avulsa será permitida, mas NÃO consumirá o empenho. ` +
+                    `A reserva continuará vinculada ao lote e poderá acompanhar o novo endereço.
+
+Deseja continuar?`
+                );
+                if (!ok) {
+                    e.preventDefault();
                     return false;
                 }
             }
@@ -1408,10 +1453,12 @@
         // Validar quantidade em tempo real
         const quantidadeInput = document.getElementById('transf_quantidade');
         quantidadeInput.addEventListener('input', function() {
-            const saldoAtual = parseInt(document.getElementById('transf_saldo_atual').textContent) || 0;
+            const saldoAtual = parseInt(this.dataset.saldo || document.getElementById('transf_saldo_atual').textContent) || 0;
+            const disponivelAtual = parseInt(this.dataset.disponivel || document.getElementById('transf_disponivel_atual').textContent) || 0;
+            const limite = tipoBeneficiamento.checked ? disponivelAtual : saldoAtual;
             const valor = parseInt(this.value) || 0;
-            
-            if (valor > saldoAtual) {
+
+            if (valor > limite) {
                 this.classList.add('is-invalid');
             } else {
                 this.classList.remove('is-invalid');
@@ -1546,7 +1593,8 @@
                             <small class="text-muted">{{ item.embalagem }}</small>
                         </div>
                         <div class="row g-2">
-                            <div class="col-6"><label class="fw-bold">Qtd Saída *</label><input type="number" name="quantidade_saida" class="form-control border-danger fw-bold" max="{{ item.saldo }}" min="1" required></div>
+                            <div class="col-6"><label class="fw-bold">Qtd Saída *</label><input type="number" name="quantidade_saida" class="form-control border-danger fw-bold" max="{{ item.disponivel_ui }}" min="1" required>
+                                <small class="text-muted">Máx. avulso: <strong>{{ item.disponivel_ui }}</strong>. {% if item.empenhado > 0 %}<span class="text-warning-emphasis">Há {{ item.empenhado }} empenhado(s); essa parte só sai pelo card.</span>{% endif %}</small></div>
                             <div class="col-6"><label>Nº Carga *</label><input type="text" name="numero_carga" class="form-control" required></div>
                             <div class="col-6"><label>Motorista *</label><input type="text" name="motorista" class="form-control" required></div>
                             <div class="col-6"><label>Placa *</label><input type="text" name="placa" class="form-control" required></div>

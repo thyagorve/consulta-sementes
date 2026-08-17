@@ -243,6 +243,39 @@
     .alert-auto-fill {
         border-left: 4px solid #10b981;
     }
+
+
+    /* ===== REFINO 2026: CABEÇALHO, SALDO E INVENTÁRIO ===== */
+    .stock-page-header {
+        display:flex; align-items:center; justify-content:space-between; gap:16px;
+        padding:18px 20px; margin-bottom:18px; border:1px solid #e2e8f0;
+        background:linear-gradient(135deg,#ffffff 0%,#f8fbf9 100%);
+        border-radius:16px; box-shadow:0 8px 25px rgba(15,23,42,.06);
+    }
+    .stock-page-header h2 { margin:0; font-weight:800; color:#172033; }
+    .stock-page-header p { margin:4px 0 0; color:#64748b; font-size:.9rem; }
+    .stock-header-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .btn-inventory-soft {
+        background:#fff; color:#365344; border:1px solid #cbd8d0; border-radius:10px;
+        padding:9px 13px; font-weight:700; box-shadow:0 2px 8px rgba(15,23,42,.04);
+    }
+    .btn-inventory-soft:hover { background:#eef8f1; color:#1e5f34; border-color:#8cc29d; transform:translateY(-1px); }
+    .stock-summary-inline { display:flex; justify-content:center; gap:5px; flex-wrap:wrap; align-items:center; }
+    .stock-mini-pill { display:inline-flex; align-items:center; gap:4px; border-radius:999px; padding:3px 7px; font-size:.64rem; font-weight:700; border:1px solid transparent; }
+    .stock-mini-pill.saldo { background:#f1f5f9; color:#334155; border-color:#e2e8f0; }
+    .stock-mini-pill.empenhado { background:#fff7db; color:#8a5a00; border-color:#f6d77a; }
+    .stock-mini-pill.disponivel { background:#eaf7ee; color:#176b37; border-color:#b7dfc3; }
+    .commitment-alert {
+        display:none; margin-top:10px; padding:10px 12px; border-radius:10px;
+        background:#fff8e1; border:1px solid #f3d37a; color:#76540c; font-size:.82rem;
+    }
+    .commitment-alert.show { display:block; }
+    .availability-card { background:linear-gradient(135deg,#effaf3,#f8fffa); border:1px solid #c9e8d2; }
+    @media(max-width:768px){
+        .stock-page-header{align-items:flex-start; flex-direction:column; padding:15px;}
+        .stock-header-actions{width:100%;}
+        .stock-header-actions .btn{flex:1 1 auto;}
+    }
 </style>
 
 <div class="container-fluid py-4">
@@ -250,15 +283,20 @@
 
 
 
-    <!-- TITULO E BOTÃO NOVO -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <!-- CABEÇALHO OPERACIONAL -->
+    <div class="stock-page-header">
         <div>
-            <h2 class="h3 fw-bold text-dark mb-1">Controle de Estoque</h2>
-            <p class="text-muted mb-0">Gerenciamento completo de lotes e movimentações</p>
+            <h2 class="h3">Controle de Estoque</h2>
+            <p>Saldo físico, reservas, disponível e movimentações por lote e endereço.</p>
         </div>
-        <button class="btn btn-primary btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNovaEntrada">
-            <i class="fas fa-plus me-2"></i> Nova Entrada
-        </button>
+        <div class="stock-header-actions">
+            <a href="{% url 'sapp:inventario_estoque' %}" class="btn btn-inventory-soft" title="Comparar inventário físico com o sistema">
+                <i class="fas fa-clipboard-check me-1"></i> Inventário
+            </a>
+            <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNovaEntrada">
+                <i class="fas fa-plus me-1"></i> Nova Entrada
+            </button>
+        </div>
     </div>
 
    
@@ -298,7 +336,12 @@
                 </thead>
                 <tbody id="tableBody">
                     {% for item in estoque %}
-                    <tr onclick="toggleDetails('details-{{ item.id }}')" style="cursor: pointer;" class="align-middle">
+                    <tr onclick="toggleDetails('details-{{ item.id }}')" style="cursor: pointer;" class="align-middle"
+                        data-stock-id="{{ item.id }}"
+                        data-saldo="{{ item.saldo }}"
+                        data-disponivel="{{ item.disponivel_ui }}"
+                        data-empenhado="{{ item.empenhado }}"
+                        data-empenhado-lote="{{ item.empenhado_lote_ui }}">
                         <td class="text-center"><i class="fas fa-chevron-right text-primary transition-icon" id="chevron-{{ item.id }}"></i></td>
                         <td>
                             <div class="fw-bold text-dark">{{ item.lote }}</div>
@@ -324,12 +367,18 @@
                             <div class="d-flex justify-content-center gap-2 align-items-center">
                                 <span class="flow-badge flow-in" title="Entrada"><i class="fas fa-arrow-down"></i> {{ item.entrada }}</span>
                                 <span class="flow-badge {% if item.saida > 0 %}flow-out{% else %}flow-zero{% endif %}" title="Saída"><i class="fas fa-arrow-up"></i> {{ item.saida }}</span>
-                                <div class="ms-2 fw-bold fs-5 text-dark">{{ item.saldo }} <small class="fw-normal fs-6 text-muted">{{ item.embalagem }}</small></div>
+                                <div class="stock-summary-inline ms-1">
+                                    <span class="stock-mini-pill saldo" title="Saldo físico">Saldo {{ item.saldo }}</span>
+                                    {% if item.empenhado > 0 %}<span class="stock-mini-pill empenhado" title="Reserva vinculada a este registro">Emp. {{ item.empenhado }}</span>{% endif %}
+                                    <span class="stock-mini-pill disponivel" title="Saldo menos empenho">Disp. {{ item.disponivel_ui }} {{ item.embalagem }}</span>
+                                </div>
                             </div>
                         </td>
                         <td class="text-center">
-                            {% if item.saldo > 0 %}
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success">Disponível</span>
+                            {% if item.disponivel_ui > 0 %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success">{{ item.disponivel_ui }} disponível</span>
+                            {% elif item.saldo > 0 and item.empenhado > 0 %}
+                            <span class="badge bg-warning bg-opacity-10 text-warning-emphasis border border-warning">Reservado</span>
                             {% else %}
                             <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Esgotado</span>
                             {% endif %}
@@ -358,10 +407,16 @@
                                             </div>
 
                                             <div class="d-grid gap-2">
-                                                {% if item.saldo > 0 %}
+                                                {% if item.disponivel_ui > 0 %}
                                                 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalSaida{{ item.id }}">
-                                                    <i class="fas fa-truck-ramp-box me-2"></i> Expedição
+                                                    <i class="fas fa-truck-ramp-box me-2"></i> Expedição avulsa
                                                 </button>
+                                                {% elif item.saldo > 0 and item.empenhado > 0 %}
+                                                <button class="btn btn-outline-warning" type="button" disabled title="A parte empenhada só pode ser expedida pelo card">
+                                                    <i class="fas fa-lock me-2"></i> Expedição pelo card
+                                                </button>
+                                                {% endif %}
+                                                {% if item.saldo > 0 %}
                                                 <button class="btn btn-warning text-dark fw-bold" onclick="abrirModalTransferencia({{ item.id }})">
                                                     <i class="fas fa-right-left me-2"></i> Transferir / Ajustar
                                                 </button>
@@ -1244,24 +1299,35 @@ function abrirModalTransferencia(id) {
     setSelect('transf_categoria', getVal('categoria'));
     setSelect('transf_tratamento', getVal('tratamento'));
     
-    const row = document.querySelector(`tr[onclick*="details-${id}"]`);
-    let saldoAtual = "0";
-    
-    if (row) {
-        const saldoElement = row.querySelector('.fs-3, .fs-4, .fs-5');
-        if (saldoElement) {
-            saldoAtual = saldoElement.innerText.split(' ')[0].trim();
-        }
-    }
-    
+    const row = document.querySelector(`tr[data-stock-id="${id}"]`);
+    const saldoAtual = parseInt(row?.dataset.saldo || '0', 10) || 0;
+    const disponivelAtual = parseInt(row?.dataset.disponivel || '0', 10) || 0;
+    const empenhadoAtual = parseInt(row?.dataset.empenhado || '0', 10) || 0;
+    const empenhadoLote = parseInt(row?.dataset.empenhadoLote || '0', 10) || 0;
+
     document.getElementById('transf_saldo_atual').innerText = saldoAtual;
+    document.getElementById('transf_disponivel_atual').innerText = disponivelAtual;
+    document.getElementById('transf_empenhado_atual').innerText = empenhadoLote;
     document.getElementById('transf_saldo').value = saldoAtual;
     document.getElementById('transf_entrada').value = getVal('entrada') || "";
     document.getElementById('transf_endereco_atual').innerText = "Endereço Atual: " + getVal('endereco');
-    
+
+    const aviso = document.getElementById('transf_empenho_alerta');
+    if (aviso) {
+        aviso.classList.toggle('show', empenhadoLote > 0);
+        aviso.innerHTML = empenhadoLote > 0
+            ? `<i class="fas fa-triangle-exclamation me-1"></i><strong>Lote empenhado:</strong> ${empenhadoLote} unidade(s) reservada(s). A transferência avulsa é permitida e não consome o empenho. Se necessário, a reserva acompanhará o lote no novo endereço.`
+            : '';
+    }
+
     const inputQtd = document.getElementById('transf_quantidade');
-    inputQtd.value = saldoAtual;
+    inputQtd.value = disponivelAtual > 0 ? disponivelAtual : saldoAtual;
+    // Transferência normal pode usar o saldo físico. Beneficiamento respeita disponível.
     inputQtd.max = saldoAtual;
+    inputQtd.dataset.saldo = saldoAtual;
+    inputQtd.dataset.disponivel = disponivelAtual;
+    inputQtd.dataset.empenhado = empenhadoAtual;
+    inputQtd.dataset.empenhadoLote = empenhadoLote;
     
     new bootstrap.Modal(modalTransfElement).show();
 }

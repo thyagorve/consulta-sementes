@@ -1,0 +1,86 @@
+{% extends 'sapp/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<style>
+:root{--inv-green:#1e5f34;--inv-green2:#2f8f4e;--inv-border:#e2e8f0;--inv-muted:#64748b}
+.inv-wrap{max-width:1600px;margin:0 auto;padding:22px}
+.inv-header{display:flex;justify-content:space-between;gap:18px;align-items:center;background:linear-gradient(135deg,#163f29,#2f8f4e);color:#fff;border-radius:20px;padding:22px 24px;box-shadow:0 16px 35px rgba(30,95,52,.18);margin-bottom:18px}
+.inv-header h1{font-size:1.55rem;font-weight:800;margin:0}.inv-header p{margin:5px 0 0;color:rgba(255,255,255,.78);font-size:.9rem}
+.inv-actions{display:flex;gap:8px;flex-wrap:wrap}.inv-actions .btn{border-radius:10px;font-weight:700}
+.inv-panel{background:#fff;border:1px solid var(--inv-border);border-radius:16px;padding:18px;box-shadow:0 4px 18px rgba(15,23,42,.05);margin-bottom:18px}
+.upload-zone{border:2px dashed #bad2c1;background:#f8fcf9;border-radius:14px;padding:22px;text-align:center}.upload-zone input{max-width:520px;margin:12px auto}
+.inv-note{background:#eff8f2;border:1px solid #c9e4d1;color:#315f40;border-radius:10px;padding:10px 12px;font-size:.82rem}
+.kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;margin-bottom:16px}.kpi{background:#fff;border:1px solid var(--inv-border);border-radius:14px;padding:14px}.kpi small{display:block;color:var(--inv-muted);font-size:.68rem;text-transform:uppercase;font-weight:800}.kpi strong{display:block;font-size:1.5rem;color:#172033;margin-top:4px}.kpi.ok{border-left:4px solid #22a559}.kpi.warn{border-left:4px solid #e6a700}.kpi.bad{border-left:4px solid #dc3545}.kpi.info{border-left:4px solid #3b82f6}
+.inv-table-wrap{overflow:auto;max-height:65vh;border:1px solid var(--inv-border);border-radius:14px}.inv-table{min-width:1180px;margin:0}.inv-table thead th{position:sticky;top:0;z-index:3;background:#f1f5f9;color:#475569;font-size:.72rem;text-transform:uppercase;padding:10px;border-bottom:1px solid #cbd5e1}.inv-table td{font-size:.78rem;padding:9px;vertical-align:top;border-color:#eef2f7}.status-pill{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:.65rem;font-weight:800}.s-ok{background:#dcfce7;color:#166534}.s-div{background:#fef3c7;color:#92400e}.s-miss{background:#fee2e2;color:#991b1b}.s-count{background:#dbeafe;color:#1e40af}.diff-list{display:flex;flex-direction:column;gap:4px}.diff{background:#fff8e1;border-left:3px solid #e6a700;padding:5px 7px;border-radius:6px}.diff b{color:#5e4200}
+@media(max-width:900px){.inv-header{align-items:flex-start;flex-direction:column}.kpi-grid{grid-template-columns:repeat(2,1fr)}.inv-wrap{padding:12px}}
+</style>
+
+<div class="inv-wrap">
+  <div class="inv-header">
+    <div>
+      <h1><i class="fas fa-clipboard-check me-2"></i>Inventário e Comparação</h1>
+      <p>Compare a contagem física com saldo, endereço e cadastro do sistema sem alterar o estoque.</p>
+    </div>
+    <div class="inv-actions">
+      <a href="{% url 'sapp:baixar_modelo_inventario' %}" class="btn btn-light"><i class="fas fa-file-excel me-1 text-success"></i> Baixar modelo Excel</a>
+      <a href="{% url 'sapp:lista_estoque' %}" class="btn btn-outline-light"><i class="fas fa-arrow-left me-1"></i> Estoque</a>
+    </div>
+  </div>
+
+  <div class="inv-panel">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="upload-zone">
+        <div class="fs-1 text-success"><i class="fas fa-cloud-arrow-up"></i></div>
+        <h5 class="fw-bold mt-2">Enviar contagem física</h5>
+        <p class="text-muted mb-1">Use o modelo do sistema. O arquivo será somente comparado, nada será alterado automaticamente.</p>
+        <input type="file" class="form-control" name="arquivo" accept=".xlsx" required>
+        <button class="btn btn-success px-4 mt-2"><i class="fas fa-code-compare me-1"></i> Comparar agora</button>
+      </div>
+    </form>
+    <div class="inv-note mt-3"><i class="fas fa-circle-info me-1"></i><strong>Regra:</strong> quantidade física é comparada com o <strong>saldo físico</strong>. Empenhado e disponível aparecem como contexto para você entender diferenças sem confundir reserva com estoque físico.</div>
+    {% if erro %}<div class="alert alert-danger mt-3 mb-0">{{ erro }}</div>{% endif %}
+  </div>
+
+  {% if resumo %}
+  <div class="kpi-grid">
+    <div class="kpi info"><small>Linhas auditadas</small><strong>{{ resumo.total }}</strong></div>
+    <div class="kpi ok"><small>Conferem</small><strong>{{ resumo.ok }}</strong></div>
+    <div class="kpi warn"><small>Divergentes</small><strong>{{ resumo.divergentes }}</strong></div>
+    <div class="kpi bad"><small>Não encontrados</small><strong>{{ resumo.nao_encontrados }}</strong></div>
+    <div class="kpi info"><small>Não contados</small><strong>{{ resumo.nao_contados }}</strong></div>
+  </div>
+
+  <div class="inv-panel p-0 overflow-hidden">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div><strong>Resultado da comparação</strong><div class="small text-muted">{{ nome_arquivo }}</div></div>
+      <span class="badge bg-light text-dark border">Nenhuma alteração automática</span>
+    </div>
+    <div class="inv-table-wrap">
+      <table class="table table-hover inv-table">
+        <thead><tr><th>Status</th><th>Linha</th><th>Código</th><th>Lote</th><th>Endereço Excel</th><th>Qtd Física</th><th>Saldo Sistema</th><th>Empenhado</th><th>Disponível</th><th>Endereço Sistema</th><th>Divergências</th></tr></thead>
+        <tbody>
+        {% for row in resultado %}
+          <tr>
+            <td>
+              {% if row.status == 'OK' %}<span class="status-pill s-ok">OK</span>
+              {% elif row.status == 'DIVERGENTE' %}<span class="status-pill s-div">DIVERGENTE</span>
+              {% elif row.status == 'NAO_CONTADO' %}<span class="status-pill s-count">NÃO CONTADO</span>
+              {% else %}<span class="status-pill s-miss">NÃO ENCONTRADO</span>{% endif %}
+            </td>
+            <td>{{ row.linha|default:"—" }}</td><td>{{ row.codigo|default:"—" }}</td><td><strong>{{ row.lote|default:"—" }}</strong></td><td>{{ row.endereco_excel|default:"—" }}</td><td>{{ row.quantidade_excel|default:"—" }}</td>
+            <td>{% if row.sistema %}{{ row.sistema.quantidade }}{% else %}—{% endif %}</td>
+            <td>{% if row.sistema %}{{ row.sistema.empenhado }}{% else %}—{% endif %}</td>
+            <td>{% if row.sistema %}{{ row.sistema.disponivel }}{% else %}—{% endif %}</td>
+            <td>{% if row.sistema %}{{ row.sistema.endereco|default:"—" }}{% else %}—{% endif %}</td>
+            <td><div class="diff-list">{% for d in row.diferencas %}<div class="diff"><b>{{ d.campo }}:</b> Excel {{ d.excel }} → Sistema {{ d.sistema }}</div>{% empty %}<span class="text-success fw-bold">Tudo confere</span>{% endfor %}</div></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

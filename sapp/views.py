@@ -540,6 +540,22 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         'conferente': get_options_list('conferente__username', 'conferente')
     }
 
+    # ================================================================
+    # RESERVAS / EMPENHOS POR LOTE
+    # ================================================================
+    # O estoque físico continua separado por endereço, mas o usuário precisa
+    # enxergar quando o LOTE possui reserva em qualquer endereço.
+    lotes_visiveis = list(qs.values_list('lote', flat=True).distinct())
+    empenhos_por_lote = {
+        row['lote']: int(row['total'] or 0)
+        for row in (
+            Estoque.objects
+            .filter(lote__in=lotes_visiveis)
+            .values('lote')
+            .annotate(total=Sum('empenhado'))
+        )
+    }
+
     # Paginação
     page_size = request.GET.get('page_size', 25)
     try:
@@ -561,6 +577,13 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     if 'page' in query_params:
         del query_params['page']
     
+    # Atributos transitórios usados apenas pelo template.
+    # disponivel = saldo físico deste endereço - reserva atribuída a este registro.
+    # empenhado_lote = reserva total do lote, independentemente do endereço.
+    for item in page_obj.object_list:
+        item.disponivel_ui = max(0, int(item.disponivel or 0))
+        item.empenhado_lote_ui = empenhos_por_lote.get(item.lote, 0)
+
     context = {
         'estoque': page_obj,
         'itens': page_obj,
@@ -1002,8 +1025,18 @@ def registrar_saida(request, id):
                 erros = []
                 if qtd <= 0: 
                     erros.append("❌ Quantidade inválida.")
-                if qtd > item.saldo: 
-                    erros.append(f"❌ Saldo insuficiente. Disponível: {item.saldo}.")
+                disponivel_avulso = max(0, int(item.disponivel or 0))
+                if qtd > disponivel_avulso:
+                    if item.empenhado > 0:
+                        erros.append(
+                            f"🔒 Este registro possui {item.empenhado} unidade(s) empenhada(s). "
+                            f"Na expedição avulsa só é permitido expedir o disponível: {disponivel_avulso}. "
+                            "Para expedir a parte empenhada, abra o card correspondente."
+                        )
+                    else:
+                        erros.append(
+                            f"❌ Quantidade acima do disponível ({disponivel_avulso})."
+                        )
                 if not motorista.strip(): 
                     erros.append("❌ Motorista é obrigatório.")
                 if not placa.strip(): 
@@ -1125,6 +1158,113 @@ def registrar_saida(request, id):
 
 from django.views.decorators.csrf import csrf_protect
 
+def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
+    """
+    Mantém o empenho vivo quando uma transferência AVULSA desloca fisicamente
+    um lote para outro endereço.
+
+    A reserva só é realocada se o saldo restante da origem não for suficiente
+    para sustentar o empenho atualmente vinculado àquele registro.
+    A transferência não consome a reserva. O consumo continua acontecendo
+    apenas nas movimentações feitas pelo card.
+    """
+    origem.refresh_from_db(fields=['saldo', 'empenhado'])
+    destino.refresh_from_db(fields=['saldo', 'empenhado'])
+
+    excesso = max(0, int(origem.empenhado or 0) - int(origem.saldo or 0))
+    if excesso <= 0:
+        return 0
+
+    itens = list(
+        ItemEmpenho.objects
+        .select_for_update()
+        .filter(estoque=origem)
+        .select_related('empenho')
+        .order_by('id')
+    )
+
+    restante = excesso
+    movido = 0
+
+    for item in itens:
+        if restante <= 0:
+            break
+
+        qtd_item = int(item.quantidade or 0)
+        qtd_mover = min(qtd_item, restante)
+        if qtd_mover <= 0:
+            continue
+
+        destino_item = (
+            ItemEmpenho.objects
+            .select_for_update()
+            .filter(empenho=item.empenho, estoque=destino)
+            .first()
+        )
+
+        if qtd_mover == qtd_item:
+            if destino_item:
+                ItemEmpenho.objects.filter(pk=destino_item.pk).update(
+                    quantidade=F('quantidade') + qtd_mover
+                )
+                # QuerySet.delete() é intencional: não chama ItemEmpenho.delete(),
+                # pois os contadores de estoque são ajustados manualmente abaixo.
+                ItemEmpenho.objects.filter(pk=item.pk).delete()
+            else:
+                ItemEmpenho.objects.filter(pk=item.pk).update(estoque=destino)
+        else:
+            ItemEmpenho.objects.filter(pk=item.pk).update(
+                quantidade=F('quantidade') - qtd_mover
+            )
+
+            if destino_item:
+                ItemEmpenho.objects.filter(pk=destino_item.pk).update(
+                    quantidade=F('quantidade') + qtd_mover
+                )
+            else:
+                # Criação por bulk_create para preservar o snapshot original
+                # sem disparar ItemEmpenho.save() e duplicar os contadores.
+                clone = ItemEmpenho(
+                    empenho=item.empenho,
+                    estoque=destino,
+                    quantidade=qtd_mover,
+                    endereco_origem=item.endereco_origem,
+                    endereco_destino=item.endereco_destino,
+                    observacao=item.observacao,
+                    lote=item.lote,
+                    cultivar=item.cultivar,
+                    peneira=item.peneira,
+                    categoria=item.categoria,
+                    saldo_anterior=item.saldo_anterior,
+                    produto_snapshot=item.produto_snapshot,
+                    especie_snapshot=item.especie_snapshot,
+                    tratamento_snapshot=item.tratamento_snapshot,
+                    embalagem_snapshot=item.embalagem_snapshot,
+                    empresa_snapshot=item.empresa_snapshot,
+                    cliente_snapshot=item.cliente_snapshot,
+                    az_origem=item.az_origem,
+                    peso_unitario_snapshot=item.peso_unitario_snapshot,
+                    observacao_snapshot=item.observacao_snapshot,
+                    conferente_snapshot=item.conferente_snapshot,
+                )
+                ItemEmpenho.objects.bulk_create([clone])
+
+        restante -= qtd_mover
+        movido += qtd_mover
+
+    if movido:
+        Estoque.objects.filter(pk=origem.pk).update(
+            empenhado=F('empenhado') - movido
+        )
+        Estoque.objects.filter(pk=destino.pk).update(
+            empenhado=F('empenhado') + movido
+        )
+        origem.refresh_from_db(fields=['saldo', 'empenhado'])
+        destino.refresh_from_db(fields=['saldo', 'empenhado'])
+
+    return movido
+
+
 @csrf_protect
 @login_required
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
@@ -1144,9 +1284,30 @@ def transferir(request, id):
                     return redirect('sapp:lista_estoque')
                 
                 if qtd > origem.saldo:
-                    messages.error(request, f"❌ Saldo insuficiente. Disponível: {origem.saldo}")
+                    messages.error(
+                        request,
+                        f"❌ Quantidade acima do saldo físico ({origem.saldo})."
+                    )
                     return redirect('sapp:lista_estoque')
-                
+
+                empenhado_lote = int(
+                    Estoque.objects
+                    .filter(lote=origem.lote)
+                    .aggregate(total=Sum('empenhado'))['total']
+                    or 0
+                )
+
+                # Beneficiamento é uma saída definitiva. Não pode consumir a
+                # parcela empenhada fora do card.
+                if tipo_transferencia == 'beneficiamento' and qtd > max(0, int(origem.disponivel or 0)):
+                    messages.error(
+                        request,
+                        f"🔒 O lote possui reserva ativa. Para beneficiamento avulso, "
+                        f"use no máximo o disponível ({max(0, int(origem.disponivel or 0))}). "
+                        "A parte empenhada só pode ser consumida pelo card."
+                    )
+                    return redirect('sapp:lista_estoque')
+
                 # Validação de endereço apenas para transferência normal
                 if tipo_transferencia == 'normal' and not novo_end:
                     messages.error(request, "❌ Novo endereço é obrigatório para transferência normal!")
@@ -1362,6 +1523,14 @@ def transferir(request, id):
                         )
                         mensagem_tipo = "criado no novo endereço"
                     
+                    # Se a transferência avulsa deslocou quantidade que era
+                    # necessária para sustentar uma reserva, move internamente a
+                    # reserva para o destino SEM consumir o empenho.
+                    reserva_realocada = _realocar_empenho_apos_transferencia_avulsa(
+                        origem,
+                        destino,
+                    )
+
                     # Históricos (Saída da origem)
                     hist_saida = HistoricoMovimentacao.objects.create(
                         estoque=origem,
@@ -1382,7 +1551,22 @@ def transferir(request, id):
                     for f in request.FILES.getlist('fotos'):
                         FotoMovimentacao.objects.create(historico=hist_saida, arquivo=f)
                     
-                    messages.success(request, f"✅ Transferência concluída! {qtd} unidades {mensagem_tipo} em {novo_end}")
+                    if empenhado_lote > 0:
+                        aviso_reserva = (
+                            f" ⚠️ O lote possui {empenhado_lote} unidade(s) empenhada(s). "
+                            "A transferência foi permitida e o empenho foi preservado."
+                        )
+                        if reserva_realocada:
+                            aviso_reserva += (
+                                f" {reserva_realocada} unidade(s) da reserva passaram a "
+                                f"acompanhar o estoque no endereço {novo_end}."
+                            )
+                        messages.warning(request, aviso_reserva)
+
+                    messages.success(
+                        request,
+                        f"✅ Transferência concluída! {qtd} unidades {mensagem_tipo} em {novo_end}."
+                    )
                 
         except Exception as e:
             import traceback
@@ -1588,8 +1772,20 @@ def nova_saida(request):
             
             item = Estoque.objects.get(id=lote_id)
             
-            if quantidade > item.saldo:
-                messages.error(request, f"❌ Quantidade excede o saldo disponível ({item.saldo}).")
+            disponivel_avulso = max(0, int(item.disponivel or 0))
+            if quantidade > disponivel_avulso:
+                if item.empenhado > 0:
+                    messages.error(
+                        request,
+                        f"🔒 O lote possui {item.empenhado} unidade(s) empenhada(s) neste endereço. "
+                        f"Expedição avulsa limitada ao disponível ({disponivel_avulso}). "
+                        "A quantidade empenhada só pode ser expedida pelo card."
+                    )
+                else:
+                    messages.error(
+                        request,
+                        f"❌ Quantidade excede o disponível ({disponivel_avulso})."
+                    )
                 return redirect('sapp:lista_estoque')
             
             # Salvar estado anterior
@@ -3614,13 +3810,11 @@ def api_ultimas_movimentacoes(request):
         'movimentacoes': data
     })
     
+"""
 @login_required
 @permission_required('sapp.pode_ver_empenhos', raise_exception=True)
 def pagina_rascunho(request):
-    """
-    View para gestão de rascunhos, transferências e expedições.
-    Implementa processamento em lote com preservação de histórico.
-    """
+
     user = request.user
     MARCA_ORIGEM = "[REP]"
 
@@ -4029,7 +4223,7 @@ def pagina_rascunho(request):
                 'estoque_id': estoque.id,
                 'lote': item.lote or estoque.lote,
                 'quantidade': item.quantidade,
-                'endereco': item.endereco_origem or estoque.endereco,
+                'endereco': estoque.endereco or item.endereco_origem,
                 'produto': estoque.produto or '',
                 'cultivar': item.cultivar or (estoque.cultivar.nome if estoque.cultivar else ''),
                 'peneira': item.peneira or (estoque.peneira.nome if estoque.peneira else ''),
@@ -4099,6 +4293,7 @@ def pagina_rascunho(request):
         'cards_impressao_json': json.dumps(cards_impressao, ensure_ascii=False),
     })
 
+"""
     
 def processar_transferencia_item(request, item, user, MARCA_ORIGEM, obs_global, empenho):
     """Processa a transferência de um item específico."""
@@ -7780,7 +7975,7 @@ def redirecionar_usuario(request):
     # 🔥 PRIORIDADE 3: EMPENHO
     if user.has_perm('sapp.pode_ver_empenhos') or user.has_perm('sapp.pode_criar_empenhos'):
         print("✅ Usuário tem permissão de empenho -> Redirecionando para Empenho")
-        return redirect('sapp:pagina_rascunho')
+        return redirect('sapp:sapp:pagina_solicitacoes')
     
     # 🔥 PRIORIDADE 4: ESTOQUE (visualização)
     if user.has_perm('sapp.pode_ver_estoque'):
@@ -8914,13 +9109,12 @@ def api_dados_impressao_solicitacao(
                     else ''
                 ),
 
+                # Endereço operacional atual. Se uma transferência avulsa
+                # realocou a reserva, o card acompanha o lote.
                 'endereco': (
-                    item.endereco_origem
-                    or (
-                        estoque.endereco
-                        if estoque
-                        else ''
-                    )
+                    estoque.endereco
+                    if estoque
+                    else item.endereco_origem
                 ),
 
                 'produto': (
@@ -9961,13 +10155,11 @@ def api_lotes_disponiveis_para_solicitacao(
                     item.quantidade or 0
                 ),
 
+                # Para operação do card, mostrar a localização física atual.
                 'endereco': (
-                    item.endereco_origem
-                    or (
-                        estoque.endereco
-                        if estoque
-                        else ''
-                    )
+                    estoque.endereco
+                    if estoque
+                    else item.endereco_origem
                 ),
 
                 'peso_unitario': float(
