@@ -3810,7 +3810,7 @@ def api_ultimas_movimentacoes(request):
         'movimentacoes': data
     })
     
-"""
+
 @login_required
 @permission_required('sapp.pode_ver_empenhos', raise_exception=True)
 def pagina_rascunho(request):
@@ -4293,7 +4293,7 @@ def pagina_rascunho(request):
         'cards_impressao_json': json.dumps(cards_impressao, ensure_ascii=False),
     })
 
-"""
+
     
 def processar_transferencia_item(request, item, user, MARCA_ORIGEM, obs_global, empenho):
     """Processa a transferência de um item específico."""
@@ -7975,7 +7975,7 @@ def redirecionar_usuario(request):
     # 🔥 PRIORIDADE 3: EMPENHO
     if user.has_perm('sapp.pode_ver_empenhos') or user.has_perm('sapp.pode_criar_empenhos'):
         print("✅ Usuário tem permissão de empenho -> Redirecionando para Empenho")
-        return redirect('sapp:sapp:pagina_solicitacoes')
+        return redirect('sapp:pagina_rascunho')
     
     # 🔥 PRIORIDADE 4: ESTOQUE (visualização)
     if user.has_perm('sapp.pode_ver_estoque'):
