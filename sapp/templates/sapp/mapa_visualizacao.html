@@ -23,10 +23,10 @@
         </div>
 
         <div class="header-center">
-            <div class="global-search">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" id="campoPesquisaLote" placeholder="Buscar lote, cliente ou endereço...">
-                <div id="wrapperContador" class="search-indicator d-none">0</div>
+            <div class="package-metrics header-packages" aria-label="Totais do armazém atual">
+                <article class="package-card bags"><span class="package-icon"><i class="fas fa-box"></i></span><span class="package-copy"><strong id="totalBags">0</strong><small>Bags</small></span></article>
+                <article class="package-card sacks"><span class="package-icon"><i class="fas fa-layer-group"></i></span><span class="package-copy"><strong id="totalSacos">0</strong><small>Sacos</small></span></article>
+                <article id="cardOutros" class="package-card other d-none"><span class="package-icon"><i class="fas fa-cubes"></i></span><span class="package-copy"><strong id="totalOutros">0</strong><small>Outros</small></span></article>
             </div>
         </div>
 
@@ -47,6 +47,9 @@
             </div>
 
             <div class="actions">
+                <button type="button" id="btnFiltros" class="btn-filter-toggle" aria-expanded="false" aria-controls="painelFiltros">
+                    <i class="fas fa-search"></i><span>Pesquisar e filtrar</span><b id="filterBadge" class="d-none">0</b>
+                </button>
                 <button class="btn-circle refresh" onclick="location.reload()" title="Sincronizar">
                     <i class="fas fa-sync-alt"></i>
                 </button>
@@ -62,6 +65,21 @@
             </div>
         </div>
     </header>
+
+    <!-- PAINEL OCULTO DE PESQUISA E FILTROS -->
+    <section id="painelFiltros" class="filters-panel" aria-hidden="true">
+        <div class="map-filters">
+            <div class="filters-caption"><i class="fas fa-filter"></i><span>Filtros do mapa</span><b id="resultadoFiltro">Todos</b></div>
+            <div class="filters-grid">
+                <select id="filtroEspecie" aria-label="Filtrar por cultura"><option value="TODAS">Todas as culturas</option></select>
+                <select id="filtroEmbalagem" aria-label="Filtrar por embalagem"><option value="TODAS">Todas as embalagens</option><option value="BAGS">Bags</option><option value="SACOS">Sacos</option><option value="OUTROS">Outras</option></select>
+                <select id="filtroCultivar" aria-label="Filtrar por cultivar"><option value="TODAS">Todas as cultivares</option></select>
+                <select id="filtroCliente" aria-label="Filtrar por cliente"><option value="TODAS">Todos os clientes</option></select>
+                <div class="filter-search"><i class="fas fa-search"></i><input id="campoPesquisaLote" type="search" placeholder="Lote, cliente ou endereço" aria-label="Pesquisar lote, cliente ou endereço"><span id="wrapperContador" class="search-indicator d-none">0</span></div>
+                <button type="button" id="limparFiltros" class="clear-filter"><i class="fas fa-undo-alt"></i><span>Limpar</span></button>
+            </div>
+        </div>
+    </section>
 
     <!-- MAP VIEWPORT -->
     <main class="viewport">
@@ -151,8 +169,8 @@
         overflow: hidden;
         height: 100vh;
         height: 100dvh;
-        width: 100vw;
-        width: 100dvw;
+        width: 100%;
+        max-width: 100%;
     }
 
     .app-container {
@@ -160,16 +178,39 @@
         flex-direction: column;
         height: 100vh;
         height: 100dvh;
-        width: 100vw;
-        width: 100dvw;
+        width: 100%;
+        max-width: 100%;
         overflow: hidden;
     }
 
+    .filters-panel { max-height:0; overflow:hidden; opacity:0; padding:0 clamp(10px,1.4vw,20px); background:linear-gradient(115deg,rgba(15,23,42,.99),rgba(23,37,84,.96)); border-bottom:1px solid transparent; transition:max-height .28s ease,opacity .2s ease,padding .28s ease; z-index:950; }
+    .filters-panel.open { max-height:120px; opacity:1; padding-top:9px; padding-bottom:9px; border-bottom-color:rgba(99,102,241,.25); }
+    .package-metrics { display:flex; gap:8px; justify-content:center; }
+    .package-card { min-width:96px; display:flex; align-items:center; gap:8px; padding:6px 9px; border:1px solid var(--border); border-radius:11px; background:rgba(255,255,255,.045); }
+    .package-card { cursor:pointer; transition:transform .2s ease, background .2s ease; }
+    .package-card:hover { transform:translateY(-2px); background:rgba(255,255,255,.08); }
+    .package-card.bags { border-color:rgba(14,165,233,.28); } .package-card.sacks { border-color:rgba(16,185,129,.28); } .package-card.other { border-color:rgba(245,158,11,.28); }
+    .package-icon { width:28px; height:28px; display:grid; place-items:center; border-radius:8px; background:rgba(255,255,255,.07); color:#93c5fd; } .sacks .package-icon { color:#6ee7b7; } .other .package-icon { color:#fcd34d; }
+    .package-copy { display:flex; flex-direction:column; line-height:1; } .package-copy strong { font:800 1.05rem 'JetBrains Mono',monospace; color:#f8fafc; } .package-copy small { margin-top:4px; color:#94a3b8; font-size:.62rem; font-weight:800; text-transform:uppercase; }
+    .map-filters { min-width:0; }
+    .filters-caption { display:flex; align-items:center; gap:6px; margin-bottom:5px; color:#94a3b8; font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; }
+    .filters-caption b { margin-left:auto; padding:2px 7px; color:#c7d2fe; background:rgba(99,102,241,.16); border-radius:999px; font-size:.58rem; }
+    .filters-grid { display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)) minmax(180px,1.35fr) auto; gap:7px; }
+    .map-filters select, .map-filters input { width:100%; min-width:0; height:34px; padding:0 24px 0 9px; color:#e2e8f0; background:#111c33; border:1px solid rgba(148,163,184,.24); border-radius:9px; font-size:.7rem; font-weight:700; outline:none; text-overflow:ellipsis; }
+    .map-filters input { padding-right:9px; } .map-filters input::placeholder { color:#64748b; }
+    .map-filters select:focus, .map-filters input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.16); }
+    .clear-filter { height:36px; display:flex; align-items:center; gap:6px; padding:0 11px; border-radius:10px; border:1px solid var(--border); background:rgba(255,255,255,.05); color:#cbd5e1; font-size:.72rem; font-weight:800; } .clear-filter:hover { background:rgba(255,255,255,.1); }
+    .filter-search { position:relative; min-width:0; } .filter-search > i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:#64748b; font-size:.72rem; z-index:1; }
+    .map-filters .filter-search input { padding-left:29px; padding-right:32px; }
+    .btn-filter-toggle { height:36px; display:flex; align-items:center; gap:7px; padding:0 12px; border-radius:10px; border:1px solid rgba(99,102,241,.35); color:#e0e7ff; background:rgba(79,70,229,.16); font-size:.72rem; font-weight:800; white-space:nowrap; cursor:pointer; }
+    .btn-filter-toggle:hover,.btn-filter-toggle.active { background:#4f46e5; color:#fff; }
+    .btn-filter-toggle b { min-width:18px; height:18px; display:grid; place-items:center; border-radius:999px; background:#f59e0b; color:#111827; font-size:.6rem; }
+
     /* HEADER */
     .app-header {
-        height: 60px;
+        min-height: 62px;
         display: grid;
-        grid-template-columns: minmax(180px, 280px) 1fr minmax(180px, 280px);
+        grid-template-columns: minmax(170px, 250px) minmax(300px, 1fr) auto;
         align-items: center;
         padding: 0 12px;
         background: var(--bg-panel);
@@ -243,6 +284,7 @@
         font-weight: 800;
     }
 
+    .header-center { min-width:0; } .header-packages { width:fit-content; max-width:100%; margin:0 auto; }
     .header-right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
     .stat-group { display: flex; gap: 4px; }
     .stat-pill {
@@ -302,16 +344,14 @@
         padding: 8px;
         position: relative;
         width: 100%;
-        height: calc(100vh - 60px);
-        height: calc(100dvh - 60px);
+        height: auto;
+        min-height: 0;
     }
 
     .map-container {
         width: 100%;
         height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        display: block;
         overflow: auto;
         position: relative;
         -webkit-overflow-scrolling: touch;
@@ -405,14 +445,18 @@
 
     /* ========== RESPONSIVO ========== */
     @media (max-width: 992px) {
-        .app-header { grid-template-columns: 1fr auto; height: auto; min-height: 55px; padding: 6px 10px; }
-        .header-center { display: none; }
+        .app-header { grid-template-columns:minmax(0,1fr) auto; height:auto; min-height:55px; padding:6px 10px; }
+        .header-center { display:block; grid-column:1 / -1; grid-row:2; padding-bottom:2px; }
+        .header-packages { width:100%; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
         .global-search { display: none; }
         .stat-group { display: none !important; }
         .header-right { gap: 6px; }
         .btn-editor span { display: none; }
         .btn-editor { padding: 6px 10px; }
-        .viewport { padding: 4px; height: calc(100vh - 55px); height: calc(100dvh - 55px); }
+        .filters-panel.open { max-height:170px; }
+        .filters-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+        .filter-search { grid-column:span 2; }
+        .viewport { padding:4px; height:auto; min-height:0; }
     }
 
     @media (max-width: 768px) {
@@ -425,6 +469,14 @@
         .hud-btn { width: 38px; height: 38px; font-size: 1rem; }
         .btn-circle { width: 32px; height: 32px; font-size: 0.8rem; }
         .modern-tooltip { width: 92vw; max-height: 60vh; max-height: 60dvh; border-radius: 12px; }
+        .package-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+        .package-card { min-width:0; padding:7px 8px; gap:6px; }
+        .package-icon { display:none; } .package-copy strong { font-size:.9rem; } .clear-filter span { display:none; }
+        .filters-panel.open { max-height:230px; }
+        .filters-grid { grid-template-columns:repeat(2,minmax(0,1fr)) 34px; }
+        .filters-grid .filter-search { grid-column:1 / 3; }
+        .filters-grid .clear-filter { grid-column:3; grid-row:1 / span 3; height:100%; padding:0; justify-content:center; }
+        .btn-filter-toggle span { display:none; }
     }
 
     @media (max-width: 480px) {
@@ -432,12 +484,13 @@
         .map-layer { border-radius: 2px; border-width: 1px; }
         .map-hud { bottom: 8px; right: 8px; gap: 4px; }
         .hud-btn { width: 34px; height: 34px; font-size: 0.9rem; border-radius: 10px; }
+        .filters-caption span { display:none; } .map-filters select, .map-filters input { height:32px; font-size:.66rem; }
     }
 
     /* Orientação paisagem no mobile */
     @media (max-width: 992px) and (orientation: landscape) {
         .app-header { min-height: 45px; }
-        .viewport { height: calc(100vh - 45px); height: calc(100dvh - 45px); }
+        .viewport { height:auto; min-height:0; }
         .map-hud { bottom: 8px; right: 8px; }
     }
 
@@ -483,7 +536,9 @@ document.addEventListener('DOMContentLoaded', function() {
         laneStats: {},
         layouts: [],
         staticItems: [],
-        stocks: {}
+        stocks: {},
+        allStocks: {},
+        filters: { species:'TODAS', packaging:'TODAS', cultivar:'TODAS', client:'TODAS', lot:'' }
     };
 
     let currentHoveredRect = null;
@@ -501,6 +556,112 @@ document.addEventListener('DOMContentLoaded', function() {
         return match ? { key: match[1] + " " + match[2], index: parseInt(match[3]) } : null;
     }
 
+    const CURRENT_WAREHOUSE = normalizeText('{{ armazem.numero|escapejs }}');
+    const numberFormatter = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
+    function normalizeText(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toUpperCase(); }
+    function itemSpecies(item) {
+        const direct = item.especie || item.cultura || item.nome_especie || item.produto_especie;
+        if (direct) return normalizeText(direct);
+        const source = normalizeText([item.produto,item.cultivar,item.descricao,item.nome].filter(Boolean).join(' '));
+        const known = ['SOJA','MILHO','SORGO','TRIGO','ALGODAO','FEIJAO','ARROZ','GIRASSOL','PASTAGEM'];
+        return known.find(name => source.includes(name)) || 'NAO INFORMADO';
+    }
+    function itemPackage(item) {
+        const value = normalizeText(item.embalagem || item.tipo_embalagem || item.unidade || item.unidade_medida);
+        if (value.includes('BAG')) return 'BAGS';
+        if (value.includes('SACO') || value === 'SC') return 'SACOS';
+        return 'OUTROS';
+    }
+    function itemQuantity(item) {
+        const raw = item.qtd ?? item.quantidade ?? item.saldo ?? 0;
+        const parsed = Number(String(raw).replace(',', '.'));
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+    function itemCultivar(item) { return normalizeText(item.cultivar || item.variedade || item.produto || item.nome_produto) || 'NAO INFORMADO'; }
+    function itemClient(item) { return normalizeText(item.cliente || item.nome_cliente || item.proprietario) || 'PADRAO'; }
+    function itemWarehouse(item) {
+        const raw = item.armazem_numero ?? item.numero_armazem ?? item.warehouse_number ?? item.armazem ?? item.warehouse;
+        if (raw && typeof raw === 'object') return normalizeText(raw.numero ?? raw.id ?? raw.nome);
+        return normalizeText(raw);
+    }
+    function sameWarehouse(item) {
+        const warehouse = itemWarehouse(item);
+        if (!warehouse) return true;
+        const currentDigits = CURRENT_WAREHOUSE.replace(/\D/g, '');
+        const itemDigits = warehouse.replace(/\D/g, '');
+        return warehouse === CURRENT_WAREHOUSE || (currentDigits && itemDigits === currentDigits);
+    }
+    function hasActiveFilters() { return engine.filters.species !== 'TODAS' || engine.filters.packaging !== 'TODAS' || engine.filters.cultivar !== 'TODAS' || engine.filters.client !== 'TODAS' || !!engine.filters.lot; }
+    function updateSearchResults() {
+        engine.foundSet.clear();
+        if (engine.search.length < 3) return;
+        Object.entries(engine.stocks).forEach(([address,stock]) => {
+            const details = stock.lotes.map(item => [item.lote,itemClient(item),itemSpecies(item),itemCultivar(item)].join(' ')).join(' ');
+            if (normalizeText(address + ' ' + details).includes(normalizeText(engine.search))) engine.foundSet.add(address);
+        });
+    }
+    function updatePackageMetrics() {
+        const totals = { BAGS:0, SACOS:0, OUTROS:0 };
+        Object.values(engine.allStocks).forEach(stock => stock.lotes.forEach(item => { totals[itemPackage(item)] += itemQuantity(item); }));
+        document.getElementById('totalBags').textContent = numberFormatter.format(totals.BAGS);
+        document.getElementById('totalSacos').textContent = numberFormatter.format(totals.SACOS);
+        document.getElementById('totalOutros').textContent = numberFormatter.format(totals.OUTROS);
+        document.getElementById('cardOutros').classList.toggle('d-none', totals.OUTROS === 0);
+    }
+    function rebuildVisibleStock() {
+        engine.stocks = {}; engine.laneStats = {};
+        Object.entries(engine.allStocks).forEach(([address,stock]) => {
+            const lotSearch = normalizeText(engine.filters.lot);
+            const lots = stock.lotes.filter(item =>
+                (engine.filters.species === 'TODAS' || itemSpecies(item) === engine.filters.species) &&
+                (engine.filters.packaging === 'TODAS' || itemPackage(item) === engine.filters.packaging) &&
+                (engine.filters.cultivar === 'TODAS' || itemCultivar(item) === engine.filters.cultivar) &&
+                (engine.filters.client === 'TODAS' || itemClient(item) === engine.filters.client) &&
+                (!lotSearch || normalizeText(address + ' ' + (item.lote || '')).includes(lotSearch))
+            );
+            if (!lots.length) return;
+            const total = lots.reduce((sum,item) => sum + itemQuantity(item), 0);
+            engine.stocks[address] = { lotes:lots, total };
+            const parsed = parseAddress(address);
+            if (parsed) engine.laneStats[parsed.key] = (engine.laneStats[parsed.key] || 0) + total;
+        });
+        const addresses = Object.keys(engine.stocks).length;
+        const lots = Object.values(engine.stocks).reduce((sum,stock) => sum + stock.lotes.length, 0);
+        document.getElementById('resultadoFiltro').textContent = `${addresses} end. • ${lots} lotes`;
+        const activeCount = ['species','packaging','cultivar','client'].filter(key => engine.filters[key] !== 'TODAS').length + (engine.filters.lot ? 1 : 0);
+        const filterBadge = document.getElementById('filterBadge');
+        filterBadge.textContent = activeCount; filterBadge.classList.toggle('d-none', activeCount === 0);
+        updatePackageMetrics(); updateSearchResults(); render();
+    }
+    function fillSelect(id, values, emptyLabel) {
+        const select = document.getElementById(id);
+        select.replaceChildren(new Option(emptyLabel, 'TODAS'));
+        values.forEach(value => select.add(new Option(value === 'NAO INFORMADO' ? 'Não informado' : value, value)));
+    }
+    function setupFilters() {
+        const species = [...new Set(Object.values(engine.allStocks).flatMap(stock => stock.lotes.map(itemSpecies)))].sort();
+        const cultivars = [...new Set(Object.values(engine.allStocks).flatMap(stock => stock.lotes.map(itemCultivar)))].sort();
+        const clients = [...new Set(Object.values(engine.allStocks).flatMap(stock => stock.lotes.map(itemClient)))].sort();
+        fillSelect('filtroEspecie', species, 'Todas as culturas');
+        fillSelect('filtroCultivar', cultivars, 'Todas as cultivares');
+        fillSelect('filtroCliente', clients, 'Todos os clientes');
+        const bindings = [['filtroEspecie','species'],['filtroEmbalagem','packaging'],['filtroCultivar','cultivar'],['filtroCliente','client']];
+        bindings.forEach(([id,key]) => document.getElementById(id).addEventListener('change', event => { engine.filters[key]=event.target.value; hideTooltip(); rebuildVisibleStock(); }));
+        let lotTimer;
+        document.getElementById('campoPesquisaLote').addEventListener('input', event => { clearTimeout(lotTimer); lotTimer=setTimeout(() => { engine.filters.lot=event.target.value; rebuildVisibleStock(); },120); });
+        document.getElementById('limparFiltros').addEventListener('click', () => {
+            engine.filters = { species:'TODAS', packaging:'TODAS', cultivar:'TODAS', client:'TODAS', lot:'' };
+            bindings.forEach(([id]) => document.getElementById(id).value='TODAS'); document.getElementById('campoPesquisaLote').value=''; engine.search=''; rebuildVisibleStock();
+        });
+        document.querySelector('.package-card.bags').addEventListener('click', () => { document.getElementById('filtroEmbalagem').value='BAGS'; engine.filters.packaging='BAGS'; rebuildVisibleStock(); });
+        document.querySelector('.package-card.sacks').addEventListener('click', () => { document.getElementById('filtroEmbalagem').value='SACOS'; engine.filters.packaging='SACOS'; rebuildVisibleStock(); });
+        const button = document.getElementById('btnFiltros'); const panel = document.getElementById('painelFiltros');
+        button.addEventListener('click', () => {
+            const open = panel.classList.toggle('open'); button.classList.toggle('active', open); button.setAttribute('aria-expanded', String(open)); panel.setAttribute('aria-hidden', String(!open));
+            setTimeout(() => { adjustCanvasToContainer(); if (open) document.getElementById('campoPesquisaLote').focus(); }, 300);
+        });
+    }
+
     function init() {
         RAW_LAYOUT.forEach(el => {
             if (el.tipo === 'RETANGULO') {
@@ -511,19 +672,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        for (const [idEnd, itens] of Object.entries(RAW_STOCK)) {
+        const allItems = Object.values(RAW_STOCK).flat();
+        const hasWarehouseIdentity = allItems.some(item => !!itemWarehouse(item));
+        for (const [idEnd, itensOriginais] of Object.entries(RAW_STOCK)) {
+            const itens = hasWarehouseIdentity ? itensOriginais.filter(sameWarehouse) : itensOriginais;
+            if (!itens.length) continue;
             const key = idEnd.toUpperCase();
             const totalQty = itens.reduce((a, b) => a + (parseInt(b.qtd) || 0), 0);
+            engine.allStocks[key] = { lotes: itens, total: totalQty };
             engine.stocks[key] = { lotes: itens, total: totalQty };
             const p = parseAddress(key);
             if(p) engine.laneStats[p.key] = (engine.laneStats[p.key] || 0) + totalQty;
         }
+        setupFilters();
+        rebuildVisibleStock();
         fetchMarkers();
         adjustCanvasToContainer();
     }
 
     function fetchMarkers() {
-        fetch('/api/marcacoes-ultimo-lote/')
+        fetch(`/api/marcacoes-ultimo-lote/?armazem=${encodeURIComponent(CURRENT_WAREHOUSE)}`)
             .then(r => r.ok ? r.json() : Promise.reject())
             .then(d => { engine.markX = d.marcacoes || {}; render(); })
             .catch(() => render());
@@ -533,11 +701,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.querySelector('.map-container');
         const wrapper = document.getElementById('canvasWrapper');
         if (container && wrapper) {
-            const scale = Math.min(
-                container.clientWidth / baseWidth,
-                container.clientHeight / baseHeight
-            );
-            wrapper.style.transform = `scale(${scale * engine.zoom})`;
+            const availableWidth = Math.max(1, container.clientWidth - 8);
+            const availableHeight = Math.max(1, container.clientHeight - 8);
+            const fitScale = Math.min(availableWidth / baseWidth, availableHeight / baseHeight);
+            const displayScale = Math.max(.08, fitScale * engine.zoom);
+            const displayWidth = Math.round(baseWidth * displayScale);
+            const displayHeight = Math.round(baseHeight * displayScale);
+            wrapper.style.transform = 'none';
+            wrapper.style.width = displayWidth + 'px';
+            wrapper.style.height = displayHeight + 'px';
+            wrapper.style.flex = '0 0 auto';
+            wrapper.style.marginLeft = Math.max(4, Math.floor((availableWidth - displayWidth) / 2)) + 'px';
+            wrapper.style.marginTop = Math.max(4, Math.floor((availableHeight - displayHeight) / 2)) + 'px';
+            wrapper.style.marginRight = '4px';
+            wrapper.style.marginBottom = '4px';
         }
     }
 
@@ -556,9 +733,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const s = engine.stocks[pos.id];
             const hasStock = !!s;
             const p = parseAddress(pos.id);
-            let isLineCompleted = !!engine.markX[pos.id];
+            let isLineCompleted = !hasActiveFilters() && !!engine.markX[pos.id];
             
-            if(!isLineCompleted && p) {
+            if(!hasActiveFilters() && !isLineCompleted && p) {
                 for (let mxId in engine.markX) {
                     const m = parseAddress(mxId);
                     if(m && m.key === p.key && p.index > m.index) { isLineCompleted = true; break; }
@@ -666,11 +843,7 @@ document.addEventListener('DOMContentLoaded', function() {
             engine.search = e.target.value.toLowerCase().trim();
             const badge = document.getElementById('wrapperContador');
             if (engine.search.length >= 3) {
-                engine.foundSet.clear();
-                for (let id in engine.stocks) {
-                    const loteInfo = engine.stocks[id].lotes.map(l => l.lote + l.cliente).join('');
-                    if ((id + loteInfo).toLowerCase().includes(engine.search)) engine.foundSet.add(id);
-                }
+                updateSearchResults();
                 if (badge) { badge.innerText = engine.foundSet.size; badge.classList.remove('d-none'); }
             } else { if (badge) badge.classList.add('d-none'); }
             render();
@@ -775,8 +948,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const st = engine.stocks[p.id];
         const adr = parseAddress(p.id);
         const lineTotal = adr ? engine.laneStats[adr.key] || 0 : 0;
-        let isLineCompleted = !!engine.markX[p.id];
-        if(!isLineCompleted && adr) {
+        let isLineCompleted = !hasActiveFilters() && !!engine.markX[p.id];
+        if(!hasActiveFilters() && !isLineCompleted && adr) {
             for(let kid in engine.markX) {
                 let mxId = parseAddress(kid);
                 if(mxId && mxId.key === adr.key && adr.index > mxId.index) { isLineCompleted = true; break; }

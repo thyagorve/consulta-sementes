@@ -4854,8 +4854,47 @@ def mapa_ocupacao_canvas(request, armazem_numero=1):
     elementos_db = armazem.elementos.all().order_by('ordem_z')
     armazens_disponiveis = ArmazemLayout.objects.filter(ativo=True).order_by('numero')
     
-    # 2. Busca Estoque com Saldo > 0
-    itens_estoque = Estoque.objects.filter(saldo__gt=0)
+    # 2. Limita o estoque SOMENTE ao armazém/mapa aberto.
+    # Primeiro tenta relacionar ArmazemLayout com o cadastro de Armazem pelo nome.
+    nomes_possiveis = [
+        str(armazem.nome).strip(),
+        f'ARMAZEM {armazem.numero}',
+        f'ARMAZÉM {armazem.numero}',
+        f'AZ {armazem.numero}',
+        f'AZ{armazem.numero}',
+    ]
+    armazem_cadastro = next((
+        cadastro
+        for nome in nomes_possiveis
+        for cadastro in [Armazem.objects.filter(nome__iexact=nome).first()]
+        if cadastro
+    ), None)
+
+    # Endereços desenhados especificamente neste mapa.
+    enderecos_mapa = {
+        el.identificador.strip().upper()
+        for el in elementos_db
+        if el.tipo == 'RETANGULO' and el.identificador
+    }
+
+    if armazem_cadastro:
+        enderecos_permitidos = list(
+            Endereco.objects.filter(armazem=armazem_cadastro)
+            .values_list('codigo', flat=True)
+        )
+    else:
+        # Fallback seguro para instalações nas quais os nomes ainda não coincidem.
+        enderecos_permitidos = list(enderecos_mapa)
+
+    enderecos_permitidos_normalizados = {
+        str(codigo).strip().upper()
+        for codigo in enderecos_permitidos
+        if codigo
+    }
+    itens_estoque = (
+        Estoque.objects.filter(saldo__gt=0)
+        .select_related('especie', 'cultivar')
+    )
 
     # 3. Mapeia Estoque (Normalizando Endereço: Tira espaços e põe Maiúsculo)
     dados_ocupacao = {}
@@ -4864,6 +4903,8 @@ def mapa_ocupacao_canvas(request, armazem_numero=1):
         if item.endereco:
             # A MÁGICA: .strip().upper() garante que " a-01" seja igual a "A-01"
             chave = item.endereco.strip().upper()
+            if chave not in enderecos_permitidos_normalizados:
+                continue
             
             if chave not in dados_ocupacao:
                 dados_ocupacao[chave] = []
@@ -4873,7 +4914,10 @@ def mapa_ocupacao_canvas(request, armazem_numero=1):
                 'produto': str(item.produto or 'S/ Produto'),
                 'qtd': float(item.saldo),
                 'embalagem': str(item.embalagem),
-                'cliente': str(item.cliente or '-')
+                'cliente': str(item.cliente or '-'),
+                'especie': str(item.especie or 'Não informado'),
+                'cultivar': str(item.cultivar or 'Não informado'),
+                'armazem_numero': str(armazem.numero),
             })
 
     # 4. Prepara Elementos para o Mapa (Já definindo a cor aqui)
@@ -7638,15 +7682,58 @@ def api_marcacoes_ultimo_lote(request):
     try:
         from .models import ArmazemLayout, ElementoMapa
         
-        # Buscar todos os lotes marcados como último
+        armazem_numero = request.GET.get('armazem', 1)
+        mapa_atual = get_object_or_404(
+            ArmazemLayout,
+            numero=armazem_numero,
+            ativo=True,
+        )
+        nomes_possiveis = [
+            str(mapa_atual.nome).strip(),
+            f'ARMAZEM {mapa_atual.numero}',
+            f'ARMAZÉM {mapa_atual.numero}',
+            f'AZ {mapa_atual.numero}',
+            f'AZ{mapa_atual.numero}',
+        ]
+        armazem_cadastro = next((
+            cadastro
+            for nome in nomes_possiveis
+            for cadastro in [Armazem.objects.filter(nome__iexact=nome).first()]
+            if cadastro
+        ), None)
+        elementos_mapa = ElementoMapa.objects.filter(
+            armazem=mapa_atual,
+            tipo='RETANGULO',
+        )
+        enderecos_mapa = list(
+            elementos_mapa.exclude(identificador__isnull=True)
+            .exclude(identificador='')
+            .values_list('identificador', flat=True)
+        )
+        if armazem_cadastro:
+            enderecos_permitidos = list(
+                Endereco.objects.filter(armazem=armazem_cadastro)
+                .values_list('codigo', flat=True)
+            )
+        else:
+            enderecos_permitidos = enderecos_mapa
+
+        # Buscar somente os lotes marcados pertencentes ao armazém aberto.
+        enderecos_permitidos_normalizados = {
+            str(codigo).strip().upper()
+            for codigo in enderecos_permitidos
+            if codigo
+        }
         lotes_marcados = Estoque.objects.filter(
             ultimo_lote_linha=True,
-            saldo__gt=0
+            saldo__gt=0,
         )
         
         marcacoes = {}
         
         for lote in lotes_marcados:
+            if not lote.endereco or lote.endereco.strip().upper() not in enderecos_permitidos_normalizados:
+                continue
             # Extrair informações do endereço usando regex
             dados_end = extrair_info_endereco(lote.endereco)
             if not dados_end:
@@ -7662,7 +7749,7 @@ def api_marcacoes_ultimo_lote(request):
             
             # Buscar no MAPA todos os endereços desta linha
             padrao = f"{rua} {ln} P"
-            elementos = ElementoMapa.objects.filter(
+            elementos = elementos_mapa.filter(
                 tipo='RETANGULO',
                 identificador__startswith=padrao
             ).values_list('identificador', flat=True).distinct()
