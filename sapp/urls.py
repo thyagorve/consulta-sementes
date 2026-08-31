@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/estoque/estatisticas/', views.api_estoque_estatisticas, name='api_estoque_estatisticas'),
     path('api/estoque/opcoes-filtro/', views.api_opcoes_filtro, name='api_opcoes_filtro'),
     path('configuracoes/', views.configuracoes, name='configuracoes'),
+    path('configuracoes/modelo-importacao/<str:tipo>/', views.baixar_modelo_configuracao, name='baixar_modelo_configuracao'),
     path('historico-geral/', views.historico_geral, name='historico_geral'),
     
     path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
@@ -91,6 +92,7 @@ urlpatterns = [
 # FASE 2 - Solicitações
     path('solicitacoes/', views.pagina_solicitacoes, name='pagina_solicitacoes'),
     path('solicitacoes/nova/', views.criar_solicitacao, name='criar_solicitacao'),
+    path('solicitacoes/<int:solicitacao_id>/editar/', views.editar_solicitacao, name='editar_solicitacao'),
     path('api/solicitacoes/<int:solicitacao_id>/lotes-disponiveis/', 
         views.api_lotes_disponiveis_para_solicitacao, 
         name='api_lotes_disponiveis_solicitacao'),

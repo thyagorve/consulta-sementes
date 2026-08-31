@@ -2364,6 +2364,19 @@ and (orientation: landscape) {
                     <div class="modal-resumo-item"><small>Selecionado</small><strong id="rSelecionado" class="text-primary">0</strong></div>
                     <div class="modal-resumo-item"><small>Restante</small><strong id="rRestante" class="text-danger">0</strong></div>
                 </div>
+
+                <div id="cargaItemEmpenhoBox" class="mx-2 mt-2 p-2 rounded-3 border bg-light" style="display:none;">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <div class="flex-grow-1" style="min-width:260px;">
+                            <label for="cargaItemEmpenhoSelect" class="form-label small fw-bold mb-1">
+                                <i class="fas fa-list-ol me-1 text-success"></i>Item da carga que será empenhado
+                            </label>
+                            <select id="cargaItemEmpenhoSelect" class="form-select form-select-sm" onchange="trocarItemCargaEmpenho(this.value)"></select>
+                        </div>
+                        <div id="cargaItemEmpenhoInfo" class="small text-muted" style="min-width:220px;"></div>
+                    </div>
+                    <div class="small text-muted mt-1">Os lotes abaixo pertencem ao estoque e são escolhidos somente agora. Cada item da carga mantém seu próprio saldo empenhado.</div>
+                </div>
                 
               <div class="modal-toolbar">
                 <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -2751,13 +2764,14 @@ and (orientation: landscape) {
                                 <th>Armazém</th>
                                 <th>Cliente</th>
                                 <th>Emb.</th>
+                                <th>Data mov.</th>
                                 <th>Situação</th>
                             </tr>
                         </thead>
 
                         <tbody id="movItemsBody">
                             <tr>
-                                <td colspan="11" class="text-center py-3 text-muted">
+                                <td colspan="12" class="text-center py-3 text-muted">
                                     Selecione um card
                                 </td>
                             </tr>
@@ -2824,30 +2838,46 @@ and (orientation: landscape) {
                             </h6>
 
                             <div class="row g-2">
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted mb-1">Nº Carga</label>
                                     <input
                                         type="text"
                                         id="movCarga"
                                         class="form-control form-control-sm"
-                                        placeholder="Nº Carga"
+                                        placeholder="Opcional"
                                     >
                                 </div>
 
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted mb-1">Cliente(s)</label>
                                     <input
                                         type="text"
                                         id="movCliente"
-                                        class="form-control form-control-sm"
-                                        placeholder="Cliente"
+                                        class="form-control form-control-sm bg-light"
+                                        placeholder="Conforme a solicitação"
+                                        title="Em cargas com vários clientes, cada item usa o cliente cadastrado na solicitação."
+                                        readonly
                                     >
                                 </div>
 
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted mb-1">Motorista</label>
+                                    <input
+                                        type="text"
+                                        id="movMotorista"
+                                        class="form-control form-control-sm bg-light"
+                                        placeholder="Conforme a solicitação"
+                                        readonly
+                                    >
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label class="form-label small text-muted mb-1">Placa</label>
                                     <input
                                         type="text"
                                         id="movPlaca"
                                         class="form-control form-control-sm text-uppercase"
-                                        placeholder="Placa"
+                                        placeholder="Conforme a solicitação"
                                     >
                                 </div>
                             </div>
@@ -3264,6 +3294,8 @@ let carregando = false;
 let movSolId = null, movAcao = null;
 let unidadeControle = 'BAGS/SC'; // padrão
 let loteQuantidadeAtual = null;
+let cargaItemAtualId = null;
+let cargaItensResumo = [];
 let linhaFocoId = null;
 let columnDragKey = null;
 let solicitacoesCache = [];
@@ -3294,7 +3326,7 @@ const modalColumnDefs = [
     { key: 'acoes', label: 'Ações', alwaysVisible: true },
 ];
 const modalFixedStartColumns = ['foco'];
-const modalFixedEndColumns = ['disponivel', 'acoes'];
+const modalFixedEndColumns = ['acoes'];
 
 function getDefaultMovableColumnOrder() {
     return modalColumnDefs
@@ -3792,6 +3824,8 @@ async function abrirModalEmpenho(id) {
     dataGrid.clearQtdValues();
     dataGrid.selectedRows.clear();
     linhaFocoId = null;
+    cargaItemAtualId = null;
+    cargaItensResumo = [];
     
     document.querySelectorAll('#modalTable th').forEach(th => th.classList.remove('filter-active'));
     
@@ -4315,10 +4349,61 @@ function confirmarQuantidadeEmpenho() {
 }
 
 
-async function carregarLotesInicial() {
+function configurarSeletorItemCarga(data) {
+    const box = document.getElementById('cargaItemEmpenhoBox');
+    const select = document.getElementById('cargaItemEmpenhoSelect');
+    const info = document.getElementById('cargaItemEmpenhoInfo');
+    const isCarga = String(data.solicitacao?.tipo_solicitacao || '').toUpperCase() === 'CARGA';
+
+    if (!box || !select) return;
+
+    if (!isCarga) {
+        box.style.display = 'none';
+        cargaItemAtualId = null;
+        cargaItensResumo = [];
+        return;
+    }
+
+    cargaItensResumo = Array.isArray(data.itens_carga) ? data.itens_carga : [];
+    cargaItemAtualId = Number(data.item_carga_ativo_id || 0) || null;
+    box.style.display = 'block';
+
+    select.innerHTML = cargaItensResumo.map((item, idx) => {
+        const solicitado = Number(item.quantidade_solicitada || 0);
+        const empenhado = Number(item.quantidade_empenhada || 0);
+        const restante = Number(item.quantidade_restante || 0);
+        const status = item.completo ? '✓ completo' : `resta ${restante}`;
+        return `<option value="${item.id}" ${Number(item.id) === Number(cargaItemAtualId) ? 'selected' : ''}>${idx + 1}. ${escaparHtml(item.cliente || '-')} · ${escaparHtml(item.codigo || '-')} · ${solicitado} (${status})</option>`;
+    }).join('');
+
+    const atual = cargaItensResumo.find(item => Number(item.id) === Number(cargaItemAtualId));
+    if (info) {
+        info.innerHTML = atual
+            ? `<strong>${escaparHtml(atual.codigo || '-')}</strong> · ${escaparHtml(atual.descricao || 'Sem descrição')}<br>Cliente: <strong>${escaparHtml(atual.cliente || '-')}</strong> · Empenhado: ${Number(atual.quantidade_empenhada || 0)} / ${Number(atual.quantidade_solicitada || 0)}`
+            : 'Nenhum item de carga disponível.';
+    }
+}
+
+async function trocarItemCargaEmpenho(valor) {
+    const novoId = Number(valor || 0) || null;
+    if (!novoId || novoId === Number(cargaItemAtualId)) return;
+
+    cargaItemAtualId = novoId;
+    linhaFocoId = null;
+    dataGrid.reset();
+    dataGrid.activeFilters = {};
+    atualizarUIComFiltros();
+    showLoading();
+    await carregarLotesInicial(novoId);
+    hideLoading();
+}
+
+async function carregarLotesInicial(itemCargaId = null) {
     carregando = true;
     try {
-        const url = `/api/solicitacoes/${solicId}/lotes-disponiveis/?page=1&page_size=1000`;
+        const itemParam = itemCargaId || cargaItemAtualId;
+        const qsItem = itemParam ? `&item_carga_id=${encodeURIComponent(itemParam)}` : '';
+        const url = `/api/solicitacoes/${solicId}/lotes-disponiveis/?page=1&page_size=1000${qsItem}`;
         const response = await fetch(url);
         const data = await response.json().catch(() => ({}));
         if (!response.ok || !data.success) throw new Error(data.error || `HTTP ${response.status}`);
@@ -4334,7 +4419,9 @@ async function carregarLotesInicial() {
         unidadeControle = data.solicitacao?.unidade_controle || 'EMBALAGEM';
         atualizarRotulosUnidadeEmpenho();
 
-        document.getElementById('rSolicitado').textContent = data.solicitacao?.quantidade_solicitada || 0;
+        document.getElementById('rSolicitado').textContent = data.solicitacao?.quantidade_solicitada_escopo ?? data.solicitacao?.quantidade_solicitada ?? 0;
+
+        configurarSeletorItemCarga(data);
         document.getElementById('modalTitulo').textContent = '📦 ' + (data.solicitacao?.titulo || 'Sem título');
         const tituloCard = document.getElementById('modalTituloCard');
         if (tituloCard) tituloCard.textContent = data.solicitacao?.titulo || '---';
@@ -5469,7 +5556,12 @@ async function salvarEmpenho() {
         if (idsEmp.has(id)) return;
         const qtd = dataGrid.getQtdValue(id);
         if (qtd && parseInt(qtd) > 0) {
-            adicionar.push({ lote_id: id, quantidade: parseInt(qtd) });
+            const loteData = dataGrid.allData.find(l => Number(l.id) === Number(id));
+            adicionar.push({
+                lote_id: Number(loteData?.estoque_id || id),
+                quantidade: parseInt(qtd),
+                item_carga_id: loteData?.item_carga_id || cargaItemAtualId || null
+            });
         }
     });
     
@@ -5575,8 +5667,8 @@ function buildColumnManagerModal() {
             No celular, use os quatro botões de posição.
             <br>
             <strong>Selecionar</strong> fica fixa à esquerda;
-            <strong>Disponível</strong> e <strong>Ações</strong>
-            ficam fixas à direita.
+            <strong>Ações</strong> fica fixa à direita.
+            As demais colunas, inclusive <strong>Disponível</strong>, podem ser reorganizadas.
         </div>
     ` + items.map(def => {
         const isFixed = (
@@ -5848,7 +5940,9 @@ function textoPesquisaSolicitacao(s) {
         s.criterios?.produto,
         s.criterios?.especie,
         s.criterios?.cliente,
+        s.tipo_solicitacao,
         ...(s.lotes || []),
+        ...((s.itens_carga || []).flatMap(i => [i.cliente, i.codigo, i.descricao, i.categoria, i.peneira])),
     ]
     .filter(
         value => (
@@ -5967,108 +6061,54 @@ function renderCards(sols) {
         `;
 }
 function criarCardHTML(s) {
-    // Usar o valor display (já em KG se for o caso)
     const qtdEmp = s.quantidade_empenhada_display ?? s.quantidade_empenhada ?? 0;
     const pct = s.percentual_empenhado ?? 0;
     const barColor = pct >= 100 ? '#28a745' : pct >= 50 ? '#ffc107' : '#dc3545';
-    const embalagens = [
-        ...new Set(
-            (s.embalagens || [])
-                .map(v => String(v || '')
-                    .trim()
-                    .toUpperCase()
-                )
-                .filter(Boolean)
-        )
-    ];
-
-    embalagens.sort((a, b) => {
-        const ordem = {
-            'BAG': 1,
-            'SC': 2
-        };
-
-        return (
-            (ordem[a] ?? 99)
-            - (ordem[b] ?? 99)
-        );
-    });
-
-    const unidade = (
-        s.unidade_controle === 'QUILOGRAMA'
-            ? 'KG'
-            : (
-                embalagens.length
-                    ? embalagens.join('/')
-                    : 'BAGS/SC'
-            )
-    );
-    const concluido = ['CONCLUIDO', 'CANCELADO'].includes(s.status);
-    const showExcluir = s.quantidade_empenhada <= 0 && !concluido;
-    const temItens = s.quantidade_empenhada > 0;
-
-    // Formatar número: 2 casas para KG, inteiro para unidades
-    const qtdFormatada = (
-        s.unidade_controle === 'QUILOGRAMA'
-            ? Number(qtdEmp).toFixed(2)
-            : Math.round(qtdEmp)
-    );
+    const isCarga = String(s.tipo_solicitacao || '').toUpperCase() === 'CARGA';
+    const embalagens = [...new Set((s.embalagens || []).map(v => String(v || '').trim().toUpperCase()).filter(Boolean))];
+    embalagens.sort((a,b)=>({'BAG':1,'SC':2}[a]??99)-({'BAG':1,'SC':2}[b]??99));
+    const unidade = s.unidade_controle === 'QUILOGRAMA' ? 'KG' : (embalagens.length ? embalagens.join('/') : 'BAGS/SC');
+    const concluido = ['CONCLUIDO','CANCELADO'].includes(s.status);
+    const showExcluir = Number(s.quantidade_empenhada || 0) <= 0 && !concluido;
+    const temItens = Number(s.quantidade_empenhada || 0) > 0;
+    const qtdFormatada = s.unidade_controle === 'QUILOGRAMA' ? Number(qtdEmp).toFixed(2) : Math.round(qtdEmp);
     const pctFormatado = Math.round(pct);
+    const operacao = isCarga ? 'expedir' : 'transferir';
+    const operacaoIcone = isCarga ? 'fa-truck' : 'fa-exchange-alt';
+    const operacaoClasse = isCarga ? 'btn-outline-danger' : 'btn-outline-warning';
+    const operacaoTitulo = isCarga ? 'Expedir carga' : 'Transferir';
+    const itensCarga = (s.itens_carga || []);
+    const resumoCarga = isCarga && itensCarga.length ? `
+        <div class="mt-1 p-2 rounded" style="background:#f7fbf8;border:1px solid #e0ebe3;font-size:.66rem;">
+            <div class="fw-bold text-success mb-1"><i class="fas fa-truck me-1"></i>${itensCarga.length} item(ns) na carga</div>
+            ${itensCarga.slice(0,3).map(i => `<div class="text-truncate">${escaparHtml(i.cliente || '-')} · <b>${escaparHtml(i.codigo || '-')}</b> · ${Number(i.quantidade_solicitada || 0)} un.</div>`).join('')}
+            ${itensCarga.length > 3 ? `<div class="text-muted">+${itensCarga.length-3} item(ns)</div>` : ''}
+        </div>` : '';
 
     return `<div class="solicitacao-card" id="card-${s.id}" style="${concluido ? 'opacity:0.8;' : ''}">
         ${showExcluir ? `<button class="btn-excluir-card show" onclick="excluirCard(${s.id},'${(s.titulo || '').replace(/'/g, "\\'")}')"><i class="fas fa-times-circle"></i></button>` : ''}
         <div class="d-flex justify-content-between mb-1">
-            <span class="card-status status-${s.status}">${fmtStatus(s.status)}</span>
+            <div class="d-flex gap-1 flex-wrap"><span class="card-status status-${s.status}">${fmtStatus(s.status)}</span>${isCarga ? '<span class="card-badge" style="background:#fff0ec;color:#a93c21;border-color:#ffd4c8"><i class="fas fa-truck me-1"></i>Carga</span>' : '<span class="card-badge"><i class="fas fa-right-left me-1"></i>Transferência</span>'}</div>
             <small class="text-muted">#${s.id}</small>
         </div>
         <h6 class="mb-1 pe-3" style="font-size:0.8rem;">${escaparHtml(s.titulo || '')}</h6>
         <div class="mb-1">
             ${s.criterios?.armazem ? `<span class="card-badge">🏭 ${escaparHtml(s.criterios.armazem)}</span>` : ''}
-            ${s.criterios?.produto ? `<span class="card-badge">📦 ${escaparHtml(s.criterios.produto)}</span>` : ''}
-            ${s.criterios?.cliente ? `<span class="card-badge">👤 ${escaparHtml(s.criterios.cliente)}</span>` : ''}
+            ${!isCarga && s.criterios?.produto ? `<span class="card-badge">📦 ${escaparHtml(s.criterios.produto)}</span>` : ''}
+            ${!isCarga && s.criterios?.cliente ? `<span class="card-badge">👤 ${escaparHtml(s.criterios.cliente)}</span>` : ''}
         </div>
-
-        ${s.destino ? `
-            <div class="card-destino-premium">
-                <i class="fas fa-map-marker-alt"></i>
-                <span>
-                    <strong>Destino:</strong>
-                    ${escaparHtml(s.destino)}
-                </span>
-            </div>
-        ` : ''}
-
-        <div class="card-progress-bar">
-            <div class="card-progress-fill" style="width:${pct}%;background:${barColor};"></div>
-        </div>
-        <div class="d-flex justify-content-between small mb-1">
-            <span>${qtdFormatada}/${s.quantidade_solicitada} ${unidade}</span>
-            <strong>${pctFormatado}%</strong>
-        </div>
-        <div class="small text-muted mb-1">👤 ${s.criador_nome} | 📅 ${s.data_criacao}</div>
-        ${concluido ? `
-            <button class="btn btn-sm btn-outline-info w-100" onclick="imprimirCard(${s.id})">
-                <i class="fas fa-print"></i> Imprimir
-            </button>` : `
-            <button class="btn btn-sm btn-success w-100" onclick="abrirModalEmpenho(${s.id})">
-                <i class="fas fa-edit me-1"></i> Empenhar
-            </button>
+        ${resumoCarga}
+        ${isCarga && s.motorista ? `<div class="card-destino-premium" style="background:#f4f7fb;border-color:#d9e2ee;color:#40526a"><i class="fas fa-id-card"></i><span><strong>Motorista:</strong> ${escaparHtml(s.motorista)}</span></div>` : ''}
+        ${s.destino ? `<div class="card-destino-premium"><i class="fas fa-map-marker-alt"></i><span><strong>Destino:</strong> ${escaparHtml(s.destino)}</span></div>` : ''}
+        <div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.min(100,pct)}%;background:${barColor};"></div></div>
+        <div class="d-flex justify-content-between small mb-1"><span>${qtdFormatada}/${s.quantidade_solicitada} ${unidade}</span><strong>${pctFormatado}%</strong></div>
+        <div class="small text-muted mb-1">👤 ${escaparHtml(s.criador_nome || '')} | 📅 ${escaparHtml(s.data_criacao || '')}</div>
+        ${concluido ? `<button class="btn btn-sm btn-outline-info w-100" onclick="imprimirCard(${s.id})"><i class="fas fa-print"></i> Imprimir</button>` : `
+            <button class="btn btn-sm btn-success w-100" onclick="abrirModalEmpenho(${s.id})"><i class="fas fa-boxes me-1"></i> Empenhar</button>
             <div class="d-flex gap-1 mt-1">
-                <button class="btn btn-sm btn-outline-info flex-fill" onclick="imprimirCard(${s.id})">
-                    <i class="fas fa-print"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-warning flex-fill" 
-                        onclick="abrirMovModal(${s.id},'transferir')"
-                        title="${s.status === 'EMPENHO_PARCIAL' ? 'Complete o empenho antes de transferir' : 'Transferir'}"
-                        ${!temItens ? 'disabled' : ''}>
-                    <i class="fas fa-exchange-alt"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger flex-fill" 
-                        onclick="abrirMovModal(${s.id},'expedir')"
-                        title="${s.status === 'EMPENHO_PARCIAL' ? 'Complete o empenho antes de expedir' : 'Expedir'}"
-                        ${!temItens ? 'disabled' : ''}>
-                    <i class="fas fa-truck"></i>
-                </button>
+                <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="window.location.href='/solicitacoes/${s.id}/editar/'" title="Editar"><i class="fas fa-pen"></i></button>
+                <button class="btn btn-sm btn-outline-info flex-fill" onclick="imprimirCard(${s.id})" title="Imprimir"><i class="fas fa-print"></i></button>
+                <button class="btn btn-sm ${operacaoClasse} flex-fill" onclick="abrirMovModal(${s.id},'${operacao}')" title="${operacaoTitulo}" ${!temItens ? 'disabled' : ''}><i class="fas ${operacaoIcone}"></i></button>
             </div>`}
     </div>`;
 }
@@ -6442,6 +6482,7 @@ window.abrirMovModal = async function(solId, acao) {
         'movNovoAz',
         'movCarga',
         'movCliente',
+        'movMotorista',
         'movPlaca',
         'movObs'
     ].forEach(id => {
@@ -6459,7 +6500,7 @@ window.abrirMovModal = async function(solId, acao) {
 
     tbody.innerHTML = `
         <tr>
-            <td colspan="11" class="text-center py-3">
+            <td colspan="12" class="text-center py-3">
                 <span class="spinner-border spinner-border-sm text-success me-1"></span>
                 Carregando itens...
             </td>
@@ -6481,6 +6522,18 @@ window.abrirMovModal = async function(solId, acao) {
 
         document.getElementById('movCardNome').textContent =
             `Card #${solId} · ${d.solicitacao?.titulo || '---'}`;
+
+        // Dados já informados na solicitação são reaproveitados na expedição.
+        // O usuário pode manter o campo como está ou até deixá-lo em branco;
+        // o backend preserva a placa cadastrada na solicitação.
+        if (acao === 'expedir') {
+            const placaSolicitacao = String(d.solicitacao?.placa || '').trim().toUpperCase();
+            const motoristaSolicitacao = String(d.solicitacao?.motorista || '').trim();
+            const placaEl = document.getElementById('movPlaca');
+            const motoristaEl = document.getElementById('movMotorista');
+            if (placaEl) placaEl.value = placaSolicitacao;
+            if (motoristaEl) motoristaEl.value = motoristaSolicitacao;
+        }
 
         let pendentes = Array.isArray(d.itens_pendentes)
             ? d.itens_pendentes
@@ -6535,8 +6588,9 @@ window.abrirMovModal = async function(solId, acao) {
                                 || estoque.endereco
                                 || '',
                             az: emp.az || estoque.az || '',
-                            cliente: emp.cliente || estoque.cliente || '',
-                            embalagem: emp.embalagem || estoque.embalagem || ''
+                            cliente: emp.cliente_solicitacao || emp.cliente || estoque.cliente || '',
+                            embalagem: emp.embalagem || estoque.embalagem || '',
+                            data_ultima_movimentacao: estoque.data_ultima_movimentacao || ''
                         };
                     });
                 }
@@ -6583,10 +6637,24 @@ window.abrirMovModal = async function(solId, acao) {
             })
         ];
 
+        if (acao === 'expedir') {
+            const clientes = [...new Set(
+                todos
+                    .map(i => String(i.cliente || '').trim())
+                    .filter(Boolean)
+            )];
+            const clienteEl = document.getElementById('movCliente');
+            if (clienteEl) {
+                clienteEl.value = clientes.length <= 2
+                    ? clientes.join(' / ')
+                    : `${clientes.length} clientes conforme a solicitação`;
+            }
+        }
+
         if (!todos.length) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="11" class="text-center py-3 text-muted">
+                    <td colspan="12" class="text-center py-3 text-muted">
                         <i class="fas fa-box-open me-1"></i>
                         Nenhum item pendente ou processado neste card.
                     </td>
@@ -6635,6 +6703,7 @@ window.abrirMovModal = async function(solId, acao) {
                         <td>${item.armazem || item.az || '-'}</td>
                         <td>${item.cliente || '-'}</td>
                         <td>${item.embalagem || '-'}</td>
+                        <td style="white-space:nowrap">${item.data_ultima_movimentacao || item.processado_em || item.data_empenho || '-'}</td>
 
                         <td>
                             <span class="badge ${badge}">
@@ -6654,7 +6723,7 @@ window.abrirMovModal = async function(solId, acao) {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="11" class="text-center text-danger py-3">
+                <td colspan="12" class="text-center text-danger py-3">
                     <i class="fas fa-exclamation-triangle me-1"></i>
                     ${e.message || 'Erro ao carregar itens'}
                 </td>
@@ -6738,7 +6807,8 @@ window.confirmarMov = async function() {
             .toUpperCase();
 
     // EXPEDIÇÃO:
-    // carga, cliente e placa continuam opcionais.
+    // número da carga e placa são opcionais. Em solicitações de carga,
+    // o cliente é obtido de cada item cadastrado na própria solicitação.
     } else {
         payload.numero_carga = String(
             document.getElementById('movCarga')?.value || ''
@@ -7074,14 +7144,41 @@ function gerarImpressaoSolicitacao(id) {
             const qtdEmp = sol.quantidade_empenhada_display ?? sol.quantidade_empenhada ?? 0;
             const totalItens = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
             const destino = sol.destino || '';
+            const motorista = sol.motorista || '';
+            const placa = sol.placa || '';
             const observacao = sol.observacao || '';
+            const isCarga = String(sol.tipo_solicitacao || '').toUpperCase() === 'CARGA';
             const criteriosSecundarios = [
-                sol.criterios?.produto ? `Produto: ${sol.criterios.produto}` : '',
-                sol.criterios?.especie ? `Espécie: ${sol.criterios.especie}` : '',
-                sol.criterios?.cliente ? `Cliente: ${sol.criterios.cliente}` : ''
+                sol.criterios?.armazem ? `Armazém: ${sol.criterios.armazem}` : '',
+                !isCarga && sol.criterios?.produto ? `Produto: ${sol.criterios.produto}` : '',
+                !isCarga && sol.criterios?.especie ? `Espécie: ${sol.criterios.especie}` : '',
+                !isCarga && sol.criterios?.cliente ? `Cliente: ${sol.criterios.cliente}` : ''
             ].filter(Boolean);
 
             const statusClasse = sol.status === 'CONCLUIDO' ? 'status-concluido' : sol.status === 'CANCELADO' ? 'status-cancelado' : 'status-andamento';
+            const totalPesoCarga = itens.reduce((soma, item) => soma + Number(item.peso_total || 0), 0);
+            const pesoBr = valor => Number(valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+            const tituloRelatorio = isCarga ? 'RELATÓRIO DE CARGA / EXPEDIÇÃO' : 'RELATÓRIO DE SOLICITAÇÃO';
+
+            const tabelaNormal = itens.length ? `<table>
+              <thead><tr><th class="col-num">#</th><th class="col-status">Situação</th><th class="col-lote">Lote</th><th class="col-qtd">Qtd.</th><th class="col-produto">Produto</th><th class="col-cultivar">Cultivar</th><th class="col-peneira">Peneira</th><th class="col-armazem">Armazém</th><th class="col-endereco">Endereço</th><th class="col-cliente">Cliente</th></tr></thead>
+              <tbody>${itens.map((item, idx) => {
+                const situacao = String(item.situacao || 'PENDENTE').toUpperCase();
+                const classe = situacao.includes('TRANSF') ? 'badge-transferido' : situacao.includes('EXPED') ? 'badge-expedido' : 'badge-pendente';
+                const armazemItem = item.armazem || item.az || '';
+                const endereco = item.endereco_destino || item.endereco || '';
+                return `<tr><td class="col-num">${idx+1}</td><td class="col-status"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td><td class="col-lote"><strong>${esc(item.lote || '-')}</strong></td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-produto">${esc(item.produto || '-')}</td><td class="col-cultivar">${esc(item.cultivar || '-')}</td><td class="col-peneira">${esc(item.peneira || '-')}</td><td class="col-armazem">${esc(armazemItem || '-')}</td><td class="col-endereco">${esc(endereco || '-')}</td><td class="col-cliente">${esc(item.cliente || '-')}</td></tr>`;
+              }).join('')}</tbody>
+              <tfoot><tr class="total"><td colspan="3" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td colspan="6"></td></tr></tfoot>
+            </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
+
+            const tabelaCarga = itens.length ? `<table class="tabela-carga">
+              <thead><tr><th>Cliente</th><th>Código</th><th>Lote</th><th>Descrição</th><th>Categoria</th><th>Peneira</th><th>AZ</th><th>Endereço</th><th>Qtd</th><th>Peso</th></tr></thead>
+              <tbody>${itens.map(item => `<tr><td>${esc(item.cliente || '-')}</td><td><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td>${esc(item.lote || '-')}</td><td class="desc-carga">${esc(item.descricao || '-')}</td><td>${esc(item.categoria || '-')}</td><td>${esc(item.peneira || '-')}</td><td>${esc(item.az || item.armazem || '-')}</td><td>${esc(item.endereco || '-')}</td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`).join('')}</tbody>
+              <tfoot><tr class="total"><td colspan="8" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
+            </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
+
+            const tabelaItensHtml = isCarga ? tabelaCarga : tabelaNormal;
 
             win.document.open();
             win.document.write(`<!doctype html>
@@ -7153,7 +7250,7 @@ body { padding: 14px; }
 .indicador-empenhado::before { background: var(--amarelo); }
 .indicador-movimentado { background: linear-gradient(135deg, var(--verde-claro), #fff); }
 .indicador-movimentado::before { background: var(--verde); }
-.info-grid { display: grid; grid-template-columns: minmax(170px,1.1fr) repeat(3, minmax(145px,.62fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
+.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
 .info { min-height: 49px; padding: 8px 10px; overflow: hidden; border-right: 1px solid var(--borda); }
 .info:last-child { border-right: 0; }
 .info b { display: block; margin-bottom: 5px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .35px; text-transform: uppercase; }
@@ -7180,6 +7277,7 @@ tr { page-break-inside: avoid; }
 .col-num { width: 27px; text-align: center; } .col-status { width: 78px; } .col-lote { width: 105px; } .col-qtd { width: 52px; text-align: center; }
 .col-produto { width: 138px; } .col-cultivar { width: 113px; } .col-peneira { width: 55px; text-align: center; } .col-armazem { width: 86px; }
 .col-endereco { width: 112px; } .col-cliente { width: 116px; }
+.tabela-carga th:nth-child(1){width:135px}.tabela-carga th:nth-child(2){width:85px}.tabela-carga th:nth-child(3){width:95px}.tabela-carga th:nth-child(4){width:190px}.tabela-carga th:nth-child(5){width:85px}.tabela-carga th:nth-child(6){width:65px}.tabela-carga th:nth-child(7){width:72px}.tabela-carga th:nth-child(8){width:105px}.tabela-carga th:nth-child(9){width:55px}.tabela-carga th:nth-child(10){width:80px}.tabela-carga .desc-carga{white-space:normal;line-height:1.2}.tabela-carga .col-peso{text-align:right;font-weight:800}
 .badge-situacao { display: inline-block; max-width: 100%; padding: 3px 6px; overflow: hidden; border-radius: 999px; font-size: 6.8px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
 .badge-pendente { color: #795900; background: #ffefad; }
 .badge-transferido { color: #176039; background: #d8f1e1; }
@@ -7330,7 +7428,7 @@ tr { page-break-inside: avoid; }
 <main class="folha">
  <header class="topo">
     <div class="topo-principal">
-      <h1>RELATÓRIO DE SOLICITAÇÃO</h1>
+      <h1>${esc(tituloRelatorio)}</h1>
       <p>#${esc(sol.id)}</p>
     </div>
     <div class="numero-card">
@@ -7347,6 +7445,8 @@ tr { page-break-inside: avoid; }
   </section>
 
   <section class="info-grid">
+    ${isCarga ? `<div class="info"><b>Motorista</b><span>${esc(motorista || 'Não informado')}</span></div>` : ''}
+    ${isCarga ? `<div class="info"><b>Placa</b><span>${esc(placa || 'Não informada')}</span></div>` : ''}
     <div class="info"><b>Criado por</b><span>${esc(sol.criador || '-')}</span></div>
     <div class="info"><b>Criação</b><span>${esc(sol.data_criacao || '-')}</span></div>
     <div class="info"><b>Atualização</b><span>${esc(sol.data_atualizacao || '-')}</span></div>
@@ -7368,33 +7468,12 @@ tr { page-break-inside: avoid; }
   ${criteriosSecundarios.length ? `<section class="criterios"><b>Critérios:</b> ${esc(criteriosSecundarios.join(' · '))}</section>` : ''}
 
   <div class="titulo-itens">
-    <span>Itens da solicitação</span>
-    <span>${itens.length} registro(s) · Total ${num(totalItens)} ${unidade}</span>
+    <span>${isCarga ? 'Itens da carga' : 'Itens da solicitação'}</span>
+    <span>${itens.length} registro(s) · Total ${num(totalItens)} ${unidade}${isCarga ? ` · ${pesoBr(totalPesoCarga)} kg` : ''}</span>
   </div>
 
   <div class="tabela-container">
-    ${itens.length ? `<table>
-      <thead><tr><th class="col-num">#</th><th class="col-status">Situação</th><th class="col-lote">Lote</th><th class="col-qtd">Qtd.</th><th class="col-produto">Produto</th><th class="col-cultivar">Cultivar</th><th class="col-peneira">Peneira</th><th class="col-armazem">Armazém</th><th class="col-endereco">Endereço</th><th class="col-cliente">Cliente</th></tr></thead>
-      <tbody>${itens.map((item, idx) => {
-        const situacao = String(item.situacao || 'PENDENTE').toUpperCase();
-        const classe = situacao.includes('TRANSF') ? 'badge-transferido' : situacao.includes('EXPED') ? 'badge-expedido' : 'badge-pendente';
-        const armazemItem = item.armazem || '';
-        const endereco = item.endereco_destino || item.endereco || '';
-        return `<tr>
-          <td class="col-num">${idx+1}</td>
-          <td class="col-status"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td>
-          <td class="col-lote"><strong>${esc(item.lote || '-')}</strong></td>
-          <td class="col-qtd">${num(item.quantidade)}</td>
-          <td class="col-produto">${esc(item.produto || '-')}</td>
-          <td class="col-cultivar">${esc(item.cultivar || '-')}</td>
-          <td class="col-peneira">${esc(item.peneira || '-')}</td>
-          <td class="col-armazem">${esc(armazemItem || '-')}</td>
-          <td class="col-endereco">${esc(endereco || '-')}</td>
-          <td class="col-cliente">${esc(item.cliente || '-')}</td>
-        </tr>`;
-      }).join('')}</tbody>
-      <tfoot><tr class="total"><td colspan="3" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td colspan="6"></td></tr></tfoot>
-    </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>'}
+    ${tabelaItensHtml}
   </div>
 
   <footer class="rodape">

@@ -391,7 +391,7 @@ class Empenho(models.Model):
 
     usuario = models.ForeignKey(
         User,
-        on_delete=models.CASCADE
+        on_delete=models.PROTECT
     )
 
     data_criacao = models.DateTimeField(auto_now_add=True)
@@ -504,6 +504,15 @@ class ItemEmpenho(models.Model):
         related_name='empenhos',
     )
 
+    item_carga = models.ForeignKey(
+        'SolicitacaoItemCarga',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='itens_empenhados',
+        verbose_name='Item da carga',
+    )
+
     quantidade = models.IntegerField(
         default=0,
     )
@@ -596,6 +605,24 @@ class ItemEmpenho(models.Model):
         default='',
     )
 
+    # Snapshot dos dados informados na solicitação de carga.
+    cliente_solicitacao_snapshot = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    codigo_produto_snapshot = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    descricao_produto_snapshot = models.TextField(
+        blank=True,
+        default='',
+    )
+
     az_origem = models.CharField(
         max_length=100,
         blank=True,
@@ -626,7 +653,18 @@ class ItemEmpenho(models.Model):
 
     class Meta:
         ordering = ['-data_criacao']
-        unique_together = ['empenho', 'estoque']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['empenho', 'estoque'],
+                condition=models.Q(item_carga__isnull=True),
+                name='uniq_empenho_estoque_sem_item_carga',
+            ),
+            models.UniqueConstraint(
+                fields=['empenho', 'estoque', 'item_carga'],
+                condition=models.Q(item_carga__isnull=False),
+                name='uniq_empenho_estoque_item_carga',
+            ),
+        ]
 
     def __str__(self):
         return (
@@ -896,6 +934,29 @@ class HistoricoItemEmpenho(models.Model):
                 'após o processamento.'
             ),
         )
+    )
+
+    item_carga_id_original = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
+    cliente_solicitacao = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+    )
+
+    codigo_produto = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+    )
+
+    descricao_produto = models.TextField(
+        blank=True,
+        default='',
     )
 
     estoque_origem = models.ForeignKey(
@@ -1392,6 +1453,11 @@ class Solicitacao(models.Model):
     histórico de datas, coluna no Kanban e vínculo com empenhos.
     """
 
+    TIPO_SOLICITACAO_CHOICES = [
+        ('TRANSFERENCIA', 'Transferência'),
+        ('CARGA', 'Carga / Expedição'),
+    ]
+
     UNIDADE_CHOICES = [
         ('EMBALAGEM', 'Embalagem'),
         ('QUILOGRAMA', 'Quilograma'),
@@ -1460,6 +1526,14 @@ class Solicitacao(models.Model):
     # CRITÉRIOS DA SOLICITAÇÃO
     # ============================================================
 
+    tipo_solicitacao = models.CharField(
+        max_length=20,
+        choices=TIPO_SOLICITACAO_CHOICES,
+        default='TRANSFERENCIA',
+        db_index=True,
+        verbose_name='Tipo de solicitação',
+    )
+
     armazem = models.ForeignKey(
         'Armazem',
         on_delete=models.PROTECT,
@@ -1499,6 +1573,22 @@ class Solicitacao(models.Model):
             'Destino da solicitação, transferência '
             'ou expedição.'
         ),
+    )
+
+    motorista = models.CharField(
+        max_length=150,
+        blank=True,
+        default='',
+        verbose_name='Motorista',
+        help_text='Nome do motorista da carga/expedição.',
+    )
+
+    placa = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        verbose_name='Placa',
+        help_text='Placa do veículo da carga/expedição.',
     )
 
     observacao = models.TextField(
@@ -1898,6 +1988,46 @@ class Solicitacao(models.Model):
             '%d/%m/%Y %H:%M'
         )
 
+
+class SolicitacaoItemCarga(models.Model):
+    """Linha de uma solicitação do tipo carga/expedição."""
+
+    solicitacao = models.ForeignKey(
+        Solicitacao,
+        on_delete=models.CASCADE,
+        related_name='itens_carga',
+    )
+    produto = models.ForeignKey(
+        'Produto',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='itens_solicitacao_carga',
+    )
+    cliente = models.CharField(max_length=255)
+    codigo = models.CharField(max_length=100, db_index=True)
+    descricao = models.TextField(blank=True, default='')
+    categoria = models.CharField(max_length=100, blank=True, default='')
+    peneira = models.CharField(max_length=100, blank=True, default='')
+    lote = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    quantidade_solicitada = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
+    ordem = models.PositiveIntegerField(default=0)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['ordem', 'id']
+        verbose_name = 'Item de carga'
+        verbose_name_plural = 'Itens de carga'
+
+    def __str__(self):
+        return f'{self.cliente} | {self.codigo} | {self.quantidade_solicitada}'
+
+
 class TagKanban(models.Model):
     nome = models.CharField(
         max_length=50,
@@ -2035,6 +2165,7 @@ class HistoricoCard(models.Model):
         ('MOVIMENTACAO_KANBAN', 'moveu o card'),
         ('REMOCAO_ITEM', 'removeu item'),
         ('CONCLUSAO', 'concluiu'),
+        ('EDICAO', 'editou a solicitação'),
     ]
     
     solicitacao = models.ForeignKey(

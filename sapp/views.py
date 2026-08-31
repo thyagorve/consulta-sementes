@@ -39,6 +39,7 @@ from django.db.models import (
     Value,
     When,
 )
+from django.db.models.functions import Trim, Upper
 from django.core.cache import cache
 
 from django.http import JsonResponse
@@ -90,9 +91,15 @@ import json
 from django.db import transaction
 import tempfile
 import os
+import unicodedata
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.worksheet.datavalidation import DataValidation
+from openpyxl.utils import get_column_letter
 
 from django.db import transaction
 from .models import FotoMovimentacao # e os outros models   
+from .models import SolicitacaoItemCarga
     
 
 # No início de views.py, com os outros imports de models
@@ -2347,6 +2354,419 @@ def logout_view(request):
 
 # sapp/views.py - Substitua a função configuracoes por esta versão SIMPLIFICADA
 
+def _normalizar_coluna_planilha(valor):
+    texto = unicodedata.normalize('NFKD', str(valor or ''))
+    texto = ''.join(c for c in texto if not unicodedata.combining(c))
+    return texto.strip().lower().replace(' ', '_').replace('-', '_').replace('/', '_')
+
+
+def _valor_linha_planilha(linha, *nomes):
+    for nome in nomes:
+        valor = linha.get(_normalizar_coluna_planilha(nome), '')
+        if pd.notna(valor) and str(valor).strip():
+            return str(valor).strip()
+    return ''
+
+
+def _resolver_fk_planilha(model, valor, rotulo, obrigatorio=False):
+    valor = str(valor or '').strip()
+    if not valor:
+        if obrigatorio:
+            raise ValueError(f'{rotulo} é obrigatório e deve existir na base de Configurações.')
+        return None
+
+    # A planilha NUNCA cria dependências automaticamente.
+    # O valor precisa corresponder a uma opção já cadastrada na base.
+    obj = model.objects.filter(nome__iexact=valor).first()
+    if not obj:
+        opcoes = list(
+            model.objects
+            .order_by('nome')
+            .values_list('nome', flat=True)[:12]
+        )
+        exemplo = ', '.join(str(v) for v in opcoes) if opcoes else 'nenhuma opção cadastrada'
+        raise ValueError(
+            f'{rotulo} "{valor}" não existe na base. '
+            f'Use exatamente um valor cadastrado em Configurações. Base disponível: {exemplo}.'
+        )
+    return obj
+
+
+
+CONFIG_IMPORT_SCHEMAS = {
+    'cultivar': {'titulo': 'Cultivares', 'headers': ['nome']},
+    'peneira': {'titulo': 'Peneiras', 'headers': ['nome']},
+    'especie': {'titulo': 'Espécies', 'headers': ['nome']},
+    'categoria': {'titulo': 'Categorias', 'headers': ['nome']},
+    'tratamento': {'titulo': 'Tratamentos', 'headers': ['nome']},
+    'produto': {
+        'titulo': 'Produtos',
+        'headers': [
+            'codigo', 'cultivar', 'descricao', 'peneira', 'especie',
+            'categoria', 'tratamento', 'empresa', 'tipo', 'ativo',
+        ],
+    },
+    'armazem': {'titulo': 'Armazéns', 'headers': ['nome']},
+    'endereco': {'titulo': 'Endereços', 'headers': ['codigo', 'armazem']},
+    'origem': {'titulo': 'Origens e Destinos', 'headers': ['nome']},
+}
+
+
+def _schema_importacao_config(tipo):
+    tipo = str(tipo or '').strip().lower()
+    schema = CONFIG_IMPORT_SCHEMAS.get(tipo)
+    if not schema:
+        raise ValueError('Tipo de cadastro inválido para importação.')
+    return tipo, schema
+
+
+def _validar_bases_importacao(tipo):
+    """Impede importar registros dependentes antes das respectivas bases."""
+    tipo, _ = _schema_importacao_config(tipo)
+
+    if tipo == 'produto':
+        # No cadastro manual, somente Cultivar é uma relação obrigatória.
+        # Peneira, Espécie, Categoria e Tratamento são opcionais.
+        # Quando forem informados na planilha, _resolver_fk_planilha()
+        # continua exigindo que o valor exista exatamente na respectiva base.
+        if not Cultivar.objects.exists():
+            raise ValueError(
+                'Antes de importar Produtos, cadastre pelo menos um Cultivar na base.'
+            )
+
+    elif tipo == 'endereco' and not Armazem.objects.exists():
+        raise ValueError('Antes de importar Endereços, cadastre pelo menos um Armazém na base.')
+
+
+def _linhas_arquivo_base_config(tipo, arquivo):
+    """Aceita apenas o XLSX-base da própria aba e valida o cabeçalho exato."""
+    tipo, schema = _schema_importacao_config(tipo)
+
+    if not arquivo:
+        raise ValueError('Selecione o arquivo base preenchido para importar.')
+
+    nome = str(getattr(arquivo, 'name', '') or '').lower()
+    if not nome.endswith('.xlsx'):
+        raise ValueError('Use o arquivo base XLSX baixado nesta aba.')
+
+    try:
+        workbook = load_workbook(arquivo, read_only=True, data_only=True)
+    except Exception as exc:
+        raise ValueError(f'Não foi possível abrir o arquivo XLSX: {exc}')
+
+    try:
+        if 'IMPORTAR' not in workbook.sheetnames:
+            raise ValueError('Arquivo fora do padrão. Baixe novamente o modelo desta aba.')
+
+        sheet = workbook['IMPORTAR']
+        cabecalhos = [_normalizar_coluna_planilha(cell.value) for cell in sheet[1]]
+        while cabecalhos and not cabecalhos[-1]:
+            cabecalhos.pop()
+
+        esperado = [_normalizar_coluna_planilha(col) for col in schema['headers']]
+        if cabecalhos != esperado:
+            raise ValueError(
+                'Arquivo fora do modelo desta aba. '
+                f"Colunas esperadas: {', '.join(schema['headers'])}. "
+                f"Colunas encontradas: {', '.join(cabecalhos) or '(sem cabeçalho)'}. "
+                'Baixe o arquivo base novamente e não altere as colunas.'
+            )
+
+        linhas = []
+        for numero_linha, valores in enumerate(
+            sheet.iter_rows(min_row=2, max_col=len(esperado), values_only=True),
+            start=2,
+        ):
+            if not any(str(valor or '').strip() for valor in valores):
+                continue
+            linhas.append((
+                numero_linha,
+                {
+                    esperado[idx]: ('' if valor is None else str(valor).strip())
+                    for idx, valor in enumerate(valores)
+                },
+            ))
+
+        if not linhas:
+            raise ValueError('O arquivo base não possui nenhuma linha preenchida.')
+        return linhas
+    finally:
+        workbook.close()
+
+
+def _adicionar_validacao_lista(ws, coluna, valores, coluna_base, max_linhas=1000):
+    valores = [str(v).strip() for v in valores if str(v).strip()]
+    if not valores:
+        return
+    fim = len(valores) + 1
+    dv = DataValidation(
+        type='list',
+        formula1=f"'BASES'!${coluna_base}$2:${coluna_base}${fim}",
+        allow_blank=True,
+    )
+    dv.error = 'Selecione um valor existente na aba BASES.'
+    dv.errorTitle = 'Valor inválido'
+    dv.prompt = 'Use um valor da base cadastrada no sistema.'
+    dv.promptTitle = 'Base do sistema'
+    ws.add_data_validation(dv)
+    dv.add(f'{coluna}2:{coluna}{max_linhas}')
+
+
+@login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
+def baixar_modelo_configuracao(request, tipo):
+    """Gera o arquivo-base XLSX específico da aba de Configurações."""
+    try:
+        tipo, schema = _schema_importacao_config(tipo)
+    except ValueError as exc:
+        return HttpResponse(str(exc), status=404, content_type='text/plain; charset=utf-8')
+
+    workbook = Workbook()
+    ws = workbook.active
+    ws.title = 'IMPORTAR'
+
+    fill = PatternFill('solid', fgColor='1E5F34')
+    font = Font(color='FFFFFF', bold=True)
+    for idx, header in enumerate(schema['headers'], start=1):
+        cell = ws.cell(row=1, column=idx, value=header)
+        cell.fill = fill
+        cell.font = font
+        cell.alignment = Alignment(horizontal='center')
+        ws.column_dimensions[get_column_letter(idx)].width = max(16, len(header) + 5)
+    ws.freeze_panes = 'A2'
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(schema['headers']))}1"
+
+    instrucoes = workbook.create_sheet('INSTRUCOES')
+    instrucoes['A1'] = f"MODELO DE IMPORTAÇÃO - {schema['titulo'].upper()}"
+    instrucoes['A1'].font = Font(bold=True, size=14, color='1E5F34')
+    instrucoes['A3'] = '1. Preencha somente a aba IMPORTAR.'
+    instrucoes['A4'] = '2. Não renomeie, remova, acrescente ou mude a ordem das colunas.'
+    instrucoes['A5'] = '3. Salve em XLSX e importe na mesma aba de Configurações.'
+    instrucoes.column_dimensions['A'].width = 100
+
+    if tipo == 'produto':
+        bases = workbook.create_sheet('BASES')
+        listas = [
+            ('Cultivares', list(Cultivar.objects.order_by('nome').values_list('nome', flat=True))),
+            ('Peneiras', list(Peneira.objects.order_by('nome').values_list('nome', flat=True))),
+            ('Espécies', list(Especie.objects.order_by('nome').values_list('nome', flat=True))),
+            ('Categorias', list(Categoria.objects.order_by('nome').values_list('nome', flat=True))),
+            ('Tratamentos', list(Tratamento.objects.order_by('nome').values_list('nome', flat=True))),
+        ]
+        for col_idx, (titulo, valores) in enumerate(listas, start=1):
+            c = bases.cell(row=1, column=col_idx, value=titulo)
+            c.fill = fill
+            c.font = font
+            bases.column_dimensions[get_column_letter(col_idx)].width = 28
+            for row_idx, valor in enumerate(valores, start=2):
+                bases.cell(row=row_idx, column=col_idx, value=valor)
+
+        _adicionar_validacao_lista(ws, 'B', listas[0][1], 'A')
+        _adicionar_validacao_lista(ws, 'D', listas[1][1], 'B')
+        _adicionar_validacao_lista(ws, 'E', listas[2][1], 'C')
+        _adicionar_validacao_lista(ws, 'F', listas[3][1], 'D')
+        _adicionar_validacao_lista(ws, 'G', listas[4][1], 'E')
+        ativo = DataValidation(type='list', formula1='"SIM,NAO"', allow_blank=True)
+        ws.add_data_validation(ativo)
+        ativo.add('J2:J1000')
+        instrucoes['A7'] = 'Produtos: Código e Cultivar são obrigatórios. Peneira, Espécie, Categoria, Tratamento, Descrição, Empresa e Tipo são opcionais.'
+        instrucoes['A8'] = 'Quando Peneira, Espécie, Categoria ou Tratamento forem preenchidos, use exatamente um valor existente na aba BASES.'
+        instrucoes['A9'] = 'Ativo é opcional; se ficar vazio, o produto será importado como ativo.'
+
+    elif tipo == 'endereco':
+        bases = workbook.create_sheet('BASES')
+        armazens = list(Armazem.objects.order_by('nome').values_list('nome', flat=True))
+        bases['A1'] = 'Armazéns'
+        bases['A1'].fill = fill
+        bases['A1'].font = font
+        bases.column_dimensions['A'].width = 30
+        for row_idx, valor in enumerate(armazens, start=2):
+            bases.cell(row=row_idx, column=1, value=valor)
+        _adicionar_validacao_lista(ws, 'B', armazens, 'A')
+        instrucoes['A7'] = 'Endereços: o Armazém precisa existir previamente e deve ser escolhido na aba BASES.'
+
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    workbook.close()
+    buffer.seek(0)
+
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="modelo_{tipo}.xlsx"'
+    return response
+
+
+def _normalizar_codigo_produto(valor):
+    """Normaliza código sem alterar zeros à esquerda."""
+    return str(valor or '').strip().upper()
+
+
+def _sincronizar_solicitacoes_carga_produto(produto):
+    """
+    Vincula pedidos de carga antigos ao Produto quando o código foi
+    cadastrado depois da solicitação. A configuração complementa apenas
+    a descrição; lote/categoria/peneira/AZ/endereço continuam vindo do
+    estoque escolhido no empenho.
+    """
+    if not produto or not produto.codigo:
+        return 0
+
+    codigo = _normalizar_codigo_produto(produto.codigo)
+    descricao = (produto.descricao or '').strip()
+
+    return (
+        SolicitacaoItemCarga.objects
+        .filter(codigo__iexact=codigo)
+        .update(
+            produto=produto,
+            descricao=descricao,
+        )
+    )
+
+
+def _sincronizar_item_carga_com_produto(item):
+    """Sincronização defensiva ao abrir um pedido antigo para empenho."""
+    if not item or not item.codigo:
+        return item
+
+    codigo = _normalizar_codigo_produto(item.codigo)
+    produto = (
+        Produto.objects
+        .filter(codigo__iexact=codigo)
+        .first()
+    )
+
+    if not produto:
+        return item
+
+    descricao = (produto.descricao or '').strip()
+    campos = []
+
+    if item.produto_id != produto.id:
+        item.produto = produto
+        campos.append('produto')
+
+    if (item.descricao or '') != descricao:
+        item.descricao = descricao
+        campos.append('descricao')
+
+    if campos:
+        campos.append('atualizado_em')
+        item.save(update_fields=campos)
+
+    return item
+
+
+def _importar_configuracoes_planilha(tipo, arquivo):
+    tipo, _ = _schema_importacao_config(tipo)
+    _validar_bases_importacao(tipo)
+    linhas = _linhas_arquivo_base_config(tipo, arquivo)
+
+    simples = {
+        'cultivar': Cultivar,
+        'peneira': Peneira,
+        'especie': Especie,
+        'categoria': Categoria,
+        'tratamento': Tratamento,
+        'armazem': Armazem,
+        'origem': OrigemDestino,
+    }
+    criados = 0
+    atualizados = 0
+    erros = []
+
+    with transaction.atomic():
+        for linha_num, linha in linhas:
+            try:
+                if tipo in simples:
+                    nome_item = _valor_linha_planilha(linha, 'nome')
+                    if not nome_item:
+                        raise ValueError('NOME é obrigatório.')
+                    _, created = simples[tipo].objects.get_or_create(
+                        nome__iexact=nome_item,
+                        defaults={'nome': nome_item},
+                    )
+                    criados += int(created)
+                    atualizados += int(not created)
+
+                elif tipo == 'endereco':
+                    codigo = _valor_linha_planilha(linha, 'codigo')
+                    armazem_nome = _valor_linha_planilha(linha, 'armazem')
+                    if not codigo:
+                        raise ValueError('CÓDIGO é obrigatório.')
+                    armazem = _resolver_fk_planilha(Armazem, armazem_nome, 'Armazém', obrigatorio=True)
+                    _, created = Endereco.objects.update_or_create(
+                        codigo=codigo.upper(),
+                        defaults={'armazem': armazem},
+                    )
+                    criados += int(created)
+                    atualizados += int(not created)
+
+                elif tipo == 'produto':
+                    codigo = _valor_linha_planilha(linha, 'codigo')
+                    if not codigo:
+                        raise ValueError('CÓDIGO é obrigatório.')
+                    # Mesma obrigatoriedade do cadastro manual:
+                    # Cultivar é obrigatório; os demais relacionamentos são opcionais.
+                    # Se um opcional vier preenchido, ele precisa existir na base.
+                    cultivar = _resolver_fk_planilha(
+                        Cultivar,
+                        _valor_linha_planilha(linha, 'cultivar'),
+                        'Cultivar',
+                        obrigatorio=True,
+                    )
+                    peneira = _resolver_fk_planilha(
+                        Peneira,
+                        _valor_linha_planilha(linha, 'peneira'),
+                        'Peneira',
+                        obrigatorio=False,
+                    )
+                    especie = _resolver_fk_planilha(
+                        Especie,
+                        _valor_linha_planilha(linha, 'especie'),
+                        'Espécie',
+                        obrigatorio=False,
+                    )
+                    categoria = _resolver_fk_planilha(
+                        Categoria,
+                        _valor_linha_planilha(linha, 'categoria'),
+                        'Categoria',
+                        obrigatorio=False,
+                    )
+                    tratamento = _resolver_fk_planilha(
+                        Tratamento,
+                        _valor_linha_planilha(linha, 'tratamento'),
+                        'Tratamento',
+                        obrigatorio=False,
+                    )
+                    ativo_txt = _valor_linha_planilha(linha, 'ativo')
+                    ativo = str(ativo_txt or 'SIM').strip().lower() not in {'0', 'nao', 'não', 'false', 'inativo'}
+
+                    produto, created = Produto.objects.update_or_create(
+                        codigo=_normalizar_codigo_produto(codigo),
+                        defaults={
+                            'cultivar': cultivar,
+                            'descricao': _valor_linha_planilha(linha, 'descricao'),
+                            'tipo': _valor_linha_planilha(linha, 'tipo'),
+                            'empresa': _valor_linha_planilha(linha, 'empresa'),
+                            'peneira': peneira,
+                            'especie': especie,
+                            'categoria': categoria,
+                            'tratamento': tratamento,
+                            'ativo': ativo,
+                        },
+                    )
+                    _sincronizar_solicitacoes_carga_produto(produto)
+                    criados += int(created)
+                    atualizados += int(not created)
+            except Exception as exc:
+                erros.append(f'Linha {linha_num}: {exc}')
+
+    return criados, atualizados, erros
+
+
 @login_required
 @permission_required('sapp.pode_configuracoes', raise_exception=True)
 def configuracoes(request):
@@ -2363,7 +2783,8 @@ def configuracoes(request):
     
     # Usuários (todos exceto o próprio usuário logado)
     usuarios_conferentes = User.objects.filter(
-        is_superuser=False
+        is_superuser=False,
+        is_active=True,
     ).exclude(id=request.user.id).order_by('username')
     
     # Produtos com relacionamentos
@@ -2394,14 +2815,38 @@ def configuracoes(request):
     if request.method == 'POST':
         
         acao = request.POST.get('acao')
-        active_tab = request.POST.get('active_tab', 'produto')
+        active_tab = request.POST.get('active_tab', 'cultivar')
         
+        # ====================================
+        # IMPORTAÇÃO EM MASSA
+        # ====================================
+        if acao == 'importar_planilha_config':
+            try:
+                tipo_importacao = request.POST.get('tipo_importacao', '')
+                criados, atualizados, erros = _importar_configuracoes_planilha(
+                    tipo_importacao,
+                    request.FILES.get('arquivo_planilha'),
+                )
+                if criados or atualizados:
+                    messages.success(
+                        request,
+                        f'✅ Importação concluída: {criados} criado(s) e {atualizados} já existente(s)/atualizado(s).'
+                    )
+                if erros:
+                    resumo_erros = ' | '.join(erros[:8])
+                    if len(erros) > 8:
+                        resumo_erros += f' | +{len(erros)-8} erro(s)'
+                    messages.warning(request, f'⚠️ Algumas linhas não foram importadas: {resumo_erros}')
+            except Exception as e:
+                messages.error(request, f'❌ Erro na importação: {e}')
+
         # ====================================
         # 1. PRODUTOS
         # ====================================
-        
-        if acao == 'add_produto':
+        elif acao == 'add_produto':
             try:
+                if not all([cultivares.exists(), peneiras.exists(), especies.exists(), categorias.exists(), tratamentos.exists()]):
+                    raise ValueError('Cadastre primeiro Cultivares, Peneiras, Espécies, Categorias e Tratamentos.')
                 cultivar_id = request.POST.get('cultivar')
                 codigo = request.POST.get('codigo', '').strip().upper()
                 descricao = request.POST.get('descricao', '').strip()
@@ -2425,6 +2870,7 @@ def configuracoes(request):
                         produto.categoria_id = request.POST.get('categoria') or None
                         produto.tratamento_id = request.POST.get('tratamento') or None
                         produto.save()
+                        _sincronizar_solicitacoes_carga_produto(produto)
                         messages.success(request, f"✅ Produto '{codigo}' cadastrado com sucesso!")
             except Exception as e:
                 messages.error(request, f"❌ Erro ao cadastrar produto: {str(e)}")
@@ -2630,8 +3076,22 @@ def configuracoes(request):
                         messages.error(request, "❌ Você não pode excluir sua própria conta!")
                     else:
                         username = user.username
-                        user.delete()
-                        messages.success(request, f"✅ Usuário '{username}' excluído com sucesso!")
+                        if not user.first_name and not user.last_name:
+                            user.first_name = username
+                        sufixo = timezone.now().strftime('%Y%m%d%H%M%S')
+                        user.username = f'inativo_{user.id}_{sufixo}_{username}'[:150]
+                        user.is_active = False
+                        user.is_staff = False
+                        user.is_superuser = False
+                        user.email = ''
+                        user.set_unusable_password()
+                        user.save()
+                        user.groups.clear()
+                        user.user_permissions.clear()
+                        messages.success(
+                            request,
+                            f"✅ Usuário '{username}' desativado. Todos os dados e históricos vinculados foram preservados."
+                        )
                 
                 except User.DoesNotExist:
                     messages.error(request, "❌ Usuário não encontrado!")
@@ -2805,6 +3265,18 @@ def configuracoes(request):
         'form_conf_user': NovoConferenteUserForm(),
         
         'produtos': produtos,
+        'cadastro_produto_liberado': all([
+            cultivares.exists(),
+            peneiras.exists(),
+            especies.exists(),
+            categorias.exists(),
+            tratamentos.exists(),
+        ]),
+        # Para importação em massa, segue a obrigatoriedade real dos campos:
+        # Produto exige Código + Cultivar. As demais bases são opcionais e
+        # somente precisam existir quando o respectivo valor for informado.
+        'importacao_produto_liberada': cultivares.exists(),
+        'cadastro_endereco_liberado': armazens_lista.exists(),
         
         'armazens': armazens_lista,
         'enderecos': enderecos_lista,
@@ -3910,14 +4382,26 @@ def pagina_rascunho(request):
             try:
                 with transaction.atomic():
                     try:
-                        empenho = Empenho.objects.select_for_update().get(id=empenho_id)
+                        empenho = (
+                            Empenho.objects
+                            .select_for_update()
+                            .select_related('solicitacao')
+                            .get(id=empenho_id)
+                        )
                     except Empenho.DoesNotExist:
                         raise ValueError("Card não encontrado.")
+
+                    solicitacao_vinculada = empenho.solicitacao
+                    if solicitacao_vinculada:
+                        if solicitacao_vinculada.tipo_solicitacao == 'CARGA' and acao != 'expedir':
+                            raise ValueError('Solicitação de carga permite somente Expedir.')
+                        if solicitacao_vinculada.tipo_solicitacao != 'CARGA' and acao != 'transferir':
+                            raise ValueError('Solicitação comum permite somente Transferir.')
                     
                     itens = list(
                         ItemEmpenho.objects
                         .filter(id__in=selected_ids, empenho=empenho)
-                        .select_related('estoque')
+                        .select_related('estoque', 'item_carga')
                         .select_for_update()
                     )
                     
@@ -3948,12 +4432,17 @@ def pagina_rascunho(request):
                                 f"Solicitado: {item.quantidade}."
                             )
                     
+                    movimentado_unidades = Decimal('0')
+                    movimentado_kg = Decimal('0')
+
                     for item in itens:
+                        origem = item.estoque
+                        qtd = item.quantidade
+                        movimentado_unidades += Decimal(str(qtd or 0))
+                        movimentado_kg += Decimal(str(qtd or 0)) * Decimal(str(origem.peso_unitario or 0))
+
                         if acao == 'transferir':
                             # Processar transferência
-                            origem = item.estoque
-                            qtd = item.quantidade
-                            
                             novo_end = request.POST.get('novo_endereco', '').strip().upper()
                             novo_az = request.POST.get('az', '').strip().upper() or origem.az
                             obs_transferencia = request.POST.get('obs_transferencia', '').strip()
@@ -4038,6 +4527,10 @@ def pagina_rascunho(request):
                             HistoricoItemEmpenho.objects.create(
                                 empenho=empenho,
                                 item_empenho_id_original=item.id,
+                                item_carga_id_original=item.item_carga_id,
+                                cliente_solicitacao=(item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '')),
+                                codigo_produto=(item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '')),
+                                descricao_produto=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
                                 estoque_origem=origem,
                                 estoque_destino=destino,
                                 lote=origem.lote,
@@ -4059,9 +4552,6 @@ def pagina_rascunho(request):
                             )
                         else:
                             # Processar expedição
-                            origem = item.estoque
-                            qtd = item.quantidade
-                            
                             obs_expedicao = request.POST.get('obs_expedicao', '').strip()
                             numero_carga = request.POST.get('numero_carga', '').strip()
                             cliente = request.POST.get('cliente', '').strip()
@@ -4073,6 +4563,16 @@ def pagina_rascunho(request):
                             origem.saida += qtd
                             origem.save()
                             
+                            cliente_item_carga = (
+                                item.cliente_solicitacao_snapshot
+                                or (item.item_carga.cliente if item.item_carga else '')
+                            )
+                            cliente_movimentacao = (
+                                cliente_item_carga
+                                if solicitacao_vinculada and solicitacao_vinculada.tipo_solicitacao == 'CARGA'
+                                else (cliente or origem.cliente or '')
+                            )
+
                             HistoricoMovimentacao.objects.create(
                                 estoque=origem,
                                 usuario=user,
@@ -4084,13 +4584,17 @@ def pagina_rascunho(request):
                                     f"{obs_global} {obs_expedicao}"
                                 ).strip(),
                                 numero_carga=numero_carga,
-                                cliente=cliente or origem.cliente,
+                                cliente=cliente_movimentacao,
                                 placa=placa
                             )
                             
                             HistoricoItemEmpenho.objects.create(
                                 empenho=empenho,
                                 item_empenho_id_original=item.id,
+                                item_carga_id_original=item.item_carga_id,
+                                cliente_solicitacao=(item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '')),
+                                codigo_produto=(item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '')),
+                                descricao_produto=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
                                 estoque_origem=origem,
                                 lote=origem.lote,
                                 produto=origem.produto or '',
@@ -4128,6 +4632,41 @@ def pagina_rascunho(request):
                         else:
                             empenho.delete()
                     
+                    if solicitacao_vinculada:
+                        incremento = (
+                            movimentado_kg
+                            if solicitacao_vinculada.unidade_controle == 'QUILOGRAMA'
+                            else movimentado_unidades
+                        )
+                        solicitacao_vinculada.quantidade_movimentada = (
+                            Decimal(str(solicitacao_vinculada.quantidade_movimentada or 0))
+                            + incremento
+                        )
+
+                        if solicitacao_vinculada.unidade_controle == 'QUILOGRAMA':
+                            restante = Decimal('0')
+                            for item_restante in empenho.itens.select_related('estoque'):
+                                restante += Decimal(str(item_restante.quantidade or 0)) * Decimal(str(item_restante.estoque.peso_unitario or 0))
+                            solicitacao_vinculada.quantidade_empenhada = restante
+                        else:
+                            restante = empenho.itens.aggregate(total=Sum('quantidade'))['total'] or 0
+                            solicitacao_vinculada.quantidade_empenhada = Decimal(str(restante))
+
+                        solicitado = Decimal(str(solicitacao_vinculada.quantidade_solicitada or 0))
+                        if solicitado > 0 and solicitacao_vinculada.quantidade_movimentada >= solicitado:
+                            solicitacao_vinculada.quantidade_movimentada = solicitado
+                            solicitacao_vinculada.status = 'CONCLUIDO'
+                        elif solicitacao_vinculada.quantidade_movimentada > 0:
+                            solicitacao_vinculada.status = 'MOVIMENTACAO_PARCIAL'
+
+                        solicitacao_vinculada.save(update_fields=[
+                            'quantidade_movimentada',
+                            'quantidade_empenhada',
+                            'status',
+                            'data_atualizacao',
+                        ])
+                        cache.delete('cards_version_hash')
+
                     acao_nome = 'Transferência' if acao == 'transferir' else 'Expedição'
                     messages.success(
                         request, 
@@ -4161,7 +4700,7 @@ def pagina_rascunho(request):
 
     todos_itens = list(
         ItemEmpenho.objects
-        .select_related('empenho', 'estoque')
+        .select_related('empenho', 'estoque', 'item_carga')
     )
 
     itens_por_estoque = defaultdict(list)
@@ -4192,6 +4731,7 @@ def pagina_rascunho(request):
     cards_ativos = (
         Empenho.objects
         .filter(status__nome='Rascunho')
+        .select_related('solicitacao')
         .prefetch_related(
             'itens',
             'itens__estoque',
@@ -4203,6 +4743,7 @@ def pagina_rascunho(request):
     cards_concluidos = (
         Empenho.objects
         .filter(status__nome='Concluído')
+        .select_related('solicitacao')
         .prefetch_related('historico_itens')
         .order_by('-id')
     )
@@ -4232,7 +4773,9 @@ def pagina_rascunho(request):
                 'tratamento': estoque.tratamento.nome if estoque.tratamento else '',
                 'embalagem': estoque.embalagem or '',
                 'empresa': estoque.empresa or '',
-                'cliente': estoque.cliente or '',
+                'cliente': item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '') or estoque.cliente or '',
+                'codigo': item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '') or estoque.produto or '',
+                'descricao': item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '') or '',
                 'saldo_atual': estoque.saldo,
                 'peso_unitario': str(estoque.peso_unitario) if estoque.peso_unitario else '0',
                 'peso_total': str(estoque.peso_total) if estoque.peso_total else '0',
@@ -4241,7 +4784,8 @@ def pagina_rascunho(request):
                 'observacao': item.observacao or estoque.observacao or '',
                 'status_sistemico': estoque.status_sistemico.nome if estoque.status_sistemico else '',
                 'situacao': 'pendente',
-                'processado_em': None
+                'processado_em': None,
+                'data_ultima_movimentacao': timezone.localtime(estoque.data_ultima_movimentacao).strftime('%d/%m/%Y %H:%M') if estoque.data_ultima_movimentacao else '',
             })
         
         itens_processados = []
@@ -4261,7 +4805,9 @@ def pagina_rascunho(request):
                 'tratamento': hist.tratamento,
                 'embalagem': hist.embalagem,
                 'empresa': hist.empresa,
-                'cliente': hist.cliente,
+                'cliente': hist.cliente_solicitacao or hist.cliente,
+                'codigo': hist.codigo_produto or hist.produto,
+                'descricao': hist.descricao_produto or '',
                 'saldo_atual': 0,
                 'peso_unitario': '0',
                 'peso_total': '0',
@@ -4271,6 +4817,7 @@ def pagina_rascunho(request):
                 'status_sistemico': '',
                 'situacao': 'transferido' if hist.tipo == 'transferencia' else 'expedido',
                 'processado_em': hist.processado_em.strftime('%d/%m/%Y %H:%M') if hist.processado_em else '',
+                'data_ultima_movimentacao': hist.processado_em.strftime('%d/%m/%Y %H:%M') if hist.processado_em else '',
                 'tipo': hist.get_tipo_display(),
                 'endereco_destino': hist.endereco_destino if hist.tipo == 'transferencia' else '',
             })
@@ -4278,6 +4825,8 @@ def pagina_rascunho(request):
         cards_impressao[str(card.id)] = {
             'card_id': card.id,
             'card_nome': card.observacao or f'Card #{card.id}',
+            'tipo_solicitacao': card.solicitacao.tipo_solicitacao if card.solicitacao else '',
+            'solicitacao_id': card.solicitacao_id,
             'itens_pendentes': itens_pendentes,
             'itens_processados': itens_processados,
             'total_pendentes': len(itens_pendentes),
@@ -8842,249 +9391,412 @@ def avaliar_workflow(solicitacao, evento, usuario=None):
     raise_exception=True
 )
 def criar_solicitacao(request):
+    """Cria solicitação normal ou uma carga com múltiplas linhas."""
+    return _salvar_solicitacao_form(request)
+
+
+@login_required
+@permission_required(
+    'sapp.pode_criar_solicitacao',
+    raise_exception=True
+)
+def editar_solicitacao(request, solicitacao_id):
+    """Edita o card sem quebrar reservas/movimentações já registradas."""
+    solicitacao = get_object_or_404(
+        Solicitacao.objects.prefetch_related('itens_carga'),
+        id=solicitacao_id,
+    )
+
+    if solicitacao.status in {'CONCLUIDO', 'CANCELADO'}:
+        messages.warning(
+            request,
+            'Solicitações concluídas ou canceladas ficam preservadas para auditoria e não podem ser editadas.'
+        )
+        return redirect('sapp:pagina_solicitacoes')
+
+    return _salvar_solicitacao_form(request, solicitacao=solicitacao)
+
+
+def _parse_decimal_solicitacao(valor, nome='Quantidade'):
+    try:
+        numero = Decimal(str(valor or '').replace(',', '.'))
+    except (InvalidOperation, ValueError, TypeError):
+        raise ValueError(f'{nome} inválida.')
+    if numero <= 0:
+        raise ValueError(f'{nome} deve ser maior que zero.')
+    return numero
+
+
+def _ler_itens_carga_post(request):
     """
-    Cria uma nova solicitação.
-    Salva corretamente Destino, Armazém e Observação.
+    Lê as linhas comerciais da carga.
+
+    A solicitação guarda somente cliente + código + quantidade.
+    A descrição é apenas um complemento do cadastro Produto e NÃO é
+    obrigatória. Lote, categoria, peneira, AZ, endereço e peso pertencem
+    ao lote escolhido no empenho.
     """
+    ids = request.POST.getlist('carga_item_id[]') or request.POST.getlist('carga_item_id')
+    clientes = request.POST.getlist('carga_cliente[]') or request.POST.getlist('carga_cliente')
+    codigos = request.POST.getlist('carga_codigo[]') or request.POST.getlist('carga_codigo')
+    quantidades = request.POST.getlist('carga_quantidade[]') or request.POST.getlist('carga_quantidade')
+
+    total_linhas = max(len(ids), len(clientes), len(codigos), len(quantidades), 0)
+    itens = []
+
+    for idx in range(total_linhas):
+        item_id_txt = (ids[idx] if idx < len(ids) else '').strip()
+        cliente = (clientes[idx] if idx < len(clientes) else '').strip()
+        codigo = (codigos[idx] if idx < len(codigos) else '').strip().upper()
+        qtd_txt = (quantidades[idx] if idx < len(quantidades) else '').strip()
+
+        if not any([item_id_txt, cliente, codigo, qtd_txt]):
+            continue
+
+        if not cliente or not codigo:
+            raise ValueError(
+                f'Linha {idx + 1} da carga: Cliente e Código são obrigatórios.'
+            )
+
+        quantidade = _parse_decimal_solicitacao(
+            qtd_txt,
+            f'Quantidade da linha {idx + 1}'
+        )
+        if quantidade != quantidade.to_integral_value():
+            raise ValueError(
+                f'Linha {idx + 1}: a quantidade da carga deve ser informada em embalagens inteiras.'
+            )
+
+        item_id = None
+        if item_id_txt:
+            try:
+                item_id = int(item_id_txt)
+            except (TypeError, ValueError):
+                raise ValueError(f'Linha {idx + 1}: identificador do item inválido.')
+
+        # Produto é OPCIONAL. Serve exclusivamente para obter a descrição.
+        produto = (
+            Produto.objects
+            .filter(codigo__iexact=codigo)
+            .first()
+        )
+
+        itens.append({
+            'id': item_id,
+            'cliente': cliente,
+            'produto': produto,
+            # Mantém o código informado na solicitação, mesmo sem cadastro.
+            'codigo': codigo,
+            'descricao': (produto.descricao or '') if produto else '',
+            # Estes dados vêm do LOTE EMPENHADO, não de Configurações.
+            'categoria': '',
+            'peneira': '',
+            'lote': '',
+            'quantidade_solicitada': quantidade,
+            'ordem': len(itens) + 1,
+        })
+
+    if not itens:
+        raise ValueError('Adicione pelo menos um item à carga.')
+
+    return itens
+
+
+def _item_carga_tem_empenho(item):
+    """Uma linha já utilizada não pode ter seus critérios comerciais alterados."""
+    if ItemEmpenho.objects.filter(item_carga_id=item.id).exists():
+        return True
+
+    return HistoricoItemEmpenho.objects.filter(
+        empenho__solicitacao_id=item.solicitacao_id,
+        item_carga_id_original=item.id,
+    ).exists()
+
+
+def _quantidade_item_carga_empenhada(item):
+    atual = (
+        ItemEmpenho.objects
+        .filter(item_carga_id=item.id)
+        .aggregate(total=Sum('quantidade'))['total']
+        or 0
+    )
+    historica = (
+        HistoricoItemEmpenho.objects
+        .filter(
+            empenho__solicitacao_id=item.solicitacao_id,
+            item_carga_id_original=item.id,
+        )
+        .aggregate(total=Sum('quantidade'))['total']
+        or 0
+    )
+    return Decimal(str(atual)) + Decimal(str(historica))
+
+
+def _sincronizar_itens_carga(solicitacao, itens_post):
+    """
+    Atualiza somente linhas que ainda nunca foram empenhadas.
+
+    Linhas já empenhadas são preservadas mesmo que alguém tente alterar o POST.
+    Linhas livres podem ser editadas/removidas e novas linhas podem ser incluídas.
+    """
+    existentes = {
+        item.id: item
+        for item in solicitacao.itens_carga.select_for_update().all()
+    }
+    recebidos = set()
+
+    for ordem, dados_originais in enumerate(itens_post, start=1):
+        dados = dict(dados_originais)
+        item_id = dados.pop('id', None)
+        dados['ordem'] = ordem
+
+        if item_id:
+            item = existentes.get(item_id)
+            if not item:
+                raise ValueError('Um dos itens informados não pertence a esta carga.')
+
+            recebidos.add(item_id)
+
+            # Linha já usada no empenho é imutável em cliente/código/quantidade.
+            if _item_carga_tem_empenho(item):
+                continue
+
+            for campo in (
+                'cliente', 'produto', 'codigo', 'descricao',
+                'categoria', 'peneira', 'lote',
+                'quantidade_solicitada', 'ordem',
+            ):
+                setattr(item, campo, dados[campo])
+            item.save(update_fields=[
+                'cliente', 'produto', 'codigo', 'descricao',
+                'categoria', 'peneira', 'lote',
+                'quantidade_solicitada', 'ordem', 'atualizado_em',
+            ])
+        else:
+            novo = SolicitacaoItemCarga.objects.create(
+                solicitacao=solicitacao,
+                **dados,
+            )
+            recebidos.add(novo.id)
+
+    # Só pode excluir linha que ainda não foi utilizada em nenhum empenho.
+    for item_id, item in existentes.items():
+        if item_id in recebidos:
+            continue
+        if not _item_carga_tem_empenho(item):
+            item.delete()
+
+    if not solicitacao.itens_carga.exists():
+        raise ValueError('A carga precisa possuir pelo menos um item.')
+
+
+def _contexto_form_solicitacao(solicitacao=None, edicao_estrutural_bloqueada=False):
+    produtos = (
+        Produto.objects
+        .select_related('cultivar')
+        .order_by('codigo')
+    )
+    produtos_js = [
+        {
+            'id': p.id,
+            'codigo': p.codigo,
+            'descricao': p.descricao or '',
+            'cultivar': p.cultivar.nome if p.cultivar else '',
+        }
+        for p in produtos
+    ]
+
+    itens_carga_edicao = []
+    if solicitacao:
+        for item in solicitacao.itens_carga.all():
+            item.quantidade_empenhada_edicao = _quantidade_item_carga_empenhada(item)
+            item.edicao_bloqueada = item.quantidade_empenhada_edicao > 0
+            itens_carga_edicao.append(item)
+
+    return {
+        'armazens': Armazem.objects.all().order_by('nome'),
+        'especies': Especie.objects.all().order_by('nome'),
+        'solicitacao': solicitacao,
+        'itens_carga_edicao': itens_carga_edicao,
+        'produtos_carga_json': json.dumps(produtos_js, cls=DjangoJSONEncoder),
+        # Bloqueio GLOBAL continua válido para tipo/armazém e solicitação normal.
+        # Carga usa item.edicao_bloqueada para bloquear somente a linha já empenhada.
+        'edicao_estrutural_bloqueada': edicao_estrutural_bloqueada,
+    }
+
+
+def _salvar_solicitacao_form(request, solicitacao=None):
+    editando = solicitacao is not None
+    edicao_estrutural_bloqueada = bool(
+        editando and (
+            Decimal(str(solicitacao.quantidade_empenhada or 0)) > 0
+            or Decimal(str(solicitacao.quantidade_movimentada or 0)) > 0
+        )
+    )
 
     if request.method == 'POST':
-
-        titulo = request.POST.get(
-            'titulo',
-            ''
-        ).strip().upper()
-
-        armazem_id = request.POST.get(
-            'armazem'
-        )
-
-        produto = request.POST.get(
-            'produto',
-            ''
-        ).strip()
-
-        especie_id = request.POST.get(
-            'especie'
-        )
-
-        cliente = request.POST.get(
-            'cliente',
-            ''
-        ).strip()
-
-        destino = request.POST.get(
-            'destino',
-            ''
-        ).strip()
-
-        unidade_controle = request.POST.get(
-            'unidade_controle',
-            'EMBALAGEM'
-        )
-
-        quantidade_texto = request.POST.get(
-            'quantidade_solicitada',
-            '0'
-        )
-
-        observacao = request.POST.get(
-            'observacao',
-            ''
-        ).strip()
-
-        prioridade = request.POST.get(
-            'prioridade',
-            'MEDIA'
-        )
-
-        if not titulo:
-            messages.error(
-                request,
-                'Título é obrigatório.'
-            )
-
-            return redirect(
-                'sapp:pagina_solicitacoes'
-            )
-
         try:
-            quantidade = Decimal(
-                str(
-                    quantidade_texto
-                ).replace(',', '.')
-            )
+            titulo = request.POST.get('titulo', '').strip().upper()
+            if not titulo:
+                raise ValueError('Título é obrigatório.')
 
-            if quantidade <= 0:
-                raise ValueError
+            destino = request.POST.get('destino', '').strip()
+            observacao = request.POST.get('observacao', '').strip()
+            prioridade = request.POST.get('prioridade', 'MEDIA')
 
-        except (
-            ValueError,
-            InvalidOperation
-        ):
-            messages.error(
-                request,
-                'Quantidade inválida.'
-            )
-
-            return redirect(
-                'sapp:pagina_solicitacoes'
-            )
-
-        try:
             with transaction.atomic():
+                if not editando:
+                    solicitacao = Solicitacao(criador=request.user)
 
-                armazem = (
-                    Armazem.objects
-                    .filter(
-                        id=armazem_id
+                # Depois do primeiro empenho, tipo e armazém não mudam.
+                if edicao_estrutural_bloqueada:
+                    tipo = solicitacao.tipo_solicitacao
+                else:
+                    tipo = request.POST.get('tipo_solicitacao', 'TRANSFERENCIA').strip().upper()
+                    if tipo not in {'TRANSFERENCIA', 'CARGA'}:
+                        tipo = 'TRANSFERENCIA'
+                    solicitacao.tipo_solicitacao = tipo
+
+                    armazem_id = request.POST.get('armazem')
+                    solicitacao.armazem = (
+                        Armazem.objects.filter(id=armazem_id).first()
+                        if armazem_id else None
                     )
-                    .first()
-                    if armazem_id
-                    else None
-                )
 
-                especie = (
-                    Especie.objects
-                    .filter(
-                        id=especie_id
-                    )
-                    .first()
-                    if especie_id
-                    else None
-                )
+                solicitacao.titulo = titulo
+                solicitacao.destino = destino
+                solicitacao.observacao = observacao or None
+                solicitacao.prioridade = prioridade
 
-                solicitacao = (
-                    Solicitacao.objects.create(
-                        titulo=titulo,
+                if tipo == 'CARGA':
+                    motorista = request.POST.get('motorista', '').strip()
+                    if not motorista:
+                        raise ValueError('Informe o nome do motorista da carga.')
 
-                        criador=request.user,
+                    placa = request.POST.get('placa', '').strip().upper()
 
-                        armazem=armazem,
+                    solicitacao.motorista = motorista
+                    solicitacao.placa = placa
+                    solicitacao.produto = None
+                    solicitacao.cliente = None
+                    solicitacao.especie = None
+                    solicitacao.unidade_controle = 'EMBALAGEM'
 
-                        produto=(
-                            produto
-                            or None
-                        ),
+                    # Em carga, mesmo após um empenho, as linhas ainda NÃO empenhadas
+                    # continuam editáveis. As linhas já usadas são preservadas.
+                    itens_carga = _ler_itens_carga_post(request)
+                else:
+                    solicitacao.motorista = ''
+                    solicitacao.placa = ''
+                    itens_carga = []
 
-                        especie=especie,
-
-                        cliente=(
-                            cliente
-                            or None
-                        ),
-
-                        destino=destino,
-
-                        unidade_controle=(
-                            unidade_controle
-                        ),
-
-                        quantidade_solicitada=(
-                            quantidade
-                        ),
-
-                        observacao=(
-                            observacao
-                            or None
-                        ),
-
-                        prioridade=prioridade,
-
-                        status=(
-                            'AGUARDANDO_EMPENHO'
-                        ),
-                    )
-                )
-
-                avaliar_workflow(
-                    solicitacao,
-                    'CRIACAO',
-                    request.user
-                )
-
-                HistoricoCard.objects.create(
-                    solicitacao=solicitacao,
-
-                    usuario=request.user,
-
-                    acao='CRIACAO',
-
-                    quantidade=quantidade,
-
-                    unidade=(
-                        'KG'
-                        if unidade_controle
-                        == 'QUILOGRAMA'
-                        else 'BAG'
-                    ),
-
-                    observacao=(
-                        f'Solicitação criada: '
-                        f'{titulo}'
-                        + (
-                            f' | Destino: '
-                            f'{destino}'
-                            if destino
-                            else ''
+                    if not edicao_estrutural_bloqueada:
+                        especie_id = request.POST.get('especie')
+                        solicitacao.especie = (
+                            Especie.objects.filter(id=especie_id).first()
+                            if especie_id else None
                         )
+                        solicitacao.produto = request.POST.get('produto', '').strip() or None
+                        solicitacao.cliente = request.POST.get('cliente', '').strip() or None
+                        solicitacao.unidade_controle = request.POST.get('unidade_controle', 'EMBALAGEM')
+                        solicitacao.quantidade_solicitada = _parse_decimal_solicitacao(
+                            request.POST.get('quantidade_solicitada', '0')
+                        )
+
+                is_new = solicitacao.pk is None
+                if is_new:
+                    solicitacao.status = 'AGUARDANDO_EMPENHO'
+
+                # Para carga nova, a quantidade é calculada depois da criação das linhas.
+                if is_new and tipo == 'CARGA':
+                    solicitacao.quantidade_solicitada = Decimal('0')
+
+                solicitacao.save()
+
+                if tipo == 'CARGA':
+                    if is_new:
+                        SolicitacaoItemCarga.objects.bulk_create([
+                            SolicitacaoItemCarga(
+                                solicitacao=solicitacao,
+                                **{k: v for k, v in item.items() if k != 'id'}
+                            )
+                            for item in itens_carga
+                        ])
+                    else:
+                        _sincronizar_itens_carga(solicitacao, itens_carga)
+
+                    total_carga = (
+                        solicitacao.itens_carga
+                        .aggregate(total=Sum('quantidade_solicitada'))['total']
+                        or Decimal('0')
                     )
-                )
+                    solicitacao.quantidade_solicitada = Decimal(str(total_carga))
 
-                from django.core.cache import cache
+                    # Se o total foi corrigido/adicionado, o status acompanha o saldo.
+                    if solicitacao.status in {
+                        'AGUARDANDO_EMPENHO', 'EMPENHO_PARCIAL', 'EMPENHO_COMPLETO'
+                    }:
+                        qtd_emp = Decimal(str(solicitacao.quantidade_empenhada or 0))
+                        if qtd_emp <= 0:
+                            solicitacao.status = 'AGUARDANDO_EMPENHO'
+                        elif qtd_emp >= solicitacao.quantidade_solicitada:
+                            solicitacao.status = 'EMPENHO_COMPLETO'
+                        else:
+                            solicitacao.status = 'EMPENHO_PARCIAL'
 
-                cache.delete(
-                    'cards_version_hash'
-                )
+                    solicitacao.save(update_fields=[
+                        'quantidade_solicitada', 'status', 'data_atualizacao'
+                    ])
+                elif not edicao_estrutural_bloqueada:
+                    # Se mudou de uma carga ainda sem empenho para transferência,
+                    # remove as linhas antigas porque ainda não possuem histórico físico.
+                    solicitacao.itens_carga.all().delete()
+
+                if is_new:
+                    avaliar_workflow(solicitacao, 'CRIACAO', request.user)
+                    HistoricoCard.objects.create(
+                        solicitacao=solicitacao,
+                        usuario=request.user,
+                        acao='CRIACAO',
+                        quantidade=solicitacao.quantidade_solicitada,
+                        unidade='BAG' if solicitacao.unidade_controle == 'EMBALAGEM' else 'KG',
+                        observacao=(
+                            f'Solicitação criada: {titulo}'
+                            f' | Tipo: {solicitacao.get_tipo_solicitacao_display()}'
+                            + (f' | Motorista: {solicitacao.motorista}' if tipo == 'CARGA' and solicitacao.motorista else '')
+                            + (f' | Placa: {solicitacao.placa}' if tipo == 'CARGA' and solicitacao.placa else '')
+                            + (f' | Destino: {destino}' if destino else '')
+                        ),
+                    )
+                else:
+                    HistoricoCard.objects.create(
+                        solicitacao=solicitacao,
+                        usuario=request.user,
+                        acao='EDICAO',
+                        quantidade=solicitacao.quantidade_solicitada,
+                        unidade='BAG' if solicitacao.unidade_controle == 'EMBALAGEM' else 'KG',
+                        observacao='Dados da solicitação editados. Linhas já empenhadas foram preservadas.',
+                    )
+
+                cache.delete('cards_version_hash')
 
             messages.success(
                 request,
-                (
-                    f'Solicitação '
-                    f'"{titulo}" '
-                    f'criada com sucesso!'
-                )
+                f'Solicitação "{titulo}" {"atualizada" if editando else "criada"} com sucesso!'
             )
+            return redirect('sapp:pagina_solicitacoes')
 
-            return redirect(
-                'sapp:pagina_solicitacoes'
-            )
-
+        except ValueError as erro:
+            messages.error(request, str(erro))
         except Exception as erro:
-
-            logger.exception(
-                'Erro ao criar solicitação'
-            )
-
-            messages.error(
-                request,
-                (
-                    'Erro ao criar solicitação: '
-                    f'{erro}'
-                )
-            )
-
-            return redirect(
-                'sapp:pagina_solicitacoes'
-            )
+            logger.exception('Erro ao salvar solicitação')
+            messages.error(request, f'Erro ao salvar solicitação: {erro}')
 
     return render(
         request,
         'sapp/criar_solicitacao.html',
-        {
-            'armazens': (
-                Armazem.objects
-                .all()
-                .order_by('nome')
-            ),
-
-            'especies': (
-                Especie.objects
-                .all()
-                .order_by('nome')
-            ),
-        }
+        _contexto_form_solicitacao(solicitacao, edicao_estrutural_bloqueada),
     )
-
 
 def _data_local_formatada(valor):
     """
@@ -9608,6 +10320,8 @@ def api_listar_solicitacoes(request):
         .prefetch_related(
             'empenhos__itens',
             'empenhos__historico_itens',
+            'itens_carga__produto__categoria',
+            'itens_carga__produto__peneira',
         )
         .order_by('-data_criacao')
     )
@@ -9719,6 +10433,21 @@ def api_listar_solicitacoes(request):
 
 
         # =====================================================
+        # ITENS DE CARGA
+        # =====================================================
+        itens_carga = []
+        for item_carga in sol.itens_carga.all():
+            itens_carga.append({
+                'id': item_carga.id,
+                'cliente': item_carga.cliente,
+                'codigo': item_carga.codigo,
+                'descricao': item_carga.descricao,
+                'categoria': item_carga.categoria,
+                'peneira': item_carga.peneira,
+                'quantidade_solicitada': float(item_carga.quantidade_solicitada or 0),
+            })
+
+        # =====================================================
         # JSON
         # =====================================================
 
@@ -9727,6 +10456,11 @@ def api_listar_solicitacoes(request):
             'id': sol.id,
 
             'titulo': sol.titulo,
+            'tipo_solicitacao': sol.tipo_solicitacao,
+            'tipo_solicitacao_display': sol.get_tipo_solicitacao_display(),
+            'destino': sol.destino or '',
+            'observacao': sol.observacao or '',
+            'itens_carga': itens_carga,
 
             'criador_nome': (
                 sol.criador.get_full_name()
@@ -9853,6 +10587,9 @@ def api_lotes_disponiveis_para_solicitacao(
         Solicitacao.objects.select_related(
             'armazem',
             'especie',
+        ).prefetch_related(
+            'itens_carga__produto__categoria',
+            'itens_carga__produto__peneira',
         ),
         id=solicitacao_id
     )
@@ -9863,15 +10600,70 @@ def api_lotes_disponiveis_para_solicitacao(
         status_nome='Rascunho'
     )
 
-    ids_empenhados_no_card = []
+    # --------------------------------------------------------------
+    # CARGA: cada linha da solicitação é independente.
+    # O lote NÃO vem da solicitação. Primeiro escolhemos qual linha
+    # (cliente + código + quantidade) está sendo atendida e só então
+    # mostramos os lotes físicos compatíveis com aquele código.
+    # --------------------------------------------------------------
+    itens_carga = list(solicitacao.itens_carga.all())
 
-    if empenho:
-        ids_empenhados_no_card = list(
-            empenho.itens.values_list(
-                'estoque_id',
-                flat=True
+    # Pedido pode ter sido criado antes do Produto existir em Configurações.
+    # Ao abrir o empenho, atualizamos vínculo e descrição sem alterar
+    # cliente, código ou quantidade da solicitação.
+    if solicitacao.tipo_solicitacao == 'CARGA':
+        for item in itens_carga:
+            _sincronizar_item_carga_com_produto(item)
+
+    totais_empenhados_carga = {}
+    item_carga_ativo = None
+
+    if solicitacao.tipo_solicitacao == 'CARGA':
+        totais_empenhados_carga = dict(
+            ItemEmpenho.objects
+            .filter(
+                empenho__solicitacao_id=solicitacao.id,
+                item_carga_id__isnull=False,
             )
+            .values('item_carga_id')
+            .annotate(total=Sum('quantidade'))
+            .values_list('item_carga_id', 'total')
         )
+
+        item_carga_id_param = request.GET.get('item_carga_id')
+        if item_carga_id_param:
+            try:
+                item_carga_id_param = int(item_carga_id_param)
+            except (TypeError, ValueError):
+                item_carga_id_param = None
+
+        if item_carga_id_param:
+            item_carga_ativo = next(
+                (item for item in itens_carga if item.id == item_carga_id_param),
+                None,
+            )
+
+        if item_carga_ativo is None:
+            # Abre primeiro a primeira linha que ainda possui saldo a empenhar.
+            item_carga_ativo = next(
+                (
+                    item for item in itens_carga
+                    if Decimal(str(totais_empenhados_carga.get(item.id, 0) or 0))
+                    < Decimal(str(item.quantidade_solicitada or 0))
+                ),
+                itens_carga[0] if itens_carga else None,
+            )
+
+    itens_ativos_card = ItemEmpenho.objects.filter(
+        empenho__solicitacao_id=solicitacao.id,
+        empenho__status__nome='Rascunho',
+    )
+    if solicitacao.tipo_solicitacao == 'CARGA' and item_carga_ativo:
+        itens_ativos_card = itens_ativos_card.filter(item_carga_id=item_carga_ativo.id)
+
+    ids_empenhados_no_card = list(
+        itens_ativos_card.values_list('estoque_id', flat=True)
+    )
 
     # Mostra:
     # 1. lotes que ainda têm disponibilidade;
@@ -9883,6 +10675,11 @@ def api_lotes_disponiveis_para_solicitacao(
             Q(saldo__gt=F('empenhado'))
             |
             Q(id__in=ids_empenhados_no_card)
+        )
+        # Normaliza o código gravado no estoque para evitar que espaços
+        # acidentais ou diferenças de caixa escondam um lote válido.
+        .annotate(
+            produto_normalizado=Upper(Trim('produto'))
         )
         .select_related(
             'cultivar',
@@ -9903,20 +10700,27 @@ def api_lotes_disponiveis_para_solicitacao(
             az=solicitacao.armazem.nome
         )
 
-    if solicitacao.produto:
-        qs = qs.filter(
-            produto__iexact=solicitacao.produto
-        )
+    if solicitacao.tipo_solicitacao == 'CARGA':
+        if item_carga_ativo:
+            codigo_item = _normalizar_codigo_produto(item_carga_ativo.codigo)
+            qs = qs.filter(produto_normalizado=codigo_item)
+        else:
+            qs = qs.none()
+    else:
+        if solicitacao.produto:
+            qs = qs.filter(
+                produto_normalizado=_normalizar_codigo_produto(solicitacao.produto)
+            )
 
-    if solicitacao.especie:
-        qs = qs.filter(
-            especie=solicitacao.especie
-        )
+        if solicitacao.especie:
+            qs = qs.filter(
+                especie=solicitacao.especie
+            )
 
-    if solicitacao.cliente:
-        qs = qs.filter(
-            cliente__iexact=solicitacao.cliente
-        )
+        if solicitacao.cliente:
+            qs = qs.filter(
+                cliente__iexact=solicitacao.cliente
+            )
 
     # ------------------------------------------------------------------
     # BUSCA
@@ -9927,19 +10731,32 @@ def api_lotes_disponiveis_para_solicitacao(
     ).strip()
 
     if busca:
-        qs = qs.filter(
+        filtro_busca = (
             Q(lote__icontains=busca)
-            |
-            Q(produto__icontains=busca)
-            |
-            Q(endereco__icontains=busca)
-            |
-            Q(cliente__icontains=busca)
-            |
-            Q(cultivar__nome__icontains=busca)
-            |
-            Q(az__icontains=busca)
+            | Q(produto__icontains=busca)
+            | Q(endereco__icontains=busca)
+            | Q(cliente__icontains=busca)
+            | Q(cultivar__nome__icontains=busca)
+            | Q(az__icontains=busca)
         )
+
+        # Para carga, Cliente/Descrição/Categoria/Peneira pertencem também
+        # ao item da solicitação. Traduzimos a busca nesses dados para os
+        # respectivos código/lote do estoque, mantendo o resultado coerente
+        # com o que a tabela realmente exibe.
+        if solicitacao.tipo_solicitacao == 'CARGA' and item_carga_ativo:
+            termo = busca.casefold()
+            texto_item = ' '.join([
+                str(item_carga_ativo.cliente or ''),
+                str(item_carga_ativo.codigo or ''),
+                str(item_carga_ativo.descricao or ''),
+                str(item_carga_ativo.categoria or ''),
+                str(item_carga_ativo.peneira or ''),
+            ]).casefold()
+            if termo in texto_item:
+                filtro_busca |= Q(produto_normalizado=_normalizar_codigo_produto(item_carga_ativo.codigo))
+
+        qs = qs.filter(filtro_busca)
 
     # ------------------------------------------------------------------
     # FILTROS POR COLUNA
@@ -9955,10 +10772,25 @@ def api_lotes_disponiveis_para_solicitacao(
         'especie': 'especie__nome__in',
         'tratamento': 'tratamento__nome__in',
         'embalagem': 'embalagem__in',
-        'cliente': 'cliente__in',
         'empresa': 'empresa__in',
         'conferente': 'conferente__username__in',
     }
+
+    # Em carga, a coluna Cliente representa o cliente da SOLICITAÇÃO,
+    # e não necessariamente o proprietário gravado no estoque.
+    clientes_filtro = [
+        valor.strip()
+        for valor in request.GET.getlist('cliente')
+        if valor and valor.strip()
+    ]
+    if clientes_filtro:
+        if solicitacao.tipo_solicitacao == 'CARGA':
+            clientes_normalizados = {v.casefold() for v in clientes_filtro}
+            cliente_ativo = str(item_carga_ativo.cliente or '').strip().casefold() if item_carga_ativo else ''
+            if cliente_ativo not in clientes_normalizados:
+                qs = qs.none()
+        else:
+            qs = qs.filter(cliente__in=clientes_filtro)
 
     for param, lookup in filter_map.items():
         valores = [
@@ -10048,10 +10880,10 @@ def api_lotes_disponiveis_para_solicitacao(
     # Mapa dos itens salvos no empenho atual.
     itens_empenhados_por_estoque = {}
 
-    if empenho:
+    if ids_empenhados_no_card:
         itens_empenhados_por_estoque = {
             item.estoque_id: item
-            for item in empenho.itens.all()
+            for item in itens_ativos_card.select_related('estoque')
         }
 
     lotes = []
@@ -10094,8 +10926,22 @@ def api_lotes_disponiveis_para_solicitacao(
             )
         )
 
+        item_carga_match = None
+        if (
+            solicitacao.tipo_solicitacao == 'CARGA'
+            and item_carga_ativo
+            and _normalizar_codigo_produto(item_carga_ativo.codigo)
+                == _normalizar_codigo_produto(lote.produto)
+        ):
+            item_carga_match = item_carga_ativo
+
         lotes.append({
             'id': lote.id,
+            'item_carga_id': item_carga_match.id if item_carga_match else None,
+            'cliente_solicitacao': item_carga_match.cliente if item_carga_match else '',
+            'codigo_solicitacao': item_carga_match.codigo if item_carga_match else '',
+            'descricao_configuracao': item_carga_match.descricao if item_carga_match else '',
+            'quantidade_solicitada_item': float(item_carga_match.quantidade_solicitada or 0) if item_carga_match else 0,
 
             'lote': lote.lote,
             'produto': lote.produto or '',
@@ -10157,9 +11003,14 @@ def api_lotes_disponiveis_para_solicitacao(
             'peso_total': float(
                 lote.peso_total or 0
             ),
+            'data_ultima_movimentacao': (
+                timezone.localtime(lote.data_ultima_movimentacao).strftime('%d/%m/%Y %H:%M')
+                if lote.data_ultima_movimentacao else ''
+            ),
 
             'embalagem': lote.embalagem or '',
-            'cliente': lote.cliente or '',
+            'cliente_estoque': lote.cliente or '',
+            'cliente': (item_carga_match.cliente if item_carga_match else (lote.cliente or '')),
             'empresa': lote.empresa or '',
             'az': lote.az or '',
 
@@ -10214,17 +11065,11 @@ def api_lotes_disponiveis_para_solicitacao(
     # ------------------------------------------------------------------
     itens_empenhados = []
 
-    if empenho:
-        itens_qs = (
-            empenho.itens
-            .select_related(
-                'estoque'
-            )
-            .order_by(
-                'lote',
-                'endereco_origem',
-                'id',
-            )
+    if ids_empenhados_no_card:
+        itens_qs = itens_ativos_card.select_related('estoque', 'empenho').order_by(
+            'lote',
+            'endereco_origem',
+            'id',
         )
 
         for item in itens_qs:
@@ -10232,10 +11077,13 @@ def api_lotes_disponiveis_para_solicitacao(
 
             itens_empenhados.append({
                 'id': item.id,
-                'empenho_id': empenho.id,
+                'empenho_id': item.empenho_id,
                 'solicitacao_id': solicitacao.id,
 
                 'estoque_id': item.estoque_id,
+                'item_carga_id': item.item_carga_id,
+                'cliente_solicitacao': item.cliente_solicitacao_snapshot or '',
+                'codigo_solicitacao': item.codigo_produto_snapshot or '',
                 'lote': item.lote,
 
                 'quantidade': float(
@@ -10273,6 +11121,33 @@ def api_lotes_disponiveis_para_solicitacao(
         or quantidade_movimentada > 0
     )
 
+    itens_carga_resumo = []
+    quantidade_solicitada_escopo = Decimal(str(solicitacao.quantidade_solicitada or 0))
+    quantidade_empenhada_escopo = Decimal(str(solicitacao.quantidade_empenhada or 0))
+
+    if solicitacao.tipo_solicitacao == 'CARGA':
+        for item in itens_carga:
+            qtd_item = Decimal(str(item.quantidade_solicitada or 0))
+            qtd_emp_item = Decimal(str(totais_empenhados_carga.get(item.id, 0) or 0))
+            restante_item = max(Decimal('0'), qtd_item - qtd_emp_item)
+            itens_carga_resumo.append({
+                'id': item.id,
+                'ordem': item.ordem,
+                'cliente': item.cliente,
+                'codigo': item.codigo,
+                'descricao': item.descricao,
+                'categoria': item.categoria,
+                'peneira': item.peneira,
+                'quantidade_solicitada': float(qtd_item),
+                'quantidade_empenhada': float(qtd_emp_item),
+                'quantidade_restante': float(restante_item),
+                'completo': restante_item <= 0,
+            })
+
+        if item_carga_ativo:
+            quantidade_solicitada_escopo = Decimal(str(item_carga_ativo.quantidade_solicitada or 0))
+            quantidade_empenhada_escopo = Decimal(str(totais_empenhados_carga.get(item_carga_ativo.id, 0) or 0))
+
     return JsonResponse({
         'success': True,
 
@@ -10282,10 +11157,15 @@ def api_lotes_disponiveis_para_solicitacao(
         'page': page,
         'page_size': page_size,
         'has_more': end < total,
+        'itens_carga': itens_carga_resumo,
+        'item_carga_ativo_id': item_carga_ativo.id if item_carga_ativo else None,
 
         'solicitacao': {
             'id': solicitacao.id,
             'titulo': solicitacao.titulo,
+            'tipo_solicitacao': solicitacao.tipo_solicitacao,
+            'quantidade_solicitada_escopo': float(quantidade_solicitada_escopo),
+            'quantidade_empenhada_escopo': float(quantidade_empenhada_escopo),
 
             'quantidade_solicitada': float(
                 solicitacao.quantidade_solicitada
@@ -10547,17 +11427,49 @@ def empenhar_na_solicitacao(
                     )
                 )
 
+                item_carga = None
+                if solicitacao.tipo_solicitacao == 'CARGA':
+                    try:
+                        item_carga_id = int(item_data.get('item_carga_id'))
+                    except (TypeError, ValueError):
+                        raise ValueError(
+                            f'O lote {lote.lote} não está vinculado a uma linha válida da carga.'
+                        )
+
+                    item_carga = (
+                        SolicitacaoItemCarga.objects
+                        .select_for_update(of=('self',))
+                        .filter(
+                            id=item_carga_id,
+                            solicitacao_id=solicitacao.id,
+                        )
+                        .first()
+                    )
+                    if not item_carga:
+                        raise ValueError('Item da carga não encontrado.')
+
+                    if _normalizar_codigo_produto(lote.produto) != _normalizar_codigo_produto(item_carga.codigo):
+                        raise ValueError(
+                            f'O produto do lote {lote.lote} não corresponde ao código {item_carga.codigo} da carga.'
+                        )
+
                 # Busca o item exclusivamente no empenho
                 # vinculado ao card atual.
+                filtro_item = {
+                    'empenho_id': empenho.id,
+                    'estoque_id': lote.id,
+                }
+                if item_carga:
+                    filtro_item['item_carga_id'] = item_carga.id
+                else:
+                    filtro_item['item_carga__isnull'] = True
+
                 item_existente = (
                     ItemEmpenho.objects
                     .select_for_update(
                         of=('self',)
                     )
-                    .filter(
-                        empenho_id=empenho.id,
-                        estoque_id=lote.id,
-                    )
+                    .filter(**filtro_item)
                     .first()
                 )
 
@@ -10596,6 +11508,25 @@ def empenhar_na_solicitacao(
                     quantidade_anterior
                     + quantidade_adicionar
                 )
+
+                if item_carga:
+                    outros_da_linha = (
+                        ItemEmpenho.objects
+                        .filter(
+                            empenho__solicitacao_id=solicitacao.id,
+                            item_carga_id=item_carga.id,
+                        )
+                        .exclude(pk=item_existente.pk if item_existente else None)
+                        .aggregate(total=Sum('quantidade'))['total']
+                        or 0
+                    )
+                    total_linha = Decimal(str(outros_da_linha)) + quantidade_final
+                    limite_linha = Decimal(str(item_carga.quantidade_solicitada or 0))
+                    if total_linha > limite_linha:
+                        raise ValueError(
+                            f'A linha da carga {item_carga.cliente} / {item_carga.codigo} permite no máximo '
+                            f'{limite_linha} embalagem(ns). Já ficaria com {total_linha}.'
+                        )
 
                 if (
                     quantidade_final
@@ -10660,21 +11591,30 @@ def empenhar_na_solicitacao(
                 # SALVAR ITEM NO EMPENHO DO CARD ATUAL
                 # ------------------------------------------------------
                 if item_existente:
-                    item_existente.quantidade = (
-                        quantidade_final
-                    )
-
-                    item_existente.save(
-                        update_fields=[
-                            'quantidade',
+                    item_existente.quantidade = quantidade_final
+                    campos_update = ['quantidade']
+                    if item_carga:
+                        item_existente.item_carga = item_carga
+                        item_existente.cliente_solicitacao_snapshot = item_carga.cliente
+                        item_existente.codigo_produto_snapshot = item_carga.codigo
+                        item_existente.descricao_produto_snapshot = item_carga.descricao
+                        campos_update += [
+                            'item_carga',
+                            'cliente_solicitacao_snapshot',
+                            'codigo_produto_snapshot',
+                            'descricao_produto_snapshot',
                         ]
-                    )
+                    item_existente.save(update_fields=campos_update)
 
                 else:
                     ItemEmpenho.objects.create(
                         empenho=empenho,
                         estoque=lote,
+                        item_carga=item_carga,
                         quantidade=quantidade_adicionar,
+                        cliente_solicitacao_snapshot=(item_carga.cliente if item_carga else ''),
+                        codigo_produto_snapshot=(item_carga.codigo if item_carga else ''),
+                        descricao_produto_snapshot=(item_carga.descricao if item_carga else ''),
 
                         lote=lote.lote,
 
@@ -10759,11 +11699,13 @@ def empenhar_na_solicitacao(
             # ----------------------------------------------------------
             # RECALCULAR TOTAL DO EMPENHO
             # ----------------------------------------------------------
+            itens_ativos_solicitacao = ItemEmpenho.objects.filter(
+                empenho__solicitacao_id=solicitacao.id
+            )
+
             total_unidades = (
-                empenho.itens.aggregate(
-                    total=Sum(
-                        'quantidade'
-                    )
+                itens_ativos_solicitacao.aggregate(
+                    total=Sum('quantidade')
                 )['total']
                 or Decimal('0')
             )
@@ -10774,12 +11716,7 @@ def empenhar_na_solicitacao(
             ):
                 total_kg_final = Decimal('0')
 
-                itens_finais = (
-                    empenho.itens
-                    .select_related(
-                        'estoque'
-                    )
-                )
+                itens_finais = itens_ativos_solicitacao.select_related('estoque')
 
                 for item_final in itens_finais:
                     quantidade_item = Decimal(
@@ -11004,38 +11941,17 @@ def api_remover_item_empenho(
                 solicitacao
             )
 
-            empenho = (
-                Empenho.objects
-                .select_for_update(
-                    of=('self',)
-                )
-                .filter(
-                    solicitacao_id=solicitacao.id,
-                    status__nome='Rascunho',
-                )
-                .order_by(
-                    '-data_criacao',
-                    '-id',
-                )
-                .first()
-            )
-
-            if not empenho:
-                raise ValueError(
-                    'Nenhum empenho salvo foi encontrado '
-                    'para este card.'
-                )
-
             item = (
                 ItemEmpenho.objects
-                .select_for_update(
-                    of=('self',)
-                )
+                .select_for_update(of=('self',))
+                .select_related('empenho')
                 .get(
                     id=item_id,
-                    empenho_id=empenho.id,
+                    empenho__solicitacao_id=solicitacao.id,
+                    empenho__status__nome='Rascunho',
                 )
             )
+            empenho = item.empenho
 
             quantidade_removida = Decimal(
                 str(
@@ -11081,10 +11997,9 @@ def api_remover_item_empenho(
                 total_restante = Decimal('0')
 
                 itens_restantes = (
-                    empenho.itens
-                    .select_related(
-                        'estoque'
-                    )
+                    ItemEmpenho.objects
+                    .filter(empenho__solicitacao_id=solicitacao.id)
+                    .select_related('estoque')
                 )
 
                 for item_restante in itens_restantes:
@@ -11122,11 +12037,9 @@ def api_remover_item_empenho(
 
             else:
                 total_restante = (
-                    empenho.itens.aggregate(
-                        total=Sum(
-                            'quantidade'
-                        )
-                    )['total']
+                    ItemEmpenho.objects
+                    .filter(empenho__solicitacao_id=solicitacao.id)
+                    .aggregate(total=Sum('quantidade'))['total']
                     or Decimal('0')
                 )
 
@@ -11382,6 +12295,12 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                 .get(id=solicitacao_id)
             )
 
+            # A operação permitida é definida pelo tipo do card.
+            if solicitacao.tipo_solicitacao == 'CARGA' and acao != 'expedir':
+                raise ValueError('Solicitação de carga permite somente Expedir.')
+            if solicitacao.tipo_solicitacao != 'CARGA' and acao != 'transferir':
+                raise ValueError('Solicitação comum permite somente Transferir.')
+
             # Impede movimentação em cards finalizados.
             if solicitacao.status in [
                 'CONCLUIDO',
@@ -11457,6 +12376,7 @@ def api_movimentar_solicitacao(request, solicitacao_id):
             numero_carga = ''
             cliente_expedicao = ''
             placa = ''
+            motorista_expedicao = ''
 
             if acao == 'transferir':
                 novo_endereco = str(
@@ -11518,9 +12438,25 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                     data.get('cliente') or ''
                 ).strip()
 
-                placa = str(
+                placa_informada = str(
                     data.get('placa') or ''
                 ).strip().upper()
+
+                # Se a tela de movimentação vier em branco, preserva a placa
+                # cadastrada na própria solicitação de carga.
+                placa = (
+                    placa_informada
+                    or str(getattr(solicitacao, 'placa', '') or '').strip().upper()
+                )
+
+                # Em cargas o motorista é definido na própria solicitação.
+                motorista_expedicao = str(
+                    getattr(solicitacao, 'motorista', '') or ''
+                ).strip()
+
+                if motorista_expedicao and empenho.motorista != motorista_expedicao:
+                    empenho.motorista = motorista_expedicao
+                    empenho.save(update_fields=['motorista', 'data_atualizacao'])
 
             total_movimentado_unidades = Decimal('0')
             total_movimentado_kg = Decimal('0')
@@ -11732,6 +12668,10 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                     HistoricoItemEmpenho.objects.create(
                         empenho=empenho,
                         item_empenho_id_original=item.id,
+                        item_carga_id_original=item.item_carga_id,
+                        cliente_solicitacao=item.cliente_solicitacao_snapshot or '',
+                        codigo_produto=item.codigo_produto_snapshot or '',
+                        descricao_produto=item.descricao_produto_snapshot or '',
                         estoque_origem=origem,
                         estoque_destino=destino,
 
@@ -11881,6 +12821,16 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         origem.az or ''
                     )
 
+                    # Em uma carga cada linha pode pertencer a um cliente
+                    # diferente. O cliente cadastrado no item da solicitação
+                    # prevalece sobre qualquer campo global da expedição.
+                    cliente_movimentacao_item = (
+                        item.cliente_solicitacao_snapshot
+                        or cliente_expedicao
+                        or origem.cliente
+                        or ''
+                    )
+
                     origem.saida = (
                         Decimal(
                             str(origem.saida or 0)
@@ -11902,9 +12852,14 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                             f' Carga: {numero_carga}.'
                         )
 
-                    if cliente_expedicao:
+                    if cliente_movimentacao_item:
                         descricao_movimentacao += (
-                            f' Cliente: {cliente_expedicao}.'
+                            f' Cliente: {cliente_movimentacao_item}.'
+                        )
+
+                    if motorista_expedicao:
+                        descricao_movimentacao += (
+                            f' Motorista: {motorista_expedicao}.'
                         )
 
                     if placa:
@@ -11926,16 +12881,18 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         numero_carga=(
                             numero_carga or None
                         ),
-                        cliente=(
-                            cliente_expedicao
-                            or origem.cliente
-                        ),
+                        cliente=cliente_movimentacao_item,
+                        motorista=motorista_expedicao or None,
                         placa=placa or None,
                     )
 
                     HistoricoItemEmpenho.objects.create(
                         empenho=empenho,
                         item_empenho_id_original=item.id,
+                        item_carga_id_original=item.item_carga_id,
+                        cliente_solicitacao=item.cliente_solicitacao_snapshot or '',
+                        codigo_produto=item.codigo_produto_snapshot or '',
+                        descricao_produto=item.descricao_produto_snapshot or '',
                         estoque_origem=origem,
 
                         # SNAPSHOT DO MOMENTO DO EMPENHO.
@@ -12072,9 +13029,14 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                             f' Carga: {numero_carga}.'
                         )
 
-                    if cliente_expedicao:
+                    if cliente_movimentacao_item:
                         descricao_feed += (
-                            f' Cliente: {cliente_expedicao}.'
+                            f' Cliente: {cliente_movimentacao_item}.'
+                        )
+
+                    if motorista_expedicao:
+                        descricao_feed += (
+                            f' Motorista: {motorista_expedicao}.'
                         )
 
                     if placa:
@@ -12453,6 +13415,21 @@ def api_dados_impressao_solicitacao(
             or ''
         )
 
+    produto_config_cache = {}
+
+    def produto_config_por_codigo(codigo):
+        chave = str(codigo or '').strip().upper()
+        if not chave:
+            return None
+        if chave not in produto_config_cache:
+            produto_config_cache[chave] = (
+                Produto.objects
+                .select_related('categoria', 'peneira')
+                .filter(codigo__iexact=chave)
+                .first()
+            )
+        return produto_config_cache[chave]
+
     if empenho:
         # ----------------------------------------------------
         # PENDENTES
@@ -12461,7 +13438,8 @@ def api_dados_impressao_solicitacao(
         # física, mas a exibição usa prioritariamente snapshot.
         # ----------------------------------------------------
         itens = (
-            empenho.itens
+            ItemEmpenho.objects
+            .filter(empenho__solicitacao_id=solicitacao.id)
             .select_related(
                 'estoque',
                 'estoque__cultivar',
@@ -12470,8 +13448,9 @@ def api_dados_impressao_solicitacao(
                 'estoque__especie',
                 'estoque__tratamento',
                 'estoque__conferente',
+                'item_carga',
             )
-            .order_by('id')
+            .order_by('empenho_id', 'id')
         )
 
         for item in itens:
@@ -12604,8 +13583,41 @@ def api_dados_impressao_solicitacao(
                 )
             )
 
+            codigo_impressao = (
+                (item.item_carga.codigo if item.item_carga else '')
+                or item.codigo_produto_snapshot
+                or produto_empenho
+            )
+            produto_config = produto_config_por_codigo(codigo_impressao)
+            descricao_impressao = (
+                (produto_config.descricao if produto_config else '')
+                or item.descricao_produto_snapshot
+                or (item.item_carga.descricao if item.item_carga else '')
+                or ''
+            )
+            # Categoria e peneira pertencem ao LOTE EMPENHADO.
+            # Configurações é consultada somente para a descrição.
+            categoria_impressao = (
+                item.categoria
+                or (estoque.categoria.nome if estoque and estoque.categoria else '')
+                or ''
+            )
+            peneira_impressao = (
+                item.peneira
+                or (estoque.peneira.nome if estoque and estoque.peneira else '')
+                or ''
+            )
+            cliente_impressao = (
+                item.cliente_solicitacao_snapshot
+                or (item.item_carga.cliente if item.item_carga else '')
+                or cliente_empenho
+            )
+
             itens_pendentes.append({
                 'item_id': item.id,
+                'item_carga_id': item.item_carga_id,
+                'codigo': codigo_impressao,
+                'descricao': descricao_impressao,
 
                 'lote': (
                     item.lote
@@ -12651,35 +13663,15 @@ def api_dados_impressao_solicitacao(
                     )
                 ),
 
-                'peneira': (
-                    item.peneira
-                    or (
-                        estoque.peneira.nome
-                        if (
-                            estoque
-                            and estoque.peneira
-                        )
-                        else ''
-                    )
-                ),
+                'peneira': peneira_impressao,
 
-                'categoria': (
-                    item.categoria
-                    or (
-                        estoque.categoria.nome
-                        if (
-                            estoque
-                            and estoque.categoria
-                        )
-                        else ''
-                    )
-                ),
+                'categoria': categoria_impressao,
 
                 'especie': especie_empenho,
                 'tratamento': tratamento_empenho,
                 'embalagem': embalagem_empenho,
                 'empresa': empresa_empenho,
-                'cliente': cliente_empenho,
+                'cliente': cliente_impressao,
 
                 'peso_unitario': str(
                     peso_unitario
@@ -12707,6 +13699,11 @@ def api_dados_impressao_solicitacao(
                     if item.data_criacao
                     else ''
                 ),
+                'data_ultima_movimentacao': (
+                    timezone.localtime(estoque.data_ultima_movimentacao).strftime('%d/%m/%Y %H:%M')
+                    if estoque and estoque.data_ultima_movimentacao
+                    else ''
+                ),
             })
 
         # ----------------------------------------------------
@@ -12716,7 +13713,8 @@ def api_dados_impressao_solicitacao(
         # estoque_destino para substituir o endereço original.
         # ----------------------------------------------------
         historicos = (
-            empenho.historico_itens
+            HistoricoItemEmpenho.objects
+            .filter(empenho__solicitacao_id=solicitacao.id)
             .select_related(
                 'estoque_origem',
                 'estoque_origem__conferente',
@@ -12778,8 +13776,22 @@ def api_dados_impressao_solicitacao(
                 )
             )
 
+            codigo_impressao = historico.codigo_produto or historico.produto or ''
+            produto_config = produto_config_por_codigo(codigo_impressao)
+            descricao_impressao = (
+                (produto_config.descricao if produto_config else '')
+                or historico.descricao_produto
+                or ''
+            )
+            categoria_impressao = historico.categoria or ''
+            peneira_impressao = historico.peneira or ''
+            cliente_impressao = historico.cliente_solicitacao or historico.cliente or ''
+
             itens_processados.append({
                 'item_id': historico.id,
+                'item_carga_id': historico.item_carga_id_original,
+                'codigo': codigo_impressao,
+                'descricao': descricao_impressao,
 
                 'lote': (
                     historico.lote
@@ -12817,15 +13829,9 @@ def api_dados_impressao_solicitacao(
                     or ''
                 ),
 
-                'peneira': (
-                    historico.peneira
-                    or ''
-                ),
+                'peneira': peneira_impressao,
 
-                'categoria': (
-                    historico.categoria
-                    or ''
-                ),
+                'categoria': categoria_impressao,
 
                 'especie': (
                     historico.especie
@@ -12847,10 +13853,7 @@ def api_dados_impressao_solicitacao(
                     or ''
                 ),
 
-                'cliente': (
-                    historico.cliente
-                    or ''
-                ),
+                'cliente': cliente_impressao,
 
                 'peso_unitario': str(
                     peso_unitario
@@ -12882,9 +13885,14 @@ def api_dados_impressao_solicitacao(
                 ),
 
                 'processado_em': (
-                    historico.processado_em.strftime(
+                    timezone.localtime(historico.processado_em).strftime(
                         '%d/%m/%Y %H:%M'
                     )
+                    if historico.processado_em
+                    else ''
+                ),
+                'data_ultima_movimentacao': (
+                    timezone.localtime(historico.processado_em).strftime('%d/%m/%Y %H:%M')
                     if historico.processado_em
                     else ''
                 ),
@@ -12912,6 +13920,7 @@ def api_dados_impressao_solicitacao(
 
     return JsonResponse({
         'success': True,
+        'emitido_em': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M'),
 
         'empenho_id': (
             empenho.id
@@ -12922,6 +13931,8 @@ def api_dados_impressao_solicitacao(
         'solicitacao': {
             'id': solicitacao.id,
             'titulo': solicitacao.titulo,
+            'tipo_solicitacao': solicitacao.tipo_solicitacao,
+            'tipo_solicitacao_display': solicitacao.get_tipo_solicitacao_display(),
 
             'criador': (
                 solicitacao.criador.get_full_name()
@@ -12971,6 +13982,7 @@ def api_dados_impressao_solicitacao(
             ),
 
             'status': solicitacao.status,
+            'status_display': solicitacao.get_status_display(),
 
             'destino': (
                 getattr(
@@ -12978,6 +13990,16 @@ def api_dados_impressao_solicitacao(
                     'destino',
                     ''
                 )
+                or ''
+            ),
+
+            'motorista': (
+                getattr(solicitacao, 'motorista', '')
+                or ''
+            ),
+
+            'placa': (
+                getattr(solicitacao, 'placa', '')
                 or ''
             ),
 
@@ -13142,8 +14164,24 @@ def _serializar_card(solicitacao):
     return {
         'id': solicitacao.id,
         'titulo': solicitacao.titulo,
+        'tipo_solicitacao': solicitacao.tipo_solicitacao,
+        'tipo_solicitacao_display': solicitacao.get_tipo_solicitacao_display(),
+        'itens_carga': [
+            {
+                'id': item.id,
+                'cliente': item.cliente,
+                'codigo': item.codigo,
+                'descricao': item.descricao,
+                'categoria': item.categoria,
+                'peneira': item.peneira,
+                'quantidade_solicitada': float(item.quantidade_solicitada or 0),
+            }
+            for item in solicitacao.itens_carga.all()
+        ],
         'observacao': solicitacao.observacao or '',
         'destino': solicitacao.destino or '',
+        'motorista': getattr(solicitacao, 'motorista', '') or '',
+        'placa': getattr(solicitacao, 'placa', '') or '',
         'criador_nome': _nome_usuario(solicitacao.criador),
         'responsavel_nome': _nome_usuario(solicitacao.responsavel),
         'data_criacao': _formatar_data(solicitacao.data_criacao),
@@ -13192,6 +14230,8 @@ def _serializar_card(solicitacao):
             ),
             'cliente': solicitacao.cliente or '',
             'destino': solicitacao.destino or '',
+            'motorista': getattr(solicitacao, 'motorista', '') or '',
+            'placa': getattr(solicitacao, 'placa', '') or '',
         },
         'lotes': _lotes_da_solicitacao(solicitacao),
 
@@ -13219,6 +14259,7 @@ def _queryset_kanban():
         )
         .prefetch_related(
             'tags_kanban',
+            'itens_carga',
             Prefetch(
                 'empenhos',
                 queryset=(

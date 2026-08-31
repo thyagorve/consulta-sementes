@@ -538,6 +538,54 @@
         background: linear-gradient(135deg, #fff8e8, #ffffff) !important;
     }
 
+
+/* ---------- PREVIEW DE IMPRESSÃO MOBILE ---------- */
+#mobilePrintPreview {
+    position: fixed;
+    inset: 0;
+    z-index: 2147482000;
+    display: none;
+    flex-direction: column;
+    background: #eef3ef;
+}
+
+#mobilePrintPreview.show {
+    display: flex !important;
+}
+
+#mobilePrintPreviewBar {
+    flex: 0 0 auto;
+    min-height: 48px;
+    padding:
+        calc(6px + env(safe-area-inset-top))
+        8px
+        6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: #fff;
+    background: linear-gradient(135deg,#174d2c,#2f8f4e);
+    box-shadow: 0 3px 12px rgba(0,0,0,.18);
+}
+
+#mobilePrintPreviewBar strong {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: .82rem;
+}
+
+#mobilePrintPreview iframe {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    border: 0;
+    background: #eef3ef;
+}
+
+
 </style>
 
 <div class="kanban-page-shell">
@@ -640,6 +688,31 @@
         </div>
     </div>
 </div>
+
+<!-- ==================== IMPRESSÃO MOBILE ==================== -->
+<div id="mobilePrintPreview">
+    <div id="mobilePrintPreviewBar">
+        <strong>
+            <i class="fas fa-print me-1"></i>
+            Visualização da solicitação
+        </strong>
+
+        <button
+            type="button"
+            class="btn btn-light btn-sm"
+            onclick="fecharImpressaoMobile()"
+        >
+            <i class="fas fa-times me-1"></i>
+            Fechar
+        </button>
+    </div>
+
+    <iframe
+        id="mobilePrintFrame"
+        title="Visualização da impressão"
+    ></iframe>
+</div>
+
 
 <script>
 // ===== FUNÇÕES UTILITÁRIAS =====
@@ -828,6 +901,9 @@ function criarCardHTML(card) {
             <span class="card-status-badge" style="background: ${statusColors[card.status] || '#f8f9fa'};">
                 ${card.status_display || card.status}
             </span>
+            <span class="badge ${card.tipo_solicitacao === 'CARGA' ? 'bg-danger' : 'bg-primary'} mt-1" style="font-size:.62rem;">
+                <i class="fas ${card.tipo_solicitacao === 'CARGA' ? 'fa-truck' : 'fa-right-left'} me-1"></i>${card.tipo_solicitacao_display || (card.tipo_solicitacao === 'CARGA' ? 'Carga' : 'Transferência')}
+            </span>
             <div class="card-progress">
                 <div class="card-progress-bar ${percentual >= 100 ? 'bg-success' : percentual >= 50 ? 'bg-warning' : 'bg-danger'}" 
                      style="width: ${percentual}%"></div>
@@ -845,6 +921,7 @@ function criarCardHTML(card) {
                 ${(card.tags || []).map(tag => `<span class="card-tag-premium" style="background:${tag.cor || '#2f8f4e'};color:${tag.cor_texto || '#fff'}">${tag.icone ? `<i class="${tag.icone}"></i>` : ''}${tag.nome}</span>`).join('')}
             </div>
             <div class="card-actions">
+                
                 <button class="btn btn-sm btn-outline-secondary"
                         onclick="event.stopPropagation(); abrirModalMover(${card.id}, '${card.titulo.replace(/'/g, "\\'")}')"
                         title="Mover card">
@@ -1259,10 +1336,97 @@ async function criarTagKanban() {
 
 
 // ===== IMPRESSÃO CORRIGIDA (SEM ARMazém NO TOPO, MAIS LIMPA) =====
+function fecharImpressaoMobile() {
+    const preview = document.getElementById(
+        'mobilePrintPreview'
+    );
+
+    const frame = document.getElementById(
+        'mobilePrintFrame'
+    );
+
+    if (preview) {
+        preview.classList.remove(
+            'show'
+        );
+    }
+
+    if (frame) {
+        frame.src = 'about:blank';
+    }
+
+    document.body.style.overflow = '';
+}
+
+function abrirJanelaImpressaoMobile() {
+    const preview = document.getElementById(
+        'mobilePrintPreview'
+    );
+
+    const frame = document.getElementById(
+        'mobilePrintFrame'
+    );
+
+    if (!preview || !frame) {
+        return null;
+    }
+
+    preview.classList.add(
+        'show'
+    );
+
+    document.body.style.overflow = 'hidden';
+
+    /*
+     * about:blank mantém o mesmo origin,
+     * permitindo document.write e window.print.
+     */
+    frame.src = 'about:blank';
+
+    return frame.contentWindow;
+}
+
+
+// ===== IMPRESSÃO CORRIGIDA (SEM ARMazém NO TOPO, MAIS LIMPA) =====
 function gerarImpressaoSolicitacao(id) {
-    const win = window.open('', '_blank', 'width=1350,height=900');
+    const isMobilePrint = (
+        window.matchMedia(
+            '(max-width: 900px)'
+        ).matches
+        || (
+            'ontouchstart' in window
+            && window.innerWidth <= 1100
+        )
+    );
+
+    let win = null;
+
+    /*
+     * No celular NÃO dependemos de popup.
+     * A impressão abre dentro de um preview de tela inteira.
+     */
+    if (isMobilePrint) {
+        win = abrirJanelaImpressaoMobile();
+    } else {
+        win = window.open(
+            '',
+            '_blank',
+            'width=1350,height=900'
+        );
+    }
+
+    /*
+     * Se o navegador desktop bloquear popup,
+     * usa o mesmo fallback mobile.
+     */
     if (!win) {
-        alert('Permita pop-ups para abrir a impressão.');
+        win = abrirJanelaImpressaoMobile();
+    }
+
+    if (!win) {
+        alert(
+            'Não foi possível abrir a visualização da impressão.'
+        );
         return;
     }
 
@@ -1387,14 +1551,41 @@ function gerarImpressaoSolicitacao(id) {
             const qtdEmp = sol.quantidade_empenhada_display ?? sol.quantidade_empenhada ?? 0;
             const totalItens = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
             const destino = sol.destino || '';
+            const motorista = sol.motorista || '';
+            const placa = sol.placa || '';
             const observacao = sol.observacao || '';
+            const isCarga = String(sol.tipo_solicitacao || '').toUpperCase() === 'CARGA';
             const criteriosSecundarios = [
-                sol.criterios?.produto ? `Produto: ${sol.criterios.produto}` : '',
-                sol.criterios?.especie ? `Espécie: ${sol.criterios.especie}` : '',
-                sol.criterios?.cliente ? `Cliente: ${sol.criterios.cliente}` : ''
+                sol.criterios?.armazem ? `Armazém: ${sol.criterios.armazem}` : '',
+                !isCarga && sol.criterios?.produto ? `Produto: ${sol.criterios.produto}` : '',
+                !isCarga && sol.criterios?.especie ? `Espécie: ${sol.criterios.especie}` : '',
+                !isCarga && sol.criterios?.cliente ? `Cliente: ${sol.criterios.cliente}` : ''
             ].filter(Boolean);
 
             const statusClasse = sol.status === 'CONCLUIDO' ? 'status-concluido' : sol.status === 'CANCELADO' ? 'status-cancelado' : 'status-andamento';
+            const totalPesoCarga = itens.reduce((soma, item) => soma + Number(item.peso_total || 0), 0);
+            const pesoBr = valor => Number(valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+            const tituloRelatorio = isCarga ? 'RELATÓRIO DE CARGA / EXPEDIÇÃO' : 'RELATÓRIO DE SOLICITAÇÃO';
+
+            const tabelaNormal = itens.length ? `<table>
+              <thead><tr><th class="col-num">#</th><th class="col-status">Situação</th><th class="col-lote">Lote</th><th class="col-qtd">Qtd.</th><th class="col-produto">Produto</th><th class="col-cultivar">Cultivar</th><th class="col-peneira">Peneira</th><th class="col-armazem">Armazém</th><th class="col-endereco">Endereço</th><th class="col-cliente">Cliente</th></tr></thead>
+              <tbody>${itens.map((item, idx) => {
+                const situacao = String(item.situacao || 'PENDENTE').toUpperCase();
+                const classe = situacao.includes('TRANSF') ? 'badge-transferido' : situacao.includes('EXPED') ? 'badge-expedido' : 'badge-pendente';
+                const armazemItem = item.armazem || item.az || '';
+                const endereco = item.endereco_destino || item.endereco || '';
+                return `<tr><td class="col-num">${idx+1}</td><td class="col-status"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td><td class="col-lote"><strong>${esc(item.lote || '-')}</strong></td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-produto">${esc(item.produto || '-')}</td><td class="col-cultivar">${esc(item.cultivar || '-')}</td><td class="col-peneira">${esc(item.peneira || '-')}</td><td class="col-armazem">${esc(armazemItem || '-')}</td><td class="col-endereco">${esc(endereco || '-')}</td><td class="col-cliente">${esc(item.cliente || '-')}</td></tr>`;
+              }).join('')}</tbody>
+              <tfoot><tr class="total"><td colspan="3" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td colspan="6"></td></tr></tfoot>
+            </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
+
+            const tabelaCarga = itens.length ? `<table class="tabela-carga">
+              <thead><tr><th>Cliente</th><th>Código</th><th>Lote</th><th>Descrição</th><th>Categoria</th><th>Peneira</th><th>AZ</th><th>Endereço</th><th>Qtd</th><th>Peso</th></tr></thead>
+              <tbody>${itens.map(item => `<tr><td>${esc(item.cliente || '-')}</td><td><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td>${esc(item.lote || '-')}</td><td class="desc-carga">${esc(item.descricao || '-')}</td><td>${esc(item.categoria || '-')}</td><td>${esc(item.peneira || '-')}</td><td>${esc(item.az || item.armazem || '-')}</td><td>${esc(item.endereco || '-')}</td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`).join('')}</tbody>
+              <tfoot><tr class="total"><td colspan="8" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
+            </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
+
+            const tabelaItensHtml = isCarga ? tabelaCarga : tabelaNormal;
 
             win.document.open();
             win.document.write(`<!doctype html>
@@ -1409,14 +1600,49 @@ function gerarImpressaoSolicitacao(id) {
 html, body { margin: 0; padding: 0; background: var(--fundo); color: var(--texto); font-family: Arial, Helvetica, sans-serif; }
 body { padding: 14px; }
 .folha { width: 297mm; min-height: 210mm; margin: 0 auto; padding: 8mm; background: #fff; box-shadow: 0 15px 50px rgba(0,0,0,.18); }
-.topo { display: grid; grid-template-columns: 1fr minmax(165px, 200px); overflow: hidden; border: 1px solid #256f40; border-radius: 14px 14px 0 0; page-break-inside: avoid; }
+.topo {
+    display: grid;
+    grid-template-columns: 1fr minmax(100px, 220px);
+    overflow: hidden;
+    border: 1px solid #256f40;
+    border-radius: 14px 14px 0 0;
+    page-break-inside: avoid;
+}
 .topo-principal { position: relative; min-width: 0; padding: 13px 16px; color: #fff; background: linear-gradient(135deg, #174d2c 0%, #2f8f4e 62%, #59b875 100%); }
 .topo-principal::after { content: ""; position: absolute; width: 145px; height: 145px; right: -55px; top: -80px; border-radius: 50%; background: rgba(255,255,255,.09); }
 .topo-principal h1 { margin: 0; font-size: 21px; font-weight: 900; letter-spacing: .45px; }
-.topo-principal p { max-width: 95%; margin: 5px 0 0; overflow: hidden; color: rgba(255,255,255,.88); font-size: 9px; font-weight: 700; white-space: nowrap; text-overflow: ellipsis; }
-.numero-card { display: flex; flex-direction: column; justify-content: center; padding: 10px 13px; text-align: right; border-left: 1px solid #c8dfcf; background: linear-gradient(180deg, #f3fbf6, #e9f6ed); }
+.topo-principal p {
+    max-width: 100%;
+    margin: 5px 0 0;
+    color: rgba(255,255,255,.88);
+    font-size: 9px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.numero-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 10px 13px;
+    text-align: right;
+    border-left: 1px solid #c8dfcf;
+    background: linear-gradient(180deg, #f3fbf6, #e9f6ed);
+    min-width: 200px;        /* largura mínima para caber 11 caracteres */
+    max-width: 300px;        /* evita que o card cresça exageradamente */
+}
 .numero-card small { color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .4px; text-transform: uppercase; }
-.numero-card strong { margin-top: 2px; color: var(--verde-escuro); font-size: 22px; font-weight: 900; white-space: nowrap; overflow: hidden;}
+.numero-card strong {
+    margin-top: 2px;
+    color: var(--verde-escuro);
+    font-size: 22px;
+    font-weight: 900;
+    white-space: nowrap;
+    overflow: hidden;          /* <- novo */
+    text-overflow: ellipsis;   /* <- novo */
+    max-width: 100%;           /* <- novo */
+}
 .resumo { display: grid; grid-template-columns: minmax(190px,1.25fr) repeat(3, minmax(135px,.55fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
 .indicador { position: relative; min-height: 64px; padding: 10px 11px; overflow: hidden; border-right: 1px solid var(--borda); background: #fff; }
 .indicador:last-child { border-right: 0; }
@@ -1431,7 +1657,7 @@ body { padding: 14px; }
 .indicador-empenhado::before { background: var(--amarelo); }
 .indicador-movimentado { background: linear-gradient(135deg, var(--verde-claro), #fff); }
 .indicador-movimentado::before { background: var(--verde); }
-.info-grid { display: grid; grid-template-columns: minmax(170px,1.1fr) repeat(3, minmax(145px,.62fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
+.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); border: 1px solid var(--borda); border-top: 0; page-break-inside: avoid; }
 .info { min-height: 49px; padding: 8px 10px; overflow: hidden; border-right: 1px solid var(--borda); }
 .info:last-child { border-right: 0; }
 .info b { display: block; margin-bottom: 5px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .35px; text-transform: uppercase; }
@@ -1458,6 +1684,7 @@ tr { page-break-inside: avoid; }
 .col-num { width: 27px; text-align: center; } .col-status { width: 78px; } .col-lote { width: 105px; } .col-qtd { width: 52px; text-align: center; }
 .col-produto { width: 138px; } .col-cultivar { width: 113px; } .col-peneira { width: 55px; text-align: center; } .col-armazem { width: 86px; }
 .col-endereco { width: 112px; } .col-cliente { width: 116px; }
+.tabela-carga th:nth-child(1){width:135px}.tabela-carga th:nth-child(2){width:85px}.tabela-carga th:nth-child(3){width:95px}.tabela-carga th:nth-child(4){width:190px}.tabela-carga th:nth-child(5){width:85px}.tabela-carga th:nth-child(6){width:65px}.tabela-carga th:nth-child(7){width:72px}.tabela-carga th:nth-child(8){width:105px}.tabela-carga th:nth-child(9){width:55px}.tabela-carga th:nth-child(10){width:80px}.tabela-carga .desc-carga{white-space:normal;line-height:1.2}.tabela-carga .col-peso{text-align:right;font-weight:800}
 .badge-situacao { display: inline-block; max-width: 100%; padding: 3px 6px; overflow: hidden; border-radius: 999px; font-size: 6.8px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
 .badge-pendente { color: #795900; background: #ffefad; }
 .badge-transferido { color: #176039; background: #d8f1e1; }
@@ -1469,6 +1696,128 @@ tr { page-break-inside: avoid; }
 .acoes button { margin: 3px; padding: 10px 19px; border: 0; border-radius: 9px; cursor: pointer; font-weight: 850; }
 .botao-imprimir { color: #fff; background: linear-gradient(135deg, #2f8f4e, #1d5d34); }
 .botao-fechar { color: #26372d; background: #e3ebe5; }
+
+@media screen and (max-width: 900px) {
+  html, body {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  body {
+    padding: 6px;
+    background: #edf3ef;
+  }
+
+  .folha {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 7px;
+    box-shadow: none;
+  }
+
+ .topo {
+    grid-template-columns: minmax(0,1fr) minmax(92px, auto);
+    border-radius: 10px 10px 0 0;
+}
+
+  .topo-principal {
+    padding: 10px;
+  }
+
+  .topo-principal h1 {
+    font-size: 15px;
+  }
+
+  .topo-principal p {
+    font-size: 7.5px;
+  }
+
+  .numero-card {
+    padding: 7px;
+  }
+
+  .numero-card strong {
+    font-size: 17px;
+  }
+
+  .resumo {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+  .indicador {
+    min-height: 54px;
+    border-bottom: 1px solid var(--borda);
+  }
+
+  .info-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+  .info {
+    min-height: 44px;
+    border-bottom: 1px solid var(--borda);
+  }
+
+  .linha-destino-obs {
+    grid-template-columns: 1fr;
+  }
+
+  .box-destino {
+    border-right: 0;
+    border-bottom: 1px solid var(--borda);
+  }
+
+  .criterios {
+    font-size: 8px;
+  }
+
+  .titulo-itens {
+    margin-top: 8px;
+    font-size: 9px;
+  }
+
+  /*
+   * A tabela continua completa.
+   * No celular ela desliza horizontalmente.
+   */
+  .tabela-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    width: 1050px;
+    min-width: 1050px;
+    table-layout: fixed;
+  }
+
+  .rodape {
+    flex-direction: column;
+    gap: 3px;
+    white-space: normal;
+  }
+
+  .acoes {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    margin: 8px -7px -7px;
+    padding: 7px;
+    background: rgba(255,255,255,.97);
+    box-shadow: 0 -4px 15px rgba(0,0,0,.10);
+  }
+
+  .acoes button {
+    min-height: 38px;
+    padding: 8px 15px;
+  }
+}
+
+
 @media print {
   @page { size: A4 landscape; margin: 5mm; }
   html, body { width: 297mm; background: #fff; }
@@ -1484,9 +1833,9 @@ tr { page-break-inside: avoid; }
 </head>
 <body>
 <main class="folha">
-  <header class="topo">
+ <header class="topo">
     <div class="topo-principal">
-      <h1>RELATÓRIO DE SOLICITAÇÃO</h1>
+      <h1>${esc(tituloRelatorio)}</h1>
       <p>#${esc(sol.id)}</p>
     </div>
     <div class="numero-card">
@@ -1503,6 +1852,8 @@ tr { page-break-inside: avoid; }
   </section>
 
   <section class="info-grid">
+    ${isCarga ? `<div class="info"><b>Motorista</b><span>${esc(motorista || 'Não informado')}</span></div>` : ''}
+    ${isCarga ? `<div class="info"><b>Placa</b><span>${esc(placa || 'Não informada')}</span></div>` : ''}
     <div class="info"><b>Criado por</b><span>${esc(sol.criador || '-')}</span></div>
     <div class="info"><b>Criação</b><span>${esc(sol.data_criacao || '-')}</span></div>
     <div class="info"><b>Atualização</b><span>${esc(sol.data_atualizacao || '-')}</span></div>
@@ -1524,33 +1875,12 @@ tr { page-break-inside: avoid; }
   ${criteriosSecundarios.length ? `<section class="criterios"><b>Critérios:</b> ${esc(criteriosSecundarios.join(' · '))}</section>` : ''}
 
   <div class="titulo-itens">
-    <span>Itens da solicitação</span>
-    <span>${itens.length} registro(s) · Total ${num(totalItens)} ${unidade}</span>
+    <span>${isCarga ? 'Itens da carga' : 'Itens da solicitação'}</span>
+    <span>${itens.length} registro(s) · Total ${num(totalItens)} ${unidade}${isCarga ? ` · ${pesoBr(totalPesoCarga)} kg` : ''}</span>
   </div>
 
   <div class="tabela-container">
-    ${itens.length ? `<table>
-      <thead><tr><th class="col-num">#</th><th class="col-status">Situação</th><th class="col-lote">Lote</th><th class="col-qtd">Qtd.</th><th class="col-produto">Produto</th><th class="col-cultivar">Cultivar</th><th class="col-peneira">Peneira</th><th class="col-armazem">Armazém</th><th class="col-endereco">Endereço</th><th class="col-cliente">Cliente</th></tr></thead>
-      <tbody>${itens.map((item, idx) => {
-        const situacao = String(item.situacao || 'PENDENTE').toUpperCase();
-        const classe = situacao.includes('TRANSF') ? 'badge-transferido' : situacao.includes('EXPED') ? 'badge-expedido' : 'badge-pendente';
-        const armazemItem = item.armazem || '';
-        const endereco = item.endereco_destino || item.endereco || '';
-        return `<tr>
-          <td class="col-num">${idx+1}</td>
-          <td class="col-status"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td>
-          <td class="col-lote"><strong>${esc(item.lote || '-')}</strong></td>
-          <td class="col-qtd">${num(item.quantidade)}</td>
-          <td class="col-produto">${esc(item.produto || '-')}</td>
-          <td class="col-cultivar">${esc(item.cultivar || '-')}</td>
-          <td class="col-peneira">${esc(item.peneira || '-')}</td>
-          <td class="col-armazem">${esc(armazemItem || '-')}</td>
-          <td class="col-endereco">${esc(endereco || '-')}</td>
-          <td class="col-cliente">${esc(item.cliente || '-')}</td>
-        </tr>`;
-      }).join('')}</tbody>
-      <tfoot><tr class="total"><td colspan="3" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td colspan="6"></td></tr></tfoot>
-    </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>'}
+    ${tabelaItensHtml}
   </div>
 
   <footer class="rodape">
@@ -1560,7 +1890,17 @@ tr { page-break-inside: avoid; }
 
   <div class="acoes">
     <button type="button" class="botao-imprimir" onclick="window.print()">Imprimir</button>
-    <button type="button" class="botao-fechar" onclick="window.close()">Fechar</button>
+    <button
+      type="button"
+      class="botao-fechar"
+      onclick="
+        if(window.frameElement && window.parent){
+          window.parent.fecharImpressaoMobile();
+        }else{
+          window.close();
+        }
+      "
+    >Fechar</button>
   </div>
 </main>
 </body></html>`);
