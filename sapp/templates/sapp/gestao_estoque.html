@@ -249,7 +249,7 @@
         display: flex;
         align-items: center;
         gap: 10px;
-        cursor: pointer;
+        cursor: grab;
         transition: background 0.2s;
         border-left: 3px solid transparent;
         font-size: 0.85rem;
@@ -272,33 +272,10 @@
         font-weight: 500;
         color: #2c3e50;
     }
-    .column-width-control {
-        flex-shrink: 0;
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
-        color: #5b4bc4;
-        font-size: 0.68rem;
-        font-weight: 700;
-    }
-    .column-width-input {
-        width: 58px;
-        height: 27px;
-        padding: 2px 5px;
-        border: 1px solid #d8d1ff;
-        border-radius: 8px;
-        background: #f7f5ff;
-        color: #5144ad;
-        font-size: 0.72rem;
-        font-weight: 700;
-        text-align: center;
-        outline: none;
-    }
-    .column-width-input:focus {
-        border-color: #6c5ce7;
-        box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.12);
-    }
-    .column-manager-footer {
+    .column-manager-item.dragging { opacity: .45; background: #eef2ff; }
+    .column-drag-handle { color: #6c5ce7; cursor: grab; width: 18px; text-align: center; }
+    .column-manager-item:active, .column-drag-handle:active { cursor: grabbing; }
+.column-manager-footer {
         padding: 10px 16px;
         border-top: 1px solid #dee2e6;
         background: #f8f9fa;
@@ -1691,6 +1668,7 @@ const columnDefinitions = [
 ];
 
 const COLUMN_WIDTH_STORAGE_KEY = 'tableColumnWidths';
+const COLUMN_ORDER_STORAGE_KEY = 'tableColumnOrderV2';
 const MAX_COLUMN_WIDTH = 800;
 const RESIZE_HANDLE_ZONE = 18;
 
@@ -1762,229 +1740,214 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================
 // NOVO: GERENCIADOR DE COLUNAS
 // ============================================================
+function ensureBodyColumnKeys() {
+    const table = document.getElementById('estoqueTable');
+    if (!table) return;
+    const headerKeys = [...table.querySelectorAll('thead th[data-column]')].map(th => th.dataset.column);
+    table.querySelectorAll('#tableBody tr').forEach(row => {
+        if (row.querySelector('td[colspan]')) return;
+        [...row.cells].forEach((cell, index) => {
+            if (!cell.dataset.column && headerKeys[index]) cell.dataset.column = headerKeys[index];
+        });
+    });
+}
+
+function getColumnOrder() {
+    const defaults = columnDefinitions.map(def => def.key);
+    try {
+        const saved = JSON.parse(localStorage.getItem(COLUMN_ORDER_STORAGE_KEY) || 'null');
+        if (Array.isArray(saved) && saved.length === defaults.length && saved.every(k => defaults.includes(k))) {
+            return saved;
+        }
+    } catch (e) {
+        console.warn('Ordem de colunas inválida, restaurando padrão.', e);
+    }
+    return defaults;
+}
+
+function applyColumnOrder(order) {
+    const table = document.getElementById('estoqueTable');
+    if (!table) return;
+    ensureBodyColumnKeys();
+    const head = table.querySelector('thead tr');
+    const colgroup = ensureColumnGroup();
+
+    order.forEach(key => {
+        const th = head?.querySelector(`th[data-column="${key}"]`);
+        if (th) head.appendChild(th);
+        const col = colgroup?.querySelector(`col[data-column="${key}"]`);
+        if (col) colgroup.appendChild(col);
+    });
+
+    table.querySelectorAll('#tableBody tr').forEach(row => {
+        if (row.querySelector('td[colspan]')) return;
+        order.forEach(key => {
+            const td = row.querySelector(`td[data-column="${key}"]`);
+            if (td) row.appendChild(td);
+        });
+    });
+    syncTableWidth();
+    requestAnimationFrame(refreshTruncationTitles);
+}
+
 function initColumnVisibility() {
-    // Carregar visibilidade salva no localStorage
+    ensureBodyColumnKeys();
+    applyColumnOrder(getColumnOrder());
     const savedVisibility = localStorage.getItem('tableColumnVisibility');
     if (savedVisibility) {
-        try {
-            const visibility = JSON.parse(savedVisibility);
-            applyVisibility(visibility);
-        } catch (e) {
-            console.error('Erro ao carregar visibilidade das colunas:', e);
-        }
+        try { applyVisibility(JSON.parse(savedVisibility)); }
+        catch (e) { console.error('Erro ao carregar visibilidade das colunas:', e); }
     }
-    
     buildColumnManager();
 }
 
 function buildColumnManager() {
     const list = document.getElementById('columnManagerList');
     if (!list) return;
-    
     list.innerHTML = '';
-    
-    columnDefinitions.forEach(def => {
+
+    getColumnOrder().forEach(key => {
+        const def = columnDefinitions.find(d => d.key === key);
+        if (!def) return;
         const th = document.querySelector(`th[data-column="${def.key}"]`);
         if (!th) return;
-        
         const isVisible = th.style.display !== 'none';
-        
         const item = document.createElement('div');
         item.className = 'column-manager-item';
+        item.draggable = true;
+        item.dataset.key = def.key;
         item.innerHTML = `
+            <i class="fa-solid fa-grip-vertical column-drag-handle" title="Segure e arraste para mudar a posição"></i>
             <input type="checkbox" id="col-vis-${def.key}" ${isVisible ? 'checked' : ''} ${def.alwaysVisible ? 'disabled' : ''}>
             <label for="col-vis-${def.key}">${def.label}</label>
-            <div class="column-width-control" title="Largura da coluna em pixels">
-                <input type="number" class="column-width-input" id="col-width-${def.key}"
-                       value="${getColumnWidth(def.key)}" min="${def.minWidth}" max="${MAX_COLUMN_WIDTH}" step="5"
-                       aria-label="Largura da coluna ${def.label}">
-                <span>px</span>
-            </div>
-            ${def.alwaysVisible ? '<i class="fa-solid fa-lock text-muted" style="font-size: 0.7rem;" title="Coluna obrigatória"></i>' : ''}
+            ${def.alwaysVisible ? '<i class="fa-solid fa-lock text-muted" style="font-size:.7rem" title="Coluna obrigatória"></i>' : '<small class="text-muted">arraste</small>'}
         `;
-
-        const widthInput = item.querySelector('.column-width-input');
-        widthInput.addEventListener('click', e => e.stopPropagation());
-        widthInput.addEventListener('pointerdown', e => e.stopPropagation());
-        widthInput.addEventListener('change', function() {
-            this.value = setColumnWidth(def.key, this.value, { refreshTitle: true });
-            saveColumnWidths();
-        });
-
+        item.querySelector('input')?.addEventListener('pointerdown', e => e.stopPropagation());
+        item.querySelector('label')?.addEventListener('pointerdown', e => e.stopPropagation());
         list.appendChild(item);
+    });
+    enableColumnManagerDrag();
+}
+
+function enableColumnManagerDrag() {
+    const list = document.getElementById('columnManagerList');
+    if (!list) return;
+    let dragging = null;
+    list.querySelectorAll('.column-manager-item').forEach(item => {
+        item.addEventListener('dragstart', e => {
+            dragging = item;
+            item.classList.add('dragging');
+            if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+        });
+        item.addEventListener('dragend', () => {
+            item.classList.remove('dragging');
+            dragging = null;
+        });
+        item.addEventListener('dragover', e => {
+            e.preventDefault();
+            if (!dragging || dragging === item) return;
+            const rect = item.getBoundingClientRect();
+            list.insertBefore(dragging, e.clientY < rect.top + rect.height / 2 ? item : item.nextSibling);
+        });
     });
 }
 
 function toggleColumnManager(event) {
     if (event) event.stopPropagation();
-    
     const container = document.getElementById('columnManagerContainer');
     const overlay = document.getElementById('columnManagerOverlay');
-    
     if (!container) return;
-    
+
     if (container.style.display === 'none' || !container.style.display) {
-        // Mostrar
         container.style.display = 'block';
-        
-        // Centralizar na tela
         if (window.innerWidth <= 768) {
-            // Mobile: centralizado
-            container.style.position = 'fixed';
-            container.style.top = '50%';
-            container.style.left = '50%';
-            container.style.transform = 'translate(-50%, -50%)';
+            container.style.position = 'fixed'; container.style.top = '50%'; container.style.left = '50%';
+            container.style.right = 'auto'; container.style.transform = 'translate(-50%, -50%)';
         } else {
-            // Desktop: próximo ao botão
             const btn = document.getElementById('btnColumnManager');
             if (btn) {
                 const rect = btn.getBoundingClientRect();
-                
                 container.style.position = 'fixed';
-                
-                // Verifica se cabe abaixo do botão
                 if (rect.bottom + 350 > window.innerHeight) {
-                    // Mostra acima
-                    container.style.top = `${rect.top - 10}px`;
-                    container.style.transform = 'translateY(-100%)';
+                    container.style.top = `${rect.top - 10}px`; container.style.transform = 'translateY(-100%)';
                 } else {
-                    // Mostra abaixo
-                    container.style.top = `${rect.bottom + 8}px`;
-                    container.style.transform = 'none';
+                    container.style.top = `${rect.bottom + 8}px`; container.style.transform = 'none';
                 }
-                
-                // Centraliza horizontalmente ou alinha com o botão
-                if (rect.left + 350 > window.innerWidth) {
-                    container.style.right = '10px';
-                    container.style.left = 'auto';
-                } else {
-                    container.style.left = `${rect.left}px`;
-                    container.style.right = 'auto';
-                }
+                if (rect.left + 350 > window.innerWidth) { container.style.right = '10px'; container.style.left = 'auto'; }
+                else { container.style.left = `${rect.left}px`; container.style.right = 'auto'; }
             }
         }
-        
         container.style.zIndex = '999999';
-        
-        // Mostrar overlay no mobile
-        if (overlay && window.innerWidth <= 768) {
-            overlay.classList.add('show');
-        }
-        
-        // Reconstruir lista
+        if (overlay && window.innerWidth <= 768) overlay.classList.add('show');
         buildColumnManager();
-        
         columnManagerContainer = container;
     } else {
-        // Esconder
-        container.style.display = 'none';
-        columnManagerContainer = null;
-        
-        // Esconder overlay
-        if (overlay) {
-            overlay.classList.remove('show');
-        }
+        container.style.display = 'none'; columnManagerContainer = null;
+        if (overlay) overlay.classList.remove('show');
     }
 }
 
-// Fechar gerenciador de colunas ao clicar fora ou no overlay
 document.addEventListener('click', function(e) {
     if (columnManagerContainer && columnManagerContainer.style.display !== 'none') {
         const isInside = columnManagerContainer.contains(e.target);
         const isBtn = e.target.closest('#btnColumnManager');
-        const isOverlay = e.target.closest('#columnManagerOverlay');
-        
         if (!isInside && !isBtn) {
-            columnManagerContainer.style.display = 'none';
-            columnManagerContainer = null;
-            
-            const overlay = document.getElementById('columnManagerOverlay');
-            if (overlay) overlay.classList.remove('show');
+            columnManagerContainer.style.display = 'none'; columnManagerContainer = null;
+            document.getElementById('columnManagerOverlay')?.classList.remove('show');
         }
     }
 });
 
-// Fechar ao redimensionar a tela
 window.addEventListener('resize', function() {
-    if (columnManagerContainer && columnManagerContainer.style.display !== 'none') {
-        // Recalcula posição
-        if (window.innerWidth <= 768) {
-            columnManagerContainer.style.position = 'fixed';
-            columnManagerContainer.style.top = '50%';
-            columnManagerContainer.style.left = '50%';
-            columnManagerContainer.style.transform = 'translate(-50%, -50%)';
-        }
+    if (columnManagerContainer && columnManagerContainer.style.display !== 'none' && window.innerWidth <= 768) {
+        columnManagerContainer.style.position = 'fixed'; columnManagerContainer.style.top = '50%';
+        columnManagerContainer.style.left = '50%'; columnManagerContainer.style.transform = 'translate(-50%, -50%)';
     }
-    syncTableWidth();
-    requestAnimationFrame(refreshTruncationTitles);
+    syncTableWidth(); requestAnimationFrame(refreshTruncationTitles);
 });
 
 function applyColumnVisibility() {
     const visibility = {};
-    
     columnDefinitions.forEach(def => {
         const checkbox = document.getElementById(`col-vis-${def.key}`);
-        if (checkbox) {
-            visibility[def.key] = checkbox.checked;
-        }
+        visibility[def.key] = def.alwaysVisible ? true : (checkbox ? checkbox.checked : true);
     });
-    
-    // Salvar no localStorage
+    const order = [...document.querySelectorAll('#columnManagerList .column-manager-item')].map(el => el.dataset.key);
+    if (order.length === columnDefinitions.length) {
+        localStorage.setItem(COLUMN_ORDER_STORAGE_KEY, JSON.stringify(order));
+        applyColumnOrder(order);
+    }
     localStorage.setItem('tableColumnVisibility', JSON.stringify(visibility));
-    
-    // Aplicar
     applyVisibility(visibility);
-    
-    // Fechar o gerenciador
     const container = document.getElementById('columnManagerContainer');
     if (container) container.style.display = 'none';
+    document.getElementById('columnManagerOverlay')?.classList.remove('show');
     columnManagerContainer = null;
 }
 
 function applyVisibility(visibility) {
-    columnDefinitions.forEach((def, index) => {
+    ensureBodyColumnKeys();
+    columnDefinitions.forEach(def => {
         const isVisible = def.alwaysVisible || (visibility[def.key] !== undefined ? visibility[def.key] : true);
-        
-        // Cabeçalho
         const th = document.querySelector(`th[data-column="${def.key}"]`);
-        if (th) {
-            th.style.display = isVisible ? '' : 'none';
-        }
-
-        // Elemento que controla a largura real da coluna inteira
+        if (th) th.style.display = isVisible ? '' : 'none';
         const col = document.querySelector(`#estoqueTable col[data-column="${def.key}"]`);
-        if (col) {
-            col.style.display = isVisible ? '' : 'none';
-        }
-        
-        // Células do corpo
-        const rows = document.querySelectorAll('#tableBody tr');
-        rows.forEach(row => {
-            if (row.querySelector('td[colspan]')) return;
-            const cell = row.cells[index];
-            if (cell) {
-                cell.style.display = isVisible ? '' : 'none';
-            }
-        });
+        if (col) col.style.display = isVisible ? '' : 'none';
+        document.querySelectorAll(`#tableBody td[data-column="${def.key}"]`).forEach(td => td.style.display = isVisible ? '' : 'none');
     });
-
-    syncTableWidth();
-    requestAnimationFrame(refreshTruncationTitles);
+    syncTableWidth(); requestAnimationFrame(refreshTruncationTitles);
 }
 
 function resetColumns() {
-    // Restaurar visibilidade e largura padrão de todas as colunas
     const visibility = {};
-    columnDefinitions.forEach(def => {
-        visibility[def.key] = true;
-    });
-    
+    columnDefinitions.forEach(def => visibility[def.key] = true);
     localStorage.setItem('tableColumnVisibility', JSON.stringify(visibility));
+    localStorage.removeItem(COLUMN_ORDER_STORAGE_KEY);
+    applyColumnOrder(columnDefinitions.map(def => def.key));
     applyVisibility(visibility);
     resetColumnWidths();
     buildColumnManager();
-    
-    mostrarNotificacao('✅ Colunas e larguras restauradas', 'success');
+    mostrarNotificacao('✅ Colunas, ordem e larguras restauradas', 'success');
 }
 
 // NOVO: Alternar paginação
@@ -2205,11 +2168,14 @@ window.showFilter = function(thElement, columnName, columnType) {
         container.style.transform = 'none';
     }
 
-    buscarOpcoesFiltro(columnName).then(({opcoes, temNull}) => {
-        container.innerHTML = columnType === 'number'
-            ? createNumericFilterHTML(columnName)
-            : createSelectFilterHTML(columnName, opcoes, temNull);
+    if (columnType === 'number') {
+        container.innerHTML = createNumericFilterHTML(columnName);
+        container.addEventListener('click', e => e.stopPropagation());
+        return;
+    }
 
+    buscarOpcoesFiltro(columnName).then(({opcoes, temNull}) => {
+        container.innerHTML = createSelectFilterHTML(columnName, opcoes, temNull);
         container.addEventListener('click', e => e.stopPropagation());
     }).catch(error => {
         console.error('Erro ao carregar filtro:', error);
@@ -2271,8 +2237,20 @@ async function buscarOpcoesFiltro(columnName) {
                 }).filter(o => o.value !== '')
                 : [];
 
+            let opcoesFinais = opcoes;
+            // Segurança adicional: se a API não trouxer opções por algum filtro
+            // encadeado, usa a lista inicial renderizada pelo backend para não
+            // deixar o menu de Cliente/Status/etc. vazio sem explicação.
+            if (!opcoesFinais.length && Array.isArray(backendOptions[columnName])) {
+                opcoesFinais = backendOptions[columnName].map(o => {
+                    if (typeof o === 'object' && o !== null) {
+                        return { value: String(o.value ?? o.id ?? o.nome ?? ''), label: String(o.label ?? o.nome ?? o.value ?? '') };
+                    }
+                    return { value: String(o), label: String(o) };
+                }).filter(o => o.value !== '');
+            }
             return {
-                opcoes: opcoes,
+                opcoes: opcoesFinais,
                 temNull: data.tem_null === true || data.temNull === true
             };
         }
@@ -2332,6 +2310,15 @@ function createNumericFilterHTML(col) {
     `;
 }
 
+function escapeHtmlFilter(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function createSelectFilterHTML(columnName, options, temNull) {
     const selectedValues = currentUrlParams.getAll(columnName);
     const hasNullSelected = selectedValues.includes('__null__');
@@ -2359,8 +2346,8 @@ function createSelectFilterHTML(columnName, options, temNull) {
             
             optionsHtml += `
                 <div class="filter-option">
-                    <input type="checkbox" class="filter-checkbox" id="${uniqueId}" value="${safeValue}" ${isChecked}>
-                    <label for="${uniqueId}" class="text-truncate" title="${opt.label}">${opt.label}</label>
+                    <input type="checkbox" class="filter-checkbox" id="${uniqueId}" value="${escapeHtmlFilter(safeValue)}" ${isChecked}>
+                    <label for="${uniqueId}" class="text-truncate" title="${escapeHtmlFilter(opt.label)}">${escapeHtmlFilter(opt.label)}</label>
                 </div>
             `;
         });
@@ -2993,9 +2980,6 @@ function setColumnWidth(columnKey, width, options = {}) {
         th.style.minWidth = size;
         th.style.maxWidth = size;
     }
-
-    const widthIndicator = document.getElementById(`col-width-${columnKey}`);
-    if (widthIndicator) widthIndicator.value = normalizedWidth;
 
     if (sync) syncTableWidth();
     if (refreshTitle) requestAnimationFrame(refreshTruncationTitles);

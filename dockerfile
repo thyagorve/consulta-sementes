@@ -5,6 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV TZ=America/Sao_Paulo
+ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
@@ -14,7 +16,12 @@ RUN apt-get update \
         gcc \
         libpq-dev \
         cron \
+        tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# Fuso horário do sistema operacional/cron/logs
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone
 
 # Copiar apenas requirements primeiro (melhor cache)
 COPY requirements.txt .

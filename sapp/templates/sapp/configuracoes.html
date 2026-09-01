@@ -681,11 +681,11 @@
 </div>
             <div class="row g-4">
                 <div class="col-lg-4">
-                    <form method="POST" class="pro-form-grid">
+                    <form method="POST" class="pro-form-grid" id="formProdutoConfig">
                         <h5 class="col-full fw-800 m-0"><i class="fas fa-plus-circle text-primary me-2"></i>Novo Produto</h5>
-                        {% if not cadastro_produto_liberado %}<div class="alert alert-warning col-full py-2 small"><i class="fas fa-triangle-exclamation me-1"></i>Cadastre primeiro Cultivares, Peneiras, Espécies, Categorias e Tratamentos. Depois o cadastro de produtos será liberado.</div>{% endif %}
+                        {% if not cadastro_produto_liberado %}<div class="alert alert-warning col-full py-2 small"><i class="fas fa-triangle-exclamation me-1"></i>Cadastre primeiro pelo menos um Cultivar. Os demais parâmetros são opcionais.</div>{% endif %}
                         {% csrf_token %}
-                        <input type="hidden" name="acao" value="add_produto">
+                        <input type="hidden" name="acao" id="produtoAcao" value="add_produto"><input type="hidden" name="tipo_item" value="produto"><input type="hidden" name="id_item" id="produtoEditId" value=""><input type="hidden" name="active_tab" value="produto">
                         <input type="hidden" name="ativo" value="on">
 
                         <div class="form-group col-full">
@@ -743,7 +743,7 @@
                     <div class="table-responsive-custom shadow-sm">
                         <table class="table-pro">
                             <thead>
-                                <tr><th>Código</th><th>Cultivar / Descrição</th><th>Espécie / Peneira</th><th>Tratamento</th><th class="text-center" width="50">Ação</th></tr></thead>
+                                <tr><th>Código</th><th>Cultivar / Descrição</th><th>Espécie / Peneira</th><th>Tratamento</th><th class="text-center" width="90">Ações</th></tr></thead>
                             <tbody>
                                 {% for p in produtos %}
                                 <tr>
@@ -752,7 +752,13 @@
                                     <td><small>{{ p.especie.nome|default:"-" }} / {{ p.peneira.nome|default:"-" }}</small></td>
                                     <td>{% if p.tratamento %}<span class="badge-treatment"><i class="fas fa-flask me-1"></i>{{ p.tratamento.nome|truncatechars:12 }}</span>{% else %}<span class="text-muted">---</span>{% endif %}</td>
                                     <td class="text-center">
-                                        <form method="POST" onsubmit="return confirm('Deseja excluir este produto?')">
+                                        <button type="button" class="btn-outline-sm me-1" title="Editar" onclick="editarProdutoConfig(this)"
+                                            data-id="{{ p.id }}" data-codigo="{{ p.codigo|escapejs }}" data-cultivar="{{ p.cultivar_id }}"
+                                            data-descricao="{{ p.descricao|default:''|escapejs }}" data-tipo="{{ p.tipo|default:''|escapejs }}"
+                                            data-empresa="{{ p.empresa|default:''|escapejs }}" data-peneira="{{ p.peneira_id|default:'' }}"
+                                            data-especie="{{ p.especie_id|default:'' }}" data-categoria="{{ p.categoria_id|default:'' }}"
+                                            data-tratamento="{{ p.tratamento_id|default:'' }}" data-ativo="{% if p.ativo %}1{% else %}0{% endif %}"><i class="fas fa-pen"></i></button>
+                                        <form method="POST" class="d-inline" onsubmit="return confirm('Deseja excluir este produto?')">
                                             {% csrf_token %}
                                             <input type="hidden" name="acao" value="delete_produto">
                                             <input type="hidden" name="id_item" value="{{ p.id }}">
@@ -787,9 +793,9 @@
                 <div class="col-md-5">
                     <div class="pro-form-grid">
                         <h6 class="col-full fw-800 text-primary mb-1"><i class="fas fa-plus-circle me-2"></i>Novo Armazém</h6>
-                        <form method="POST" class="col-full">
+                        <form method="POST" class="col-full" id="formArmazemConfig">
                             {% csrf_token %}
-                            <input type="hidden" name="acao" value="add_armazem">
+                            <input type="hidden" name="acao" id="armazemAcao" value="add_armazem"><input type="hidden" name="tipo_item" value="armazem"><input type="hidden" name="id_item" id="armazemEditId" value=""><input type="hidden" name="active_tab" value="armazem">
                             <div class="mb-3"><label>Nome do Armazém *</label><input type="text" name="nome" class="form-control-pro" required placeholder="Ex: AZ-01, ARMAZEM 1"></div>
                             <button type="submit" class="btn-main mt-2"><i class="fas fa-save"></i>SALVAR ARMAZÉM</button>
                         </form>
@@ -800,7 +806,7 @@
                     <div class="items-list-container">
                         {% for az in armazens %}
                         <div class="others-item"><div class="item-info"><span class="item-name"><i class="fas fa-building me-2 text-primary"></i>{{ az.nome }}</span></div>
-                            <form method="POST" onsubmit="return confirm('Excluir este armazém?')">{% csrf_token %}<input type="hidden" name="acao" value="delete_item"><input type="hidden" name="tipo_item" value="armazem"><input type="hidden" name="id_item" value="{{ az.id }}"><button type="submit" class="btn-del"><i class="fas fa-trash-alt"></i></button></form>
+                            <button type="button" class="btn-outline-sm me-1" onclick="editarArmazemConfig({{ az.id }}, '{{ az.nome|escapejs }}')" title="Editar"><i class="fas fa-pen"></i></button><form method="POST" class="d-inline" onsubmit="return confirm('Excluir este armazém?')">{% csrf_token %}<input type="hidden" name="acao" value="delete_item"><input type="hidden" name="tipo_item" value="armazem"><input type="hidden" name="id_item" value="{{ az.id }}"><button type="submit" class="btn-del"><i class="fas fa-trash-alt"></i></button></form>
                         </div>
                         {% empty %}<div class="empty-state"><i class="fas fa-warehouse"></i><p>Nenhum armazém cadastrado</p></div>{% endfor %}
                     </div>
@@ -826,11 +832,11 @@
                 <div class="col-md-5">
                     <div class="pro-form-grid">
                         <h6 class="col-full fw-800 text-primary mb-1"><i class="fas fa-plus-circle me-2"></i>Cadastrar Endereço</h6>
-                        <form method="POST" class="col-full">
+                        <form method="POST" class="col-full" id="formEnderecoConfig">
                             {% csrf_token %}
-                            <input type="hidden" name="acao" value="add_endereco">
-                            <div class="mb-3"><label>Endereço *</label><input type="text" name="endereco_codigo" class="form-control-pro" placeholder="Ex: R-A, R-A LN10, CORREDOR A" required><small class="text-muted">Digite o endereço no formato que preferir</small></div>
-                            <div class="mb-3"><label>Armazém *</label><select name="armazem_id" class="form-control-pro-select" required><option value="">Selecione o armazém...</option>{% for az in armazens %}<option value="{{ az.id }}">{{ az.nome }}</option>{% endfor %}</select></div>
+                            <input type="hidden" name="acao" id="enderecoAcao" value="add_endereco"><input type="hidden" name="tipo_item" value="endereco"><input type="hidden" name="id_item" id="enderecoEditId" value=""><input type="hidden" name="active_tab" value="endereco">
+                            <div class="mb-3"><label>Endereço *</label><input type="text" name="endereco_codigo" id="enderecoCodigoConfig" class="form-control-pro" placeholder="Ex: R-A, R-A LN10, CORREDOR A" required><small class="text-muted">Digite o endereço no formato que preferir</small></div>
+                            <div class="mb-3"><label>Armazém *</label><select name="armazem_id" id="enderecoArmazemConfig" class="form-control-pro-select" required><option value="">Selecione o armazém...</option>{% for az in armazens %}<option value="{{ az.id }}">{{ az.nome }}</option>{% endfor %}</select></div>
                             <button type="submit" class="btn-main mt-2"><i class="fas fa-save"></i>SALVAR ENDEREÇO</button>
                         </form>
                     </div>
@@ -842,7 +848,7 @@
                         {% for end in enderecos %}
                         <div class="others-item" data-endereco="{{ end.codigo|lower }} {{ end.armazem.nome|lower }}">
                             <div class="item-info"><span class="item-name"><i class="fas fa-map-pin text-primary me-2"></i><strong>{{ end.codigo }}</strong></span><span class="badge-info"><i class="fas fa-warehouse me-1"></i>{{ end.armazem.nome }}</span></div>
-                            <form method="POST" onsubmit="return confirm('Excluir este endereço?')">{% csrf_token %}<input type="hidden" name="acao" value="delete_item"><input type="hidden" name="tipo_item" value="endereco"><input type="hidden" name="id_item" value="{{ end.id }}"><button type="submit" class="btn-del"><i class="fas fa-trash-alt"></i></button></form>
+                            <button type="button" class="btn-outline-sm me-1" onclick="editarEnderecoConfig({{ end.id }}, '{{ end.codigo|escapejs }}', {{ end.armazem_id|default:'null' }})" title="Editar"><i class="fas fa-pen"></i></button><form method="POST" class="d-inline" onsubmit="return confirm('Excluir este endereço?')">{% csrf_token %}<input type="hidden" name="acao" value="delete_item"><input type="hidden" name="tipo_item" value="endereco"><input type="hidden" name="id_item" value="{{ end.id }}"><button type="submit" class="btn-del"><i class="fas fa-trash-alt"></i></button></form>
                         </div>
                         {% empty %}<div class="empty-state"><i class="fas fa-map-marker-alt"></i><p>Nenhum endereço cadastrado</p></div>{% endfor %}
                     </div>
@@ -856,16 +862,17 @@
             <div class="row g-4">
                 <div class="col-md-5">
                     <div class="pro-form-grid">
-                        <h6 class="col-full fw-800 text-primary mb-1"><i class="fas fa-user-plus me-2"></i>Nova Conta de Acesso</h6>
+                        <h6 class="col-full fw-800 text-primary mb-1" id="userFormTitle"><i class="fas fa-user-plus me-2"></i>Nova Conta de Acesso</h6>
                         {% if user.is_superuser or perms.sapp.pode_gerenciar_usuarios %}
                         <form method="POST" class="col-full" id="form-create-user">
                             {% csrf_token %}
-                            <input type="hidden" name="acao" value="create_conferente_user">
+                            <input type="hidden" name="acao" id="userConfigAcao" value="create_conferente_user">
+                            <input type="hidden" name="user_id" id="userConfigId" value="">
                             <input type="hidden" name="active_tab" value="conferente">
                             <div class="mb-3"><label>Nome de Usuário (Login) *</label><input type="text" name="username" class="form-control-pro" placeholder="Ex: joao.silva" minlength="3" required autocomplete="off"><small class="text-muted">Mínimo 3 caracteres, apenas letras e números</small></div>
                             <div class="mb-3"><label>Nome Completo *</label><input type="text" name="first_name" class="form-control-pro" placeholder="Ex: João Silva" required></div>
                             <div class="mb-3"><label>Senha</label><input type="text" name="password" class="form-control-pro" placeholder="Deixe em branco para usar 'conceito123'"><small class="text-muted">Mínimo 6 caracteres</small></div>
-                            <div class="mb-3"><label>Grupo de Acesso *</label><select name="group" class="form-control-pro-select" required id="groupSelect"><option value="">Selecione...</option><option value="conferente">Conferente (Acesso básico)</option><option value="almoxarife">Almoxarife (Estoque + Almoxarifado)</option><option value="operador">Operador (Consulta apenas)</option>{% if user.is_superuser %}<option value="admin">Administrador (Acesso total)</option>{% endif %}</select></div>
+                            <div class="mb-3" id="userGroupWrapper"><label>Grupo de Acesso *</label><select name="group" class="form-control-pro-select" required id="groupSelect"><option value="">Selecione...</option><option value="conferente">Conferente (Acesso básico)</option><option value="almoxarife">Almoxarife (Estoque + Almoxarifado)</option><option value="operador">Operador (Consulta apenas)</option>{% if user.is_superuser %}<option value="admin">Administrador (Acesso total)</option>{% endif %}</select></div>
                             
                             <div class="mb-3" id="permissions-container" style="display: none;">
                                 <label class="fw-bold mb-2">Permissões Específicas</label>
@@ -916,7 +923,7 @@
                                 </div>
                                 <small class="text-muted mt-2 d-block"><i class="fas fa-info-circle"></i> As permissões serão somadas ao grupo selecionado</small>
                             </div>
-                            <button type="submit" class="btn-main mt-2"><i class="fas fa-save"></i> CRIAR USUÁRIO</button>
+                            <div class="d-flex gap-2 mt-2"><button type="submit" class="btn-main flex-grow-1" id="userConfigSubmit"><i class="fas fa-save"></i> CRIAR USUÁRIO</button><button type="button" class="btn-outline-sm d-none" id="userConfigCancel" onclick="resetUserConfigForm()"><i class="fas fa-times"></i> Cancelar</button></div>
                         </form>
                         {% else %}<div class="alert alert-warning"><i class="fas fa-lock me-2"></i> Você não tem permissão para criar novos usuários.</div>{% endif %}
                     </div>
@@ -928,7 +935,7 @@
                         <div class="others-item" data-username="{{ user_obj.username|lower }} {{ user_obj.first_name|lower }}">
                             <div class="item-info flex-grow-1"><div><span class="item-name"><i class="fas fa-user-circle text-primary me-2"></i><strong>{{ user_obj.username }}</strong></span><div class="small text-muted mt-1"><i class="fas fa-user me-1"></i>{{ user_obj.first_name }}{% if user_obj.groups.all %}<span class="badge-info ms-2"><i class="fas fa-tag me-1"></i>{{ user_obj.groups.all|join:", " }}</span>{% endif %}</div>{% if user_obj.is_superuser %}<span class="badge bg-danger text-white mt-1 d-inline-block"><i class="fas fa-crown me-1"></i>Superusuário</span>{% endif %}</div></div>
                             <div class="d-flex gap-2">
-                                {% if user.is_superuser or perms.sapp.pode_gerenciar_usuarios %}<button class="btn-outline-sm" onclick="editUserPermissions({{ user_obj.id }}, '{{ user_obj.username }}')" title="Editar permissões"><i class="fas fa-lock-open"></i></button>{% endif %}
+                                {% if user.is_superuser or perms.sapp.pode_gerenciar_usuarios %}<button type="button" class="btn-outline-sm" onclick="editarUsuarioConfig({{ user_obj.id }}, '{{ user_obj.username|escapejs }}', '{{ user_obj.first_name|escapejs }}')" title="Editar usuário"><i class="fas fa-pen"></i></button><button class="btn-outline-sm" onclick="editUserPermissions({{ user_obj.id }}, '{{ user_obj.username }}')" title="Editar permissões"><i class="fas fa-lock-open"></i></button>{% endif %}
                                 {% if user.is_superuser or perms.sapp.pode_gerenciar_usuarios %}<form method="POST" onsubmit="return confirm('Resetar senha para {{ user_obj.first_name }}? A nova senha será: conceito123')" class="d-inline">{% csrf_token %}<input type="hidden" name="acao" value="reset_password"><input type="hidden" name="user_id" value="{{ user_obj.id }}"><input type="hidden" name="active_tab" value="conferente"><button type="submit" class="btn-outline-sm" title="Resetar senha"><i class="fas fa-key"></i></button></form>{% endif %}
                                 {% if user.is_superuser or perms.sapp.pode_gerenciar_usuarios %}<form method="POST" onsubmit="return confirm('Remover o acesso de {{ user_obj.first_name }}? Os dados e históricos cadastrados por esse usuário serão preservados.')">{% csrf_token %}<input type="hidden" name="acao" value="delete_user"><input type="hidden" name="user_id" value="{{ user_obj.id }}"><input type="hidden" name="active_tab" value="conferente"><button type="submit" class="btn-del"><i class="fas fa-trash-alt"></i></button></form>{% endif %}
                             </div>
@@ -958,7 +965,7 @@
                         <h6 class="col-full fw-800 text-primary mb-1" id="other-title">Cadastrar Item</h6>
                         <form method="POST" class="col-full" id="form-others">
                             {% csrf_token %}
-                            <input type="hidden" name="acao" id="o-acao"><input type="hidden" name="tipo_item" id="o-tipo"><input type="hidden" name="active_tab" id="o-active-tab">
+                            <input type="hidden" name="acao" id="o-acao"><input type="hidden" name="tipo_item" id="o-tipo"><input type="hidden" name="id_item" id="o-edit-id" value=""><input type="hidden" name="active_tab" id="o-active-tab">
                             <div class="mb-3" id="group-nome"><label id="o-label">Nome Oficial</label><input type="text" name="nome" id="o-input-nome" class="form-control-pro" required></div>
                             <button type="submit" class="btn-main mt-2"><i class="fas fa-plus"></i> ADICIONAR</button>
                         </form>
@@ -988,7 +995,109 @@
     </div>
 </div>
 
+<form method="POST" id="formEdicaoUsuarioConfig" style="display:none;">{% csrf_token %}<input type="hidden" name="acao" value="edit_user_basic"><input type="hidden" name="user_id" id="editUserId"><input type="hidden" name="username" id="editUserUsername"><input type="hidden" name="first_name" id="editUserNome"><input type="hidden" name="active_tab" value="conferente"></form>
+
+<form method="POST" id="formEdicaoRapidaConfig" style="display:none;">{% csrf_token %}
+<input type="hidden" name="acao" value="edit_item"><input type="hidden" name="tipo_item" id="editCfgTipo"><input type="hidden" name="id_item" id="editCfgId"><input type="hidden" name="nome" id="editCfgNome"><input type="hidden" name="codigo" id="editCfgCodigo"><input type="hidden" name="armazem_id" id="editCfgArmazem"><input type="hidden" name="active_tab" id="editCfgTab">
+</form>
+
 <script>
+    function normalizarCampoCadastro(v){ return String(v||'').trim().replace(/\s+/g,' ').toUpperCase(); }
+    function resetUserConfigForm(){
+        const f=document.getElementById('form-create-user'); if(!f)return;
+        f.reset();
+        document.getElementById('userConfigAcao').value='create_conferente_user';
+        document.getElementById('userConfigId').value='';
+        const titulo=document.getElementById('userFormTitle');
+        if(titulo) titulo.innerHTML='<i class="fas fa-user-plus me-2"></i>Nova Conta de Acesso';
+        const btn=document.getElementById('userConfigSubmit');
+        if(btn) btn.innerHTML='<i class="fas fa-save"></i> CRIAR USUÁRIO';
+        const senha=f.querySelector('[name="password"]');
+        if(senha) senha.placeholder="Deixe em branco para usar 'conceito123'";
+        document.getElementById('userConfigCancel')?.classList.add('d-none');
+        const groupWrap=document.getElementById('userGroupWrapper');
+        const group=document.getElementById('groupSelect');
+        if(groupWrap) groupWrap.style.display='';
+        if(group) group.required=true;
+        const perms=document.getElementById('permissions-container');
+        if(perms) perms.style.display='none';
+    }
+    function editarUsuarioConfig(id,loginAtual,nomeAtual){
+        const f=document.getElementById('form-create-user'); if(!f)return;
+        document.getElementById('userConfigAcao').value='edit_user_basic';
+        document.getElementById('userConfigId').value=id;
+        f.querySelector('[name="username"]').value=String(loginAtual||'').trim().toLowerCase();
+        f.querySelector('[name="first_name"]').value=normalizarCampoCadastro(nomeAtual||'');
+        f.querySelector('[name="password"]').value='';
+        f.querySelector('[name="password"]').placeholder='Deixe em branco para manter a senha atual';
+        const titulo=document.getElementById('userFormTitle');
+        if(titulo) titulo.innerHTML='<i class="fas fa-user-pen me-2"></i>Editar Conta de Acesso';
+        const btn=document.getElementById('userConfigSubmit');
+        if(btn) btn.innerHTML='<i class="fas fa-save"></i> SALVAR ALTERAÇÕES';
+        document.getElementById('userConfigCancel')?.classList.remove('d-none');
+        const groupWrap=document.getElementById('userGroupWrapper');
+        const group=document.getElementById('groupSelect');
+        if(groupWrap) groupWrap.style.display='none';
+        if(group) group.required=false;
+        const perms=document.getElementById('permissions-container');
+        if(perms) perms.style.display='none';
+        f.scrollIntoView({behavior:'smooth',block:'center'});
+        f.querySelector('[name="username"]')?.focus();
+    }
+    function editarArmazemConfig(id,nomeAtual){
+        const f=document.getElementById('formArmazemConfig'); if(!f)return;
+        document.getElementById('armazemAcao').value='edit_item';
+        document.getElementById('armazemEditId').value=id;
+        const input=f.querySelector('[name="nome"]');
+        if(input) input.value=normalizarCampoCadastro(nomeAtual||'');
+        const titulo=f.closest('.pro-form-grid')?.querySelector('h6');
+        if(titulo) titulo.innerHTML='<i class="fas fa-pen me-2"></i>Editar Armazém';
+        const btn=f.querySelector('button[type="submit"]');
+        if(btn) btn.innerHTML='<i class="fas fa-save"></i>SALVAR ALTERAÇÕES';
+        f.scrollIntoView({behavior:'smooth',block:'center'});
+        input?.focus();
+    }
+    function editarSimplesConfig(tipo,id,nomeAtual){
+        // Cultivar, Peneira, Espécie, Categoria, Tratamento e Origem
+        // são editados no mesmo formulário lateral usado para cadastro.
+        goTab(tipo);
+        const f=document.getElementById('form-others'); if(!f)return;
+        document.getElementById('o-acao').value='edit_item';
+        document.getElementById('o-tipo').value=tipo;
+        document.getElementById('o-edit-id').value=id;
+        document.getElementById('o-active-tab').value=tipo;
+        const input=document.getElementById('o-input-nome');
+        if(input) input.value=normalizarCampoCadastro(nomeAtual||'');
+        const data=auxData[tipo];
+        const titulo=document.getElementById('other-title');
+        if(titulo) titulo.innerHTML=`<i class="fas fa-pen me-2"></i>Editar ${data?.title||'Registro'}`;
+        const btn=f.querySelector('button[type="submit"]');
+        if(btn) btn.innerHTML='<i class="fas fa-save"></i> SALVAR ALTERAÇÕES';
+        f.scrollIntoView({behavior:'smooth',block:'center'});
+        input?.focus();
+    }
+    function editarEnderecoConfig(id,codigoAtual,armazemAtual){
+        const f=document.getElementById('formEnderecoConfig'); if(!f)return;
+        document.getElementById('enderecoAcao').value='edit_item';
+        document.getElementById('enderecoEditId').value=id;
+        document.getElementById('enderecoCodigoConfig').value=normalizarCampoCadastro(codigoAtual||'');
+        document.getElementById('enderecoArmazemConfig').value=String(armazemAtual||'');
+        const titulo=f.closest('.pro-form-grid')?.querySelector('h6'); if(titulo) titulo.innerHTML='<i class="fas fa-pen me-2"></i>Editar Endereço';
+        const btn=f.querySelector('button[type="submit"]'); if(btn) btn.innerHTML='<i class="fas fa-save"></i>SALVAR ALTERAÇÕES';
+        f.scrollIntoView({behavior:'smooth',block:'center'}); document.getElementById('enderecoCodigoConfig')?.focus();
+    }
+    function editarProdutoConfig(btn){
+        const f=document.getElementById('formProdutoConfig'); if(!f)return;
+        document.getElementById('produtoAcao').value='edit_item'; document.getElementById('produtoEditId').value=btn.dataset.id;
+        f.querySelector('[name="codigo"]').value=btn.dataset.codigo||''; f.querySelector('[name="cultivar"]').value=btn.dataset.cultivar||'';
+        f.querySelector('[name="descricao"]').value=btn.dataset.descricao||''; f.querySelector('[name="tipo"]').value=btn.dataset.tipo||'';
+        f.querySelector('[name="empresa"]').value=btn.dataset.empresa||''; f.querySelector('[name="peneira"]').value=btn.dataset.peneira||'';
+        f.querySelector('[name="especie"]').value=btn.dataset.especie||''; f.querySelector('[name="categoria"]').value=btn.dataset.categoria||'';
+        f.querySelector('[name="tratamento"]').value=btn.dataset.tratamento||'';
+        f.scrollIntoView({behavior:'smooth',block:'start'}); f.querySelector('[name="codigo"]').focus();
+    }
+    document.addEventListener('blur',e=>{ if(e.target.matches('.form-control-pro:not([type=password])')) e.target.value=normalizarCampoCadastro(e.target.value); }, true);
+
     const auxData = {
         'origem': { title: 'Origens / Destinos', label: 'Nome (Ex: Produção)', acao: 'add_origem', list: [{% for i in origens %}{id: {{i.id}}, n: "{{i.nome|escapejs}}"},{% endfor %}] },
         'cultivar': { title: 'Cultivares', label: 'Nome da Cultivar', acao: 'add_cultivar', list: [{% for i in cultivares %}{id: {{i.id}}, n: "{{i.nome|escapejs}}"},{% endfor %}] },
@@ -1021,13 +1130,21 @@
                 if(massTab) massTab.value = k;
                 if(massDownload) massDownload.href = modeloImportacaoConfigUrl.replace('TIPO_PLACEHOLDER', encodeURIComponent(k));
                 if(massHint) massHint.textContent = `Baixe o modelo de ${data.title}, preencha e importe nesta mesma aba.`;
-                if(formOthers) { formOthers.querySelector('#o-acao').value = data.acao; formOthers.querySelector('#o-tipo').value = k; formOthers.querySelector('#o-active-tab').value = k; }
+                if(formOthers) {
+                    formOthers.querySelector('#o-acao').value = data.acao;
+                    formOthers.querySelector('#o-tipo').value = k;
+                    formOthers.querySelector('#o-active-tab').value = k;
+                    formOthers.querySelector('#o-edit-id').value = '';
+                    formOthers.querySelector('#o-input-nome').value = '';
+                    const btn = formOthers.querySelector('button[type="submit"]');
+                    if(btn) btn.innerHTML = '<i class="fas fa-plus"></i> ADICIONAR';
+                }
                 document.getElementById('other-title').innerHTML = `<i class="fas fa-plus-circle me-2"></i>${data.title}`;
                 document.getElementById('o-label').innerText = data.label || 'Nome do Registro';
                 document.getElementById('list-label').innerHTML = `<i class="fas fa-list me-1"></i> ${data.title} (${data.list.length})`;
                 let h = "";
                 if(data.list.length === 0) { h = '<div class="empty-state"><i class="fas fa-database"></i><p>Nenhum registro encontrado</p></div>'; }
-                else { data.list.forEach(i => { h += `<div class="others-item"><div class="item-info"><span class="item-name">${i.n}</span></div><form method="POST" onsubmit="return confirm('Excluir este item?')">{% csrf_token %}<input type="hidden" name="acao" value="delete_item"><input type="hidden" name="tipo_item" value="${k}"><input type="hidden" name="id_item" value="${i.id}"><input type="hidden" name="active_tab" value="${k}"><button type="submit" class="btn-del"><i class="fas fa-trash-alt"></i></button></form></div>`; }); }
+                else { data.list.forEach(i => { h += `<div class="others-item"><div class="item-info"><span class="item-name">${i.n}</span></div><div><button type="button" class="btn-outline-sm me-1" onclick="editarSimplesConfig('${k}',${i.id},decodeURIComponent('${encodeURIComponent(i.n)}'))" title="Editar"><i class="fas fa-pen"></i></button><form method="POST" class="d-inline" onsubmit="return confirm('Excluir este item?')">{% csrf_token %}<input type="hidden" name="acao" value="delete_item"><input type="hidden" name="tipo_item" value="${k}"><input type="hidden" name="id_item" value="${i.id}"><input type="hidden" name="active_tab" value="${k}"><button type="submit" class="btn-del"><i class="fas fa-trash-alt"></i></button></form></div></div>`; }); }
                 document.getElementById('list-target').innerHTML = h;
             }
         }

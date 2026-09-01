@@ -71,10 +71,11 @@ from django.contrib.auth.models import User, Group, Permission
 from django.contrib.auth.hashers import make_password
 from django.http import JsonResponse
 from django.db import transaction
+from django.db.models.deletion import ProtectedError
 from django.urls import reverse  # Também pode importar assim
 from .models import (
     Produto, Cultivar, Peneira, Especie, Categoria, Tratamento, 
-    Armazem, Endereco, OrigemDestino, Configuracao
+    Armazem, Endereco, OrigemDestino, Configuracao, normalizar_texto_cadastro
 )
 from .forms import ConfiguracaoForm, NovoConferenteUserForm
 
@@ -391,7 +392,7 @@ def dashboard_data(request):
         movimentacoes = []
         for mov in mov_qs.order_by('-data_hora')[:10]:
             movimentacoes.append({
-                'dt': mov.data_hora.strftime('%d/%m/%Y %H:%M') if mov.data_hora else '--',
+                'dt': timezone.localtime(mov.data_hora).strftime('%d/%m/%Y %H:%M') if mov.data_hora else '--',
                 'tp': mov.tipo or '--',
                 'lt': mov.lote_ref or (mov.estoque.lote if mov.estoque else '--'),
                 'unidade': mov.estoque.embalagem if mov.estoque else '--',
@@ -467,7 +468,8 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         'embalagem': 'embalagem__in',
         'cliente': 'cliente__in',
         'empresa': 'empresa__in',
-        'conferente': 'conferente__username__in'
+        'conferente': 'conferente__username__in',
+        'observacao': 'observacao__in'
     }
 
     for param, lookup in filter_map.items():
@@ -492,9 +494,10 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
             qs = qs.filter(Q(**{f"{param}__isnull": True}) | Q(**{f"{param}": ''}))
 
     # Filtros numéricos
-    for field in ['saldo', 'peso_unitario', 'peso_total']:
-        min_val = request.GET.get(f'min_{field}')
-        max_val = request.GET.get(f'max_{field}')
+    for field in ['saldo', 'empenhado', 'disponivel_filtro', 'peso_unitario', 'peso_total']:
+        param_field = 'disponivel' if field == 'disponivel_filtro' else field
+        min_val = request.GET.get(f'min_{param_field}')
+        max_val = request.GET.get(f'max_{param_field}')
         if min_val:
             qs = qs.filter(**{f'{field}__gte': min_val})
         if max_val:
@@ -616,6 +619,22 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     return render(request, template_name, context)
 
 
+def _aplicar_filtro_valores(qs, lookup_in, valores):
+    """Aplica multisseleção sem diferenciar maiúsculas/minúsculas e aceita vazio."""
+    valores = [str(v) for v in (valores or []) if str(v).strip()]
+    if not valores:
+        return qs
+    campo = lookup_in[:-4] if lookup_in.endswith('__in') else lookup_in
+    tem_vazio = '__null__' in valores
+    especificos = [v for v in valores if v != '__null__']
+    cond = Q()
+    for valor in especificos:
+        cond |= Q(**{f'{campo}__iexact': str(valor).strip()})
+    if tem_vazio:
+        cond |= Q(**{f'{campo}__isnull': True}) | Q(**{campo: ''})
+    return qs.filter(cond)
+
+
 @login_required
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
@@ -624,42 +643,57 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     """
     
     # QuerySet Base - APENAS LOTES COM SALDO > 0 - NUNCA mostrar saldo zero
-    qs = Estoque.objects.filter(saldo__gt=0).select_related(
-        'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente'
+    qs = Estoque.objects.filter(saldo__gt=0).annotate(
+        disponivel_filtro=F('saldo') - F('empenhado')
+    ).select_related(
+        'cultivar', 'peneira', 'categoria', 'tratamento', 'especie', 'conferente', 'status_sistemico'
     ).order_by('-data_ultima_movimentacao', '-id')
     
     # NÃO existe qs_metrics separado - tudo deve usar o mesmo filtro
     
     # FILTRO POR STATUS SISTÊMICO
+    # Aceita ID, nome e também a opção especial de status vazio.
     status_filter = request.GET.getlist('status_sistemico')
 
     if status_filter:
         status_ids = []
+        incluir_vazio = '__null__' in status_filter
 
         for status_value in status_filter:
+            if status_value == '__null__':
+                continue
             try:
                 if str(status_value).isdigit():
                     status_ids.append(int(status_value))
                 else:
-                    status_obj = StatusSistemico.objects.get(nome=status_value)
-                    status_ids.append(status_obj.id)
-            except (StatusSistemico.DoesNotExist, ValueError):
+                    status_obj = StatusSistemico.objects.filter(
+                        nome__iexact=str(status_value).strip()
+                    ).first()
+                    if status_obj:
+                        status_ids.append(status_obj.id)
+            except (TypeError, ValueError):
                 pass
 
-        if status_ids:
-            qs = qs.filter(status_sistemico__in=status_ids)
+        if status_ids or incluir_vazio:
+            cond_status = Q()
+            if status_ids:
+                cond_status |= Q(status_sistemico_id__in=status_ids)
+            if incluir_vazio:
+                cond_status |= Q(status_sistemico__isnull=True)
+            qs = qs.filter(cond_status)
     
     # Busca Global
     busca = request.GET.get('busca', '').strip()
     if busca:
         for termo in busca.split():
             qs = qs.filter(
-                Q(lote__icontains=termo) | 
-                Q(produto__icontains=termo) |
-                Q(cultivar__nome__icontains=termo) | 
-                Q(especie__nome__icontains=termo) |
-                Q(endereco__icontains=termo) | 
-                Q(cliente__icontains=termo)
+                Q(lote__icontains=termo) | Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) | Q(peneira__nome__icontains=termo) |
+                Q(categoria__nome__icontains=termo) | Q(especie__nome__icontains=termo) |
+                Q(tratamento__nome__icontains=termo) | Q(endereco__icontains=termo) |
+                Q(az__icontains=termo) | Q(cliente__icontains=termo) |
+                Q(empresa__icontains=termo) | Q(conferente__username__icontains=termo) |
+                Q(observacao__icontains=termo)
             )
 
     # Aplicar filtros sequenciais
@@ -676,39 +710,33 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
         'embalagem': 'embalagem__in',
         'cliente': 'cliente__in',
         'empresa': 'empresa__in',
-        'conferente': 'conferente__username__in'
+        'conferente': 'conferente__username__in',
+        'observacao': 'observacao__in'
     }
 
     for param, lookup in filter_map.items():
-        values = request.GET.getlist(param)
-        values = [v for v in values if v and v.strip()]
-        
-        if values:
-            if '__null__' in values:
-                specific_values = [v for v in values if v != '__null__']
-                if specific_values:
-                    qs = qs.filter(
-                        Q(**{lookup: specific_values}) | 
-                        Q(**{lookup.replace('__in', '__isnull'): True})
-                    )
-                else:
-                    qs = qs.filter(**{lookup.replace('__in', '__isnull'): True})
-            else:
-                qs = qs.filter(**{lookup: values})
+        qs = _aplicar_filtro_valores(qs, lookup, request.GET.getlist(param))
 
-    # Filtros numéricos
-    for field in ['saldo', 'peso_unitario', 'peso_total']:
-        min_val = request.GET.get(f'min_{field}')
-        max_val = request.GET.get(f'max_{field}')
+    # Filtros numéricos de todas as colunas quantitativas.
+    numeric_fields = {
+        'saldo': 'saldo',
+        'empenhado': 'empenhado',
+        'disponivel': 'disponivel_filtro',
+        'peso_unitario': 'peso_unitario',
+        'peso_total': 'peso_total',
+    }
+    for param, field in numeric_fields.items():
+        min_val = request.GET.get(f'min_{param}')
+        max_val = request.GET.get(f'max_{param}')
         if min_val:
             try:
-                qs = qs.filter(**{f'{field}__gte': float(min_val)})
-            except ValueError:
+                qs = qs.filter(**{f'{field}__gte': Decimal(str(min_val).replace(',', '.'))})
+            except (ValueError, InvalidOperation):
                 pass
         if max_val:
             try:
-                qs = qs.filter(**{f'{field}__lte': float(max_val)})
-            except ValueError:
+                qs = qs.filter(**{f'{field}__lte': Decimal(str(max_val).replace(',', '.'))})
+            except (ValueError, InvalidOperation):
                 pass
 
     # MÉTRICAS - usando o mesmo queryset filtrado
@@ -763,7 +791,8 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
         'embalagem': get_options_list('embalagem'),
         'cliente': get_options_list('cliente'),
         'empresa': get_options_list('empresa'),
-        'conferente': get_options_list('conferente__username')
+        'conferente': get_options_list('conferente__username'),
+        'observacao': get_options_list('observacao')
     }
 
     # Paginação
@@ -1004,12 +1033,14 @@ def opcoes_filtro_api(request):
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def registrar_saida(request, id):
     print("🔍 [REGISTRAR SAÍDA] Iniciando processamento da expedição")
-    
-    item = get_object_or_404(Estoque, id=id)
-    
+
     if request.method == 'POST':
         try:
             with transaction.atomic():
+                # Bloqueia o registro de estoque até o fim da transação.
+                # Isso impede duas requisições simultâneas de lerem o mesmo saldo.
+                item = Estoque.objects.select_for_update(of=('self',)).get(id=id)
+
                 # 1. Captura de Dados
                 qtd = int(request.POST.get('quantidade_saida', 0))
                 carga = request.POST.get('numero_carga', '')
@@ -1018,6 +1049,21 @@ def registrar_saida(request, id):
                 cliente = request.POST.get('cliente', '')
                 obs = request.POST.get('observacao', '')
                 fotos = request.FILES.getlist('fotos')
+                operation_token = ''.join(
+                    ch for ch in str(request.POST.get('operation_token') or '').strip()
+                    if ch.isalnum() or ch in '-_:.'
+                )[:160]
+
+                # Idempotência: cada abertura do modal envia um token. Se o mesmo
+                # formulário chegar novamente por duplo clique/reenvio, a segunda
+                # requisição não movimenta o estoque outra vez.
+                if operation_token and HistoricoMovimentacao.objects.filter(
+                    estoque=item,
+                    tipo='Expedição',
+                    descricao__contains=f'data-operation-token="{operation_token}"',
+                ).exists():
+                    messages.warning(request, '⚠️ Esta expedição já foi processada. O envio duplicado foi ignorado.')
+                    return redirect('sapp:lista_estoque')
 
                 print(f"📦 Dados recebidos:")
                 print(f"   Quantidade: {qtd}")
@@ -1077,7 +1123,7 @@ def registrar_saida(request, id):
                     item.peso_total = item.peso_total.quantize(Decimal('0.01'))
                 
                 # Atualizar observação
-                obs_historico = f"[EXPEDIÇÃO {timezone.now().strftime('%d/%m/%Y %H:%M')}] Carga: {carga}, Motorista: {motorista}"
+                obs_historico = f"[EXPEDIÇÃO {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}] Carga: {carga}, Motorista: {motorista}"
                 if obs:
                     obs_historico += f" | Obs: {obs}"
                 
@@ -1090,7 +1136,12 @@ def registrar_saida(request, id):
                 print(f"✅ Item atualizado: {item.lote} | Saldo anterior: {saldo_anterior} → Novo saldo: {item.saldo}")
 
                 # 5. Descrição Rica em HTML para o Histórico
+                token_html = (
+                    f'<span class="d-none" data-operation-token="{operation_token}"></span>'
+                    if operation_token else ''
+                )
                 desc_html = f"""
+                    {token_html}
                     <div class="d-flex flex-column gap-1">
                         <div class="d-flex justify-content-between border-bottom pb-1">
                             <span><strong>Qtd Expedida:</strong> <span class="text-danger">-{qtd}</span></span>
@@ -1101,7 +1152,7 @@ def registrar_saida(request, id):
                             <i class="fas fa-id-card"></i> <strong>Motorista:</strong> {motorista}<br>
                             <i class="fas fa-building"></i> <strong>Cliente:</strong> {cliente or 'N/A'}<br>
                             <i class="fas fa-user"></i> <strong>Responsável:</strong> {request.user.get_full_name() or request.user.username}<br>
-                            <i class="fas fa-clock"></i> <strong>Data/Hora:</strong> {timezone.now().strftime('%d/%m/%Y %H:%M')}
+                            <i class="fas fa-clock"></i> <strong>Data/Hora:</strong> {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}
                         </div>
                         {f'<div class="mt-1 p-1 bg-light rounded small"><strong>Obs:</strong> {obs}</div>' if obs else ''}
                     </div>
@@ -1130,9 +1181,8 @@ def registrar_saida(request, id):
                     try:
                         # CORREÇÃO AQUI: Use o objeto 'historico' diretamente
                         FotoMovimentacao.objects.create(
-                            historico=historico,  # Usando o objeto já salvo
+                            historico=historico,
                             arquivo=foto,
-                            legenda=f"Expedição {carga} - {item.lote} - {timezone.now().strftime('%d/%m/%Y')}"
                         )
                         fotos_salvas += 1
                         print(f"📸 Foto salva: {foto.name} (ID: {historico.id})")
@@ -1154,6 +1204,8 @@ def registrar_saida(request, id):
                 fotos_salvas_query = FotoMovimentacao.objects.filter(historico=historico).count()
                 print(f"🔍 DEBUG - Fotos no banco para histórico {historico.id}: {fotos_salvas_query}")
 
+        except Estoque.DoesNotExist:
+            messages.error(request, '❌ Lote não encontrado.')
         except Exception as e:
             import traceback
             print(f"💥 ERRO CRÍTICO NA EXPEDIÇÃO:")
@@ -1276,14 +1328,28 @@ def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
 @login_required
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def transferir(request, id):
-    origem = get_object_or_404(Estoque, id=id)
-    
     if request.method == 'POST':
         try:
             with transaction.atomic():
+                origem = Estoque.objects.select_for_update(of=('self',)).get(id=id)
                 qtd = int(request.POST.get('quantidade', 0))
                 tipo_transferencia = request.POST.get('tipo_transferencia', 'normal')
                 novo_end = request.POST.get('novo_endereco', '').strip().upper()
+                operation_token = ''.join(
+                    ch for ch in str(request.POST.get('operation_token') or '').strip()
+                    if ch.isalnum() or ch in '-_:.'
+                )[:160]
+                token_marker = (
+                    f'<!-- data-operation-token="{operation_token}" -->'
+                    if operation_token else ''
+                )
+
+                if operation_token and HistoricoMovimentacao.objects.filter(
+                    estoque=origem,
+                    descricao__contains=f'data-operation-token="{operation_token}"',
+                ).exists():
+                    messages.warning(request, '⚠️ Esta movimentação já foi processada. O envio duplicado foi ignorado.')
+                    return redirect('sapp:lista_estoque')
                 
                 # === VALIDAÇÕES BÁSICAS (COMUNS A AMBOS OS TIPOS) ===
                 if qtd <= 0:
@@ -1331,7 +1397,7 @@ def transferir(request, id):
                     # ============================================
                     
                     # Criar histórico de beneficiamento (NÃO cria destino)
-                    descricao_beneficiamento = f"Enviado para beneficiamento – Quantidade: {qtd} {origem.embalagem}"
+                    descricao_beneficiamento = f"{token_marker} Enviado para beneficiamento – Quantidade: {qtd} {origem.embalagem}"
                     if novo_end:
                         descricao_beneficiamento += f" | Destino referência: {novo_end}"
                     
@@ -1453,9 +1519,9 @@ def transferir(request, id):
                         nova_obs = request.POST.get('observacao', '')
                         if nova_obs:
                             if obs_atual:
-                                destino_existente.observacao = f"{obs_atual}\n[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
+                                destino_existente.observacao = f"{obs_atual}\n[TRANSFERÊNCIA {timezone.localtime(timezone.now()).strftime('%d/%m %H:%M')}]: {nova_obs}"
                             else:
-                                destino_existente.observacao = f"[TRANSFERÊNCIA {timezone.now().strftime('%d/%m %H:%M')}]: {nova_obs}"
+                                destino_existente.observacao = f"[TRANSFERÊNCIA {timezone.localtime(timezone.now()).strftime('%d/%m %H:%M')}]: {nova_obs}"
                         
                         destino_existente.save()
                         
@@ -1543,7 +1609,7 @@ def transferir(request, id):
                         estoque=origem,
                         usuario=request.user,
                         tipo='Transferência (Saída)',
-                        descricao=f"Transferido para {novo_end} ({destino.lote}) - Quantidade: {qtd} {origem.embalagem} | {mensagem_tipo}"
+                        descricao=f"{token_marker} Transferido para {novo_end} ({destino.lote}) - Quantidade: {qtd} {origem.embalagem} | {mensagem_tipo}"
                     )
                     
                     # Histórico (Entrada no destino)
@@ -1575,6 +1641,8 @@ def transferir(request, id):
                         f"✅ Transferência concluída! {qtd} unidades {mensagem_tipo} em {novo_end}."
                     )
                 
+        except Estoque.DoesNotExist:
+            messages.error(request, '❌ Lote não encontrado.')
         except Exception as e:
             import traceback
             print(f"❌ ERRO NA TRANSFERÊNCIA: {e}")
@@ -1617,15 +1685,62 @@ def detalhes_estoque_api(request, id):
     except Estoque.DoesNotExist:
         return JsonResponse({'error': 'Item não encontrado'}, status=404)
 
+def _resolver_produto_para_lote(codigo, cultivar, tratamento):
+    """Resolve o Produto para um lote. Código informado tem prioridade.
+
+    Sem código, a combinação Cultivar + Tratamento só é usada quando identifica
+    exatamente um Produto ativo. Em caso de ambiguidade o usuário precisa informar
+    o código, evitando associação silenciosa ao produto errado.
+    """
+    codigo = _normalizar_codigo_produto(codigo)
+    if codigo:
+        produto = Produto.objects.filter(codigo__iexact=codigo, ativo=True).first()
+        return produto, codigo
+
+    qs = Produto.objects.filter(cultivar=cultivar, ativo=True)
+    if tratamento is None:
+        qs = qs.filter(tratamento__isnull=True)
+    else:
+        qs = qs.filter(tratamento=tratamento)
+
+    encontrados = list(qs.order_by('id')[:2])
+    if len(encontrados) == 1:
+        return encontrados[0], _normalizar_codigo_produto(encontrados[0].codigo)
+    if len(encontrados) > 1:
+        raise ValueError(
+            f'Existe mais de um produto ativo para {cultivar} / '
+            f'{tratamento or "SEM TRATAMENTO"}. Informe o código para identificar corretamente.'
+        )
+    return None, ''
+
+
+def _aplicar_produto_ao_lote_por_codigo(item, produto):
+    """Quando o código é conhecido, completa os parâmetros cadastrados sem apagar dados opcionais."""
+    if not produto:
+        return item
+    item.produto = _normalizar_codigo_produto(produto.codigo)
+    item.cultivar = produto.cultivar or item.cultivar
+    if produto.tratamento_id is not None:
+        item.tratamento = produto.tratamento
+    if produto.peneira_id is not None:
+        item.peneira = produto.peneira
+    if produto.categoria_id is not None:
+        item.categoria = produto.categoria
+    if produto.especie_id is not None:
+        item.especie = produto.especie
+    if produto.empresa:
+        item.empresa = produto.empresa
+    return item
+
 @login_required
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def nova_entrada(request):
     if request.method == 'POST':
         try:
             with transaction.atomic():
-                lote = request.POST.get('lote', '').strip()
-                endereco = request.POST.get('endereco', '').strip().upper()
-                produto = request.POST.get('produto', '').strip()
+                lote = normalizar_texto_cadastro(request.POST.get('lote', ''))
+                endereco = normalizar_texto_cadastro(request.POST.get('endereco', ''))
+                produto = _normalizar_codigo_produto(request.POST.get('produto', ''))
                 qtd = int(request.POST.get('entrada', 0))
                 
                 # 🔥 NOVO: Capturar o checkbox
@@ -1656,6 +1771,12 @@ def nova_entrada(request):
                 trat_id = request.POST.get('tratamento')
                 tratamento = Tratamento.objects.filter(id=trat_id).first() if trat_id else None
 
+                produto_obj, produto_resolvido = _resolver_produto_para_lote(
+                    produto, cultivar, tratamento
+                )
+                if produto_resolvido:
+                    produto = produto_resolvido
+
                 # Buscar item existente
                 item = Estoque.objects.filter(
                     lote=lote, 
@@ -1668,7 +1789,7 @@ def nova_entrada(request):
                 if item:
                     # Soma ao existente
                     item.entrada += qtd
-                    item.observacao += f"\n[+ENTRADA {qtd} em {timezone.now().strftime('%d/%m')}]"
+                    item.observacao += f"\n[+ENTRADA {qtd} em {timezone.localtime(timezone.now()).strftime('%d/%m')}]"
                     item.especie = especie_obj
                     
                     # 🔥 IMPORTANTE: Se for marcar como último lote
@@ -1703,10 +1824,10 @@ def nova_entrada(request):
                         especie=especie_obj,
                         conferente=request.user,
                         produto=produto,
-                        cliente=request.POST.get('cliente', ''),
-                        empresa=request.POST.get('empresa', ''),
-                        az=request.POST.get('az', ''),
-                        origem_destino=request.POST.get('origem_destino', ''),
+                        cliente=normalizar_texto_cadastro(request.POST.get('cliente', '')),
+                        empresa=normalizar_texto_cadastro(request.POST.get('empresa', '')),
+                        az=normalizar_texto_cadastro(request.POST.get('az', '')),
+                        origem_destino=normalizar_texto_cadastro(request.POST.get('origem_destino', '')),
                         peso_unitario=novo_peso,
                         embalagem=request.POST.get('embalagem', 'BAG'),
                         observacao=request.POST.get('observacao', ''),
@@ -1729,6 +1850,7 @@ def nova_entrada(request):
                     msg = "criado com sucesso"
                     print(f"🆕 Novo lote criado: {lote}")
                 
+                _aplicar_produto_ao_lote_por_codigo(item, produto_obj)
                 item.save()
                 
                 # Calcular peso total
@@ -1741,8 +1863,9 @@ def nova_entrada(request):
                 status_ultimo = " e marcado como ÚLTIMO DA LINHA" if ultimo_lote_linha else ""
                 descricao_historico = f"Entrada de {qtd} unidades. ({msg}{status_ultimo}) | Produto: {produto} | Peso: {novo_peso} kg"
                 hist = HistoricoMovimentacao.objects.create(
-                    estoque=item, 
-                    usuario=request.user, 
+                    estoque=item,
+                    usuario=request.user,
+                    quantidade=qtd,
                     tipo='Entrada',
                     descricao=descricao_historico
                 )
@@ -1812,9 +1935,9 @@ def nova_saida(request):
             # Atualizar observação
             if observacao:
                 if item.observacao:
-                    item.observacao += f"\n\n[EXPEDIÇÃO GERAL {timezone.now().strftime('%d/%m/%Y %H:%M')}]: {observacao}"
+                    item.observacao += f"\n\n[EXPEDIÇÃO GERAL {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}]: {observacao}"
                 else:
-                    item.observacao = f"[EXPEDIÇÃO GERAL {timezone.now().strftime('%d/%m/%Y %H:%M')}]: {observacao}"
+                    item.observacao = f"[EXPEDIÇÃO GERAL {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}]: {observacao}"
             
             item.save()
             
@@ -1900,7 +2023,7 @@ def api_estoque_estatisticas(request):
     """API para atualizar os cards de estatísticas com base nos filtros atuais"""
     
     # Query base - apenas saldo > 0
-    qs = Estoque.objects.filter(saldo__gt=0)
+    qs = Estoque.objects.filter(saldo__gt=0).annotate(disponivel_filtro=F('saldo') - F('empenhado'))
     
     # Aplicar os mesmos filtros da view principal
     # Status sistêmico
@@ -1921,9 +2044,11 @@ def api_estoque_estatisticas(request):
             qs = qs.filter(
                 Q(lote__icontains=termo) | 
                 Q(produto__icontains=termo) |
-                Q(cultivar__nome__icontains=termo) | 
-                Q(endereco__icontains=termo) | 
-                Q(cliente__icontains=termo)
+                Q(cultivar__nome__icontains=termo) | Q(peneira__nome__icontains=termo) |
+                Q(categoria__nome__icontains=termo) | Q(especie__nome__icontains=termo) |
+                Q(tratamento__nome__icontains=termo) | Q(endereco__icontains=termo) |
+                Q(az__icontains=termo) | Q(cliente__icontains=termo) | Q(empresa__icontains=termo) |
+                Q(conferente__username__icontains=termo) | Q(observacao__icontains=termo)
             )
     
     # Filtros de seleção
@@ -1940,39 +2065,26 @@ def api_estoque_estatisticas(request):
         'embalagem': 'embalagem__in',
         'cliente': 'cliente__in',
         'empresa': 'empresa__in',
-        'conferente': 'conferente__username__in'
+        'conferente': 'conferente__username__in',
+        'observacao': 'observacao__in'
     }
 
     for param, lookup in filter_map.items():
-        values = request.GET.getlist(param)
-        values = [v for v in values if v and v.strip()]
-        if values:
-            if '__null__' in values:
-                specific_values = [v for v in values if v != '__null__']
-                if specific_values:
-                    qs = qs.filter(
-                        Q(**{lookup: specific_values}) | 
-                        Q(**{lookup.replace('__in', '__isnull'): True})
-                    )
-                else:
-                    qs = qs.filter(**{lookup.replace('__in', '__isnull'): True})
-            else:
-                qs = qs.filter(**{lookup: values})
-    
-    # Filtros numéricos
-    for field in ['saldo', 'peso_unitario', 'peso_total']:
-        min_val = request.GET.get(f'min_{field}')
-        max_val = request.GET.get(f'max_{field}')
+        qs = _aplicar_filtro_valores(qs, lookup, request.GET.getlist(param))
+
+    numeric_fields = {
+        'saldo': 'saldo', 'empenhado': 'empenhado', 'disponivel': 'disponivel_filtro',
+        'peso_unitario': 'peso_unitario', 'peso_total': 'peso_total',
+    }
+    for param, field in numeric_fields.items():
+        min_val = request.GET.get(f'min_{param}')
+        max_val = request.GET.get(f'max_{param}')
         if min_val:
-            try:
-                qs = qs.filter(**{f'{field}__gte': float(min_val)})
-            except ValueError:
-                pass
+            try: qs = qs.filter(**{f'{field}__gte': Decimal(str(min_val).replace(',', '.'))})
+            except (ValueError, InvalidOperation): pass
         if max_val:
-            try:
-                qs = qs.filter(**{f'{field}__lte': float(max_val)})
-            except ValueError:
-                pass
+            try: qs = qs.filter(**{f'{field}__lte': Decimal(str(max_val).replace(',', '.'))})
+            except (ValueError, InvalidOperation): pass
     
     # Calcular estatísticas
     total_itens = qs.count()
@@ -2000,94 +2112,16 @@ def api_estoque_estatisticas(request):
 @login_required
 @permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_opcoes_filtro(request):
-    """Retorna opções de filtro baseadas nos filtros atuais (encadeamento)"""
-    coluna = request.GET.get('coluna')
+    """Opções encadeadas para TODOS os filtros da Gestão de Estoque.
+
+    A mesma nomenclatura usada no HTML é usada aqui. Ao abrir uma coluna,
+    os filtros das demais colunas continuam valendo, no estilo do Excel.
+    """
+    coluna = str(request.GET.get('coluna') or '').strip()
     if not coluna:
-        return JsonResponse({'success': False, 'error': 'Coluna não especificada'})
+        return JsonResponse({'success': False, 'error': 'Coluna não especificada'}, status=400)
 
-    # Query base - APENAS saldo > 0
-    qs = Estoque.objects.filter(saldo__gt=0)
-
-    # Aplicar TODOS os filtros atuais, exceto a coluna que estamos abrindo
-    # Status sistêmico
-    status_filter = request.GET.getlist('status_sistemico')
-    if status_filter and coluna != 'status_sistemico':
-        if '__null__' in status_filter:
-            qs = qs.filter(
-                Q(status_sistemico__in=[s for s in status_filter if s != '__null__']) | 
-                Q(status_sistemico__isnull=True)
-            )
-        else:
-            qs = qs.filter(status_sistemico__in=status_filter)
-
-    # Busca
-    busca = request.GET.get('busca', '').strip()
-    if busca:
-        for termo in busca.split():
-            qs = qs.filter(
-                Q(lote__icontains=termo) | 
-                Q(produto__icontains=termo) |
-                Q(cultivar__nome__icontains=termo) | 
-                Q(endereco__icontains=termo) | 
-                Q(cliente__icontains=termo)
-            )
-
-    # Mapeamento de filtros
-    filter_map = {
-        'az': 'az__in',
-        'lote': 'lote__in',
-        'produto': 'produto__in',
-        'cultivar': 'cultivar__nome__in',
-        'peneira': 'peneira__nome__in',
-        'categoria': 'categoria__nome__in',
-        'endereco': 'endereco__in',
-        'especie': 'especie__nome__in',
-        'tratamento': 'tratamento__nome__in',
-        'embalagem': 'embalagem__in',
-        'cliente': 'cliente__in',
-        'empresa': 'empresa__in',
-        'conferente': 'conferente__username__in'
-    }
-
-    # Aplicar outros filtros (exceto a coluna atual)
-    for param, lookup in filter_map.items():
-        if param == coluna:
-            continue
-
-        values = request.GET.getlist(param)
-        values = [v for v in values if v and v.strip()]
-        if values:
-            if '__null__' in values:
-                specific_values = [v for v in values if v != '__null__']
-                if specific_values:
-                    qs = qs.filter(
-                        Q(**{lookup: specific_values}) | 
-                        Q(**{lookup.replace('__in', '__isnull'): True})
-                    )
-                else:
-                    qs = qs.filter(**{lookup.replace('__in', '__isnull'): True})
-            else:
-                qs = qs.filter(**{lookup: values})
-
-    # Filtros numéricos (exceto a coluna atual)
-    for field in ['saldo', 'peso_unitario', 'peso_total']:
-        if field == coluna:
-            continue
-        min_val = request.GET.get(f'min_{field}')
-        max_val = request.GET.get(f'max_{field}')
-        if min_val:
-            try:
-                qs = qs.filter(**{f'{field}__gte': float(min_val)})
-            except ValueError:
-                pass
-        if max_val:
-            try:
-                qs = qs.filter(**{f'{field}__lte': float(max_val)})
-            except ValueError:
-                pass
-
-    # Mapeamento para buscar os valores distintos
-    field_lookup_map = {
+    campos_texto = {
         'az': 'az',
         'lote': 'lote',
         'produto': 'produto',
@@ -2100,22 +2134,136 @@ def api_opcoes_filtro(request):
         'embalagem': 'embalagem',
         'cliente': 'cliente',
         'empresa': 'empresa',
-        'conferente': 'conferente__username'
+        'conferente': 'conferente__username',
+        'observacao': 'observacao',
     }
+    campos_numericos = {
+        'saldo': 'saldo',
+        'empenhado': 'empenhado',
+        'disponivel': 'disponivel_filtro',
+        'peso_unitario': 'peso_unitario',
+        'peso_total': 'peso_total',
+    }
+    colunas_validas = set(campos_texto) | set(campos_numericos) | {'status_sistemico'}
+    if coluna not in colunas_validas:
+        return JsonResponse({'success': False, 'error': f'Coluna inválida: {coluna}'}, status=400)
 
-    if coluna in field_lookup_map:
-        lookup = field_lookup_map[coluna]
-        tem_null = qs.filter(**{lookup + '__isnull': True}).exists() or qs.filter(**{lookup: ''}).exists()
-        valores = qs.exclude(**{lookup: None}).exclude(**{lookup: ''}).values_list(lookup, flat=True).distinct().order_by(lookup)
-        opcoes = [str(v) for v in valores if v is not None and str(v).strip() != '']
+    qs = Estoque.objects.filter(saldo__gt=0).annotate(
+        disponivel_filtro=F('saldo') - F('empenhado')
+    )
 
+    # Busca geral, idêntica à página principal.
+    busca = str(request.GET.get('busca') or '').strip()
+    if busca:
+        for termo in busca.split():
+            qs = qs.filter(
+                Q(lote__icontains=termo) | Q(produto__icontains=termo) |
+                Q(cultivar__nome__icontains=termo) | Q(peneira__nome__icontains=termo) |
+                Q(categoria__nome__icontains=termo) | Q(especie__nome__icontains=termo) |
+                Q(tratamento__nome__icontains=termo) | Q(endereco__icontains=termo) |
+                Q(az__icontains=termo) | Q(cliente__icontains=termo) |
+                Q(empresa__icontains=termo) | Q(conferente__username__icontains=termo) |
+                Q(observacao__icontains=termo)
+            )
+
+    # Status atual, exceto quando o próprio menu de Status está sendo aberto.
+    if coluna != 'status_sistemico':
+        valores_status = request.GET.getlist('status_sistemico')
+        if valores_status:
+            ids_status = []
+            incluir_vazio = '__null__' in valores_status
+            for valor in valores_status:
+                if valor == '__null__':
+                    continue
+                if str(valor).isdigit():
+                    ids_status.append(int(valor))
+                else:
+                    status_obj = StatusSistemico.objects.filter(nome__iexact=str(valor).strip()).first()
+                    if status_obj:
+                        ids_status.append(status_obj.id)
+            if ids_status or incluir_vazio:
+                cond = Q()
+                if ids_status:
+                    cond |= Q(status_sistemico_id__in=ids_status)
+                if incluir_vazio:
+                    cond |= Q(status_sistemico__isnull=True)
+                qs = qs.filter(cond)
+
+    # Demais colunas de seleção, exceto a coluna que está sendo aberta.
+    for param, campo in campos_texto.items():
+        if param == coluna:
+            continue
+        valores = [str(v) for v in request.GET.getlist(param) if str(v).strip()]
+        if not valores:
+            continue
+
+        incluir_vazio = '__null__' in valores
+        especificos = [v for v in valores if v != '__null__']
+        cond = Q()
+        if especificos:
+            # OR com iexact torna o filtro tolerante a cadastros antigos com
+            # diferenças de maiúsculas/minúsculas.
+            for valor in especificos:
+                cond |= Q(**{f'{campo}__iexact': valor})
+        if incluir_vazio:
+            cond |= Q(**{f'{campo}__isnull': True}) | Q(**{campo: ''})
+        qs = qs.filter(cond)
+
+    # Demais filtros numéricos, exceto a coluna que está sendo aberta.
+    for param, campo in campos_numericos.items():
+        if param == coluna:
+            continue
+        min_val = request.GET.get(f'min_{param}')
+        max_val = request.GET.get(f'max_{param}')
+        if min_val not in (None, ''):
+            try:
+                qs = qs.filter(**{f'{campo}__gte': Decimal(str(min_val).replace(',', '.'))})
+            except (ValueError, InvalidOperation):
+                pass
+        if max_val not in (None, ''):
+            try:
+                qs = qs.filter(**{f'{campo}__lte': Decimal(str(max_val).replace(',', '.'))})
+            except (ValueError, InvalidOperation):
+                pass
+
+    # Colunas numéricas usam mínimo/máximo e não precisam de lista de opções.
+    if coluna in campos_numericos:
+        return JsonResponse({'success': True, 'opcoes': [], 'tem_null': False})
+
+    if coluna == 'status_sistemico':
+        ids_em_uso = qs.exclude(status_sistemico__isnull=True).values_list(
+            'status_sistemico_id', flat=True
+        ).distinct()
+        status = StatusSistemico.objects.filter(
+            ativo=True, id__in=ids_em_uso
+        ).order_by('ordem', 'nome')
         return JsonResponse({
             'success': True,
-            'opcoes': opcoes,
-            'tem_null': tem_null
+            'opcoes': [
+                {'value': str(s.id), 'label': f'{s.icone or ""} {s.nome}'.strip()}
+                for s in status
+            ],
+            'tem_null': qs.filter(status_sistemico__isnull=True).exists(),
         })
 
-    return JsonResponse({'success': False, 'error': 'Coluna inválida'})
+    campo = campos_texto[coluna]
+    tem_null = (
+        qs.filter(**{f'{campo}__isnull': True}).exists()
+        or qs.filter(**{campo: ''}).exists()
+    )
+    valores = (
+        qs.exclude(**{f'{campo}__isnull': True})
+        .exclude(**{campo: ''})
+        .values_list(campo, flat=True)
+        .distinct()
+        .order_by(campo)
+    )
+    opcoes = [
+        {'value': str(v), 'label': str(v)}
+        for v in valores
+        if v is not None and str(v).strip()
+    ]
+    return JsonResponse({'success': True, 'opcoes': opcoes, 'tem_null': tem_null})
 
 
 ############################################################################
@@ -2151,12 +2299,12 @@ def editar(request, id):
                 }
 
                 # 2. CAPTURA OS NOVOS VALORES
-                novo_lote = request.POST.get('lote', '').strip()
-                novo_endereco = request.POST.get('endereco', '').strip().upper()
-                novo_empresa = request.POST.get('empresa', '').strip()
-                novo_origem_destino = request.POST.get('origem_destino', '').strip()
-                novo_produto = request.POST.get('produto', '').strip()
-                novo_cliente = request.POST.get('cliente', '').strip()
+                novo_lote = normalizar_texto_cadastro(request.POST.get('lote', ''))
+                novo_endereco = normalizar_texto_cadastro(request.POST.get('endereco', ''))
+                novo_empresa = normalizar_texto_cadastro(request.POST.get('empresa', ''))
+                novo_origem_destino = normalizar_texto_cadastro(request.POST.get('origem_destino', ''))
+                novo_produto = _normalizar_codigo_produto(request.POST.get('produto', ''))
+                novo_cliente = normalizar_texto_cadastro(request.POST.get('cliente', ''))
                 
                 # NOVO: Capturar quantidade
                 nova_entrada_raw = request.POST.get('entrada', '0')
@@ -2179,7 +2327,7 @@ def editar(request, id):
                     novo_peso = Decimal('0.00')
                 
                 novo_emb = request.POST.get('embalagem', 'BAG')
-                novo_az = request.POST.get('az', '').strip()
+                novo_az = normalizar_texto_cadastro(request.POST.get('az', ''))
                 novo_obs = request.POST.get('observacao', '').strip()
 
                 # 3. BUSCAR OBJETOS RELACIONADOS
@@ -2217,6 +2365,20 @@ def editar(request, id):
                         obj_tratamento = item.tratamento
                 else:
                     obj_tratamento = None
+
+                produto_obj, codigo_resolvido = _resolver_produto_para_lote(
+                    novo_produto, obj_cultivar, obj_tratamento
+                )
+                if codigo_resolvido:
+                    novo_produto = codigo_resolvido
+                if produto_obj:
+                    obj_cultivar = produto_obj.cultivar or obj_cultivar
+                    obj_tratamento = produto_obj.tratamento if produto_obj.tratamento_id is not None else obj_tratamento
+                    obj_peneira = produto_obj.peneira if produto_obj.peneira_id is not None else obj_peneira
+                    obj_categoria = produto_obj.categoria if produto_obj.categoria_id is not None else obj_categoria
+                    obj_especie = produto_obj.especie if produto_obj.especie_id is not None else obj_especie
+                    if produto_obj.empresa:
+                        novo_empresa = produto_obj.empresa
 
                 # 4. COMPARAÇÃO DETALHADA PARA O HISTÓRICO
                 mudancas = []
@@ -2369,7 +2531,7 @@ def _valor_linha_planilha(linha, *nomes):
 
 
 def _resolver_fk_planilha(model, valor, rotulo, obrigatorio=False):
-    valor = str(valor or '').strip()
+    valor = normalizar_texto_cadastro(valor)
     if not valor:
         if obrigatorio:
             raise ValueError(f'{rotulo} é obrigatório e deve existir na base de Configurações.')
@@ -2600,7 +2762,7 @@ def baixar_modelo_configuracao(request, tipo):
 
 def _normalizar_codigo_produto(valor):
     """Normaliza código sem alterar zeros à esquerda."""
-    return str(valor or '').strip().upper()
+    return normalizar_texto_cadastro(valor)
 
 
 def _sincronizar_solicitacoes_carga_produto(produto):
@@ -2681,7 +2843,7 @@ def _importar_configuracoes_planilha(tipo, arquivo):
         for linha_num, linha in linhas:
             try:
                 if tipo in simples:
-                    nome_item = _valor_linha_planilha(linha, 'nome')
+                    nome_item = normalizar_texto_cadastro(_valor_linha_planilha(linha, 'nome'))
                     if not nome_item:
                         raise ValueError('NOME é obrigatório.')
                     _, created = simples[tipo].objects.get_or_create(
@@ -2692,15 +2854,19 @@ def _importar_configuracoes_planilha(tipo, arquivo):
                     atualizados += int(not created)
 
                 elif tipo == 'endereco':
-                    codigo = _valor_linha_planilha(linha, 'codigo')
-                    armazem_nome = _valor_linha_planilha(linha, 'armazem')
+                    codigo = normalizar_texto_cadastro(_valor_linha_planilha(linha, 'codigo'))
+                    armazem_nome = normalizar_texto_cadastro(_valor_linha_planilha(linha, 'armazem'))
                     if not codigo:
                         raise ValueError('CÓDIGO é obrigatório.')
                     armazem = _resolver_fk_planilha(Armazem, armazem_nome, 'Armazém', obrigatorio=True)
-                    _, created = Endereco.objects.update_or_create(
-                        codigo=codigo.upper(),
-                        defaults={'armazem': armazem},
-                    )
+                    endereco_obj = Endereco.objects.filter(codigo__iexact=codigo).first()
+                    created = endereco_obj is None
+                    if created:
+                        endereco_obj = Endereco(codigo=codigo, armazem=armazem)
+                    else:
+                        endereco_obj.codigo = codigo
+                        endereco_obj.armazem = armazem
+                    endereco_obj.save()
                     criados += int(created)
                     atualizados += int(not created)
 
@@ -2744,20 +2910,21 @@ def _importar_configuracoes_planilha(tipo, arquivo):
                     ativo_txt = _valor_linha_planilha(linha, 'ativo')
                     ativo = str(ativo_txt or 'SIM').strip().lower() not in {'0', 'nao', 'não', 'false', 'inativo'}
 
-                    produto, created = Produto.objects.update_or_create(
-                        codigo=_normalizar_codigo_produto(codigo),
-                        defaults={
-                            'cultivar': cultivar,
-                            'descricao': _valor_linha_planilha(linha, 'descricao'),
-                            'tipo': _valor_linha_planilha(linha, 'tipo'),
-                            'empresa': _valor_linha_planilha(linha, 'empresa'),
-                            'peneira': peneira,
-                            'especie': especie,
-                            'categoria': categoria,
-                            'tratamento': tratamento,
-                            'ativo': ativo,
-                        },
-                    )
+                    codigo_norm = _normalizar_codigo_produto(codigo)
+                    produto = Produto.objects.filter(codigo__iexact=codigo_norm).first()
+                    created = produto is None
+                    if created:
+                        produto = Produto(codigo=codigo_norm)
+                    produto.cultivar = cultivar
+                    produto.descricao = _valor_linha_planilha(linha, 'descricao')
+                    produto.tipo = _valor_linha_planilha(linha, 'tipo')
+                    produto.empresa = _valor_linha_planilha(linha, 'empresa')
+                    produto.peneira = peneira
+                    produto.especie = especie
+                    produto.categoria = categoria
+                    produto.tratamento = tratamento
+                    produto.ativo = ativo
+                    produto.save()
                     _sincronizar_solicitacoes_carga_produto(produto)
                     criados += int(created)
                     atualizados += int(not created)
@@ -2766,6 +2933,93 @@ def _importar_configuracoes_planilha(tipo, arquivo):
 
     return criados, atualizados, erros
 
+
+def _dependencias_configuracao(tipo, item):
+    """Retorna um resumo legível do que impede a exclusão de um cadastro."""
+    deps = []
+    checks = []
+    if tipo == 'cultivar':
+        checks = [('Produtos', Produto.objects.filter(cultivar=item)), ('Lotes de estoque', Estoque.objects.filter(cultivar=item))]
+    elif tipo == 'peneira':
+        checks = [('Produtos', Produto.objects.filter(peneira=item)), ('Lotes de estoque', Estoque.objects.filter(peneira=item))]
+    elif tipo == 'especie':
+        checks = [('Produtos', Produto.objects.filter(especie=item)), ('Lotes de estoque', Estoque.objects.filter(especie=item))]
+    elif tipo == 'categoria':
+        checks = [('Produtos', Produto.objects.filter(categoria=item)), ('Lotes de estoque', Estoque.objects.filter(categoria=item))]
+    elif tipo == 'tratamento':
+        checks = [('Produtos', Produto.objects.filter(tratamento=item)), ('Lotes de estoque', Estoque.objects.filter(tratamento=item))]
+    elif tipo == 'armazem':
+        checks = [('Endereços', item.enderecos.all()), ('Solicitações', Solicitacao.objects.filter(armazem=item))]
+    elif tipo == 'endereco':
+        checks = [('Lotes de estoque', Estoque.objects.filter(endereco__iexact=item.codigo))]
+    elif tipo == 'produto':
+        checks = [
+            ('Itens de carga', SolicitacaoItemCarga.objects.filter(Q(produto=item) | Q(codigo__iexact=item.codigo))),
+            ('Lotes de estoque', Estoque.objects.filter(produto__iexact=item.codigo)),
+        ]
+    elif tipo == 'origem':
+        checks = [('Lotes de estoque', Estoque.objects.filter(origem_destino__iexact=item.nome))]
+
+    for rotulo, qs in checks:
+        qtd = qs.count()
+        if qtd:
+            amostras = [str(x) for x in qs[:3]]
+            deps.append(f'{rotulo}: {qtd}' + (f' ({"; ".join(amostras)})' if amostras else ''))
+    return deps
+
+
+def _editar_item_configuracao(tipo, item_id, post):
+    simples = {
+        'cultivar': Cultivar, 'peneira': Peneira, 'especie': Especie,
+        'categoria': Categoria, 'tratamento': Tratamento, 'origem': OrigemDestino,
+        'armazem': Armazem,
+    }
+    if tipo in simples:
+        obj = get_object_or_404(simples[tipo], id=item_id)
+        nome = normalizar_texto_cadastro(post.get('nome', ''))
+        if not nome:
+            raise ValueError('Informe o nome.')
+        if simples[tipo].objects.filter(nome__iexact=nome).exclude(id=obj.id).exists():
+            raise ValueError(f'Já existe um cadastro com o nome {nome}.')
+        obj.nome = nome
+        obj.save()
+        return str(obj)
+
+    if tipo == 'endereco':
+        obj = get_object_or_404(Endereco, id=item_id)
+        codigo = normalizar_texto_cadastro(post.get('codigo', ''))
+        armazem_id = post.get('armazem_id')
+        if not codigo or not armazem_id:
+            raise ValueError('Endereço e Armazém são obrigatórios.')
+        if Endereco.objects.filter(codigo__iexact=codigo).exclude(id=obj.id).exists():
+            raise ValueError(f'Já existe o endereço {codigo}.')
+        obj.codigo = codigo
+        obj.armazem = get_object_or_404(Armazem, id=armazem_id)
+        obj.save()
+        return str(obj)
+
+    if tipo == 'produto':
+        obj = get_object_or_404(Produto, id=item_id)
+        codigo = _normalizar_codigo_produto(post.get('codigo', ''))
+        cultivar_id = post.get('cultivar')
+        if not codigo or not cultivar_id:
+            raise ValueError('Código e Cultivar são obrigatórios.')
+        if Produto.objects.filter(codigo__iexact=codigo).exclude(id=obj.id).exists():
+            raise ValueError(f'Já existe o produto {codigo}.')
+        obj.codigo = codigo
+        obj.cultivar_id = cultivar_id
+        obj.descricao = normalizar_texto_cadastro(post.get('descricao', ''))
+        obj.tipo = normalizar_texto_cadastro(post.get('tipo', ''))
+        obj.empresa = normalizar_texto_cadastro(post.get('empresa', ''))
+        obj.peneira_id = post.get('peneira') or None
+        obj.especie_id = post.get('especie') or None
+        obj.categoria_id = post.get('categoria') or None
+        obj.tratamento_id = post.get('tratamento') or None
+        obj.ativo = post.get('ativo') == 'on'
+        obj.save()
+        _sincronizar_solicitacoes_carga_produto(obj)
+        return str(obj)
+    raise ValueError('Tipo de cadastro inválido.')
 
 @login_required
 @permission_required('sapp.pode_configuracoes', raise_exception=True)
@@ -2845,15 +3099,15 @@ def configuracoes(request):
         # ====================================
         elif acao == 'add_produto':
             try:
-                if not all([cultivares.exists(), peneiras.exists(), especies.exists(), categorias.exists(), tratamentos.exists()]):
-                    raise ValueError('Cadastre primeiro Cultivares, Peneiras, Espécies, Categorias e Tratamentos.')
+                if not cultivares.exists():
+                    raise ValueError('Cadastre primeiro pelo menos um Cultivar.')
                 cultivar_id = request.POST.get('cultivar')
-                codigo = request.POST.get('codigo', '').strip().upper()
-                descricao = request.POST.get('descricao', '').strip()
+                codigo = _normalizar_codigo_produto(request.POST.get('codigo', ''))
+                descricao = normalizar_texto_cadastro(request.POST.get('descricao', ''))
                 
                 if not cultivar_id or not codigo:
                     messages.error(request, "❌ Cultivar e Código são obrigatórios!")
-                elif Produto.objects.filter(codigo=codigo).exists():
+                elif Produto.objects.filter(codigo__iexact=codigo).exists():
                     messages.error(request, f"❌ Código '{codigo}' já existe!")
                 else:
                     with transaction.atomic():
@@ -2861,8 +3115,8 @@ def configuracoes(request):
                             cultivar_id=cultivar_id,
                             codigo=codigo,
                             descricao=descricao,
-                            tipo=request.POST.get('tipo', '').strip(),
-                            empresa=request.POST.get('empresa', '').strip(),
+                            tipo=normalizar_texto_cadastro(request.POST.get('tipo', '')),
+                            empresa=normalizar_texto_cadastro(request.POST.get('empresa', '')),
                             ativo=request.POST.get('ativo') == 'on'
                         )
                         produto.peneira_id = request.POST.get('peneira') or None
@@ -2883,8 +3137,12 @@ def configuracoes(request):
                 else:
                     produto = Produto.objects.get(id=item_id)
                     codigo = produto.codigo
-                    produto.delete()
-                    messages.success(request, f"✅ Produto '{codigo}' excluído com sucesso!")
+                    deps = _dependencias_configuracao('produto', produto)
+                    if deps:
+                        messages.error(request, f"❌ Não é possível excluir Produto '{codigo}'. Vinculado a: " + ' | '.join(deps))
+                    else:
+                        produto.delete()
+                        messages.success(request, f"✅ Produto '{codigo}' excluído com sucesso!")
             except Produto.DoesNotExist:
                 messages.error(request, "❌ Produto não encontrado!")
             except Exception as e:
@@ -3039,6 +3297,35 @@ def configuracoes(request):
                     import traceback
                     traceback.print_exc()
                     messages.error(request, f"❌ Erro ao atualizar permissões: {str(e)}")
+        elif acao == 'edit_user_basic':
+            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+                messages.error(request, '❌ Você não tem permissão para editar usuários!')
+            else:
+                try:
+                    user_id = request.POST.get('user_id')
+                    usuario = User.objects.get(id=user_id, is_active=True)
+                    username = str(request.POST.get('username', '') or '').strip().lower()
+                    first_name = normalizar_texto_cadastro(request.POST.get('first_name', ''))
+                    if not username or not first_name:
+                        raise ValueError('Login e nome são obrigatórios.')
+                    if User.objects.filter(username__iexact=username).exclude(id=usuario.id).exists():
+                        raise ValueError(f'O login {username} já está em uso.')
+                    nova_senha = str(request.POST.get('password', '') or '').strip()
+                    if nova_senha and len(nova_senha) < 6:
+                        raise ValueError('A senha deve ter no mínimo 6 caracteres.')
+                    usuario.username = username
+                    usuario.first_name = first_name
+                    campos_atualizados = ['username', 'first_name']
+                    if nova_senha:
+                        usuario.set_password(nova_senha)
+                        campos_atualizados.append('password')
+                    usuario.save(update_fields=campos_atualizados)
+                    messages.success(request, f'✅ Usuário {first_name} atualizado com sucesso!')
+                except User.DoesNotExist:
+                    messages.error(request, '❌ Usuário não encontrado!')
+                except Exception as exc:
+                    messages.error(request, f'❌ Não foi possível editar o usuário: {exc}')
+
         elif acao == 'reset_password':
             # Verifica permissão para resetar senha
             if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
@@ -3078,7 +3365,7 @@ def configuracoes(request):
                         username = user.username
                         if not user.first_name and not user.last_name:
                             user.first_name = username
-                        sufixo = timezone.now().strftime('%Y%m%d%H%M%S')
+                        sufixo = timezone.localtime(timezone.now()).strftime('%Y%m%d%H%M%S')
                         user.username = f'inativo_{user.id}_{sufixo}_{username}'[:150]
                         user.is_active = False
                         user.is_staff = False
@@ -3103,9 +3390,13 @@ def configuracoes(request):
         # ====================================
         
         elif acao == 'add_armazem':
-            nome = request.POST.get('nome', '').strip().upper()
+            nome = normalizar_texto_cadastro(request.POST.get('nome', ''))
             if nome:
-                obj, created = Armazem.objects.get_or_create(nome=nome)
+                obj = Armazem.objects.filter(nome__iexact=nome).first()
+                created = False
+                if not obj:
+                    obj = Armazem.objects.create(nome=nome)
+                    created = True
                 if created:
                     messages.success(request, f"✅ Armazém '{nome}' criado com sucesso!")
                 else:
@@ -3118,7 +3409,7 @@ def configuracoes(request):
         # ====================================
         
         elif acao == 'add_endereco':
-            endereco_codigo = request.POST.get('endereco_codigo', '').strip().upper()
+            endereco_codigo = normalizar_texto_cadastro(request.POST.get('endereco_codigo', ''))
             armazem_id = request.POST.get('armazem_id')
             
             if not endereco_codigo:
@@ -3129,7 +3420,7 @@ def configuracoes(request):
                 try:
                     armazem = Armazem.objects.get(id=armazem_id)
                     
-                    if Endereco.objects.filter(codigo=endereco_codigo).exists():
+                    if Endereco.objects.filter(codigo__iexact=endereco_codigo).exists():
                         messages.warning(request, f"⚠️ Endereço '{endereco_codigo}' já cadastrado!")
                     else:
                         Endereco.objects.create(
@@ -3179,9 +3470,13 @@ def configuracoes(request):
             }
             
             if model:
-                nome = request.POST.get('nome', '').strip()
+                nome = normalizar_texto_cadastro(request.POST.get('nome', ''))
                 if nome:
-                    obj, created = model.objects.get_or_create(nome=nome)
+                    obj = model.objects.filter(nome__iexact=nome).first()
+                    created = False
+                    if not obj:
+                        obj = model.objects.create(nome=nome)
+                        created = True
                     if created:
                         messages.success(request, f"✅ {nome_display[acao]} '{nome}' adicionado com sucesso!")
                     else:
@@ -3193,6 +3488,15 @@ def configuracoes(request):
         # 7. EXCLUSÃO GENÉRICA
         # ====================================
         
+        elif acao == 'edit_item':
+            tipo = request.POST.get('tipo_item', '')
+            item_id = request.POST.get('id_item')
+            try:
+                nome = _editar_item_configuracao(tipo, item_id, request.POST)
+                messages.success(request, f'✅ Cadastro atualizado: {nome}')
+            except Exception as exc:
+                messages.error(request, f'❌ Não foi possível editar: {exc}')
+
         elif acao == 'delete_item':
             tipo = request.POST.get('tipo_item')
             item_id = request.POST.get('id_item')
@@ -3217,6 +3521,14 @@ def configuracoes(request):
                     try:
                         item = model.objects.get(id=item_id)
                         nome_excluido = str(item)
+                        dependencias = _dependencias_configuracao(tipo, item)
+                        if dependencias:
+                            messages.error(
+                                request,
+                                f"❌ Não é possível excluir {nome_tipo} '{nome_excluido}'. Vinculado a: "
+                                + ' | '.join(dependencias)
+                            )
+                            return redirect(f"{reverse('sapp:configuracoes')}#{active_tab}")
                         
                         # Validações de integridade referencial
                         if tipo == 'endereco' and hasattr(item, 'estoque_set') and item.estoque_set.exists():
@@ -3265,13 +3577,7 @@ def configuracoes(request):
         'form_conf_user': NovoConferenteUserForm(),
         
         'produtos': produtos,
-        'cadastro_produto_liberado': all([
-            cultivares.exists(),
-            peneiras.exists(),
-            especies.exists(),
-            categorias.exists(),
-            tratamentos.exists(),
-        ]),
+        'cadastro_produto_liberado': cultivares.exists(),
         # Para importação em massa, segue a obrigatoriedade real dos campos:
         # Produto exige Código + Cultivar. As demais bases são opcionais e
         # somente precisam existir quando o respectivo valor for informado.
@@ -4021,7 +4327,7 @@ def exportar_pdf(request):
     styles = getSampleStyleSheet()
     title = Paragraph("RELATÓRIO DE ESTOQUE - SEMENTES", styles['Title'])
     elements.append(title)
-    elements.append(Paragraph(f"Data: {timezone.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+    elements.append(Paragraph(f"Data: {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
     elements.append(Paragraph("<br/>", styles['Normal']))
     
     # Dados da tabela ATUALIZADOS
@@ -4270,7 +4576,7 @@ def api_ultimas_movimentacoes(request):
     for mov in movimentacoes:
         data.append({
             'id': mov.id,
-            'data_hora': mov.data_hora.strftime('%d/%m/%Y %H:%M'),
+            'data_hora': timezone.localtime(mov.data_hora).strftime('%d/%m/%Y %H:%M') if mov.data_hora else '--',
             'tipo': mov.tipo,
             'descricao': mov.descricao,
             'usuario': mov.usuario.username if mov.usuario else 'Sistema',
@@ -4417,7 +4723,13 @@ def pagina_rascunho(request):
                         )
                     
                     for item in itens:
-                        item.estoque.refresh_from_db()
+                        # Bloqueia também a linha física do estoque. Isso evita duas
+                        # requisições concorrentes consumirem o mesmo saldo.
+                        item.estoque = (
+                            Estoque.objects
+                            .select_for_update(of=('self',))
+                            .get(pk=item.estoque_id)
+                        )
                         
                         if item.quantidade <= 0:
                             raise ValueError(
@@ -4553,12 +4865,13 @@ def pagina_rascunho(request):
                         else:
                             # Processar expedição
                             obs_expedicao = request.POST.get('obs_expedicao', '').strip()
-                            numero_carga = request.POST.get('numero_carga', '').strip()
-                            cliente = request.POST.get('cliente', '').strip()
-                            placa = request.POST.get('placa', '').strip()
-                            
-                            if not numero_carga:
-                                raise ValueError("Número da carga/pedido não informado.")
+                            numero_carga = normalizar_texto_cadastro(request.POST.get('numero_carga', ''))
+                            cliente = normalizar_texto_cadastro(request.POST.get('cliente', ''))
+                            placa = normalizar_texto_cadastro(request.POST.get('placa', ''))
+                            motorista_exp = ''
+                            if solicitacao_vinculada and solicitacao_vinculada.tipo_solicitacao == 'CARGA':
+                                placa = placa or normalizar_texto_cadastro(solicitacao_vinculada.placa)
+                                motorista_exp = normalizar_texto_cadastro(solicitacao_vinculada.motorista)
                             
                             origem.saida += qtd
                             origem.save()
@@ -4580,12 +4893,13 @@ def pagina_rascunho(request):
                                 tipo='Expedição',
                                 descricao=(
                                     f"{MARCA_ORIGEM} Expedido {qtd} un. "
-                                    f"Carga: {numero_carga}. "
-                                    f"{obs_global} {obs_expedicao}"
+                                    + (f"Carga: {numero_carga}. " if numero_carga else '')
+                                    + f"{obs_global} {obs_expedicao}"
                                 ).strip(),
-                                numero_carga=numero_carga,
+                                numero_carga=numero_carga or None,
                                 cliente=cliente_movimentacao,
-                                placa=placa
+                                placa=placa or None,
+                                motorista=motorista_exp or None
                             )
                             
                             HistoricoItemEmpenho.objects.create(
@@ -4816,8 +5130,8 @@ def pagina_rascunho(request):
                 'observacao': hist.observacao,
                 'status_sistemico': '',
                 'situacao': 'transferido' if hist.tipo == 'transferencia' else 'expedido',
-                'processado_em': hist.processado_em.strftime('%d/%m/%Y %H:%M') if hist.processado_em else '',
-                'data_ultima_movimentacao': hist.processado_em.strftime('%d/%m/%Y %H:%M') if hist.processado_em else '',
+                'processado_em': timezone.localtime(hist.processado_em).strftime('%d/%m/%Y %H:%M') if hist.processado_em else '',
+                'data_ultima_movimentacao': timezone.localtime(hist.processado_em).strftime('%d/%m/%Y %H:%M') if hist.processado_em else '',
                 'tipo': hist.get_tipo_display(),
                 'endereco_destino': hist.endereco_destino if hist.tipo == 'transferencia' else '',
             })
@@ -5625,91 +5939,84 @@ def editor_avancado(request, armazem_numero=1):
 
 
 @login_required
-@permission_required('sapp.pode_ver_estoque', raise_exception=True)  # CORRIGIDO
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_buscar_produto(request):
+    """
+    Resolve produto por código ou, quando o código estiver vazio,
+    por Cultivar + Tratamento. Nunca escolhe silenciosamente quando
+    existir mais de um produto compatível.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'encontrado': False, 'erro': 'Método não permitido.'}, status=405)
 
     try:
-        # Log para debug
-        print("=" * 50)
-        print("API: Recebida requisição para buscar produto")
-        print(f"API: Método: {request.method}")
-        print(f"API: GET params: {dict(request.GET)}")
-        
-        # Apenas aceita GET
-        if request.method != 'GET':
-            return JsonResponse({
-                'encontrado': False,
-                'erro': 'Método não permitido. Use GET.'
-            }, status=405)
-        
-        # Pegar código da query string
-        codigo = request.GET.get('codigo', '').strip()
-        
-        if not codigo:
-            print("API: Erro - Código não fornecido")
-            return JsonResponse({
-                'encontrado': False, 
-                'erro': 'Código não fornecido'
-            }, status=400)
-        
-        print(f"API: Buscando produto com código: '{codigo}'")
-        
-        # Importar dentro da função para evitar problemas de importação circular
-        from .models import Produto
-        
-        # Buscar produto ativo pelo código
-        produto = Produto.objects.filter(codigo=codigo, ativo=True).first()
-        
-        if not produto:
-            print(f"API: Produto '{codigo}' não encontrado ou inativo")
-            return JsonResponse({
-                'encontrado': False, 
-                'erro': f'Produto "{codigo}" não encontrado ou inativo'
-            })
-        
-        print(f"API: Produto encontrado - ID: {produto.id}, Código: {produto.codigo}")
-        
-        # Preparar dados para resposta - USANDO OS CAMPOS REAIS DO SEU MODELO
+        codigo = _normalizar_codigo_produto(request.GET.get('codigo', ''))
+        cultivar_id = request.GET.get('cultivar_id') or request.GET.get('cultivar')
+        tratamento_id = request.GET.get('tratamento_id') or request.GET.get('tratamento')
+
+        if codigo:
+            produto = (
+                Produto.objects
+                .filter(codigo__iexact=codigo, ativo=True)
+                .select_related('cultivar', 'peneira', 'especie', 'categoria', 'tratamento')
+                .first()
+            )
+            if not produto:
+                return JsonResponse({
+                    'encontrado': False,
+                    'erro': f'Produto {codigo} não encontrado ou inativo.'
+                })
+        else:
+            if not cultivar_id:
+                return JsonResponse({
+                    'encontrado': False,
+                    'erro': 'Informe o código ou selecione Cultivar + Tratamento.'
+                })
+
+            qs = (
+                Produto.objects
+                .filter(cultivar_id=cultivar_id, ativo=True)
+                .select_related('cultivar', 'peneira', 'especie', 'categoria', 'tratamento')
+            )
+            if tratamento_id:
+                qs = qs.filter(tratamento_id=tratamento_id)
+            else:
+                qs = qs.filter(tratamento__isnull=True)
+
+            produtos = list(qs.order_by('id')[:2])
+            if not produtos:
+                return JsonResponse({
+                    'encontrado': False,
+                    'erro': 'Nenhum produto cadastrado para essa combinação.'
+                })
+            if len(produtos) > 1:
+                return JsonResponse({
+                    'encontrado': False,
+                    'ambiguo': True,
+                    'erro': 'Existe mais de um produto para essa combinação. Informe o código.'
+                })
+            produto = produtos[0]
+
         dados = {
             'codigo': produto.codigo,
-            'cultivar_id': str(produto.cultivar.id) if produto.cultivar else None,
+            'cultivar_id': str(produto.cultivar_id) if produto.cultivar_id else None,
             'cultivar_nome': produto.cultivar.nome if produto.cultivar else '',
-            'peneira_id': str(produto.peneira.id) if produto.peneira else None,
+            'peneira_id': str(produto.peneira_id) if produto.peneira_id else None,
             'peneira_nome': produto.peneira.nome if produto.peneira else '',
-            'especie_id': str(produto.especie.id) if produto.especie else None,
+            'especie_id': str(produto.especie_id) if produto.especie_id else None,
             'especie_nome': produto.especie.nome if produto.especie else '',
-            'categoria_id': str(produto.categoria.id) if produto.categoria else None,
+            'categoria_id': str(produto.categoria_id) if produto.categoria_id else None,
             'categoria_nome': produto.categoria.nome if produto.categoria else '',
-            'tratamento_id': str(produto.tratamento.id) if produto.tratamento else None,
+            'tratamento_id': str(produto.tratamento_id) if produto.tratamento_id else None,
             'tratamento_nome': produto.tratamento.nome if produto.tratamento else '',
             'empresa': produto.empresa or '',
             'tipo': produto.tipo or '',
-            'descricao': produto.descricao or ''
+            'descricao': produto.descricao or '',
         }
-        
-        print(f"API: Dados preparados para retorno: {json.dumps(dados, indent=2, ensure_ascii=False)}")
-        
-        # Criar resposta
-        response_data = {
-            'encontrado': True, 
-            'dados': dados
-        }
-        
-        print("API: Retornando dados com sucesso")
-        print("=" * 50)
-        
-        return JsonResponse(response_data)
-        
-    except Exception as e:
-        print(f"API: ERRO INTERNO: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        return JsonResponse({
-            'encontrado': False, 
-            'erro': f'Erro interno do servidor: {str(e)}'
-        }, status=500)
-    
+        return JsonResponse({'encontrado': True, 'dados': dados})
+    except Exception as exc:
+        logger.exception('Erro ao resolver produto para lote')
+        return JsonResponse({'encontrado': False, 'erro': str(exc)}, status=500)
 
 
 
@@ -5771,7 +6078,7 @@ def api_atualizar_status_sistemico(request):
                         'legenda': novo_status.legenda or '',
                     },
                     'alterado_por': request.user.get_full_name() or request.user.username,
-                    'alterado_em': timezone.now().strftime('%d/%m/%Y %H:%M'),
+                    'alterado_em': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M'),
                     'observacao': observacao or ''
                 })
                 
@@ -5886,7 +6193,7 @@ def api_atualizar_status_sistemico(request):
                         'legenda': novo_status.legenda or '',
                     },
                     'alterado_por': request.user.get_full_name() or request.user.username,
-                    'alterado_em': timezone.now().strftime('%d/%m/%Y %H:%M'),
+                    'alterado_em': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M'),
                     'observacao': observacao or ''
                 })
                 
@@ -9446,8 +9753,8 @@ def _ler_itens_carga_post(request):
 
     for idx in range(total_linhas):
         item_id_txt = (ids[idx] if idx < len(ids) else '').strip()
-        cliente = (clientes[idx] if idx < len(clientes) else '').strip()
-        codigo = (codigos[idx] if idx < len(codigos) else '').strip().upper()
+        cliente = normalizar_texto_cadastro(clientes[idx] if idx < len(clientes) else '')
+        codigo = _normalizar_codigo_produto(codigos[idx] if idx < len(codigos) else '')
         qtd_txt = (quantidades[idx] if idx < len(quantidades) else '').strip()
 
         if not any([item_id_txt, cliente, codigo, qtd_txt]):
@@ -9458,14 +9765,15 @@ def _ler_itens_carga_post(request):
                 f'Linha {idx + 1} da carga: Cliente e Código são obrigatórios.'
             )
 
-        quantidade = _parse_decimal_solicitacao(
-            qtd_txt,
-            f'Quantidade da linha {idx + 1}'
-        )
-        if quantidade != quantidade.to_integral_value():
-            raise ValueError(
-                f'Linha {idx + 1}: a quantidade da carga deve ser informada em embalagens inteiras.'
-            )
+        # Quantidade vazia/zero significa CARGA ABERTA: não existe teto de empenho.
+        if qtd_txt:
+            quantidade = _parse_decimal_solicitacao(qtd_txt, f'Quantidade da linha {idx + 1}')
+            if quantidade != quantidade.to_integral_value():
+                raise ValueError(
+                    f'Linha {idx + 1}: a quantidade da carga deve ser informada em embalagens inteiras.'
+                )
+        else:
+            quantidade = Decimal('0')
 
         item_id = None
         if item_id_txt:
@@ -9636,11 +9944,11 @@ def _salvar_solicitacao_form(request, solicitacao=None):
 
     if request.method == 'POST':
         try:
-            titulo = request.POST.get('titulo', '').strip().upper()
+            titulo = normalizar_texto_cadastro(request.POST.get('titulo', ''))
             if not titulo:
                 raise ValueError('Título é obrigatório.')
 
-            destino = request.POST.get('destino', '').strip()
+            destino = normalizar_texto_cadastro(request.POST.get('destino', ''))
             observacao = request.POST.get('observacao', '').strip()
             prioridade = request.POST.get('prioridade', 'MEDIA')
 
@@ -9669,11 +9977,11 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                 solicitacao.prioridade = prioridade
 
                 if tipo == 'CARGA':
-                    motorista = request.POST.get('motorista', '').strip()
+                    motorista = normalizar_texto_cadastro(request.POST.get('motorista', ''))
                     if not motorista:
                         raise ValueError('Informe o nome do motorista da carga.')
 
-                    placa = request.POST.get('placa', '').strip().upper()
+                    placa = normalizar_texto_cadastro(request.POST.get('placa', ''))
 
                     solicitacao.motorista = motorista
                     solicitacao.placa = placa
@@ -9725,12 +10033,15 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                     else:
                         _sincronizar_itens_carga(solicitacao, itens_carga)
 
+                    tem_linha_aberta = solicitacao.itens_carga.filter(quantidade_solicitada__lte=0).exists()
                     total_carga = (
                         solicitacao.itens_carga
                         .aggregate(total=Sum('quantidade_solicitada'))['total']
                         or Decimal('0')
                     )
-                    solicitacao.quantidade_solicitada = Decimal(str(total_carga))
+                    # Se qualquer linha estiver sem quantidade, a carga é aberta como um todo.
+                    # Linhas que possuem quantidade continuam respeitando seu próprio limite.
+                    solicitacao.quantidade_solicitada = Decimal('0') if tem_linha_aberta else Decimal(str(total_carga))
 
                     # Se o total foi corrigido/adicionado, o status acompanha o saldo.
                     if solicitacao.status in {
@@ -9739,6 +10050,8 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                         qtd_emp = Decimal(str(solicitacao.quantidade_empenhada or 0))
                         if qtd_emp <= 0:
                             solicitacao.status = 'AGUARDANDO_EMPENHO'
+                        elif solicitacao.quantidade_solicitada <= 0:
+                            solicitacao.status = 'EMPENHO_COMPLETO'
                         elif qtd_emp >= solicitacao.quantidade_solicitada:
                             solicitacao.status = 'EMPENHO_COMPLETO'
                         else:
@@ -11129,7 +11442,8 @@ def api_lotes_disponiveis_para_solicitacao(
         for item in itens_carga:
             qtd_item = Decimal(str(item.quantidade_solicitada or 0))
             qtd_emp_item = Decimal(str(totais_empenhados_carga.get(item.id, 0) or 0))
-            restante_item = max(Decimal('0'), qtd_item - qtd_emp_item)
+            ilimitado = qtd_item <= 0
+            restante_item = Decimal('0') if ilimitado else max(Decimal('0'), qtd_item - qtd_emp_item)
             itens_carga_resumo.append({
                 'id': item.id,
                 'ordem': item.ordem,
@@ -11140,8 +11454,9 @@ def api_lotes_disponiveis_para_solicitacao(
                 'peneira': item.peneira,
                 'quantidade_solicitada': float(qtd_item),
                 'quantidade_empenhada': float(qtd_emp_item),
-                'quantidade_restante': float(restante_item),
-                'completo': restante_item <= 0,
+                'quantidade_restante': None if ilimitado else float(restante_item),
+                'quantidade_aberta': ilimitado,
+                'completo': False if ilimitado else restante_item <= 0,
             })
 
         if item_carga_ativo:
@@ -11522,7 +11837,7 @@ def empenhar_na_solicitacao(
                     )
                     total_linha = Decimal(str(outros_da_linha)) + quantidade_final
                     limite_linha = Decimal(str(item_carga.quantidade_solicitada or 0))
-                    if total_linha > limite_linha:
+                    if limite_linha > 0 and total_linha > limite_linha:
                         raise ValueError(
                             f'A linha da carga {item_carga.cliente} / {item_carga.codigo} permite no máximo '
                             f'{limite_linha} embalagem(ns). Já ficaria com {total_linha}.'
@@ -11772,11 +12087,14 @@ def empenhar_na_solicitacao(
             # ATUALIZAR STATUS
             # ----------------------------------------------------------
             if quantidade_para_status <= 0:
-                solicitacao.status = (
-                    'AGUARDANDO_EMPENHO'
-                )
-
+                solicitacao.status = 'AGUARDANDO_EMPENHO'
                 evento = 'CRIACAO'
+
+            elif solicitacao.tipo_solicitacao == 'CARGA' and quantidade_solicitada <= 0:
+                # Carga aberta sempre mostra 100% após o primeiro empenho,
+                # mas permanece apta a receber mais empenhos até iniciar a movimentação.
+                solicitacao.status = 'EMPENHO_COMPLETO'
+                evento = 'EMPENHO_COMPLETO'
 
             elif (
                 quantidade_para_status

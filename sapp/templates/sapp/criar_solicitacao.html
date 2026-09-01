@@ -177,7 +177,7 @@
                     </div>
                     <div class="load-table-wrap">
                         <table class="table table-sm load-table">
-                            <thead><tr><th>Cliente *</th><th>Código *</th><th>Descrição</th><th style="width:115px">Qtd *</th><th style="width:52px"></th></tr></thead>
+                            <thead><tr><th>Cliente *</th><th>Código *</th><th>Descrição</th><th style="width:130px">Qtd (opcional)</th><th style="width:52px"></th></tr></thead>
                             <tbody id="cargaBody">
                             {% for item in itens_carga_edicao %}
                                 <tr class="carga-row {% if item.edicao_bloqueada %}row-locked{% endif %}" data-locked="{% if item.edicao_bloqueada %}1{% else %}0{% endif %}">
@@ -190,14 +190,14 @@
                                         <div class="product-info"><strong>{{ item.descricao|default:'Sem descrição cadastrada' }}</strong></div>
                                         {% if item.edicao_bloqueada %}<span class="lock-badge"><i class="fas fa-lock"></i>{{ item.quantidade_empenhada_edicao|stringformat:'g' }} empenhado(s)</span>{% endif %}
                                     </td>
-                                    <td><input type="number" name="carga_quantidade[]" class="form-control carga-qtd" min="1" step="1" value="{{ item.quantidade_solicitada|stringformat:'f' }}" required {% if item.edicao_bloqueada %}readonly{% endif %}></td>
+                                    <td><input type="number" name="carga_quantidade[]" class="form-control carga-qtd" min="0" step="1" value="{% if item.quantidade_solicitada %}{{ item.quantidade_solicitada|stringformat:'f' }}{% endif %}" {% if item.edicao_bloqueada %}readonly{% endif %}></td>
                                     <td>{% if not item.edicao_bloqueada %}<button type="button" class="btn-remove-line" title="Remover item"><i class="fas fa-trash"></i></button>{% else %}<span class="text-muted"><i class="fas fa-shield-alt"></i></span>{% endif %}</td>
                                 </tr>
                             {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    <div class="load-footer"><span><i class="fas fa-lock me-1"></i>Itens empenhados não podem ter cliente, código ou quantidade alterados.</span><span class="load-total">Total: <span id="totalCarga">0</span> embalagens</span></div>
+                    <div class="load-footer"><span><i class="fas fa-lock me-1"></i>Itens empenhados não podem ter cliente, código ou quantidade alterados. Quantidade em branco = carga aberta, sem limite pré-definido.</span><span class="load-total">Total: <span id="totalCarga">0</span> embalagens</span></div>
                     <datalist id="produtosCarga"></datalist>
                 </div>
             </section>
@@ -214,7 +214,7 @@
                     </div>
                     <div class="col-md-4 normal-field">
                         <label class="form-label">Quantidade solicitada *</label>
-                        <input type="number" name="quantidade_solicitada" class="form-control" min="0.01" step="0.01" value="{{ solicitacao.quantidade_solicitada|stringformat:'f'|default:'' }}" {% if edicao_estrutural_bloqueada %}disabled{% endif %} placeholder="0,00">
+                        <input type="number" id="quantidadeSolicitadaNormal" name="quantidade_solicitada" class="form-control" min="0.01" step="0.01" value="{{ solicitacao.quantidade_solicitada|stringformat:'f'|default:'' }}" {% if edicao_estrutural_bloqueada %}disabled{% endif %} placeholder="0,00" required>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Prioridade *</label>
@@ -265,15 +265,58 @@ function productInfoHtml(p) {
     return `<strong>${escapeHtml(p.descricao)}</strong>`;
 }
 
+function prepararEstadoOriginalControle(el) {
+    if (!el.dataset.originalDisabled) {
+        el.dataset.originalDisabled = el.disabled ? '1' : '0';
+    }
+    if (!el.dataset.originalRequired) {
+        el.dataset.originalRequired = el.required ? '1' : '0';
+    }
+}
+
+function alternarControlesDoBloco(selector, ativo) {
+    document.querySelectorAll(`${selector} input, ${selector} select, ${selector} textarea, ${selector} button`).forEach(el => {
+        prepararEstadoOriginalControle(el);
+
+        const bloqueadoPeloServidor = el.dataset.originalDisabled === '1';
+        el.disabled = !ativo || bloqueadoPeloServidor;
+
+        // Campo invisível nunca pode continuar obrigatório: o navegador
+        // bloqueia o submit com "invalid form control ... is not focusable".
+        if ('required' in el) {
+            const eraObrigatorio = el.dataset.originalRequired === '1';
+            el.required = ativo && eraObrigatorio && !bloqueadoPeloServidor;
+        }
+    });
+}
+
 function updateTipo() {
     const carga = isCarga();
+
     document.querySelectorAll('.carga-field').forEach(el => el.style.display = carga ? '' : 'none');
     document.querySelectorAll('.normal-field').forEach(el => el.style.display = carga ? 'none' : '');
 
+    // Além de esconder, desabilita os controles do tipo que não está ativo.
+    // Isso impede validação e envio acidental de campos ocultos.
+    alternarControlesDoBloco('.carga-field', carga);
+    alternarControlesDoBloco('.normal-field', !carga);
+
     const motorista = document.getElementById('motoristaCarga');
-    if (motorista) motorista.required = carga;
+    if (motorista) {
+        motorista.required = carga && !motorista.disabled;
+    }
+
+    const quantidadeNormal = document.getElementById('quantidadeSolicitadaNormal');
+    if (quantidadeNormal) {
+        quantidadeNormal.required = !carga && !quantidadeNormal.disabled;
+    }
 
     if (carga && !document.querySelector('.carga-row')) addCargaRow();
+
+    // A linha adicionada acima nasce depois da primeira alternância.
+    // Garante que o estado de todos os controles fique coerente.
+    alternarControlesDoBloco('.carga-field', carga);
+
     updateTotal();
 }
 
@@ -310,7 +353,7 @@ function addCargaRow() {
         <td><input type="hidden" name="carga_item_id[]" value=""><input name="carga_cliente[]" class="form-control carga-cliente" required placeholder="Cliente"></td>
         <td><input name="carga_codigo[]" class="form-control carga-codigo" list="produtosCarga" required placeholder="Código"></td>
         <td><div class="product-info text-muted">Sem descrição cadastrada</div></td>
-        <td><input type="number" name="carga_quantidade[]" class="form-control carga-qtd" min="1" step="1" required placeholder="0"></td>
+        <td><input type="number" name="carga_quantidade[]" class="form-control carga-qtd" min="0" step="1" placeholder="Carga aberta"></td>
         <td><button type="button" class="btn-remove-line" title="Remover item"><i class="fas fa-trash"></i></button></td>`;
     body.appendChild(tr);
     bindRow(tr);

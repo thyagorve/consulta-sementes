@@ -100,53 +100,53 @@
     </div>
     {% endif %}
 
-    <!-- BOTÃO COLUNAS -->
-    <button class="btn btn-sm mb-2" onclick="toggleColunas()" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:600;"><i class="fas fa-columns me-1"></i> Colunas</button>
+    <!-- FERRAMENTAS DA TABELA -->
+    <div class="d-flex gap-2 mb-2 flex-wrap"><button class="btn btn-sm" onclick="toggleColunas()" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:600;"><i class="fas fa-columns me-1"></i> Colunas</button><button class="btn btn-sm btn-outline-secondary" onclick="limparTodosFiltros()"><i class="fas fa-filter-circle-xmark me-1"></i> Limpar filtros</button></div>
 
     <!-- TABELA -->
     <div class="table-wrapper"><div class="table-scroll-container">
         <table class="table-advanced" id="mainTable">
             <thead><tr>
-                <th onclick="abrirFiltro('status',this)">Status <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('produto',this)">Produto <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('lote',this)">Lote <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('cultivar',this)">Cultivar <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('peneira',this)">Pen <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('categoria',this)">Cat <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('especie',this)">Espécie <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('tratamento',this)">Trat <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('embalagem',this)">Emb <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('cliente',this)">Cliente <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('empresa',this)">Empresa <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('az',this)">Armazém <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('endereco',this)">Endereço <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('empenhado',this)">Empenhado <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('saldo',this)">Saldo <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('disponivel',this)">Disponível <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('data',this)">Última mov. <i class="fas fa-filter"></i></th>
-                <th onclick="abrirFiltro('rascunhos',this)">Rascunhos <i class="fas fa-filter"></i></th>
+                <th data-col="status" onclick="abrirFiltro('status',this)">Status <i class="fas fa-filter"></i></th>
+                <th data-col="produto" onclick="abrirFiltro('produto',this)">Produto <i class="fas fa-filter"></i></th>
+                <th data-col="lote" onclick="abrirFiltro('lote',this)">Lote <i class="fas fa-filter"></i></th>
+                <th data-col="data" onclick="abrirFiltro('data',this)">Última movimentação <i class="fas fa-calendar-days ms-1"></i><i class="fas fa-filter ms-1"></i></th>
+                <th data-col="cultivar" onclick="abrirFiltro('cultivar',this)">Cultivar <i class="fas fa-filter"></i></th>
+                <th data-col="peneira" onclick="abrirFiltro('peneira',this)">Pen <i class="fas fa-filter"></i></th>
+                <th data-col="categoria" onclick="abrirFiltro('categoria',this)">Cat <i class="fas fa-filter"></i></th>
+                <th data-col="especie" onclick="abrirFiltro('especie',this)">Espécie <i class="fas fa-filter"></i></th>
+                <th data-col="tratamento" onclick="abrirFiltro('tratamento',this)">Trat <i class="fas fa-filter"></i></th>
+                <th data-col="embalagem" onclick="abrirFiltro('embalagem',this)">Emb <i class="fas fa-filter"></i></th>
+                <th data-col="cliente" onclick="abrirFiltro('cliente',this)">Cliente <i class="fas fa-filter"></i></th>
+                <th data-col="empresa" onclick="abrirFiltro('empresa',this)">Empresa <i class="fas fa-filter"></i></th>
+                <th data-col="az" onclick="abrirFiltro('az',this)">Armazém <i class="fas fa-filter"></i></th>
+                <th data-col="endereco" onclick="abrirFiltro('endereco',this)">Endereço <i class="fas fa-filter"></i></th>
+                <th data-col="empenhado" onclick="abrirFiltro('empenhado',this)">Empenhado <i class="fas fa-filter"></i></th>
+                <th data-col="saldo" onclick="abrirFiltro('saldo',this)">Saldo <i class="fas fa-filter"></i></th>
+                <th data-col="disponivel" onclick="abrirFiltro('disponivel',this)">Disponível <i class="fas fa-filter"></i></th>
+                <th data-col="rascunhos" onclick="abrirFiltro('rascunhos',this)">Rascunhos <i class="fas fa-filter"></i></th>
             </tr></thead>
             <tbody>
                 {% for item in lotes %}
                 <tr>
-                    <td><div class="status-sistemico-indicator" style="background-color:{{ item.lote.status_sistemico.cor|default:'#6c757d' }};" title="{{ item.lote.get_status_legenda_completa|default:'Sem status' }}">{{ item.lote.status_sistemico.icone|default:'' }}</div><span class="visually-hidden">{{ item.lote.status_sistemico.nome|default:'-' }}</span></td>
-                    <td>{{ item.lote.produto|default:"-" }}</td>
-                    <td class="fw-bold text-primary">{{ item.lote.lote }}</td>
-                    <td>{{ item.lote.cultivar.nome|default:"-" }}</td>
-                    <td>{{ item.lote.peneira.nome|default:"-" }}</td>
-                    <td>{{ item.lote.categoria.nome|default:"-" }}</td>
-                    <td>{{ item.lote.especie.nome|default:"-" }}</td>
-                    <td>{{ item.lote.tratamento.nome|default:"-" }}</td>
-                    <td>{{ item.lote.get_embalagem_display|default:"-" }}</td>
-                    <td>{{ item.lote.cliente|default:"-" }}</td>
-                    <td>{{ item.lote.empresa|default:"-" }}</td>
-                    <td>{{ item.lote.az|default:"-" }}</td>
-                    <td><span class="endereco-badge">{{ item.lote.endereco }}</span></td>
-                    <td><span class="badge badge-empenhado">{{ item.empenhado|intcomma }}</span></td>
-                    <td><span class="badge badge-saldo {% if item.lote.saldo > 0 %}bg-success{% else %}bg-danger{% endif %}">{{ item.lote.saldo|intcomma }}</span></td>
-                    <td><span class="badge badge-disponivel">{{ item.disponivel|intcomma }}</span></td>
-                    <td>{{ item.lote.data_ultima_movimentacao|date:"d/m/Y H:i"|default:"-" }}</td>
-                    <td>{% for r in item.itens_empenho %}<span class="tag-rascunho">{{ r.empenho.observacao|default:'Card'|truncatechars:8 }}:{{ r.quantidade }} <form method="POST" class="d-inline" onsubmit="return confirm('Remover?')">{% csrf_token %}<input type="hidden" name="excluir_item" value="1"><input type="hidden" name="item_id" value="{{ r.id }}"><button class="btn btn-link text-danger p-0" style="font-size:0.5rem;"><i class="fas fa-times"></i></button></form></span>{% endfor %}</td>
+                    <td data-col="status" data-filter-value="{{ item.lote.status_sistemico.nome|default:'(vazio)'|escape }}"><div class="status-sistemico-indicator" style="background-color:{{ item.lote.status_sistemico.cor|default:'#6c757d' }};" title="{{ item.lote.get_status_legenda_completa|default:'Sem status' }}">{{ item.lote.status_sistemico.icone|default:'' }}</div><span class="visually-hidden">{{ item.lote.status_sistemico.nome|default:'-' }}</span></td>
+                    <td data-col="produto">{{ item.lote.produto|default:"-" }}</td>
+                    <td class="fw-bold text-primary" data-col="lote">{{ item.lote.lote }}</td>
+                    <td data-col="data" data-filter-date="{{ item.lote.data_ultima_movimentacao|date:'Y-m-d' }}">{{ item.lote.data_ultima_movimentacao|date:"d/m/Y H:i"|default:"-" }}</td>
+                    <td data-col="cultivar">{{ item.lote.cultivar.nome|default:"-" }}</td>
+                    <td data-col="peneira">{{ item.lote.peneira.nome|default:"-" }}</td>
+                    <td data-col="categoria">{{ item.lote.categoria.nome|default:"-" }}</td>
+                    <td data-col="especie">{{ item.lote.especie.nome|default:"-" }}</td>
+                    <td data-col="tratamento">{{ item.lote.tratamento.nome|default:"-" }}</td>
+                    <td data-col="embalagem">{{ item.lote.get_embalagem_display|default:"-" }}</td>
+                    <td data-col="cliente" data-filter-value="{{ item.lote.cliente|default:'(vazio)'|escape }}">{{ item.lote.cliente|default:"-" }}</td>
+                    <td data-col="empresa">{{ item.lote.empresa|default:"-" }}</td>
+                    <td data-col="az">{{ item.lote.az|default:"-" }}</td>
+                    <td data-col="endereco"><span class="endereco-badge">{{ item.lote.endereco }}</span></td>
+                    <td data-col="empenhado"><span class="badge badge-empenhado">{{ item.empenhado|intcomma }}</span></td>
+                    <td data-col="saldo"><span class="badge badge-saldo {% if item.lote.saldo > 0 %}bg-success{% else %}bg-danger{% endif %}">{{ item.lote.saldo|intcomma }}</span></td>
+                    <td data-col="disponivel"><span class="badge badge-disponivel">{{ item.disponivel|intcomma }}</span></td>
+                    <td data-col="rascunhos">{% for r in item.itens_empenho %}<span class="tag-rascunho">{{ r.empenho.observacao|default:'Card'|truncatechars:8 }}:{{ r.quantidade }} <form method="POST" class="d-inline" onsubmit="return confirm('Remover?')">{% csrf_token %}<input type="hidden" name="excluir_item" value="1"><input type="hidden" name="item_id" value="{{ r.id }}"><button class="btn btn-link text-danger p-0" style="font-size:0.5rem;"><i class="fas fa-times"></i></button></form></span>{% endfor %}</td>
                 </tr>
                 {% empty %}<tr><td colspan="18" class="text-center py-4 text-muted">Nenhum lote</td></tr>{% endfor %}
             </tbody>
@@ -178,7 +178,7 @@
                 </table>
             </div>
             <div id="blockTransfer" class="d-none mt-3"><h6 class="text-warning">Destino</h6><div class="row g-2"><div class="col-8"><input type="text" name="novo_endereco" class="form-control" placeholder="Endereço *"></div><div class="col-4"><input type="text" name="az" class="form-control" placeholder="AZ"></div></div><input type="text" name="obs_transferencia" class="form-control mt-2" placeholder="Obs"></div>
-            <div id="blockExped" class="d-none mt-3"><h6 class="text-danger">Expedição</h6><input type="text" name="numero_carga" class="form-control mb-2" placeholder="Nº Carga *"><div class="row g-2"><div class="col-6"><input type="text" name="cliente" class="form-control bg-light" placeholder="Clientes conforme a solicitação" title="Cada item usa o cliente cadastrado na solicitação." readonly></div><div class="col-6"><input type="text" name="placa" class="form-control" placeholder="Placa"></div></div><input type="text" name="obs_expedicao" class="form-control mt-2" placeholder="Obs"></div>
+            <div id="blockExped" class="d-none mt-3"><h6 class="text-danger">Expedição</h6><input type="text" name="numero_carga" class="form-control mb-2" placeholder="Nº Carga (opcional)"><div class="row g-2"><div class="col-6"><input type="text" name="cliente" class="form-control bg-light" placeholder="Clientes conforme a solicitação" title="Cada item usa o cliente cadastrado na solicitação." readonly></div><div class="col-6"><input type="text" name="placa" class="form-control" placeholder="Placa"></div></div><input type="text" name="obs_expedicao" class="form-control mt-2" placeholder="Obs"></div>
             <textarea name="obs_global" class="form-control mt-2" rows="2" placeholder="Obs global"></textarea>
         </div>
         <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Fechar</button><button type="submit" class="btn btn-primary btn-sm fw-bold px-4" id="btnConfirmMass" disabled>Confirmar</button></div>
@@ -206,49 +206,99 @@ async function imprimirSolicitacaoRascunho(id){
 }
 // ==================== FILTROS ====================
 let filtroCol = null, filtrosAtivos = {};
-const colMap = {status:1,produto:2,lote:3,cultivar:4,peneira:5,categoria:6,especie:7,tratamento:8,embalagem:9,cliente:10,empresa:11,az:12,endereco:13,empenhado:14,saldo:15,disponivel:16,data:17,rascunhos:18};
-
+function celulaColuna(row,col){ return row.querySelector(`td[data-col="${col}"]`); }
+function valorFiltroCelula(row,col){
+    const cell=celulaColuna(row,col); if(!cell)return '(vazio)';
+    if(col==='data') return String(cell.dataset.filterDate||'').trim();
+    const explicito=cell.dataset.filterValue;
+    let valor=(explicito!==undefined?explicito:cell.textContent).replace(/\s+/g,' ').trim();
+    return (!valor||valor==='-')?'(vazio)':valor;
+}
 function abrirFiltro(col, th) {
     filtroCol = col;
-    const idx = colMap[col];
-    const vals = [...new Set([...document.querySelectorAll(`#mainTable tbody tr td:nth-child(${idx})`)].map(td=>td.textContent.trim()).filter(v=>v&&v!=='-'))].sort();
-    const sel = filtrosAtivos[col]||[];
     const popup = document.getElementById('filterPopup');
-    popup.innerHTML = `<div class="filter-header">${col}</div><div class="filter-search"><input type="text" class="form-control form-control-sm" placeholder="Buscar..." onkeyup="this.parentElement.nextElementSibling.querySelectorAll('.filter-option').forEach(o=>o.style.display=o.textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none')"></div><div class="filter-options">${vals.map(v=>`<div class="filter-option"><input type="checkbox" class="fc" value="${v}" ${sel.includes(v)?'checked':''}><span>${v}</span></div>`).join('')}</div><div class="filter-actions"><div><button class="btn btn-sm btn-link" onclick="document.querySelectorAll('.fc').forEach(c=>c.checked=true)">Todos</button><button class="btn btn-sm btn-link" onclick="document.querySelectorAll('.fc').forEach(c=>c.checked=false)">Nenhum</button></div><div><button class="btn btn-sm btn-secondary" onclick="fecharFiltro()">Cancelar</button><button class="btn btn-sm btn-primary" onclick="aplicarFiltro()">Aplicar</button></div></div>`;
-    popup.style.display='block';
-    const r=th.getBoundingClientRect();
-    popup.style.top=Math.min(r.bottom+5,window.innerHeight-350)+'px';
-    popup.style.left=Math.min(r.left,window.innerWidth-370)+'px';
+
+    if(col==='data'){
+        const atual=filtrosAtivos.data||{tipo:'data',de:'',ate:''};
+        popup.innerHTML=`
+            <div class="filter-header"><i class="fas fa-calendar-days me-1"></i>Filtrar por data</div>
+            <div class="p-3">
+                <label class="form-label small fw-bold mb-1">De</label>
+                <input type="date" id="filtroDataDe" class="form-control form-control-sm mb-2" value="${atual.de||''}">
+                <label class="form-label small fw-bold mb-1">Até</label>
+                <input type="date" id="filtroDataAte" class="form-control form-control-sm" value="${atual.ate||''}">
+                <small class="text-muted d-block mt-2">Filtra pela última movimentação registrada no lote.</small>
+            </div>
+            <div class="filter-actions">
+                <button class="btn btn-sm btn-outline-danger" onclick="limparFiltroAtual()">Limpar</button>
+                <button class="btn btn-sm btn-primary" onclick="aplicarFiltroData()">Aplicar</button>
+            </div>`;
+    }else{
+        const vals=[...new Set([...document.querySelectorAll('#mainTable tbody tr')].map(r=>valorFiltroCelula(r,col)))].sort((a,b)=>a.localeCompare(b,'pt-BR',{numeric:true}));
+        const sel=Array.isArray(filtrosAtivos[col])?filtrosAtivos[col]:[];
+        popup.innerHTML=`<div class="filter-header"><i class="fas fa-filter me-1"></i>Filtrar: ${col}</div><div class="filter-search"><input type="text" class="form-control form-control-sm" placeholder="Buscar valores..." onkeyup="this.parentElement.nextElementSibling.querySelectorAll('.filter-option').forEach(o=>o.style.display=o.textContent.toLowerCase().includes(this.value.toLowerCase())?'flex':'none')"></div><div class="filter-options">${vals.map(v=>`<label class="filter-option"><input type="checkbox" class="fc" value="${String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" ${sel.includes(v)?'checked':''}><span>${v}</span></label>`).join('')}</div><div class="filter-actions"><div><button class="btn btn-sm btn-link" onclick="document.querySelectorAll('#filterPopup .fc').forEach(c=>c.checked=true)">Todos</button><button class="btn btn-sm btn-link" onclick="document.querySelectorAll('#filterPopup .fc').forEach(c=>c.checked=false)">Nenhum</button></div><div><button class="btn btn-sm btn-outline-danger" onclick="limparFiltroAtual()">Limpar</button><button class="btn btn-sm btn-primary" onclick="aplicarFiltro()">Aplicar</button></div></div>`;
+    }
+    popup.style.display='block'; const r=th.getBoundingClientRect();
+    popup.style.top=Math.max(8,Math.min(r.bottom+5,window.innerHeight-390))+'px'; popup.style.left=Math.max(8,Math.min(r.left,window.innerWidth-370))+'px';
     document.getElementById('filterOverlay').classList.add('show');
 }
 function aplicarFiltro() {
     const s=[...document.querySelectorAll('#filterPopup .fc:checked')].map(c=>c.value);
     if(s.length) filtrosAtivos[filtroCol]=s; else delete filtrosAtivos[filtroCol];
-    document.querySelectorAll('#mainTable tbody tr').forEach(r=>{let m=true;for(const[c,v]of Object.entries(filtrosAtivos)){const td=r.querySelector(`td:nth-child(${colMap[c]})`);if(td&&!v.includes(td.textContent.trim())){m=false;break}}r.style.display=m?'':'none';});
-    document.querySelectorAll('#mainTable thead th').forEach(th=>{const icon=th.querySelector('.fa-filter');if(icon){const c=icon.parentElement.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];th.classList.toggle('filter-active',c&&filtrosAtivos[c]);}});
-    fecharFiltro();
+    aplicarTodosFiltros(); fecharFiltro();
 }
+function aplicarFiltroData(){
+    const de=document.getElementById('filtroDataDe')?.value||'';
+    const ate=document.getElementById('filtroDataAte')?.value||'';
+    if(de||ate) filtrosAtivos.data={tipo:'data',de,ate}; else delete filtrosAtivos.data;
+    aplicarTodosFiltros(); fecharFiltro();
+}
+function aplicarTodosFiltros(){
+    document.querySelectorAll('#mainTable tbody tr').forEach(r=>{
+        let ok=true;
+        for(const[c,filtro]of Object.entries(filtrosAtivos)){
+            if(c==='data'&&filtro&&filtro.tipo==='data'){
+                const valor=valorFiltroCelula(r,'data');
+                if(!valor || (filtro.de&&valor<filtro.de) || (filtro.ate&&valor>filtro.ate)){ok=false;break;}
+            }else{
+                const valor=valorFiltroCelula(r,c);
+                if(!Array.isArray(filtro)||!filtro.includes(valor)){ok=false;break;}
+            }
+        }
+        r.style.display=ok?'':'none';
+    });
+    document.querySelectorAll('#mainTable thead th[data-col]').forEach(th=>th.classList.toggle('filter-active',!!filtrosAtivos[th.dataset.col]));
+}
+function limparFiltroAtual(){ if(filtroCol) delete filtrosAtivos[filtroCol]; aplicarTodosFiltros(); fecharFiltro(); }
 function fecharFiltro(){document.getElementById('filterPopup').style.display='none';document.getElementById('filterOverlay').classList.remove('show');filtroCol=null;}
-function limparTodosFiltros(){filtrosAtivos={};document.querySelectorAll('#mainTable tbody tr').forEach(r=>r.style.display='');document.querySelectorAll('#mainTable thead th').forEach(th=>th.classList.remove('filter-active'));}
+function limparTodosFiltros(){filtrosAtivos={};aplicarTodosFiltros();}
 
-// ==================== COLUNAS ====================
-const colDefs=['status','produto','lote','cultivar','peneira','categoria','especie','tratamento','embalagem','cliente','empresa','az','endereco','empenhado','saldo','disponivel','data','rascunhos'];
-const colFixas=[0,2,12,13,14,15,17];
+// ==================== COLUNAS: VISIBILIDADE + ORDEM ====================
+const colDefs=[
+ {key:'status',label:'Status',fixa:true},{key:'produto',label:'Produto'},{key:'lote',label:'Lote',fixa:true},{key:'data',label:'Última movimentação',fixa:true},{key:'cultivar',label:'Cultivar'},
+ {key:'peneira',label:'Peneira'},{key:'categoria',label:'Categoria'},{key:'especie',label:'Espécie'},{key:'tratamento',label:'Tratamento'},
+ {key:'embalagem',label:'Embalagem'},{key:'cliente',label:'Cliente'},{key:'empresa',label:'Empresa'},{key:'az',label:'Armazém'},
+ {key:'endereco',label:'Endereço',fixa:true},{key:'empenhado',label:'Empenhado',fixa:true},{key:'saldo',label:'Saldo',fixa:true},
+ {key:'disponivel',label:'Disponível',fixa:true},{key:'rascunhos',label:'Rascunhos',fixa:true}
+];
+const VIS_KEY='rc_vis_v4', ORDER_KEY='rc_order_v4';
+function ordemAtual(){const salva=JSON.parse(localStorage.getItem(ORDER_KEY)||'null');const keys=colDefs.map(x=>x.key);return Array.isArray(salva)&&salva.length===keys.length&&salva.every(k=>keys.includes(k))?salva:keys;}
+function aplicarOrdemColunas(ordem){
+ const table=document.getElementById('mainTable'); if(!table)return;
+ const head=table.querySelector('thead tr'); ordem.forEach(k=>{const th=head.querySelector(`th[data-col="${k}"]`);if(th)head.appendChild(th);});
+ table.querySelectorAll('tbody tr').forEach(row=>ordem.forEach(k=>{const td=row.querySelector(`td[data-col="${k}"]`);if(td)row.appendChild(td);}));
+}
+function aplicarVisibilidadeColunas(){const vis=JSON.parse(localStorage.getItem(VIS_KEY)||'{}');colDefs.forEach(d=>{const mostrar=d.fixa||vis[d.key]!==false;document.querySelectorAll(`#mainTable [data-col="${d.key}"]`).forEach(el=>el.style.display=mostrar?'':'none');});}
 function toggleColunas(){
-    const c=document.getElementById('colManager');
-    if(c.style.display==='block'){c.style.display='none';return;}
-    const saved=JSON.parse(localStorage.getItem('rc_v2')||'{}');
-    document.getElementById('colList').innerHTML=colDefs.map((d,i)=>`<div class="column-manager-item"><input type="checkbox" id="vc-${i}" ${saved[i]!==undefined?saved[i]:true?'checked':''} ${colFixas.includes(i)?'disabled':''}><span>${d}</span>${colFixas.includes(i)?'<small style="color:#94a3b8">fixa</small>':''}</div>`).join('');
-    c.style.display='block';
+ const c=document.getElementById('colManager');if(c.style.display==='block'){c.style.display='none';return;}
+ const vis=JSON.parse(localStorage.getItem(VIS_KEY)||'{}');const ordem=ordemAtual();
+ document.getElementById('colList').innerHTML=ordem.map(k=>{const d=colDefs.find(x=>x.key===k);return `<div class="column-manager-item" draggable="true" data-key="${k}"><i class="fas fa-grip-vertical text-primary" title="Segure e arraste para mover a coluna"></i><input type="checkbox" id="vc-${k}" ${d.fixa||vis[k]!==false?'checked':''} ${d.fixa?'disabled':''}><span style="flex:1">${d.label}</span>${d.fixa?'<small style="color:#94a3b8">fixa</small>':''}</div>`}).join('');
+ habilitarDragColunas();c.style.display='block';
 }
-function applyColunas(){
-    const v={};colDefs.forEach((d,i)=>{const cb=document.getElementById('vc-'+i);if(cb)v[i]=cb.checked;});
-    localStorage.setItem('rc_v2',JSON.stringify(v));
-    colDefs.forEach((d,i)=>{document.querySelectorAll(`#mainTable th:nth-child(${i+1}),#mainTable td:nth-child(${i+1})`).forEach(el=>el.style.display=v[i]?'':'none');});
-    document.getElementById('colManager').style.display='none';
-}
-function resetColunas(){localStorage.removeItem('rc_v2');colDefs.forEach((d,i)=>{document.querySelectorAll(`#mainTable th:nth-child(${i+1}),#mainTable td:nth-child(${i+1})`).forEach(el=>el.style.display='');});document.getElementById('colManager').style.display='none';}
-document.addEventListener('DOMContentLoaded',()=>{const s=JSON.parse(localStorage.getItem('rc_v2')||'{}');if(Object.keys(s).length)colDefs.forEach((d,i)=>{if(s[i]===false)document.querySelectorAll(`#mainTable th:nth-child(${i+1}),#mainTable td:nth-child(${i+1})`).forEach(el=>el.style.display='none');});});
+function habilitarDragColunas(){let drag=null;document.querySelectorAll('#colList .column-manager-item').forEach(el=>{el.addEventListener('dragstart',()=>{drag=el;el.style.opacity='.45'});el.addEventListener('dragend',()=>{el.style.opacity='';drag=null});el.addEventListener('dragover',e=>{e.preventDefault();if(!drag||drag===el)return;const r=el.getBoundingClientRect();el.parentNode.insertBefore(drag,e.clientY<r.top+r.height/2?el:el.nextSibling);});});}
+function applyColunas(){const ordem=[...document.querySelectorAll('#colList .column-manager-item')].map(x=>x.dataset.key);const vis={};colDefs.forEach(d=>{const cb=document.getElementById('vc-'+d.key);vis[d.key]=d.fixa?true:(cb?cb.checked:true);});localStorage.setItem(ORDER_KEY,JSON.stringify(ordem));localStorage.setItem(VIS_KEY,JSON.stringify(vis));aplicarOrdemColunas(ordem);aplicarVisibilidadeColunas();document.getElementById('colManager').style.display='none';}
+function resetColunas(){localStorage.removeItem(ORDER_KEY);localStorage.removeItem(VIS_KEY);aplicarOrdemColunas(colDefs.map(x=>x.key));aplicarVisibilidadeColunas();document.getElementById('colManager').style.display='none';}
+document.addEventListener('DOMContentLoaded',()=>{aplicarOrdemColunas(ordemAtual());aplicarVisibilidadeColunas();});
 
 // ==================== MODAL ====================
 function updateBtn(){document.getElementById('btnConfirmMass').disabled=!document.querySelectorAll('#modalItemsList .modal-item-checkbox:checked').length;}
@@ -268,11 +318,14 @@ function abrirModal(acao,cardId){
     }catch(e){console.error(e);tbody.innerHTML='<tr><td colspan="11" class="text-center text-danger py-3">Erro ao carregar dados</td></tr>';}
     new bootstrap.Modal(document.getElementById('modalMassa')).show();
 }
+let processandoMovimentacao=false;
 document.querySelector('#modalMassa form').addEventListener('submit',function(e){
     e.preventDefault();
+    if(processandoMovimentacao)return;
     const ids=[...document.querySelectorAll('#modalItemsList .modal-item-checkbox:checked')].map(c=>parseInt(c.getAttribute('data-item-id'))).filter(id=>id>0);
     if(!ids.length){alert('Selecione pelo menos um item!');return;}
     document.getElementById('selected_items_input').value=JSON.stringify(ids);
+    processandoMovimentacao=true; const b=document.getElementById('btnConfirmMass'); if(b){b.disabled=true;b.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Processando...';}
     this.submit();
 });
 </script>

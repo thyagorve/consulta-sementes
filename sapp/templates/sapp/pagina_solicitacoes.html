@@ -4112,18 +4112,14 @@ function calcularMaximoQuantidadeLote(id) {
         );
     });
 
-    const restante = Math.max(
-        0,
-        solicitado - jaEmpenhado - outrosSelecionados
-    );
+    // Carga aberta: solicitado = 0 significa sem teto comercial.
+    // O limite passa a ser somente o disponível físico do lote.
+    if (solicitado <= 0 && cargaItemAtualId) {
+        return Math.max(0, Math.floor(disponivel));
+    }
 
-    return Math.max(
-        0,
-        Math.min(
-            disponivel,
-            Math.floor(restante)
-        )
-    );
+    const restante = Math.max(0, solicitado - jaEmpenhado - outrosSelecionados);
+    return Math.max(0, Math.min(disponivel, Math.floor(restante)));
 }
 
 function atualizarCheckboxesOrientacao() {
@@ -4371,15 +4367,17 @@ function configurarSeletorItemCarga(data) {
     select.innerHTML = cargaItensResumo.map((item, idx) => {
         const solicitado = Number(item.quantidade_solicitada || 0);
         const empenhado = Number(item.quantidade_empenhada || 0);
+        const aberta = !!item.quantidade_aberta || solicitado <= 0;
         const restante = Number(item.quantidade_restante || 0);
-        const status = item.completo ? '✓ completo' : `resta ${restante}`;
-        return `<option value="${item.id}" ${Number(item.id) === Number(cargaItemAtualId) ? 'selected' : ''}>${idx + 1}. ${escaparHtml(item.cliente || '-')} · ${escaparHtml(item.codigo || '-')} · ${solicitado} (${status})</option>`;
+        const status = aberta ? `carga aberta · empenhado ${empenhado}` : (item.completo ? '✓ completo' : `resta ${restante}`);
+        const qtdLabel = aberta ? 'SEM LIMITE' : solicitado;
+        return `<option value="${item.id}" ${Number(item.id) === Number(cargaItemAtualId) ? 'selected' : ''}>${idx + 1}. ${escaparHtml(item.cliente || '-')} · ${escaparHtml(item.codigo || '-')} · ${qtdLabel} (${status})</option>`;
     }).join('');
 
     const atual = cargaItensResumo.find(item => Number(item.id) === Number(cargaItemAtualId));
     if (info) {
         info.innerHTML = atual
-            ? `<strong>${escaparHtml(atual.codigo || '-')}</strong> · ${escaparHtml(atual.descricao || 'Sem descrição')}<br>Cliente: <strong>${escaparHtml(atual.cliente || '-')}</strong> · Empenhado: ${Number(atual.quantidade_empenhada || 0)} / ${Number(atual.quantidade_solicitada || 0)}`
+            ? `<strong>${escaparHtml(atual.codigo || '-')}</strong> · ${escaparHtml(atual.descricao || 'Sem descrição')}<br>Cliente: <strong>${escaparHtml(atual.cliente || '-')}</strong> · Empenhado: ${Number(atual.quantidade_empenhada || 0)}${(atual.quantidade_aberta || Number(atual.quantidade_solicitada||0)<=0) ? ' · CARGA ABERTA' : ' / ' + Number(atual.quantidade_solicitada || 0)}`
             : 'Nenhum item de carga disponível.';
     }
 }
@@ -5544,7 +5542,9 @@ async function removerItem(itemId, loteId) {
     }
 }
 
+let salvandoEmpenhoAgora = false;
 async function salvarEmpenho() {
+    if (salvandoEmpenhoAgora) return;
     if (dataGrid.empenhoBloqueado) {
         alert('🔒 A movimentação já foi iniciada. O empenho não pode mais ser alterado.');
         return;
@@ -5577,6 +5577,7 @@ async function salvarEmpenho() {
     }
     
     const btn = document.getElementById('btnConfirmar');
+    salvandoEmpenhoAgora = true;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
     
@@ -5613,6 +5614,7 @@ async function salvarEmpenho() {
     } catch(e) {
         alert('❌ ' + (e.message || 'Erro'));
     } finally {
+        salvandoEmpenhoAgora = false;
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-save me-1"></i> Salvar Alterações';
     }
@@ -6737,7 +6739,9 @@ window.abrirMovModal = async function(solId, acao) {
 };
 
 
+let movimentacaoEmProcessamento = false;
 window.confirmarMov = async function() {
+    if (movimentacaoEmProcessamento) return;
     const ids = [
         ...document.querySelectorAll(
             '.mov-chk:checked'
@@ -6829,6 +6833,7 @@ window.confirmarMov = async function() {
 
     const textoOriginal = btn.innerHTML;
 
+    movimentacaoEmProcessamento = true;
     btn.disabled = true;
 
     btn.innerHTML = `
@@ -6884,6 +6889,7 @@ window.confirmarMov = async function() {
         );
 
     } finally {
+        movimentacaoEmProcessamento = false;
         btn.disabled = false;
         btn.innerHTML = textoOriginal;
     }

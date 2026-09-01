@@ -7,33 +7,56 @@ from decimal import Decimal, InvalidOperation
 import json  # <-- ADICIONE ESTA LINHA
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
+
+def normalizar_texto_cadastro(valor, maiusculo=True):
+    """Remove espaços nas pontas, reduz espaços internos e padroniza caixa."""
+    if valor is None:
+        return valor
+    valor = ' '.join(str(valor).strip().split())
+    return valor.upper() if maiusculo else valor
+
+
+class CadastroNomeNormalizadoMixin(models.Model):
+    """Padronização usada nos cadastros mestres do sistema."""
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if hasattr(self, 'nome'):
+            self.nome = normalizar_texto_cadastro(self.nome)
+            if self.nome:
+                for pk, existente in self.__class__.objects.exclude(pk=self.pk).values_list('pk', 'nome'):
+                    if normalizar_texto_cadastro(existente) == self.nome:
+                        raise ValidationError(f"Já existe {self._meta.verbose_name} com o valor '{self.nome}'.")
+        super().save(*args, **kwargs)
 
 # ============================================================================
 # TABELAS AUXILIARES (Cadastros Básicos)
 # ============================================================================
 
-class Cultivar(models.Model):
+class Cultivar(CadastroNomeNormalizadoMixin, models.Model):
     nome = models.CharField(max_length=50, unique=True)
     def __str__(self): return self.nome
 
-class Peneira(models.Model):
+class Peneira(CadastroNomeNormalizadoMixin, models.Model):
     nome = models.CharField(max_length=50, unique=True)
     def __str__(self): return self.nome
 
-class Categoria(models.Model):
+class Categoria(CadastroNomeNormalizadoMixin, models.Model):
     nome = models.CharField(max_length=50, unique=True)
     def __str__(self): return self.nome
 
-class Tratamento(models.Model):
+class Tratamento(CadastroNomeNormalizadoMixin, models.Model):
     nome = models.CharField(max_length=100, unique=True)
     def __str__(self): return self.nome
 
-class Especie(models.Model):
+class Especie(CadastroNomeNormalizadoMixin, models.Model):
     nome = models.CharField(max_length=50, unique=True)
     def __str__(self): return self.nome
 
-class OrigemDestino(models.Model):
+class OrigemDestino(CadastroNomeNormalizadoMixin, models.Model):
     nome = models.CharField(max_length=100, unique=True)
     def __str__(self): return self.nome
 
@@ -43,7 +66,7 @@ class OrigemDestino(models.Model):
 
 # models.py - Adicione/atualize
 
-class Armazem(models.Model):
+class Armazem(CadastroNomeNormalizadoMixin, models.Model):
     nome = models.CharField(max_length=20, unique=True)
     def __str__(self): return self.nome
 
@@ -63,6 +86,14 @@ class Endereco(models.Model):
         if self.armazem:
             return f"{self.codigo} ({self.armazem.nome})"
         return self.codigo
+
+    def save(self, *args, **kwargs):
+        self.codigo = normalizar_texto_cadastro(self.codigo)
+        if self.codigo:
+            for pk, existente in Endereco.objects.exclude(pk=self.pk).values_list('pk', 'codigo'):
+                if normalizar_texto_cadastro(existente) == self.codigo:
+                    raise ValidationError(f"Já existe o endereço '{self.codigo}'.")
+        super().save(*args, **kwargs)
     
 
     
@@ -177,6 +208,12 @@ class Estoque(models.Model):
     
     # NOVO: Sobrescrever save para definir status padrão
     def save(self, *args, **kwargs):
+        # Campos de identificação seguem o padrão global. Observação permanece texto livre.
+        for campo in ('lote', 'produto', 'endereco', 'origem_destino', 'empresa', 'az', 'cliente'):
+            valor = getattr(self, campo, None)
+            if valor is not None:
+                setattr(self, campo, normalizar_texto_cadastro(valor))
+
         original = None
         if self.pk:
             try:
@@ -278,7 +315,7 @@ class HistoricoStatusSistemico(models.Model):
         ordering = ['-alterado_em']
     
     def __str__(self):
-        return f"{self.estoque.lote} - {self.status_anterior} → {self.status_novo} em {self.alterado_em.strftime('%d/%m/%Y %H:%M')}"
+        return f"{self.estoque.lote} - {self.status_anterior} → {self.status_novo} em {timezone.localtime(self.alterado_em).strftime('%d/%m/%Y %H:%M')}"
 # sapp/models.py - Adicionar método para legenda completa
 
 def get_status_legenda_completa(self):
@@ -1216,6 +1253,17 @@ class Produto(models.Model):
             ("pode_configuracoes", "Pode alterar configurações"),
         ]
     
+    def save(self, *args, **kwargs):
+        self.codigo = normalizar_texto_cadastro(self.codigo)
+        if self.codigo:
+            for pk, existente in Produto.objects.exclude(pk=self.pk).values_list('pk', 'codigo'):
+                if normalizar_texto_cadastro(existente) == self.codigo:
+                    raise ValidationError(f"Já existe o produto com código '{self.codigo}'.")
+        self.tipo = normalizar_texto_cadastro(self.tipo) if self.tipo else self.tipo
+        self.empresa = normalizar_texto_cadastro(self.empresa) if self.empresa else self.empresa
+        self.descricao = normalizar_texto_cadastro(self.descricao) if self.descricao else ''
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.codigo} - {self.cultivar.nome}"
     
@@ -1780,7 +1828,10 @@ class Solicitacao(models.Model):
         )
 
         if quantidade_solicitada <= 0:
-            return Decimal('0.00')
+            # Carga aberta: qualquer quantidade empenhada representa 100%,
+            # mas o empenho continua aceitando novas reservas até a movimentação iniciar.
+            quantidade_atual = Decimal(str(self.quantidade_empenhada or 0))
+            return Decimal('100.00') if self.tipo_solicitacao == 'CARGA' and quantidade_atual > 0 else Decimal('0.00')
 
         if self.unidade_controle == 'QUILOGRAMA':
             quantidade_empenhada = (
@@ -2023,6 +2074,12 @@ class SolicitacaoItemCarga(models.Model):
         ordering = ['ordem', 'id']
         verbose_name = 'Item de carga'
         verbose_name_plural = 'Itens de carga'
+
+    def save(self, *args, **kwargs):
+        self.cliente = normalizar_texto_cadastro(self.cliente)
+        self.codigo = normalizar_texto_cadastro(self.codigo)
+        self.descricao = normalizar_texto_cadastro(self.descricao) if self.descricao else ''
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.cliente} | {self.codigo} | {self.quantidade_solicitada}'
