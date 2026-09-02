@@ -6,6 +6,42 @@ from .models import (
 )
 from decimal import Decimal, InvalidOperation
 from django.contrib.auth.models import User
+from django.contrib.auth.forms import AuthenticationForm
+
+
+class CaseInsensitiveAuthenticationForm(AuthenticationForm):
+    """
+    Formulário de login tolerante a maiúsculas/minúsculas no usuário.
+
+    O username salvo no banco NÃO é alterado. Apenas localizamos o usuário
+    de forma case-insensitive e entregamos ao AuthenticationForm o username
+    canônico antes de validar a senha.
+    """
+
+    def clean(self):
+        username = str(self.cleaned_data.get('username') or '').strip()
+
+        if username:
+            # Primeiro preserva o comportamento exato do Django.
+            usuario = User.objects.filter(username=username, is_active=True).first()
+
+            # Se não encontrou exatamente, aceita diferença apenas de caixa.
+            if usuario is None:
+                candidatos = list(
+                    User.objects.filter(
+                        username__iexact=username,
+                        is_active=True,
+                    ).order_by('id')[:2]
+                )
+                # Só usamos o modo case-insensitive quando há um único usuário
+                # compatível. Isso evita qualquer ambiguidade em bases antigas.
+                if len(candidatos) == 1:
+                    usuario = candidatos[0]
+
+            if usuario is not None:
+                self.cleaned_data['username'] = usuario.get_username()
+
+        return super().clean()
 
 class NovaEntradaForm(forms.ModelForm):
     class Meta:

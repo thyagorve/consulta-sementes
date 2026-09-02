@@ -3157,14 +3157,14 @@ def configuracoes(request):
             if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
                 messages.error(request, "❌ Você não tem permissão para criar usuários!")
             else:
-                username = request.POST.get('username', '').strip().lower()
+                username = request.POST.get('username', '').strip()
                 first_name = request.POST.get('first_name', '').strip()
                 password = request.POST.get('password', '').strip()
                 
                 # Validações
                 if not username or not first_name:
                     messages.error(request, "❌ Nome de usuário e nome completo são obrigatórios!")
-                elif User.objects.filter(username=username).exists():
+                elif User.objects.filter(username__iexact=username).exists():
                     messages.error(request, f"❌ Usuário '{username}' já existe!")
                 else:
                     try:
@@ -3304,8 +3304,8 @@ def configuracoes(request):
                 try:
                     user_id = request.POST.get('user_id')
                     usuario = User.objects.get(id=user_id, is_active=True)
-                    username = str(request.POST.get('username', '') or '').strip().lower()
-                    first_name = normalizar_texto_cadastro(request.POST.get('first_name', ''))
+                    username = str(request.POST.get('username', '') or '').strip()
+                    first_name = str(request.POST.get('first_name', '') or '').strip()
                     if not username or not first_name:
                         raise ValueError('Login e nome são obrigatórios.')
                     if User.objects.filter(username__iexact=username).exclude(id=usuario.id).exists():
@@ -8889,61 +8889,65 @@ def api_listar_enderecos(request):
 @login_required
 def redirecionar_usuario(request):
     """
-    Redireciona o usuário para a primeira página que ele tem permissão
+    Envia o usuário para a primeira tela que ele realmente pode acessar.
+
+    Importante: o login usa esta view como LOGIN_REDIRECT_URL. Assim um
+    usuário sem Dashboard, mas com Estoque/Solicitações/Almoxarifado, não
+    cai em uma página proibida logo depois de autenticar.
     """
     user = request.user
-    
-    print(f"\n🔍 REDIRECIONANDO USUÁRIO: {user.username}")
-    print(f"Superusuário: {user.is_superuser}")
-    
-    # Mostrar todas as permissões para debug
-    all_perms = list(user.get_all_permissions())
-    print(f"Permissões totais: {all_perms}")
-    
-    # Superusuário vai para dashboard
+
     if user.is_superuser:
-        print("✅ Superusuário -> Dashboard")
         return redirect('sapp:dashboard')
-    
-    # 🔥 PRIORIDADE 1: ALMOXARIFADO (APENAS VISUALIZAÇÃO)
-    if user.has_perm('almoxarifado.pode_ver_almoxarifado'):
-        print("✅ Usuário tem permissão de almoxarifado -> Redirecionando para Almoxarifado")
+
+    # Almoxarifado
+    if (
+        user.has_perm('almoxarifado.pode_ver_almoxarifado')
+        or user.has_perm('almoxarifado.pode_gerenciar_almoxarifado')
+    ):
         return redirect('almoxarifado:lista_itens')
-    
-    # 🔥 PRIORIDADE 2: ALMOXARIFADO (GERENCIAR)
-    if user.has_perm('almoxarifado.pode_gerenciar_almoxarifado'):
-        print("✅ Usuário tem permissão de gerenciar almoxarifado -> Redirecionando para Almoxarifado")
-        return redirect('almoxarifado:lista_itens')
-    
-    # 🔥 PRIORIDADE 3: EMPENHO
-    if user.has_perm('sapp.pode_ver_empenhos') or user.has_perm('sapp.pode_criar_empenhos'):
-        print("✅ Usuário tem permissão de empenho -> Redirecionando para Empenho")
-        return redirect('sapp:pagina_rascunho')
-    
-    # 🔥 PRIORIDADE 4: ESTOQUE (visualização)
+
+    # Solicitações / empenho
+    if user.has_perm('sapp.pode_ver_empenhos'):
+        return redirect('sapp:pagina_solicitacoes')
+
+    if user.has_perm('sapp.pode_criar_solicitacao'):
+        return redirect('sapp:criar_solicitacao')
+
+    if (
+        user.has_perm('sapp.pode_empenhar_solicitacao')
+        or user.has_perm('sapp.pode_movimentar_solicitacao')
+        or user.has_perm('sapp.pode_cancelar_solicitacao')
+        or user.has_perm('sapp.pode_criar_empenhos')
+    ):
+        return redirect('sapp:pagina_kanban')
+
+    # Estoque
     if user.has_perm('sapp.pode_ver_estoque'):
-        print("✅ Usuário tem permissão de estoque -> Redirecionando para Estoque")
         return redirect('sapp:lista_estoque')
-    
-    # 🔥 PRIORIDADE 5: MOVIMENTAR ESTOQUE
+
     if user.has_perm('sapp.pode_movimentar_estoque'):
-        print("✅ Usuário tem permissão de movimentar -> Redirecionando para Gestão")
         return redirect('sapp:gestao_estoque')
-    
-    # 🔥 PRIORIDADE 6: MAPA
+
+    # Mapa
     if user.has_perm('sapp.pode_ver_mapa'):
-        print("✅ Usuário tem permissão de mapa -> Redirecionando para Mapa")
         return redirect('sapp:mapa_canvas', armazem_numero=1)
-    
-    # 🔥 PRIORIDADE 7: DASHBOARD (apenas se tiver permissão específica)
+
+    # Dashboard
     if user.has_perm('sapp.pode_ver_dashboard'):
-        print("✅ Usuário tem permissão de dashboard -> Redirecionando para Dashboard")
         return redirect('sapp:dashboard')
-    
-    # Se não tiver nenhuma permissão, fazer logout com mensagem
-    print("❌ Usuário sem nenhuma permissão! Fazendo logout...")
+
+    # Configuração do sistema
+    if user.has_perm('sapp.pode_configuracoes'):
+        return redirect('sapp:configuracoes')
+
+    # Nenhuma permissão de navegação válida.
     from django.contrib.auth import logout
-    messages.error(request, "❌ Você não tem permissão para acessar nenhuma página do sistema!")
+    messages.error(
+        request,
+        'Sua conta está ativa, mas ainda não possui permissão de acesso. '
+        'Peça a um administrador para revisar suas permissões.'
+    )
     logout(request)
     return redirect('sapp:login')
 

@@ -169,8 +169,8 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # ========== AUTENTICAÇÃO E SESSÃO ==========
-LOGIN_URL = '/login/?expired=1'
-LOGIN_REDIRECT_URL = 'sapp:dashboard'
+LOGIN_URL = 'sapp:login'
+LOGIN_REDIRECT_URL = 'sapp:redirecionar'
 LOGOUT_REDIRECT_URL = 'sapp:login'
 
 

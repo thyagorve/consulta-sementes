@@ -449,6 +449,169 @@
         height: 28px;
       }
     }
+
+
+    /* =========================================================
+       SELECT PESQUISÁVEL GLOBAL
+       Mantém o <select> original como fonte de verdade do form.
+       Funciona em desktop e celular e também em modais dinâmicos.
+       ========================================================= */
+    .smart-select-wrap {
+      position: relative;
+      width: 100%;
+      min-width: 0;
+    }
+
+    .smart-select-native {
+      position: absolute !important;
+      left: 0 !important;
+      bottom: 0 !important;
+      width: 1px !important;
+      height: 1px !important;
+      min-width: 1px !important;
+      min-height: 1px !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      border: 0 !important;
+    }
+
+    .smart-select-box {
+      position: relative;
+      width: 100%;
+    }
+
+    .smart-select-input {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 38px 8px 12px;
+      border: 1px solid #ced4da;
+      border-radius: 8px;
+      background: #fff;
+      color: #2d3748;
+      font: inherit;
+      line-height: 1.5;
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+
+    .smart-select-input:hover:not(:disabled) {
+      border-color: #9fb7a7;
+    }
+
+    .smart-select-input:focus {
+      border-color: var(--brand-primary);
+      box-shadow: 0 0 0 3px rgba(47,143,78,.12);
+      background: #fff;
+    }
+
+    .smart-select-input:disabled {
+      cursor: not-allowed;
+      background: #e9ecef;
+      color: #6c757d;
+      opacity: .85;
+    }
+
+    .smart-select-chevron {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+      color: #6b7280;
+      font-size: 11px;
+      transition: transform .15s ease;
+    }
+
+    .smart-select-wrap.is-open .smart-select-chevron {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .smart-select-menu {
+      position: fixed;
+      z-index: 2147483000;
+      display: none;
+      max-height: min(280px, 46vh);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 5px;
+      border: 1px solid #d8e0db;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 14px 38px rgba(15, 35, 23, .20);
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .smart-select-menu.show {
+      display: block;
+    }
+
+    .smart-select-option {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 38px;
+      margin: 0;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 7px;
+      background: transparent;
+      color: #26372d;
+      text-align: left;
+      font: inherit;
+      font-size: .9rem;
+      cursor: pointer;
+      word-break: break-word;
+    }
+
+    .smart-select-option:hover,
+    .smart-select-option.is-active {
+      background: #eef8f1;
+      color: #176337;
+    }
+
+    .smart-select-option.is-selected {
+      background: #e3f4e8;
+      color: #145b32;
+      font-weight: 700;
+    }
+
+    .smart-select-option:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+      background: transparent;
+    }
+
+    .smart-select-empty {
+      padding: 14px 12px;
+      color: #7a8680;
+      text-align: center;
+      font-size: .84rem;
+    }
+
+    .smart-select-group {
+      padding: 7px 10px 3px;
+      color: #6f7c75;
+      font-size: .69rem;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 768px) {
+      .smart-select-input {
+        min-height: 44px;
+        font-size: 16px; /* evita zoom automático do iPhone */
+      }
+      .smart-select-option {
+        min-height: 44px;
+        font-size: .95rem;
+      }
+      .smart-select-menu {
+        max-height: 45vh;
+      }
+    }
   </style>
   
   {% block extra_css %}{% endblock %}
@@ -742,6 +905,340 @@
     })();
   </script>
   
+
+  <script>
+    /* =========================================================
+       SELECT PESQUISÁVEL GLOBAL
+       - digite para filtrar qualquer lista de formulário;
+       - mantém o select original e dispara change/input;
+       - suporta selects adicionados depois via JavaScript;
+       - não altera selects multiple nem seletores de paginação.
+       ========================================================= */
+    (function() {
+      'use strict';
+
+      const SKIP_SELECTOR = [
+        'select[multiple]',
+        'select[size]:not([size="1"])',
+        'select[data-no-search]',
+        'select.pagination-items-select',
+        'select.history-page-size-select',
+        '.dataTables_length select'
+      ].join(',');
+
+      let openInstance = null;
+
+      function norm(text) {
+        return String(text == null ? '' : text)
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLocaleLowerCase('pt-BR')
+          .trim();
+      }
+
+      function shouldEnhance(select) {
+        return select instanceof HTMLSelectElement
+          && !select.dataset.smartSelectReady
+          && !select.matches(SKIP_SELECTOR);
+      }
+
+      function enhance(select) {
+        if (!shouldEnhance(select)) return;
+        select.dataset.smartSelectReady = '1';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'smart-select-wrap';
+
+        const box = document.createElement('div');
+        box.className = 'smart-select-box';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'smart-select-input';
+        input.autocomplete = 'off';
+        input.spellcheck = false;
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-expanded', 'false');
+        input.placeholder = select.dataset.searchPlaceholder || 'Digite para pesquisar...';
+
+        const chevron = document.createElement('span');
+        chevron.className = 'smart-select-chevron';
+        chevron.innerHTML = '<i class="fa-solid fa-chevron-down"></i>';
+
+        const menu = document.createElement('div');
+        menu.className = 'smart-select-menu';
+        menu.setAttribute('role', 'listbox');
+        document.body.appendChild(menu);
+
+        select.parentNode.insertBefore(wrap, select);
+        wrap.appendChild(select);
+        wrap.appendChild(box);
+        box.appendChild(input);
+        box.appendChild(chevron);
+        select.classList.add('smart-select-native');
+        select.tabIndex = -1;
+
+        let visibleOptions = [];
+        let activeIndex = -1;
+
+        function optionLabel(option) {
+          const own = String(option.textContent || '').trim();
+          const parent = option.parentElement;
+          if (parent && parent.tagName === 'OPTGROUP' && parent.label) {
+            return `${parent.label} · ${own}`;
+          }
+          return own;
+        }
+
+        function selectedLabel() {
+          const option = select.options[select.selectedIndex];
+          if (!option || !option.value) return '';
+          return optionLabel(option);
+        }
+
+        function syncFromNative() {
+          input.disabled = select.disabled;
+          input.value = selectedLabel();
+          input.title = input.value;
+          wrap.classList.toggle('is-disabled', select.disabled);
+        }
+
+        function positionMenu() {
+          if (!menu.classList.contains('show')) return;
+          const r = input.getBoundingClientRect();
+          const gap = 4;
+          const minWidth = Math.max(r.width, 220);
+          const maxWidth = Math.max(220, window.innerWidth - 16);
+          const width = Math.min(minWidth, maxWidth);
+          menu.style.width = `${width}px`;
+
+          let left = Math.min(r.left, window.innerWidth - width - 8);
+          left = Math.max(8, left);
+
+          const spaceBelow = window.innerHeight - r.bottom - 8;
+          const spaceAbove = r.top - 8;
+          const desired = Math.min(280, Math.max(150, menu.scrollHeight || 220));
+          const openAbove = spaceBelow < Math.min(desired, 190) && spaceAbove > spaceBelow;
+
+          menu.style.left = `${left}px`;
+          if (openAbove) {
+            const h = Math.min(menu.offsetHeight || desired, spaceAbove - gap);
+            menu.style.top = `${Math.max(8, r.top - h - gap)}px`;
+          } else {
+            menu.style.top = `${Math.min(window.innerHeight - 60, r.bottom + gap)}px`;
+          }
+        }
+
+        function close({restore = true} = {}) {
+          menu.classList.remove('show');
+          wrap.classList.remove('is-open');
+          input.setAttribute('aria-expanded', 'false');
+          activeIndex = -1;
+          if (restore) syncFromNative();
+          if (openInstance && openInstance.select === select) openInstance = null;
+        }
+
+        function choose(option) {
+          if (!option || option.disabled) return;
+          select.value = option.value;
+          select.dispatchEvent(new Event('input', { bubbles: true }));
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          syncFromNative();
+          close({restore: false});
+          input.focus({preventScroll: true});
+        }
+
+        function render(filterText = '') {
+          const term = norm(filterText);
+          menu.innerHTML = '';
+          visibleOptions = [];
+          activeIndex = -1;
+
+          let lastGroup = null;
+          Array.from(select.options).forEach(option => {
+            const label = optionLabel(option);
+            if (term && !norm(label).includes(term) && !norm(option.value).includes(term)) return;
+
+            const parent = option.parentElement;
+            const group = parent && parent.tagName === 'OPTGROUP' ? parent.label : null;
+            if (group && group !== lastGroup) {
+              const groupEl = document.createElement('div');
+              groupEl.className = 'smart-select-group';
+              groupEl.textContent = group;
+              menu.appendChild(groupEl);
+              lastGroup = group;
+            } else if (!group) {
+              lastGroup = null;
+            }
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'smart-select-option';
+            btn.setAttribute('role', 'option');
+            btn.textContent = label || (option.value ? option.value : 'Selecione...');
+            btn.disabled = option.disabled;
+            if (option.selected) {
+              btn.classList.add('is-selected');
+              btn.setAttribute('aria-selected', 'true');
+            }
+            btn.addEventListener('mousedown', e => e.preventDefault());
+            btn.addEventListener('click', e => {
+              e.preventDefault();
+              choose(option);
+            });
+            menu.appendChild(btn);
+            visibleOptions.push({option, btn});
+          });
+
+          if (!visibleOptions.length) {
+            const empty = document.createElement('div');
+            empty.className = 'smart-select-empty';
+            empty.innerHTML = '<i class="fa-solid fa-magnifying-glass me-1"></i>Nenhum resultado';
+            menu.appendChild(empty);
+          }
+        }
+
+        function open(filterText = '') {
+          if (select.disabled) return;
+          if (openInstance && openInstance.select !== select) openInstance.close();
+          syncFromNative();
+          render(filterText);
+          menu.classList.add('show');
+          wrap.classList.add('is-open');
+          input.setAttribute('aria-expanded', 'true');
+          openInstance = {select, close, position: positionMenu};
+          requestAnimationFrame(positionMenu);
+        }
+
+        function setActive(index) {
+          if (!visibleOptions.length) return;
+          activeIndex = Math.max(0, Math.min(index, visibleOptions.length - 1));
+          visibleOptions.forEach((item, i) => item.btn.classList.toggle('is-active', i === activeIndex));
+          visibleOptions[activeIndex].btn.scrollIntoView({block: 'nearest'});
+        }
+
+        input.addEventListener('focus', () => {
+          syncFromNative();
+          open('');
+          requestAnimationFrame(() => input.select());
+        });
+
+        input.addEventListener('click', () => {
+          if (!menu.classList.contains('show')) open('');
+        });
+
+        input.addEventListener('input', () => {
+          if (!menu.classList.contains('show')) open(input.value);
+          else {
+            render(input.value);
+            positionMenu();
+          }
+        });
+
+        input.addEventListener('keydown', e => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!menu.classList.contains('show')) open(input.value);
+            setActive(activeIndex + 1);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (!menu.classList.contains('show')) open(input.value);
+            setActive(activeIndex < 0 ? visibleOptions.length - 1 : activeIndex - 1);
+          } else if (e.key === 'Enter' && menu.classList.contains('show')) {
+            if (activeIndex >= 0 && visibleOptions[activeIndex]) {
+              e.preventDefault();
+              choose(visibleOptions[activeIndex].option);
+            } else if (visibleOptions.length === 1) {
+              e.preventDefault();
+              choose(visibleOptions[0].option);
+            }
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
+          } else if (e.key === 'Tab') {
+            close();
+          }
+        });
+
+        select.addEventListener('change', syncFromNative);
+        select.addEventListener('focus', () => input.focus());
+        select.addEventListener('invalid', () => {
+          input.focus();
+          open(input.value);
+        });
+
+        // Atualiza a lista se opções forem adicionadas/removidas via AJAX/JS.
+        new MutationObserver(() => {
+          syncFromNative();
+          if (menu.classList.contains('show')) {
+            render(input.value);
+            positionMenu();
+          }
+        }).observe(select, {childList: true, subtree: true, characterData: true});
+
+        const form = select.closest('form');
+        if (form) {
+          form.addEventListener('reset', () => setTimeout(syncFromNative, 0));
+        }
+
+        syncFromNative();
+      }
+
+      function scan(root = document) {
+        if (root instanceof HTMLSelectElement) {
+          enhance(root);
+          return;
+        }
+        root.querySelectorAll?.('select').forEach(enhance);
+      }
+
+      document.addEventListener('DOMContentLoaded', () => scan(document));
+
+      new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === 1) scan(node);
+          });
+          if (mutation.type === 'attributes' && mutation.target instanceof HTMLSelectElement) {
+            const select = mutation.target;
+            const wrap = select.closest('.smart-select-wrap');
+            const input = wrap?.querySelector('.smart-select-input');
+            if (input) input.disabled = select.disabled;
+          }
+        });
+      }).observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['disabled']
+      });
+
+      document.addEventListener('mousedown', e => {
+        if (!openInstance) return;
+        const wrap = openInstance.select.closest('.smart-select-wrap');
+        const anyMenu = e.target.closest('.smart-select-menu');
+        if (!wrap?.contains(e.target) && !anyMenu) openInstance.close();
+      });
+
+      window.addEventListener('resize', () => {
+        if (openInstance?.position) openInstance.position();
+      }, {passive: true});
+
+      window.addEventListener('scroll', () => {
+        if (openInstance) openInstance.close();
+      }, {passive: true, capture: true});
+
+      // Sincroniza selects programaticamente alterados quando um modal abre.
+      document.addEventListener('shown.bs.modal', e => {
+        scan(e.target);
+        e.target.querySelectorAll('select[data-smart-select-ready="1"]').forEach(select => {
+          select.dispatchEvent(new Event('change', {bubbles: false}));
+        });
+      });
+    })();
+  </script>
+
   {% block extra_js %}{% endblock %}
 </body>
 </html>

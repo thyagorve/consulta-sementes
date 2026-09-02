@@ -869,8 +869,8 @@
                             <input type="hidden" name="acao" id="userConfigAcao" value="create_conferente_user">
                             <input type="hidden" name="user_id" id="userConfigId" value="">
                             <input type="hidden" name="active_tab" value="conferente">
-                            <div class="mb-3"><label>Nome de Usuário (Login) *</label><input type="text" name="username" class="form-control-pro" placeholder="Ex: joao.silva" minlength="3" required autocomplete="off"><small class="text-muted">Mínimo 3 caracteres, apenas letras e números</small></div>
-                            <div class="mb-3"><label>Nome Completo *</label><input type="text" name="first_name" class="form-control-pro" placeholder="Ex: João Silva" required></div>
+                            <div class="mb-3"><label>Nome de Usuário (Login) *</label><input type="text" name="username" class="form-control-pro" data-preserve-case="true" placeholder="Ex: joao.silva" minlength="3" required autocomplete="off" autocapitalize="none"><small class="text-muted">Mínimo 3 caracteres. Maiúsculas/minúsculas são preservadas.</small></div>
+                            <div class="mb-3"><label>Nome Completo *</label><input type="text" name="first_name" class="form-control-pro" data-preserve-case="true" placeholder="Ex: João Silva" required></div>
                             <div class="mb-3"><label>Senha</label><input type="text" name="password" class="form-control-pro" placeholder="Deixe em branco para usar 'conceito123'"><small class="text-muted">Mínimo 6 caracteres</small></div>
                             <div class="mb-3" id="userGroupWrapper"><label>Grupo de Acesso *</label><select name="group" class="form-control-pro-select" required id="groupSelect"><option value="">Selecione...</option><option value="conferente">Conferente (Acesso básico)</option><option value="almoxarife">Almoxarife (Estoque + Almoxarifado)</option><option value="operador">Operador (Consulta apenas)</option>{% if user.is_superuser %}<option value="admin">Administrador (Acesso total)</option>{% endif %}</select></div>
                             
@@ -1026,8 +1026,8 @@
         const f=document.getElementById('form-create-user'); if(!f)return;
         document.getElementById('userConfigAcao').value='edit_user_basic';
         document.getElementById('userConfigId').value=id;
-        f.querySelector('[name="username"]').value=String(loginAtual||'').trim().toLowerCase();
-        f.querySelector('[name="first_name"]').value=normalizarCampoCadastro(nomeAtual||'');
+        f.querySelector('[name="username"]').value=String(loginAtual||'').trim();
+        f.querySelector('[name="first_name"]').value=String(nomeAtual||'').trim();
         f.querySelector('[name="password"]').value='';
         f.querySelector('[name="password"]').placeholder='Deixe em branco para manter a senha atual';
         const titulo=document.getElementById('userFormTitle');
@@ -1096,7 +1096,7 @@
         f.querySelector('[name="tratamento"]').value=btn.dataset.tratamento||'';
         f.scrollIntoView({behavior:'smooth',block:'start'}); f.querySelector('[name="codigo"]').focus();
     }
-    document.addEventListener('blur',e=>{ if(e.target.matches('.form-control-pro:not([type=password])')) e.target.value=normalizarCampoCadastro(e.target.value); }, true);
+    document.addEventListener('blur',e=>{ if(e.target.matches('.form-control-pro:not([type=password]):not([data-preserve-case="true"])')) e.target.value=normalizarCampoCadastro(e.target.value); }, true);
 
     const auxData = {
         'origem': { title: 'Origens / Destinos', label: 'Nome (Ex: Produção)', acao: 'add_origem', list: [{% for i in origens %}{id: {{i.id}}, n: "{{i.nome|escapejs}}"},{% endfor %}] },

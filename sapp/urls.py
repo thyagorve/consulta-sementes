@@ -1,5 +1,6 @@
 from . import views
 from . import views_inventario
+from .forms import CaseInsensitiveAuthenticationForm
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
@@ -12,7 +13,7 @@ app_name = 'sapp'
 
 
 urlpatterns = [
-    path('login/', auth_views.LoginView.as_view(template_name='sapp/registration/login.html', redirect_authenticated_user=True), name='login'),
+    path('login/', auth_views.LoginView.as_view(template_name='sapp/registration/login.html', authentication_form=CaseInsensitiveAuthenticationForm, redirect_authenticated_user=True), name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('mudar-senha/', views.mudar_senha, name='mudar_senha'),
     path('', views.redirecionar_usuario, name='redirecionar'),
