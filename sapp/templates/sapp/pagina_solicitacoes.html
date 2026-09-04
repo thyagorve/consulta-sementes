@@ -2454,8 +2454,8 @@ and (orientation: landscape) {
                                     Produto <i class="fas fa-filter text-white-50 ms-1"></i>
                                 </th>
 
-                                <th data-col="cultivar" onclick="abrirFiltro('cultivar', event)" style="min-width:120px;">
-                                    Cultivar <i class="fas fa-filter text-white-50 ms-1"></i>
+                                <th data-col="descricao" onclick="abrirFiltro('descricao', event)" style="min-width:220px;">
+                                    Descrição <i class="fas fa-filter text-white-50 ms-1"></i>
                                 </th>
 
                                 <th data-col="peneira" onclick="abrirFiltro('peneira', event)" style="min-width:80px;">
@@ -3308,7 +3308,7 @@ const modalColumnDefs = [
     { key: 'az', label: 'AZ', alwaysVisible: false },
     { key: 'lote', label: 'Lote', alwaysVisible: true },
     { key: 'produto', label: 'Produto', alwaysVisible: false },
-    { key: 'cultivar', label: 'Cultivar', alwaysVisible: false },
+    { key: 'descricao', label: 'Descrição', alwaysVisible: false },
     { key: 'peneira', label: 'Peneira', alwaysVisible: false },
     { key: 'categoria', label: 'Categoria', alwaysVisible: false },
     { key: 'especie', label: 'Espécie', alwaysVisible: false },
@@ -4755,7 +4755,7 @@ function appendTableRows(lotes) {
             </td>
 
             <td data-col="produto">${l.produto ? escaparHtml(l.produto) : '<span class="badge-null">vazio</span>'}</td>
-            <td data-col="cultivar">${l.cultivar ? escaparHtml(l.cultivar) : '<span class="badge-null">vazio</span>'}</td>
+            <td data-col="descricao">${l.descricao ? escaparHtml(l.descricao) : '<span class="badge-null">sem descrição</span>'}</td>
             <td data-col="peneira">${l.peneira ? escaparHtml(l.peneira) : '<span class="badge-null">vazio</span>'}</td>
             <td data-col="categoria">${l.categoria ? escaparHtml(l.categoria) : '<span class="badge-null">vazio</span>'}</td>
             <td data-col="especie">${l.especie ? escaparHtml(l.especie) : '<span class="badge-null">vazio</span>'}</td>
@@ -6987,7 +6987,7 @@ function abrirJanelaImpressaoMobile() {
 
 
 // ===== IMPRESSÃO CORRIGIDA (SEM ARMazém NO TOPO, MAIS LIMPA) =====
-function gerarImpressaoSolicitacao(id) {
+function gerarImpressaoSolicitacao(id, janelaExistente = null) {
     const isMobilePrint = (
         window.matchMedia(
             '(max-width: 900px)'
@@ -6998,20 +6998,22 @@ function gerarImpressaoSolicitacao(id) {
         )
     );
 
-    let win = null;
+    let win = janelaExistente || null;
 
     /*
-     * No celular NÃO dependemos de popup.
-     * A impressão abre dentro de um preview de tela inteira.
+     * Quando o usuário troca o relatório pelo seletor da própria
+     * visualização, reutilizamos a mesma janela/iframe.
      */
-    if (isMobilePrint) {
-        win = abrirJanelaImpressaoMobile();
-    } else {
-        win = window.open(
-            '',
-            '_blank',
-            'width=1350,height=900'
-        );
+    if (!win) {
+        if (isMobilePrint) {
+            win = abrirJanelaImpressaoMobile();
+        } else {
+            win = window.open(
+                '',
+                '_blank',
+                'width=1350,height=900'
+            );
+        }
     }
 
     /*
@@ -7166,25 +7168,24 @@ function gerarImpressaoSolicitacao(id) {
             const pesoBr = valor => Number(valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
             const tituloRelatorio = isCarga ? 'RELATÓRIO DE CARGA / EXPEDIÇÃO' : 'RELATÓRIO DE SOLICITAÇÃO';
 
-            const tabelaNormal = itens.length ? `<table>
-              <thead><tr><th class="col-num">#</th><th class="col-status">Situação</th><th class="col-lote">Lote</th><th class="col-qtd">Qtd.</th><th class="col-produto">Produto</th><th class="col-cultivar">Cultivar</th><th class="col-peneira">Peneira</th><th class="col-armazem">Armazém</th><th class="col-endereco">Endereço</th><th class="col-cliente">Cliente</th></tr></thead>
-              <tbody>${itens.map((item, idx) => {
+            // TSI mantém a coluna Situação.
+            // Carga não precisa de Situação e começa diretamente por Cliente.
+            const cabecalhoSituacao = isCarga
+                ? ''
+                : '<th class="col-status-print">Situação</th>';
+
+            const tabelaItensHtml = itens.length ? `<table class="tabela-solicitacao">
+              <thead><tr>${cabecalhoSituacao}<th class="col-cliente-print">Cliente</th><th class="col-codigo-print">Código</th><th class="col-lote-print">Lote</th><th class="col-descricao-impressao">Descrição</th><th class="col-categoria-print">Categoria</th><th class="col-peneira-print">Peneira</th><th class="col-az-print">AZ</th><th class="col-endereco-print">Endereço</th><th class="col-qtd">Qtd</th><th class="col-peso">Peso</th></tr></thead>
+              <tbody>${itens.map(item => {
                 const situacao = String(item.situacao || 'PENDENTE').toUpperCase();
                 const classe = situacao.includes('TRANSF') ? 'badge-transferido' : situacao.includes('EXPED') ? 'badge-expedido' : 'badge-pendente';
-                const armazemItem = item.armazem || item.az || '';
-                const endereco = item.endereco_destino || item.endereco || '';
-                return `<tr><td class="col-num">${idx+1}</td><td class="col-status"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td><td class="col-lote"><strong>${esc(item.lote || '-')}</strong></td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-produto">${esc(item.produto || '-')}</td><td class="col-cultivar">${esc(item.cultivar || '-')}</td><td class="col-peneira">${esc(item.peneira || '-')}</td><td class="col-armazem">${esc(armazemItem || '-')}</td><td class="col-endereco">${esc(endereco || '-')}</td><td class="col-cliente">${esc(item.cliente || '-')}</td></tr>`;
+                const celulaSituacao = isCarga
+                    ? ''
+                    : `<td class="col-status-print"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td>`;
+                return `<tr>${celulaSituacao}<td class="col-cliente-print">${esc(item.cliente || sol.criterios?.cliente || 'CS')}</td><td class="col-codigo-print"><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td class="col-lote-print">${esc(item.lote || '-')}</td><td class="col-descricao-impressao">${esc(item.descricao || '-')}</td><td class="col-categoria-print">${esc(item.categoria || '-')}</td><td class="col-peneira-print">${esc(item.peneira || '-')}</td><td class="col-az-print">${esc(item.az || item.armazem || '-')}</td><td class="col-endereco-print">${esc(item.endereco || '-')}</td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`;
               }).join('')}</tbody>
-              <tfoot><tr class="total"><td colspan="3" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td colspan="6"></td></tr></tfoot>
+              <tfoot><tr class="total"><td colspan="${isCarga ? 8 : 9}" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
             </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
-
-            const tabelaCarga = itens.length ? `<table class="tabela-carga">
-              <thead><tr><th>Cliente</th><th>Código</th><th>Lote</th><th>Descrição</th><th>Categoria</th><th>Peneira</th><th>AZ</th><th>Endereço</th><th>Qtd</th><th>Peso</th></tr></thead>
-              <tbody>${itens.map(item => `<tr><td>${esc(item.cliente || '-')}</td><td><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td>${esc(item.lote || '-')}</td><td class="desc-carga">${esc(item.descricao || '-')}</td><td>${esc(item.categoria || '-')}</td><td>${esc(item.peneira || '-')}</td><td>${esc(item.az || item.armazem || '-')}</td><td>${esc(item.endereco || '-')}</td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`).join('')}</tbody>
-              <tfoot><tr class="total"><td colspan="8" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
-            </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
-
-            const tabelaItensHtml = isCarga ? tabelaCarga : tabelaNormal;
 
             win.document.open();
             win.document.write(`<!doctype html>
@@ -7280,10 +7281,18 @@ td { padding: 5px 4px; border-right: 1px solid #d6dfd8; border-bottom: 1px solid
 th:last-child, td:last-child { border-right: 0; }
 tbody tr:nth-child(even) { background: #f6faf7; }
 tr { page-break-inside: avoid; }
-.col-num { width: 27px; text-align: center; } .col-status { width: 78px; } .col-lote { width: 105px; } .col-qtd { width: 52px; text-align: center; }
-.col-produto { width: 138px; } .col-cultivar { width: 113px; } .col-peneira { width: 55px; text-align: center; } .col-armazem { width: 86px; }
-.col-endereco { width: 112px; } .col-cliente { width: 116px; }
-.tabela-carga th:nth-child(1){width:135px}.tabela-carga th:nth-child(2){width:85px}.tabela-carga th:nth-child(3){width:95px}.tabela-carga th:nth-child(4){width:190px}.tabela-carga th:nth-child(5){width:85px}.tabela-carga th:nth-child(6){width:65px}.tabela-carga th:nth-child(7){width:72px}.tabela-carga th:nth-child(8){width:105px}.tabela-carga th:nth-child(9){width:55px}.tabela-carga th:nth-child(10){width:80px}.tabela-carga .desc-carga{white-space:normal;line-height:1.2}.tabela-carga .col-peso{text-align:right;font-weight:800}
+.tabela-solicitacao { table-layout: fixed; }
+.tabela-solicitacao .col-status-print { width: 76px; }
+.tabela-solicitacao .col-cliente-print { width: 115px; }
+.tabela-solicitacao .col-codigo-print { width: 82px; }
+.tabela-solicitacao .col-lote-print { width: 90px; }
+.tabela-solicitacao .col-descricao-impressao { width: 190px; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; line-height: 1.25; overflow-wrap: anywhere; word-break: break-word; }
+.tabela-solicitacao .col-categoria-print { width: 78px; }
+.tabela-solicitacao .col-peneira-print { width: 58px; text-align: center; }
+.tabela-solicitacao .col-az-print { width: 65px; }
+.tabela-solicitacao .col-endereco-print { width: 92px; }
+.tabela-solicitacao .col-qtd { width: 48px; text-align: center; }
+.tabela-solicitacao .col-peso { width: 75px; text-align: right; font-weight: 800; }
 .badge-situacao { display: inline-block; max-width: 100%; padding: 3px 6px; overflow: hidden; border-radius: 999px; font-size: 6.8px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
 .badge-pendente { color: #795900; background: #ffefad; }
 .badge-transferido { color: #176039; background: #d8f1e1; }
@@ -7420,7 +7429,25 @@ tr { page-break-inside: avoid; }
 }
 
 
+.troca-relatorio {
+  width: min(297mm, calc(100vw - 20px));
+  margin: 0 auto 9px;
+  padding: 9px 11px;
+  display: grid;
+  grid-template-columns: auto minmax(170px, 1fr) minmax(240px, 2fr);
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #d3dfd6;
+  border-radius: 10px;
+  background: rgba(255,255,255,.98);
+  box-shadow: 0 5px 18px rgba(0,0,0,.08);
+}
+.troca-relatorio label { font-size: 12px; font-weight: 800; color: #31523d; white-space: nowrap; }
+.troca-relatorio input, .troca-relatorio select { min-height: 36px; border: 1px solid #cfdcd3; border-radius: 8px; padding: 6px 9px; background:#fff; color:#24382b; font:inherit; font-size:12px; }
+@media(max-width:760px){ .troca-relatorio{grid-template-columns:1fr}.troca-relatorio label{white-space:normal} }
+
 @media print {
+  .troca-relatorio { display:none !important; }
   @page { size: A4 landscape; margin: 5mm; }
   html, body { width: 297mm; background: #fff; }
   body { padding: 0; }
@@ -7434,6 +7461,11 @@ tr { page-break-inside: avoid; }
 </style>
 </head>
 <body>
+<div class="troca-relatorio">
+  <label for="trocarRelatorioSelect"><i class="fas fa-list"></i> Trocar relatório</label>
+  <input type="search" id="trocarRelatorioBusca" placeholder="Pesquisar carga/solicitação..." autocomplete="off">
+  <select id="trocarRelatorioSelect"><option value="">Carregando histórico...</option></select>
+</div>
 <main class="folha">
  <header class="topo">
     <div class="topo-principal">
@@ -7517,6 +7549,51 @@ tr { page-break-inside: avoid; }
     >Fechar</button>
   </div>
 </main>
+<script>
+(function(){
+  var atual = Number("${Number(id)}");
+  var seletor = document.getElementById('trocarRelatorioSelect');
+  var busca = document.getElementById('trocarRelatorioBusca');
+  var lista = [];
+
+  function renderLista(termo){
+    termo = String(termo || '').toLocaleLowerCase('pt-BR').trim();
+    seletor.innerHTML = '';
+    lista.filter(function(item){
+      var texto = [item.id, item.titulo, item.tipo_solicitacao_display, item.status_display || item.status, item.destino].join(' ').toLocaleLowerCase('pt-BR');
+      return !termo || texto.indexOf(termo) >= 0;
+    }).forEach(function(item){
+      var opt = document.createElement('option');
+      opt.value = item.id;
+      opt.textContent = (item.tipo_solicitacao === 'CARGA' ? 'CARGA · ' : 'TSI · ') + (item.titulo || ('#' + item.id)) + ' · ' + (item.status_display || item.status || '');
+      if (Number(item.id) === atual) opt.selected = true;
+      seletor.appendChild(opt);
+    });
+    if (!seletor.options.length) {
+      var vazio = document.createElement('option');
+      vazio.value = '';
+      vazio.textContent = 'Nenhum relatório encontrado';
+      seletor.appendChild(vazio);
+    }
+  }
+
+  fetch('/api/solicitacoes/listar/')
+    .then(function(r){ return r.json(); })
+    .then(function(data){ lista = Array.isArray(data.solicitacoes) ? data.solicitacoes : []; renderLista(''); })
+    .catch(function(){ seletor.innerHTML = '<option value="">Não foi possível carregar a lista</option>'; });
+
+  busca.addEventListener('input', function(){ renderLista(this.value); });
+  seletor.addEventListener('change', function(){
+    var novo = Number(this.value || 0);
+    if (!novo || novo === atual) return;
+    if (window.frameElement && window.parent && typeof window.parent.gerarImpressaoSolicitacao === 'function') {
+      window.parent.gerarImpressaoSolicitacao(novo, window);
+    } else if (window.opener && typeof window.opener.gerarImpressaoSolicitacao === 'function') {
+      window.opener.gerarImpressaoSolicitacao(novo, window);
+    }
+  });
+})();
+<\/script>
 </body></html>`);
             win.document.close();
         })

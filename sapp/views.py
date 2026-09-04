@@ -9902,6 +9902,34 @@ def _sincronizar_itens_carga(solicitacao, itens_post):
         raise ValueError('A carga precisa possuir pelo menos um item.')
 
 
+def _reservar_titulo_carga():
+    """Reserva, com lock, o próximo título CARGA N sem reutilizar números."""
+    config = (
+        Configuracao.objects
+        .select_for_update()
+        .filter(pk=1)
+        .first()
+    )
+    if config is None:
+        config = Configuracao.objects.create(pk=1, proximo_numero_carga=1)
+
+    numero = max(1, int(config.proximo_numero_carga or 1))
+    while Solicitacao.objects.filter(titulo__iexact=f'CARGA {numero}').exists():
+        numero += 1
+
+    config.proximo_numero_carga = numero + 1
+    config.save(update_fields=['proximo_numero_carga'])
+    return f'CARGA {numero}'
+
+
+def _descricao_produto_por_codigo(codigo):
+    codigo = _normalizar_codigo_produto(codigo)
+    if not codigo:
+        return ''
+    produto = Produto.objects.filter(codigo__iexact=codigo).only('descricao').first()
+    return (produto.descricao or '') if produto else ''
+
+
 def _contexto_form_solicitacao(solicitacao=None, edicao_estrutural_bloqueada=False):
     produtos = (
         Produto.objects
@@ -9931,6 +9959,7 @@ def _contexto_form_solicitacao(solicitacao=None, edicao_estrutural_bloqueada=Fal
         'solicitacao': solicitacao,
         'itens_carga_edicao': itens_carga_edicao,
         'produtos_carga_json': json.dumps(produtos_js, cls=DjangoJSONEncoder),
+        'proximo_titulo_carga': f"CARGA {max(1, int(Configuracao.get_solo().proximo_numero_carga or 1))}",
         # Bloqueio GLOBAL continua válido para tipo/armazém e solicitação normal.
         # Carga usa item.edicao_bloqueada para bloquear somente a linha já empenhada.
         'edicao_estrutural_bloqueada': edicao_estrutural_bloqueada,
@@ -9948,8 +9977,14 @@ def _salvar_solicitacao_form(request, solicitacao=None):
 
     if request.method == 'POST':
         try:
-            titulo = normalizar_texto_cadastro(request.POST.get('titulo', ''))
-            if not titulo:
+            tipo_postado = request.POST.get('tipo_solicitacao', 'TRANSFERENCIA').strip().upper()
+            if tipo_postado not in {'TRANSFERENCIA', 'CARGA'}:
+                tipo_postado = 'TRANSFERENCIA'
+
+            titulo_digitado = normalizar_texto_cadastro(request.POST.get('titulo', ''))
+            # Carga nova recebe título sequencial dentro da transação. Para
+            # transferência, o título continua informado pelo usuário.
+            if tipo_postado != 'CARGA' and not titulo_digitado:
                 raise ValueError('Título é obrigatório.')
 
             destino = normalizar_texto_cadastro(request.POST.get('destino', ''))
@@ -9960,13 +9995,13 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                 if not editando:
                     solicitacao = Solicitacao(criador=request.user)
 
+                tipo_anterior = solicitacao.tipo_solicitacao if editando else None
+
                 # Depois do primeiro empenho, tipo e armazém não mudam.
                 if edicao_estrutural_bloqueada:
                     tipo = solicitacao.tipo_solicitacao
                 else:
-                    tipo = request.POST.get('tipo_solicitacao', 'TRANSFERENCIA').strip().upper()
-                    if tipo not in {'TRANSFERENCIA', 'CARGA'}:
-                        tipo = 'TRANSFERENCIA'
+                    tipo = tipo_postado
                     solicitacao.tipo_solicitacao = tipo
 
                     armazem_id = request.POST.get('armazem')
@@ -9974,6 +10009,14 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                         Armazem.objects.filter(id=armazem_id).first()
                         if armazem_id else None
                     )
+
+                if tipo == 'CARGA':
+                    if (not editando) or tipo_anterior != 'CARGA':
+                        titulo = _reservar_titulo_carga()
+                    else:
+                        titulo = solicitacao.titulo
+                else:
+                    titulo = titulo_digitado
 
                 solicitacao.titulo = titulo
                 solicitacao.destino = destino
@@ -10008,8 +10051,8 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                             Especie.objects.filter(id=especie_id).first()
                             if especie_id else None
                         )
-                        solicitacao.produto = request.POST.get('produto', '').strip() or None
-                        solicitacao.cliente = request.POST.get('cliente', '').strip() or None
+                        solicitacao.produto = _normalizar_codigo_produto(request.POST.get('produto', '')) or None
+                        solicitacao.cliente = normalizar_texto_cadastro(request.POST.get('cliente', '')) or 'CS'
                         solicitacao.unidade_controle = request.POST.get('unidade_controle', 'EMBALAGEM')
                         solicitacao.quantidade_solicitada = _parse_decimal_solicitacao(
                             request.POST.get('quantidade_solicitada', '0')
@@ -10666,8 +10709,13 @@ def api_listar_solicitacoes(request):
                 qtd_emp
                 / sol.quantidade_solicitada
             ) * 100
+        elif sol.tipo_solicitacao == 'CARGA' and qtd_emp > 0:
+            # Carga aberta não possui teto pré-definido: qualquer quantidade
+            # empenhada representa 100% do ciclo atual, mas novos empenhos
+            # continuam permitidos até a movimentação começar.
+            percentual = Decimal('100')
         else:
-            percentual = 0
+            percentual = Decimal('0')
 
 
         # =====================================================
@@ -10785,12 +10833,14 @@ def api_listar_solicitacoes(request):
             ),
 
             'data_criacao': (
-                sol.data_criacao.strftime(
+                timezone.localtime(sol.data_criacao).strftime(
                     '%d/%m/%Y %H:%M'
                 )
+                if sol.data_criacao else ''
             ),
 
             'status': sol.status,
+            'status_display': sol.get_status_display(),
 
             'unidade_controle': (
                 sol.unidade_controle
@@ -11034,10 +11084,8 @@ def api_lotes_disponiveis_para_solicitacao(
                 especie=solicitacao.especie
             )
 
-        if solicitacao.cliente:
-            qs = qs.filter(
-                cliente__iexact=solicitacao.cliente
-            )
+        # Cliente da solicitação é o cliente comercial do empenho, como em
+        # Carga. Ele NÃO restringe o proprietário gravado no estoque.
 
     # ------------------------------------------------------------------
     # BUSCA
@@ -11107,7 +11155,10 @@ def api_lotes_disponiveis_para_solicitacao(
             if cliente_ativo not in clientes_normalizados:
                 qs = qs.none()
         else:
-            qs = qs.filter(cliente__in=clientes_filtro)
+            clientes_normalizados = {v.casefold() for v in clientes_filtro}
+            cliente_solicitacao = str(solicitacao.cliente or 'CS').strip().casefold()
+            if cliente_solicitacao not in clientes_normalizados:
+                qs = qs.none()
 
     for param, lookup in filter_map.items():
         valores = [
@@ -11192,7 +11243,17 @@ def api_lotes_disponiveis_para_solicitacao(
 
     end = start + page_size
 
-    lotes_qs = qs[start:end]
+    lotes_qs = list(qs[start:end])
+
+    codigos_pagina = {
+        _normalizar_codigo_produto(lote.produto)
+        for lote in lotes_qs
+        if lote.produto
+    }
+    descricoes_produtos = {
+        _normalizar_codigo_produto(produto.codigo): (produto.descricao or '')
+        for produto in Produto.objects.filter(codigo__in=codigos_pagina).only('codigo', 'descricao')
+    }
 
     # Mapa dos itens salvos no empenho atual.
     itens_empenhados_por_estoque = {}
@@ -11262,6 +11323,11 @@ def api_lotes_disponiveis_para_solicitacao(
 
             'lote': lote.lote,
             'produto': lote.produto or '',
+            'descricao': (
+                item_carga_match.descricao
+                if item_carga_match
+                else descricoes_produtos.get(_normalizar_codigo_produto(lote.produto), '')
+            ),
 
             'cultivar': (
                 lote.cultivar.nome
@@ -11327,7 +11393,11 @@ def api_lotes_disponiveis_para_solicitacao(
 
             'embalagem': lote.embalagem or '',
             'cliente_estoque': lote.cliente or '',
-            'cliente': (item_carga_match.cliente if item_carga_match else (lote.cliente or '')),
+            'cliente': (
+                item_carga_match.cliente
+                if item_carga_match
+                else (solicitacao.cliente or 'CS')
+            ),
             'empresa': lote.empresa or '',
             'az': lote.az or '',
 
@@ -11508,6 +11578,7 @@ def api_lotes_disponiveis_para_solicitacao(
             'status': solicitacao.status,
             'destino': solicitacao.destino or '',
             'observacao': solicitacao.observacao or '',
+            'cliente': solicitacao.cliente or ('CS' if solicitacao.tipo_solicitacao != 'CARGA' else ''),
 
             'empenho_bloqueado': empenho_bloqueado,
         },
@@ -11909,20 +11980,27 @@ def empenhar_na_solicitacao(
                 # ------------------------------------------------------
                 # SALVAR ITEM NO EMPENHO DO CARD ATUAL
                 # ------------------------------------------------------
+                descricao_lote_config = _descricao_produto_por_codigo(lote.produto)
+                cliente_solicitacao_item = (
+                    item_carga.cliente if item_carga else (solicitacao.cliente or 'CS')
+                )
+                codigo_solicitacao_item = item_carga.codigo if item_carga else (lote.produto or '')
+                descricao_solicitacao_item = item_carga.descricao if item_carga else descricao_lote_config
+
                 if item_existente:
                     item_existente.quantidade = quantidade_final
-                    campos_update = ['quantidade']
+                    item_existente.cliente_solicitacao_snapshot = cliente_solicitacao_item
+                    item_existente.codigo_produto_snapshot = codigo_solicitacao_item
+                    item_existente.descricao_produto_snapshot = descricao_solicitacao_item
+                    campos_update = [
+                        'quantidade',
+                        'cliente_solicitacao_snapshot',
+                        'codigo_produto_snapshot',
+                        'descricao_produto_snapshot',
+                    ]
                     if item_carga:
                         item_existente.item_carga = item_carga
-                        item_existente.cliente_solicitacao_snapshot = item_carga.cliente
-                        item_existente.codigo_produto_snapshot = item_carga.codigo
-                        item_existente.descricao_produto_snapshot = item_carga.descricao
-                        campos_update += [
-                            'item_carga',
-                            'cliente_solicitacao_snapshot',
-                            'codigo_produto_snapshot',
-                            'descricao_produto_snapshot',
-                        ]
+                        campos_update.append('item_carga')
                     item_existente.save(update_fields=campos_update)
 
                 else:
@@ -11931,9 +12009,9 @@ def empenhar_na_solicitacao(
                         estoque=lote,
                         item_carga=item_carga,
                         quantidade=quantidade_adicionar,
-                        cliente_solicitacao_snapshot=(item_carga.cliente if item_carga else ''),
-                        codigo_produto_snapshot=(item_carga.codigo if item_carga else ''),
-                        descricao_produto_snapshot=(item_carga.descricao if item_carga else ''),
+                        cliente_solicitacao_snapshot=cliente_solicitacao_item,
+                        codigo_produto_snapshot=codigo_solicitacao_item,
+                        descricao_produto_snapshot=descricao_solicitacao_item,
 
                         lote=lote.lote,
 
@@ -13934,6 +14012,8 @@ def api_dados_impressao_solicitacao(
                 or (item.item_carga.cliente if item.item_carga else '')
                 or cliente_empenho
             )
+            if solicitacao.tipo_solicitacao != 'CARGA':
+                cliente_impressao = solicitacao.cliente or 'CS'
 
             itens_pendentes.append({
                 'item_id': item.id,
@@ -14015,7 +14095,7 @@ def api_dados_impressao_solicitacao(
                 'situacao': 'pendente',
 
                 'data_empenho': (
-                    item.data_criacao.strftime(
+                    timezone.localtime(item.data_criacao).strftime(
                         '%d/%m/%Y %H:%M'
                     )
                     if item.data_criacao
@@ -14108,6 +14188,8 @@ def api_dados_impressao_solicitacao(
             categoria_impressao = historico.categoria or ''
             peneira_impressao = historico.peneira or ''
             cliente_impressao = historico.cliente_solicitacao or historico.cliente or ''
+            if solicitacao.tipo_solicitacao != 'CARGA':
+                cliente_impressao = solicitacao.cliente or 'CS'
 
             itens_processados.append({
                 'item_id': historico.id,
@@ -14262,13 +14344,14 @@ def api_dados_impressao_solicitacao(
             ),
 
             'data_criacao': (
-                solicitacao.data_criacao.strftime(
+                timezone.localtime(solicitacao.data_criacao).strftime(
                     '%d/%m/%Y %H:%M'
                 )
+                if solicitacao.data_criacao else ''
             ),
 
             'data_atualizacao': (
-                solicitacao.data_atualizacao.strftime(
+                timezone.localtime(solicitacao.data_atualizacao).strftime(
                     '%d/%m/%Y %H:%M'
                 )
                 if solicitacao.data_atualizacao
@@ -14276,7 +14359,7 @@ def api_dados_impressao_solicitacao(
             ),
 
             'data_finalizacao': (
-                solicitacao.data_finalizacao.strftime(
+                timezone.localtime(solicitacao.data_finalizacao).strftime(
                     '%d/%m/%Y %H:%M'
                 )
                 if getattr(
@@ -14454,7 +14537,11 @@ def _serializar_card(solicitacao):
     percentual = (
         (qtd_empenhada_display / quantidade_solicitada) * 100
         if quantidade_solicitada > 0
-        else Decimal('0')
+        else (
+            Decimal('100')
+            if solicitacao.tipo_solicitacao == 'CARGA' and qtd_empenhada_display > 0
+            else Decimal('0')
+        )
     )
 
     embalagens = set()
@@ -14550,7 +14637,11 @@ def _serializar_card(solicitacao):
                 solicitacao.especie.nome
                 if solicitacao.especie else ''
             ),
-            'cliente': solicitacao.cliente or '',
+            'cliente': (
+                (solicitacao.cliente or 'CS')
+                if solicitacao.tipo_solicitacao != 'CARGA'
+                else ''
+            ),
             'destino': solicitacao.destino or '',
             'motorista': getattr(solicitacao, 'motorista', '') or '',
             'placa': getattr(solicitacao, 'placa', '') or '',

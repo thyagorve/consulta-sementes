@@ -686,7 +686,6 @@
                         {% if not cadastro_produto_liberado %}<div class="alert alert-warning col-full py-2 small"><i class="fas fa-triangle-exclamation me-1"></i>Cadastre primeiro pelo menos um Cultivar. Os demais parâmetros são opcionais.</div>{% endif %}
                         {% csrf_token %}
                         <input type="hidden" name="acao" id="produtoAcao" value="add_produto"><input type="hidden" name="tipo_item" value="produto"><input type="hidden" name="id_item" id="produtoEditId" value=""><input type="hidden" name="active_tab" value="produto">
-                        <input type="hidden" name="ativo" value="on">
 
                         <div class="form-group col-full">
                             <label>Cultivar *</label>
@@ -725,11 +724,21 @@
                             <input type="text" name="empresa" class="form-control-pro" placeholder="Ex: Grupo Conceito">
                         </div>
                         <div class="form-group">
+                            <label>Tipo</label>
+                            <input type="text" name="tipo" class="form-control-pro" placeholder="Opcional">
+                        </div>
+                        <div class="form-group">
                             <label>Categoria</label>
                             <select name="categoria" class="form-control-pro-select">
                                 <option value="">Nenhuma</option>
                                 {% for cat in categorias %}<option value="{{ cat.id }}">{{ cat.nome }}</option>{% endfor %}
                             </select>
+                        </div>
+                        <div class="form-group col-full">
+                            <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer;">
+                                <input type="checkbox" name="ativo" class="form-check-input m-0" checked>
+                                <span>Produto ativo</span>
+                            </label>
                         </div>
                         <div class="form-group col-full">
                             <label>Descrição</label>
@@ -753,9 +762,9 @@
                                     <td>{% if p.tratamento %}<span class="badge-treatment"><i class="fas fa-flask me-1"></i>{{ p.tratamento.nome|truncatechars:12 }}</span>{% else %}<span class="text-muted">---</span>{% endif %}</td>
                                     <td class="text-center">
                                         <button type="button" class="btn-outline-sm me-1" title="Editar" onclick="editarProdutoConfig(this)"
-                                            data-id="{{ p.id }}" data-codigo="{{ p.codigo|escapejs }}" data-cultivar="{{ p.cultivar_id }}"
-                                            data-descricao="{{ p.descricao|default:''|escapejs }}" data-tipo="{{ p.tipo|default:''|escapejs }}"
-                                            data-empresa="{{ p.empresa|default:''|escapejs }}" data-peneira="{{ p.peneira_id|default:'' }}"
+                                            data-id="{{ p.id }}" data-codigo="{{ p.codigo|escape }}" data-cultivar="{{ p.cultivar_id }}"
+                                            data-descricao="{{ p.descricao|default:''|escape }}" data-tipo="{{ p.tipo|default:''|escape }}"
+                                            data-empresa="{{ p.empresa|default:''|escape }}" data-peneira="{{ p.peneira_id|default:'' }}"
                                             data-especie="{{ p.especie_id|default:'' }}" data-categoria="{{ p.categoria_id|default:'' }}"
                                             data-tratamento="{{ p.tratamento_id|default:'' }}" data-ativo="{% if p.ativo %}1{% else %}0{% endif %}"><i class="fas fa-pen"></i></button>
                                         <form method="POST" class="d-inline" onsubmit="return confirm('Deseja excluir este produto?')">
@@ -1082,19 +1091,52 @@
         document.getElementById('enderecoEditId').value=id;
         document.getElementById('enderecoCodigoConfig').value=normalizarCampoCadastro(codigoAtual||'');
         document.getElementById('enderecoArmazemConfig').value=String(armazemAtual||'');
+        document.getElementById('enderecoArmazemConfig').dispatchEvent(new Event('change', {bubbles:true}));
         const titulo=f.closest('.pro-form-grid')?.querySelector('h6'); if(titulo) titulo.innerHTML='<i class="fas fa-pen me-2"></i>Editar Endereço';
         const btn=f.querySelector('button[type="submit"]'); if(btn) btn.innerHTML='<i class="fas fa-save"></i>SALVAR ALTERAÇÕES';
         f.scrollIntoView({behavior:'smooth',block:'center'}); document.getElementById('enderecoCodigoConfig')?.focus();
     }
+    function definirValorConfig(form, nome, valor) {
+        const campo = form?.querySelector(`[name="${nome}"]`);
+        if (!campo) return;
+        if (campo.type === 'checkbox') {
+            campo.checked = valor === true || String(valor) === '1' || String(valor).toLowerCase() === 'true' || String(valor).toLowerCase() === 'on';
+            campo.dispatchEvent(new Event('change', {bubbles:true}));
+            return;
+        }
+        campo.value = valor ?? '';
+        // O select pesquisável global usa o <select> nativo como fonte da verdade.
+        // Disparar change faz o campo visual acompanhar a edição imediatamente.
+        if (campo.tagName === 'SELECT') {
+            campo.dispatchEvent(new Event('change', {bubbles:true}));
+        } else {
+            campo.dispatchEvent(new Event('input', {bubbles:true}));
+        }
+    }
+
     function editarProdutoConfig(btn){
         const f=document.getElementById('formProdutoConfig'); if(!f)return;
-        document.getElementById('produtoAcao').value='edit_item'; document.getElementById('produtoEditId').value=btn.dataset.id;
-        f.querySelector('[name="codigo"]').value=btn.dataset.codigo||''; f.querySelector('[name="cultivar"]').value=btn.dataset.cultivar||'';
-        f.querySelector('[name="descricao"]').value=btn.dataset.descricao||''; f.querySelector('[name="tipo"]').value=btn.dataset.tipo||'';
-        f.querySelector('[name="empresa"]').value=btn.dataset.empresa||''; f.querySelector('[name="peneira"]').value=btn.dataset.peneira||'';
-        f.querySelector('[name="especie"]').value=btn.dataset.especie||''; f.querySelector('[name="categoria"]').value=btn.dataset.categoria||'';
-        f.querySelector('[name="tratamento"]').value=btn.dataset.tratamento||'';
-        f.scrollIntoView({behavior:'smooth',block:'start'}); f.querySelector('[name="codigo"]').focus();
+        document.getElementById('produtoAcao').value='edit_item';
+        document.getElementById('produtoEditId').value=btn.dataset.id || '';
+
+        definirValorConfig(f, 'codigo', btn.dataset.codigo || '');
+        definirValorConfig(f, 'cultivar', btn.dataset.cultivar || '');
+        definirValorConfig(f, 'descricao', btn.dataset.descricao || '');
+        definirValorConfig(f, 'empresa', btn.dataset.empresa || '');
+        definirValorConfig(f, 'tipo', btn.dataset.tipo || '');
+        definirValorConfig(f, 'ativo', btn.dataset.ativo || '0');
+        definirValorConfig(f, 'peneira', btn.dataset.peneira || '');
+        definirValorConfig(f, 'especie', btn.dataset.especie || '');
+        definirValorConfig(f, 'categoria', btn.dataset.categoria || '');
+        definirValorConfig(f, 'tratamento', btn.dataset.tratamento || '');
+
+        const titulo=f.querySelector('h5');
+        if(titulo) titulo.innerHTML='<i class="fas fa-pen text-primary me-2"></i>Editar Produto';
+        const submit=f.querySelector('button[type="submit"]');
+        if(submit) submit.innerHTML='<i class="fas fa-save"></i>SALVAR ALTERAÇÕES';
+
+        f.scrollIntoView({behavior:'smooth',block:'start'});
+        setTimeout(()=>f.querySelector('[name="codigo"]')?.focus(), 180);
     }
     document.addEventListener('blur',e=>{ if(e.target.matches('.form-control-pro:not([type=password]):not([data-preserve-case="true"])')) e.target.value=normalizarCampoCadastro(e.target.value); }, true);
 

@@ -92,7 +92,7 @@
                 <div class="row g-3">
                     <div class="col-md-8">
                         <label class="form-label">Título do pedido *</label>
-                        <input type="text" name="titulo" class="form-control" maxlength="100" required autofocus value="{{ solicitacao.titulo|default:'' }}" placeholder="Ex.: CARGA CLIENTES RIO VERDE">
+                        <input type="text" id="tituloPedido" name="titulo" class="form-control" maxlength="100" required autofocus value="{{ solicitacao.titulo|default:'' }}" placeholder="Ex.: CARGA CLIENTES RIO VERDE">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Responsável</label>
@@ -137,8 +137,9 @@
                         <input type="text" name="produto" class="form-control" maxlength="100" value="{{ solicitacao.produto|default:'' }}" {% if edicao_estrutural_bloqueada %}disabled{% endif %} placeholder="Código, produto ou descrição">
                     </div>
                     <div class="col-md-6 normal-field">
-                        <label class="form-label">Cliente / proprietário</label>
-                        <input type="text" name="cliente" class="form-control" maxlength="255" value="{{ solicitacao.cliente|default:'' }}" {% if edicao_estrutural_bloqueada %}disabled{% endif %}>
+                        <label class="form-label">Cliente da solicitação</label>
+                        <input type="text" name="cliente" class="form-control" maxlength="255" value="{{ solicitacao.cliente|default:'CS' }}" {% if edicao_estrutural_bloqueada %}disabled{% endif %} placeholder="CS">
+                        <div class="field-help">Se ficar em branco, o sistema usa CS automaticamente.</div>
                     </div>
                     <div class="col-md-4 carga-field" style="display:none">
                         <div class="driver-box">
@@ -243,6 +244,9 @@
 
 <script>
 const produtosCarga = {{ produtos_carga_json|safe }};
+const tituloCargaAutomatico = "{{ proximo_titulo_carga|escapejs }}";
+const solicitacaoEdicaoTipo = "{{ solicitacao.tipo_solicitacao|default:''|escapejs }}";
+let tituloTransferenciaDigitado = "{{ solicitacao.titulo|default:''|escapejs }}";
 const mapaProdutos = new Map(produtosCarga.map(p => [String(p.codigo || '').trim().toUpperCase(), p]));
 const datalist = document.getElementById('produtosCarga');
 
@@ -311,7 +315,30 @@ function updateTipo() {
         quantidadeNormal.required = !carga && !quantidadeNormal.disabled;
     }
 
-    if (carga && !document.querySelector('.carga-row')) addCargaRow();
+    const tituloPedido = document.getElementById('tituloPedido');
+    if (tituloPedido) {
+        if (carga) {
+            if (!tituloPedido.readOnly && String(tituloPedido.value || '').trim()) {
+                tituloTransferenciaDigitado = tituloPedido.value;
+            }
+            const tituloExistenteCarga = solicitacaoEdicaoTipo === 'CARGA'
+                ? String(tituloPedido.defaultValue || tituloPedido.value || '').trim()
+                : '';
+            tituloPedido.value = tituloExistenteCarga || tituloCargaAutomatico;
+            tituloPedido.readOnly = true;
+            tituloPedido.classList.add('bg-light');
+            tituloPedido.title = 'Número automático. O servidor confirma a sequência ao salvar.';
+        } else {
+            tituloPedido.readOnly = false;
+            tituloPedido.classList.remove('bg-light');
+            tituloPedido.removeAttribute('title');
+            if (solicitacaoEdicaoTipo !== 'TRANSFERENCIA' && tituloTransferenciaDigitado) {
+                tituloPedido.value = tituloTransferenciaDigitado;
+            }
+        }
+    }
+
+    if (carga && !document.querySelector('.carga-row')) addCargaRow(false);
 
     // A linha adicionada acima nasce depois da primeira alternância.
     // Garante que o estado de todos os controles fique coerente.
@@ -344,7 +371,7 @@ function bindRow(row) {
     refresh();
 }
 
-function addCargaRow() {
+function addCargaRow(focarCliente = true) {
     const body = document.getElementById('cargaBody');
     const tr = document.createElement('tr');
     tr.className = 'carga-row';
@@ -357,7 +384,7 @@ function addCargaRow() {
         <td><button type="button" class="btn-remove-line" title="Remover item"><i class="fas fa-trash"></i></button></td>`;
     body.appendChild(tr);
     bindRow(tr);
-    tr.querySelector('.carga-cliente')?.focus();
+    if (focarCliente) tr.querySelector('.carga-cliente')?.focus({preventScroll: true});
 }
 
 function updateTotal() {
@@ -371,7 +398,7 @@ function updateTotal() {
 
 document.querySelectorAll('input[name="tipo_solicitacao"]').forEach(i => i.addEventListener('change', updateTipo));
 document.querySelectorAll('.carga-row').forEach(bindRow);
-document.getElementById('btnAddCarga')?.addEventListener('click', addCargaRow);
+document.getElementById('btnAddCarga')?.addEventListener('click', () => addCargaRow(true));
 document.getElementById('placaCarga')?.addEventListener('input', function() {
     this.value = String(this.value || '').toUpperCase();
 });

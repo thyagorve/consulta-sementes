@@ -550,19 +550,22 @@
     .smart-select-option {
       display: flex;
       align-items: center;
+      gap: 10px;
       width: 100%;
-      min-height: 38px;
+      min-height: 40px;
       margin: 0;
-      padding: 8px 10px;
+      padding: 7px 10px;
       border: 0;
-      border-radius: 7px;
+      border-radius: 8px;
       background: transparent;
       color: #26372d;
       text-align: left;
       font: inherit;
       font-size: .9rem;
-      cursor: pointer;
+      cursor: default;
       word-break: break-word;
+      touch-action: pan-y;
+      user-select: none;
     }
 
     .smart-select-option:hover,
@@ -577,10 +580,26 @@
       font-weight: 700;
     }
 
-    .smart-select-option:disabled {
-      cursor: not-allowed;
+    .smart-select-option.is-disabled {
       opacity: .45;
       background: transparent;
+    }
+
+    .smart-select-check {
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--brand-primary);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .smart-select-option-label {
+      flex: 1 1 auto;
+      min-width: 0;
+      line-height: 1.3;
+      cursor: default;
     }
 
     .smart-select-empty {
@@ -969,7 +988,13 @@
         const menu = document.createElement('div');
         menu.className = 'smart-select-menu';
         menu.setAttribute('role', 'listbox');
-        document.body.appendChild(menu);
+
+        // Quando o select está dentro de um modal/offcanvas, o menu também
+        // precisa ficar dentro dele. Se for anexado diretamente ao <body>,
+        // o FocusTrap do Bootstrap tenta roubar o foco do checkbox e pode
+        // deslocar o scroll para o topo ou até interromper a seleção no PC.
+        const floatingHost = select.closest('.modal, .offcanvas') || document.body;
+        floatingHost.appendChild(menu);
 
         select.parentNode.insertBefore(wrap, select);
         wrap.appendChild(select);
@@ -1039,14 +1064,73 @@
           if (openInstance && openInstance.select === select) openInstance = null;
         }
 
-        function choose(option) {
+        function captureScrollState() {
+          const state = [{ target: window, left: window.scrollX, top: window.scrollY }];
+          const seen = new Set();
+          let node = wrap.parentElement;
+
+          while (node && node !== document.documentElement) {
+            if (!seen.has(node)) {
+              const style = window.getComputedStyle(node);
+              const overflow = `${style.overflow} ${style.overflowY} ${style.overflowX}`;
+              const canScroll = /(auto|scroll|overlay)/.test(overflow)
+                || node.classList.contains('modal')
+                || node.classList.contains('offcanvas')
+                || node.classList.contains('modal-body');
+
+              if (canScroll) {
+                state.push({ target: node, left: node.scrollLeft, top: node.scrollTop });
+                seen.add(node);
+              }
+            }
+            node = node.parentElement;
+          }
+          return state;
+        }
+
+        function restoreScrollState(state) {
+          state.forEach(item => {
+            if (item.target === window) {
+              window.scrollTo({ left: item.left, top: item.top, behavior: 'auto' });
+            } else if (item.target && item.target.isConnected) {
+              item.target.scrollLeft = item.left;
+              item.target.scrollTop = item.top;
+            }
+          });
+        }
+
+        function keepScrollPosition(state) {
+          // Restaura imediatamente e mais algumas vezes porque algumas telas
+          // reagem ao evento change no próximo frame/setTimeout.
+          restoreScrollState(state);
+          requestAnimationFrame(() => {
+            restoreScrollState(state);
+            requestAnimationFrame(() => restoreScrollState(state));
+          });
+          setTimeout(() => restoreScrollState(state), 30);
+          setTimeout(() => restoreScrollState(state), 120);
+        }
+
+        function choose(option, {closeAfter = true} = {}) {
           if (!option || option.disabled) return;
+
+          // Selecionar uma opção nunca pode alterar a posição atual da tela,
+          // inclusive quando o campo está dentro de um modal rolável.
+          const scrollState = captureScrollState();
+
           select.value = option.value;
+          // Garante explicitamente a seleção antes de disparar integrações antigas.
+          Array.from(select.options).forEach(opt => { opt.selected = (opt === option); });
           select.dispatchEvent(new Event('input', { bubbles: true }));
           select.dispatchEvent(new Event('change', { bubbles: true }));
-          syncFromNative();
-          close({restore: false});
-          input.focus({preventScroll: true});
+
+          if (closeAfter) {
+            close({restore: true});
+          } else {
+            syncFromNative();
+          }
+
+          keepScrollPosition(scrollState);
         }
 
         function render(filterText = '') {
@@ -1072,23 +1156,48 @@
               lastGroup = null;
             }
 
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'smart-select-option';
-            btn.setAttribute('role', 'option');
-            btn.textContent = label || (option.value ? option.value : 'Selecione...');
-            btn.disabled = option.disabled;
-            if (option.selected) {
-              btn.classList.add('is-selected');
-              btn.setAttribute('aria-selected', 'true');
-            }
-            btn.addEventListener('mousedown', e => e.preventDefault());
-            btn.addEventListener('click', e => {
+            const row = document.createElement('div');
+            row.className = 'smart-select-option';
+            row.setAttribute('role', 'option');
+            row.setAttribute('aria-selected', option.selected ? 'true' : 'false');
+            if (option.disabled) row.classList.add('is-disabled');
+            if (option.selected) row.classList.add('is-selected');
+
+            const check = document.createElement('input');
+            check.type = 'checkbox';
+            check.className = 'smart-select-check';
+            check.checked = option.selected;
+            check.disabled = option.disabled;
+            check.setAttribute('aria-label', `Selecionar ${label || option.value || 'opção'}`);
+
+            const text = document.createElement('span');
+            text.className = 'smart-select-option-label';
+            text.textContent = label || (option.value ? option.value : 'Selecione...');
+
+            // Somente o checkbox confirma a escolha. O texto da linha continua
+            // livre para toque/rolagem. Ao confirmar, a lista fecha imediatamente.
+            // Usamos click (e não change) porque alguns formulários são reconstruídos
+            // no evento change do <select> e poderiam destruir o checkbox antes da
+            // confirmação terminar.
+            // No desktop, impedir o mousedown de mover o foco para um elemento
+            // flutuante evita o FocusTrap do Bootstrap e mantém o scroll intacto.
+            // O click continua sendo processado normalmente e confirma a opção.
+            check.tabIndex = -1;
+            check.addEventListener('mousedown', e => {
               e.preventDefault();
-              choose(option);
+              e.stopPropagation();
             });
-            menu.appendChild(btn);
-            visibleOptions.push({option, btn});
+            check.addEventListener('pointerdown', e => e.stopPropagation());
+            check.addEventListener('click', e => {
+              e.stopPropagation();
+              if (option.disabled) return;
+              choose(option, {closeAfter: true});
+            });
+
+            row.appendChild(check);
+            row.appendChild(text);
+            menu.appendChild(row);
+            visibleOptions.push({option, row, check});
           });
 
           if (!visibleOptions.length) {
@@ -1114,8 +1223,8 @@
         function setActive(index) {
           if (!visibleOptions.length) return;
           activeIndex = Math.max(0, Math.min(index, visibleOptions.length - 1));
-          visibleOptions.forEach((item, i) => item.btn.classList.toggle('is-active', i === activeIndex));
-          visibleOptions[activeIndex].btn.scrollIntoView({block: 'nearest'});
+          visibleOptions.forEach((item, i) => item.row.classList.toggle('is-active', i === activeIndex));
+          visibleOptions[activeIndex].row.scrollIntoView({block: 'nearest'});
         }
 
         input.addEventListener('focus', () => {
@@ -1146,12 +1255,11 @@
             if (!menu.classList.contains('show')) open(input.value);
             setActive(activeIndex < 0 ? visibleOptions.length - 1 : activeIndex - 1);
           } else if (e.key === 'Enter' && menu.classList.contains('show')) {
+            // Enter apenas leva o foco ao checkbox. A confirmação continua
+            // explícita, evitando seleção acidental durante navegação/rolagem.
             if (activeIndex >= 0 && visibleOptions[activeIndex]) {
               e.preventDefault();
-              choose(visibleOptions[activeIndex].option);
-            } else if (visibleOptions.length === 1) {
-              e.preventDefault();
-              choose(visibleOptions[0].option);
+              visibleOptions[activeIndex].check.focus({preventScroll: true});
             }
           } else if (e.key === 'Escape') {
             e.preventDefault();
@@ -1214,19 +1322,26 @@
         attributeFilter: ['disabled']
       });
 
-      document.addEventListener('mousedown', e => {
+      document.addEventListener('pointerdown', e => {
         if (!openInstance) return;
         const wrap = openInstance.select.closest('.smart-select-wrap');
         const anyMenu = e.target.closest('.smart-select-menu');
         if (!wrap?.contains(e.target) && !anyMenu) openInstance.close();
       });
 
+      // Se um modal/offcanvas for fechado enquanto a lista estiver aberta,
+      // fecha o menu também para não deixar elemento flutuante órfão.
+      document.addEventListener('hide.bs.modal', () => openInstance?.close?.());
+      document.addEventListener('hide.bs.offcanvas', () => openInstance?.close?.());
+
       window.addEventListener('resize', () => {
         if (openInstance?.position) openInstance.position();
       }, {passive: true});
 
-      window.addEventListener('scroll', () => {
-        if (openInstance) openInstance.close();
+      window.addEventListener('scroll', event => {
+        if (!openInstance) return;
+        if (event.target?.closest?.('.smart-select-menu')) return;
+        if (openInstance.position) openInstance.position();
       }, {passive: true, capture: true});
 
       // Sincroniza selects programaticamente alterados quando um modal abre.

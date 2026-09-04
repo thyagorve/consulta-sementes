@@ -111,6 +111,11 @@ def criar_perfil_usuario(sender, instance, created, **kwargs):
 
 class Configuracao(models.Model):
     ocultar_esgotados = models.BooleanField(default=False, verbose_name="Ocultar Lotes Esgotados")
+    proximo_numero_carga = models.PositiveIntegerField(
+        default=1,
+        verbose_name='Próximo número de carga',
+        help_text='Sequência automática usada nos títulos CARGA N.',
+    )
     def save(self, *args, **kwargs):
         self.pk = 1
         super(Configuracao, self).save(*args, **kwargs)
