@@ -605,6 +605,457 @@
     }
 
     /* ========================================================
+       EXPEDIÇÕES / CARREGAMENTOS
+       ======================================================== */
+    .expedition-card {
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 16px;
+        border: 1px solid #dce8df;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 10px 30px rgba(31, 77, 46, .075);
+    }
+
+    .expedition-card::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4px;
+        background: linear-gradient(90deg, #b91c1c 0%, #ef4444 38%, #2f8f4e 100%);
+        z-index: 2;
+    }
+
+    .expedition-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 16px 16px 14px;
+        border-bottom: 1px solid #e7eee9;
+        background:
+            radial-gradient(circle at 92% 20%, rgba(47, 143, 78, .08), transparent 28%),
+            linear-gradient(180deg, #ffffff 0%, #fbfdfb 100%);
+    }
+
+    .expedition-title-wrap {
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        gap: 11px;
+    }
+
+    .expedition-title-icon {
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        color: #fff;
+        background: linear-gradient(135deg, #991b1b, #ef4444);
+        box-shadow: 0 6px 16px rgba(239, 68, 68, .2);
+    }
+
+    .expedition-header h6 {
+        margin: 0;
+        color: var(--dash-text);
+        font-size: .84rem;
+        font-weight: 950;
+        letter-spacing: -.15px;
+    }
+
+    .expedition-header small {
+        display: block;
+        margin-top: 3px;
+        color: var(--dash-muted);
+        font-size: .59rem;
+        line-height: 1.4;
+    }
+
+    .expedition-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 7px;
+        flex-wrap: wrap;
+        flex-shrink: 0;
+    }
+
+    .expedition-period {
+        flex-shrink: 0;
+        padding: 6px 10px;
+        border: 1px solid #dbe6de;
+        border-radius: 999px;
+        color: #496251;
+        background: rgba(255,255,255,.9);
+        font-size: .58rem;
+        font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .expedition-filter-btn {
+        min-height: 31px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border: 1px solid #cfe2d5;
+        border-radius: 999px;
+        color: #245d37;
+        background: #eef8f1;
+        font-size: .59rem;
+        font-weight: 900;
+        cursor: pointer;
+        transition: .16s ease;
+    }
+
+    .expedition-filter-btn:hover {
+        transform: translateY(-1px);
+        color: #fff;
+        border-color: var(--dash-green);
+        background: var(--dash-green);
+        box-shadow: 0 5px 14px rgba(47, 143, 78, .18);
+    }
+
+    .expedition-filter-count {
+        min-width: 18px;
+        height: 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 5px;
+        border-radius: 999px;
+        color: #fff;
+        background: #2f8f4e;
+        font-size: .5rem;
+        line-height: 1;
+    }
+
+    .expedition-filter-count:empty,
+    .expedition-filter-count[data-count="0"] {
+        display: none;
+    }
+
+    .expedition-filter-panel {
+        display: none;
+        padding: 12px 14px 13px;
+        border-bottom: 1px solid #e7eee9;
+        background: linear-gradient(180deg, #f8fcf9 0%, #ffffff 100%);
+    }
+
+    .expedition-filter-panel.show {
+        display: block;
+        animation: expFilterIn .16s ease;
+    }
+
+    @keyframes expFilterIn {
+        from { opacity: 0; transform: translateY(-4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .expedition-filter-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 9px;
+    }
+
+    .expedition-filter-head strong {
+        color: #355441;
+        font-size: .65rem;
+        font-weight: 950;
+    }
+
+    .expedition-filter-head small {
+        color: #839087;
+        font-size: .55rem;
+    }
+
+    .expedition-filter-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 7px;
+    }
+
+    .expedition-filter-field {
+        min-width: 0;
+    }
+
+    .expedition-filter-field label {
+        display: block;
+        margin-bottom: 4px;
+        color: #64746a;
+        font-size: .51rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+    }
+
+    .expedition-filter-control {
+        width: 100%;
+        min-height: 34px;
+        padding: 6px 8px;
+        border: 1px solid #dce7df;
+        border-radius: 9px;
+        color: #33473a;
+        background: #fff;
+        font-size: .62rem;
+        outline: none;
+        transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    .expedition-filter-control:focus {
+        border-color: #6db386;
+        box-shadow: 0 0 0 3px rgba(47, 143, 78, .09);
+    }
+
+    .expedition-filter-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 7px;
+        margin-top: 9px;
+    }
+
+    .expedition-filter-action {
+        min-height: 31px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 9px;
+        font-size: .58rem;
+        font-weight: 900;
+        cursor: pointer;
+    }
+
+    .expedition-filter-action.clear {
+        color: #66736b;
+        border: 1px solid #dce5df;
+        background: #fff;
+    }
+
+    .expedition-filter-action.apply {
+        color: #fff;
+        border: 1px solid var(--dash-green);
+        background: linear-gradient(135deg, #256f42, #2f8f4e);
+        box-shadow: 0 5px 13px rgba(47,143,78,.16);
+    }
+
+    .expedition-kpis {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 8px;
+        padding: 12px;
+        background: #fbfdfb;
+        border-bottom: 1px solid var(--dash-border);
+    }
+
+    .expedition-kpi {
+        position: relative;
+        overflow: hidden;
+        min-width: 0;
+        min-height: 82px;
+        padding: 10px 11px;
+        border: 1px solid #e2ebe5;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .expedition-kpi::after {
+        content: '';
+        position: absolute;
+        width: 54px;
+        height: 54px;
+        right: -20px;
+        bottom: -23px;
+        border-radius: 50%;
+        background: var(--exp-soft, #eef8f1);
+    }
+
+    .expedition-kpi-top {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 7px;
+    }
+
+    .expedition-kpi-icon {
+        width: 26px;
+        height: 26px;
+        flex: 0 0 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        color: var(--exp-color, #2f8f4e);
+        background: var(--exp-soft, #eef8f1);
+    }
+
+    .expedition-kpi-label {
+        position: relative;
+        z-index: 1;
+        display: block;
+        color: var(--dash-muted);
+        font-size: .53rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: .32px;
+    }
+
+    .expedition-kpi strong {
+        position: relative;
+        z-index: 1;
+        display: block;
+        margin-top: 6px;
+        color: var(--dash-text);
+        font-size: 1.12rem;
+        font-weight: 950;
+        line-height: 1;
+    }
+
+    .expedition-kpi small {
+        position: relative;
+        z-index: 1;
+        display: block;
+        margin-top: 4px;
+        color: #87928a;
+        font-size: .51rem;
+        line-height: 1.25;
+    }
+
+    .expedition-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .expedition-table {
+        min-width: 1120px;
+        margin: 0;
+    }
+
+    .expedition-table thead th {
+        padding: 9px 10px;
+        color: #5c6b62;
+        background: #f5f9f6;
+        border-bottom: 1px solid var(--dash-border);
+        font-size: .54rem;
+        font-weight: 950;
+        text-transform: uppercase;
+        letter-spacing: .38px;
+        white-space: nowrap;
+    }
+
+    .expedition-table tbody td {
+        padding: 10px;
+        color: #425248;
+        border-bottom: 1px solid #edf2ee;
+        font-size: .63rem;
+        vertical-align: middle;
+    }
+
+    .expedition-table tbody tr:hover {
+        background: #f9fcfa;
+    }
+
+    .expedition-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .load-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 8px;
+        border-radius: 999px;
+        color: #8f1f1f;
+        background: #ffe8e8;
+        border: 1px solid #ffd2d2;
+        font-size: .58rem;
+        font-weight: 950;
+        white-space: nowrap;
+    }
+
+    .load-badge.avulsa {
+        color: #5d6570;
+        background: #f1f4f6;
+        border-color: #e1e6ea;
+    }
+
+    .lot-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        max-width: 390px;
+    }
+
+    .lot-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 7px;
+        border-radius: 7px;
+        color: #305941;
+        background: #eef8f1;
+        border: 1px solid #d8ebde;
+        font-size: .54rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .expedition-quantity {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        min-width: 120px;
+    }
+
+    .expedition-quantity-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 7px;
+        border-radius: 8px;
+        color: #334155;
+        background: #f4f7f5;
+        border: 1px solid #dfe8e2;
+        font-size: .56rem;
+        font-weight: 900;
+        white-space: nowrap;
+    }
+
+    .expedition-equivalent {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 8px;
+        border-radius: 9px;
+        color: #9a5b00;
+        background: #fff6dc;
+        border: 1px solid #f7df9a;
+        font-size: .6rem;
+        font-weight: 950;
+        white-space: nowrap;
+    }
+
+    .expedition-note {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 13px;
+        color: #65736a;
+        background: #fcfdfc;
+        border-bottom: 1px solid #edf2ee;
+        font-size: .56rem;
+    }
+
+    /* ========================================================
        RECENT TABLE
        ======================================================== */
     .recent-card {
@@ -792,6 +1243,14 @@
                     minmax(0, 1fr)
                 );
         }
+
+        .expedition-filter-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .expedition-kpis {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
     }
 
     @media (
@@ -898,6 +1357,71 @@
         .chart-container {
             height: 260px;
             min-height: 260px;
+        }
+
+        .expedition-card {
+            margin-bottom: 9px;
+            border-radius: 13px;
+        }
+
+        .expedition-header {
+            align-items: flex-start;
+            flex-direction: column;
+            padding: 13px 11px 11px;
+        }
+
+        .expedition-actions {
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .expedition-period {
+            align-self: center;
+        }
+
+        .expedition-filter-btn {
+            margin-left: auto;
+        }
+
+        .expedition-filter-panel {
+            padding: 9px;
+        }
+
+        .expedition-filter-head {
+            align-items: flex-start;
+        }
+
+        .expedition-filter-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .expedition-filter-field.wide-mobile {
+            grid-column: 1 / -1;
+        }
+
+        .expedition-filter-footer {
+            justify-content: stretch;
+        }
+
+        .expedition-filter-action {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .expedition-kpis {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+            padding: 8px;
+        }
+
+        .expedition-kpi {
+            min-height: 78px;
+            padding: 8px;
+        }
+
+        .expedition-note {
+            padding: 7px 9px;
         }
 
         .recent-card {
@@ -1613,6 +2137,150 @@
         </article>
     </section>
 
+    <!-- EXPEDIÇÕES / CARREGAMENTOS -->
+    <section class="expedition-card">
+        <div class="expedition-header">
+            <div class="expedition-title-wrap">
+                <span class="expedition-title-icon">
+                    <i class="fas fa-truck-fast"></i>
+                </span>
+                <div>
+                    <h6>Expedições / Carregamentos</h6>
+                    <small>Visão consolidada por carga. Repetições do mesmo número são somadas sem duplicar o caminhão.</small>
+                </div>
+            </div>
+
+            <div class="expedition-actions">
+                <span id="expedicaoPeriodo" class="expedition-period">--</span>
+                <button type="button" class="expedition-filter-btn" onclick="toggleExpeditionFilters()">
+                    <i class="fas fa-sliders"></i>
+                    Filtrar expedições
+                    <span id="expedicaoFilterCount" class="expedition-filter-count" data-count="0"></span>
+                    <i id="expedicaoFilterIcon" class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="expedicaoFilterPanel" class="expedition-filter-panel">
+            <div class="expedition-filter-head">
+                <div>
+                    <strong><i class="fas fa-filter me-1"></i>Filtros da expedição</strong>
+                    <small class="d-block">Ajustam somente o quadro de carregamentos abaixo.</small>
+                </div>
+            </div>
+
+            <div class="expedition-filter-grid">
+                <div class="expedition-filter-field">
+                    <label for="expFilterDataInicio">Data inicial</label>
+                    <input type="date" id="expFilterDataInicio" class="expedition-filter-control">
+                </div>
+                <div class="expedition-filter-field">
+                    <label for="expFilterDataFim">Data final</label>
+                    <input type="date" id="expFilterDataFim" class="expedition-filter-control">
+                </div>
+                <div class="expedition-filter-field">
+                    <label for="expFilterCarga">Carga</label>
+                    <input type="search" id="expFilterCarga" class="expedition-filter-control" placeholder="Ex.: 432 ou CARGA 432">
+                </div>
+                <div class="expedition-filter-field">
+                    <label for="expFilterCliente">Cliente</label>
+                    <input type="search" id="expFilterCliente" class="expedition-filter-control" placeholder="Nome do cliente">
+                </div>
+                <div class="expedition-filter-field">
+                    <label for="expFilterPlaca">Placa</label>
+                    <input type="search" id="expFilterPlaca" class="expedition-filter-control" placeholder="ABC1D23">
+                </div>
+                <div class="expedition-filter-field">
+                    <label for="expFilterMotorista">Motorista</label>
+                    <input type="search" id="expFilterMotorista" class="expedition-filter-control" placeholder="Nome do motorista">
+                </div>
+                <div class="expedition-filter-field wide-mobile">
+                    <label for="expFilterLote">Lote</label>
+                    <input type="search" id="expFilterLote" class="expedition-filter-control" placeholder="Lote carregado">
+                </div>
+            </div>
+
+            <div class="expedition-filter-footer">
+                <button type="button" class="expedition-filter-action clear" onclick="limparFiltrosExpedicao()">
+                    <i class="fas fa-eraser"></i> Limpar
+                </button>
+                <button type="button" class="expedition-filter-action apply" onclick="aplicarFiltrosExpedicao()">
+                    <i class="fas fa-check"></i> Aplicar filtros
+                </button>
+            </div>
+        </div>
+
+        <div class="expedition-kpis">
+            <div class="expedition-kpi" style="--exp-color:#b91c1c;--exp-soft:#ffe9e9;">
+                <div class="expedition-kpi-top">
+                    <span class="expedition-kpi-label">Cargas expedidas</span>
+                    <span class="expedition-kpi-icon"><i class="fas fa-truck"></i></span>
+                </div>
+                <strong id="exp-kpi-cargas">--</strong>
+                <small id="exp-kpi-cargas-sub">cargas únicas no período</small>
+            </div>
+            <div class="expedition-kpi" style="--exp-color:#2563eb;--exp-soft:#e8f1ff;">
+                <div class="expedition-kpi-top">
+                    <span class="expedition-kpi-label">Volume carregado</span>
+                    <span class="expedition-kpi-icon"><i class="fas fa-boxes-packing"></i></span>
+                </div>
+                <strong id="exp-kpi-volume">--</strong>
+                <small>BAG e SC carregados</small>
+            </div>
+            <div class="expedition-kpi" style="--exp-color:#d97706;--exp-soft:#fff4d8;">
+                <div class="expedition-kpi-top">
+                    <span class="expedition-kpi-label">Equivalente em sacos</span>
+                    <span class="expedition-kpi-icon"><i class="fas fa-calculator"></i></span>
+                </div>
+                <strong id="exp-kpi-equivalente">--</strong>
+                <small>1 BAG = 25 SC + sacos físicos</small>
+            </div>
+            <div class="expedition-kpi" style="--exp-color:#7c3aed;--exp-soft:#f1eaff;">
+                <div class="expedition-kpi-top">
+                    <span class="expedition-kpi-label">Lotes carregados</span>
+                    <span class="expedition-kpi-icon"><i class="fas fa-boxes-stacked"></i></span>
+                </div>
+                <strong id="exp-kpi-lotes">--</strong>
+                <small>lotes nas cargas filtradas</small>
+            </div>
+            <div class="expedition-kpi" style="--exp-color:#0f766e;--exp-soft:#e3f7f4;">
+                <div class="expedition-kpi-top">
+                    <span class="expedition-kpi-label">Placas</span>
+                    <span class="expedition-kpi-icon"><i class="fas fa-id-card"></i></span>
+                </div>
+                <strong id="exp-kpi-placas">--</strong>
+                <small>veículos identificados</small>
+            </div>
+        </div>
+
+        <div class="expedition-note">
+            <i class="fas fa-circle-info text-success"></i>
+            <span id="expedicaoNota">Uma carga é contada uma única vez. Para equivalência: 1 BAG = 25 SC e cada SC físico soma 1 SC.</span>
+        </div>
+
+        <div class="expedition-table-wrap">
+            <table class="table expedition-table align-middle">
+                <thead>
+                    <tr>
+                        <th>Última movimentação</th>
+                        <th>Carga</th>
+                        <th>Placa</th>
+                        <th>Motorista</th>
+                        <th>Cliente</th>
+                        <th>Lotes carregados</th>
+                        <th>Quantidade</th>
+                        <th>Equiv. em sacos</th>
+                    </tr>
+                </thead>
+                <tbody id="listaExpedicoes">
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">Carregando...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
     <!-- RECENTES -->
     <section class="recent-card">
         <div class="recent-header">
@@ -2301,6 +2969,183 @@
         };
     }
 
+    function toggleExpeditionFilters() {
+        const panel = document.getElementById('expedicaoFilterPanel');
+        const icon = document.getElementById('expedicaoFilterIcon');
+        if (!panel) return;
+
+        panel.classList.toggle('show');
+        if (icon) {
+            icon.className = panel.classList.contains('show')
+                ? 'fas fa-chevron-up'
+                : 'fas fa-chevron-down';
+        }
+    }
+
+    function getExpeditionFilters() {
+        const ids = {
+            exp_data_inicio: 'expFilterDataInicio',
+            exp_data_fim: 'expFilterDataFim',
+            exp_carga: 'expFilterCarga',
+            exp_cliente: 'expFilterCliente',
+            exp_placa: 'expFilterPlaca',
+            exp_motorista: 'expFilterMotorista',
+            exp_lote: 'expFilterLote',
+        };
+
+        const filtros = {};
+        Object.entries(ids).forEach(([key, id]) => {
+            filtros[key] = document.getElementById(id)?.value?.trim() || '';
+        });
+        return filtros;
+    }
+
+    function atualizarContadorFiltrosExpedicao() {
+        const filtros = getExpeditionFilters();
+        const total = Object.values(filtros).filter(Boolean).length;
+        const badge = document.getElementById('expedicaoFilterCount');
+        if (badge) {
+            badge.dataset.count = String(total);
+            badge.textContent = total ? String(total) : '';
+        }
+        return total;
+    }
+
+    function aplicarFiltrosExpedicao() {
+        atualizarContadorFiltrosExpedicao();
+        executarBusca();
+    }
+
+    function limparFiltrosExpedicao() {
+        [
+            'expFilterDataInicio',
+            'expFilterDataFim',
+            'expFilterCarga',
+            'expFilterCliente',
+            'expFilterPlaca',
+            'expFilterMotorista',
+            'expFilterLote',
+        ].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        atualizarContadorFiltrosExpedicao();
+        executarBusca();
+    }
+
+    function atualizarExpedicoes(d) {
+        const bloco = d.expedicoes || {};
+        const resumo = bloco.resumo || {};
+        const cargas = Array.isArray(bloco.cargas) ? bloco.cargas : [];
+        const periodo = bloco.periodo || {};
+
+        document.getElementById('exp-kpi-cargas').textContent =
+            formatNumber(resumo.cargas || 0);
+        const volumePartes = [];
+        if (Number(resumo.bags || 0) > 0) {
+            volumePartes.push(`${formatNumber(resumo.bags || 0, 0)} BAG`);
+        }
+        if (Number(resumo.scs || 0) > 0) {
+            volumePartes.push(`${formatNumber(resumo.scs || 0, 0)} SC`);
+        }
+        if (Number(resumo.outros || 0) > 0) {
+            volumePartes.push(`${formatNumber(resumo.outros || 0, 0)} UN`);
+        }
+        document.getElementById('exp-kpi-volume').textContent =
+            volumePartes.length ? volumePartes.join(' · ') : '0';
+        document.getElementById('exp-kpi-equivalente').textContent =
+            `${formatNumber(resumo.equivalente_sc || 0, 0)} SC`;
+        document.getElementById('exp-kpi-lotes').textContent =
+            formatNumber(resumo.lotes || 0);
+        document.getElementById('exp-kpi-placas').textContent =
+            formatNumber(resumo.placas || 0);
+
+        const periodoEl = document.getElementById('expedicaoPeriodo');
+        if (periodoEl) {
+            periodoEl.textContent = (periodo.inicio && periodo.fim)
+                ? `${periodo.inicio} a ${periodo.fim}`
+                : '--';
+        }
+
+        const nota = document.getElementById('expedicaoNota');
+        if (nota) {
+            nota.textContent = 'Uma carga é contada uma única vez. Equivalência usada: 1 BAG = 25 SC; sacos físicos (SC) entram diretamente na soma.';
+        }
+
+        const tbody = document.getElementById('listaExpedicoes');
+        if (!tbody) return;
+
+        if (!cargas.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">
+                        <i class="fas fa-truck me-1"></i>
+                        Nenhuma expedição encontrada para os filtros informados.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = cargas.map(carga => {
+            const lotes = Array.isArray(carga.lotes) ? carga.lotes : [];
+            const lotesHtml = lotes.length
+                ? lotes.map(item => `
+                    <span class="lot-chip" title="${escapeHtml(item.lote)}">
+                        <i class="fas fa-box"></i>
+                        ${escapeHtml(item.lote)}
+                        <b>${formatNumber(item.qtd || 0, 0)} ${escapeHtml(item.unidade || 'UN')}</b>
+                    </span>
+                `).join('')
+                : '<span class="text-muted">--</span>';
+
+            const cargaNome = String(carga.carga || 'AVULSA');
+            const avulsa = cargaNome.toUpperCase() === 'AVULSA';
+            const quantidadePartes = [];
+            if (Number(carga.qtd_bag || 0) > 0) {
+                quantidadePartes.push(
+                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_bag || 0, 0)} BAG</span>`
+                );
+            }
+            if (Number(carga.qtd_sc || 0) > 0) {
+                quantidadePartes.push(
+                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_sc || 0, 0)} SC</span>`
+                );
+            }
+            if (Number(carga.qtd_outros || 0) > 0) {
+                quantidadePartes.push(
+                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_outros || 0, 0)} UN</span>`
+                );
+            }
+            const quantidadeHtml = quantidadePartes.length
+                ? quantidadePartes.join('')
+                : '<span class="text-muted">0</span>';
+
+            return `
+                <tr>
+                    <td class="text-nowrap">${escapeHtml(carga.dt || '--')}</td>
+                    <td>
+                        <span class="load-badge ${avulsa ? 'avulsa' : ''}">
+                            <i class="fas ${avulsa ? 'fa-box-open' : 'fa-truck'}"></i>
+                            ${escapeHtml(cargaNome)}
+                        </span>
+                    </td>
+                    <td class="fw-bold text-nowrap">${escapeHtml(carga.placa || '--')}</td>
+                    <td>${escapeHtml(carga.motorista || '--')}</td>
+                    <td>${escapeHtml(carga.cliente || '--')}</td>
+                    <td><div class="lot-list">${lotesHtml}</div></td>
+                    <td><div class="expedition-quantity">${quantidadeHtml}</div></td>
+                    <td>
+                        <span class="expedition-equivalent">
+                            <i class="fas fa-equals"></i>
+                            ${formatNumber(carga.equivalente_sc || 0, 0)} SC
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
     function atualizarRecentes(d) {
         const tbody = document.getElementById(
             'listaRecentes'
@@ -2550,6 +3395,12 @@
             ).value
         );
 
+        const filtrosExpedicao = getExpeditionFilters();
+        Object.entries(filtrosExpedicao).forEach(([key, value]) => {
+            if (value) params.set(key, value);
+        });
+        atualizarContadorFiltrosExpedicao();
+
         if (!primeiraCarga) {
             showLoading(true);
         }
@@ -2581,6 +3432,7 @@
 
             atualizarKpis(d);
             atualizarGraficos(d);
+            atualizarExpedicoes(d);
             atualizarRecentes(d);
 
             const opcoes = (
@@ -3044,6 +3896,27 @@
                 aplicarFiltros
             );
 
+            [
+                'expFilterDataInicio',
+                'expFilterDataFim',
+                'expFilterCarga',
+                'expFilterCliente',
+                'expFilterPlaca',
+                'expFilterMotorista',
+                'expFilterLote',
+            ].forEach(id => {
+                const el = document.getElementById(id);
+                el?.addEventListener('input', atualizarContadorFiltrosExpedicao);
+                el?.addEventListener('change', atualizarContadorFiltrosExpedicao);
+                el?.addEventListener('keydown', event => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        aplicarFiltrosExpedicao();
+                    }
+                });
+            });
+
+            atualizarContadorFiltrosExpedicao();
             executarBusca();
         }
     );

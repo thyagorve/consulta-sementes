@@ -6799,6 +6799,22 @@ def _dashboard_aplicar_filtros_movimentacao(
                 descricao__icontains=
                     search
             )
+            | Q(
+                numero_carga__icontains=
+                    search
+            )
+            | Q(
+                placa__icontains=
+                    search
+            )
+            | Q(
+                motorista__icontains=
+                    search
+            )
+            | Q(
+                cliente__icontains=
+                    search
+            )
         )
 
     return queryset
@@ -6944,6 +6960,57 @@ def _dashboard_data_segura(
         return None
 
 
+def _dashboard_normalizar_carga(valor):
+    """
+    Normaliza o identificador da carga para agrupamento no dashboard.
+
+    Exemplos que passam a representar a mesma carga:
+    - 432
+    - carga 432
+    - CARGA-432
+    - CARGA: 432
+    """
+    texto = str(valor or '').strip().upper()
+    texto = texto.replace('-', ' ').replace(':', ' ')
+    texto = ' '.join(texto.split())
+
+    if not texto:
+        return '', ''
+
+    if texto.isdigit():
+        numero = texto.lstrip('0') or '0'
+        texto = f'CARGA {numero}'
+    elif texto.startswith('CARGA'):
+        restante = texto[5:].strip()
+        if restante.isdigit():
+            numero = restante.lstrip('0') or '0'
+            texto = f'CARGA {numero}'
+
+    return texto, texto
+
+
+def _dashboard_q_expedicao():
+    """Reconhece expedições com ou sem acento em históricos antigos."""
+    return (
+        Q(tipo__icontains='Expedição')
+        | Q(tipo__icontains='Expedicao')
+    )
+
+
+def _dashboard_tipo_inclui_expedicao(tipo_mov):
+    """
+    Diz se o filtro de tipo atual permite exibir o bloco de expedições.
+    'Saída' inclui expedição no dashboard; Entrada/Transferência não.
+    """
+    valor = str(tipo_mov or '').strip().lower()
+    if not valor:
+        return True
+    return valor in {
+        'saida', 'saída', 'saidas', 'saídas',
+        'expedicao', 'expedição',
+    }
+
+
 # ================================================================
 # API DO DASHBOARD
 # ================================================================
@@ -7031,6 +7098,20 @@ def dashboard_data(request):
                 ''
             ).strip()
         )
+
+        # Filtros exclusivos do quadro de Expedições / Carregamentos.
+        # Eles não alteram os demais KPIs/gráficos do dashboard.
+        exp_data_inicio = _dashboard_data_segura(
+            request.GET.get('exp_data_inicio', '').strip()
+        )
+        exp_data_fim = _dashboard_data_segura(
+            request.GET.get('exp_data_fim', '').strip()
+        )
+        exp_carga = request.GET.get('exp_carga', '').strip()
+        exp_cliente = request.GET.get('exp_cliente', '').strip()
+        exp_placa = request.GET.get('exp_placa', '').strip()
+        exp_motorista = request.GET.get('exp_motorista', '').strip()
+        exp_lote = request.GET.get('exp_lote', '').strip()
 
         try:
             periodo_dias = int(
@@ -7763,6 +7844,261 @@ def dashboard_data(request):
         }
 
         # --------------------------------------------------------
+        # EXPEDIÇÕES / CARREGAMENTOS
+        # --------------------------------------------------------
+        # O período acompanha o seletor do dashboard quando não há
+        # datas explícitas. Se o usuário escolher datas, elas prevalecem.
+        expedicao_inicio = exp_data_inicio or data_inicio or data_limite
+        expedicao_fim = exp_data_fim or data_fim or hoje
+
+        expedicoes_qs = (
+            mov_qs
+            .filter(
+                _dashboard_q_expedicao(),
+                data_hora__date__gte=expedicao_inicio,
+                data_hora__date__lte=expedicao_fim,
+            )
+            .order_by('-data_hora', '-id')
+        )
+
+        # Respeita também o filtro "Tipo movimentação" do dashboard.
+        if not _dashboard_tipo_inclui_expedicao(tipo_mov):
+            expedicoes_qs = expedicoes_qs.none()
+
+        # Filtros específicos da área de expedição.
+        if exp_cliente:
+            expedicoes_qs = expedicoes_qs.filter(
+                Q(cliente__icontains=exp_cliente)
+                | Q(estoque__cliente__icontains=exp_cliente)
+            )
+
+        if exp_placa:
+            expedicoes_qs = expedicoes_qs.filter(
+                placa__icontains=exp_placa
+            )
+
+        if exp_motorista:
+            expedicoes_qs = expedicoes_qs.filter(
+                motorista__icontains=exp_motorista
+            )
+
+        if exp_lote:
+            expedicoes_qs = expedicoes_qs.filter(
+                Q(lote_ref__icontains=exp_lote)
+                | Q(estoque__lote__icontains=exp_lote)
+            )
+
+        if exp_carga:
+            # Aceita procurar tanto por "432" quanto por "CARGA 432".
+            _, carga_normalizada = _dashboard_normalizar_carga(exp_carga)
+            termos_carga = {exp_carga}
+            if carga_normalizada:
+                termos_carga.add(carga_normalizada)
+                if carga_normalizada.startswith('CARGA '):
+                    termos_carga.add(carga_normalizada.split(' ', 1)[1])
+
+            filtro_carga = Q()
+            for termo_carga in termos_carga:
+                termo_carga = str(termo_carga or '').strip()
+                if termo_carga:
+                    filtro_carga |= Q(numero_carga__icontains=termo_carga)
+
+            if filtro_carga:
+                expedicoes_qs = expedicoes_qs.filter(filtro_carga)
+
+        cargas_agrupadas = {}
+        placas_unicas = set()
+        total_baixas_expedicao = 0
+        volume_expedido = Decimal('0')
+        total_bag_expedido = Decimal('0')
+        total_sc_expedido = Decimal('0')
+        total_outros_expedido = Decimal('0')
+        total_equivalente_sc = Decimal('0')
+
+        for mov in expedicoes_qs:
+            chave_carga, nome_carga = _dashboard_normalizar_carga(
+                mov.numero_carga
+            )
+
+            # Sem um número/nome de carga não é seguro unir duas baixas
+            # diferentes. Cada registro fica como uma expedição avulsa.
+            if not chave_carga:
+                chave_carga = f'AVULSA:{mov.id}'
+                nome_carga = 'AVULSA'
+
+            quantidade_mov = Decimal(
+                str(getattr(mov, 'quantidade', 0) or 0)
+            )
+
+            # A embalagem vem do lote movimentado. Esta é a mesma regra
+            # de conversão já utilizada no dashboard geral do projeto:
+            # 1 BAG = 25 SC; cada SC físico = 1 SC equivalente.
+            unidade_mov = str(
+                getattr(mov.estoque, 'embalagem', '')
+                if mov.estoque
+                else ''
+            ).strip().upper()
+            if unidade_mov not in ('BAG', 'SC'):
+                unidade_mov = 'UN'
+
+            if unidade_mov == 'BAG':
+                equivalente_sc_mov = quantidade_mov * Decimal('25')
+                total_bag_expedido += quantidade_mov
+            elif unidade_mov == 'SC':
+                equivalente_sc_mov = quantidade_mov
+                total_sc_expedido += quantidade_mov
+            else:
+                equivalente_sc_mov = Decimal('0')
+                total_outros_expedido += quantidade_mov
+
+            total_equivalente_sc += equivalente_sc_mov
+
+            lote_mov = (
+                mov.lote_ref
+                or (mov.estoque.lote if mov.estoque else '')
+                or '--'
+            )
+
+            placa_mov = ' '.join(
+                str(mov.placa or '').strip().upper().split()
+            )
+            motorista_mov = ' '.join(
+                str(mov.motorista or '').strip().split()
+            )
+            cliente_mov = ' '.join(
+                str(mov.cliente or '').strip().split()
+            )
+
+            if placa_mov:
+                placas_unicas.add(placa_mov)
+
+            grupo = cargas_agrupadas.setdefault(
+                chave_carga,
+                {
+                    'carga': nome_carga,
+                    'data_hora': mov.data_hora,
+                    'qtd': Decimal('0'),
+                    'qtd_bag': Decimal('0'),
+                    'qtd_sc': Decimal('0'),
+                    'qtd_outros': Decimal('0'),
+                    'equivalente_sc': Decimal('0'),
+                    'baixas': 0,
+                    'lotes': {},
+                    'placas': set(),
+                    'motoristas': set(),
+                    'clientes': set(),
+                },
+            )
+
+            # Como o queryset está do mais novo para o mais antigo,
+            # a primeira data já representa a última baixa da carga.
+            grupo['qtd'] += quantidade_mov
+            grupo['equivalente_sc'] += equivalente_sc_mov
+            grupo['baixas'] += 1
+
+            if unidade_mov == 'BAG':
+                grupo['qtd_bag'] += quantidade_mov
+            elif unidade_mov == 'SC':
+                grupo['qtd_sc'] += quantidade_mov
+            else:
+                grupo['qtd_outros'] += quantidade_mov
+
+            # O mesmo lote pode aparecer em mais de uma movimentação.
+            # A unidade faz parte da chave para nunca somar BAG e SC
+            # como se fossem a mesma grandeza.
+            lote_chave = (lote_mov, unidade_mov)
+            lote_info = grupo['lotes'].setdefault(
+                lote_chave,
+                {
+                    'lote': lote_mov,
+                    'unidade': unidade_mov,
+                    'qtd': Decimal('0'),
+                    'equivalente_sc': Decimal('0'),
+                },
+            )
+            lote_info['qtd'] += quantidade_mov
+            lote_info['equivalente_sc'] += equivalente_sc_mov
+
+            if placa_mov:
+                grupo['placas'].add(placa_mov)
+            if motorista_mov:
+                grupo['motoristas'].add(motorista_mov)
+            if cliente_mov:
+                grupo['clientes'].add(cliente_mov)
+
+            total_baixas_expedicao += 1
+            volume_expedido += quantidade_mov
+
+        cargas_lista = []
+        total_lotes_nas_cargas = 0
+        cargas_multiplas_baixas = 0
+
+        for grupo in cargas_agrupadas.values():
+            lotes = [
+                {
+                    'lote': info_lote['lote'],
+                    'unidade': info_lote['unidade'],
+                    'qtd': _dashboard_numero(info_lote['qtd']),
+                    'equivalente_sc': _dashboard_numero(
+                        info_lote['equivalente_sc']
+                    ),
+                }
+                for _, info_lote in sorted(
+                    grupo['lotes'].items(),
+                    key=lambda item: (str(item[0][0]), str(item[0][1])),
+                )
+            ]
+
+            total_lotes_nas_cargas += len(lotes)
+            if grupo['baixas'] > 1:
+                cargas_multiplas_baixas += 1
+
+            cargas_lista.append({
+                'carga': grupo['carga'],
+                'dt': (
+                    timezone.localtime(grupo['data_hora']).strftime(
+                        '%d/%m/%Y %H:%M'
+                    )
+                    if grupo['data_hora']
+                    else '--'
+                ),
+                'qtd': _dashboard_numero(grupo['qtd']),
+                'qtd_bag': _dashboard_numero(grupo['qtd_bag']),
+                'qtd_sc': _dashboard_numero(grupo['qtd_sc']),
+                'qtd_outros': _dashboard_numero(grupo['qtd_outros']),
+                'equivalente_sc': _dashboard_numero(
+                    grupo['equivalente_sc']
+                ),
+                'baixas': int(grupo['baixas']),
+                'lotes': lotes,
+                'placa': ' / '.join(sorted(grupo['placas'])) or '--',
+                'motorista': ' / '.join(sorted(grupo['motoristas'])) or '--',
+                'cliente': ' / '.join(sorted(grupo['clientes'])) or '--',
+            })
+
+        # Mantém o painel leve em telas menores. Os KPIs consideram TODAS
+        # as cargas do período; a tabela exibe as 30 mais recentes.
+        expedicoes = {
+            'resumo': {
+                'cargas': len(cargas_agrupadas),
+                'volume': _dashboard_numero(volume_expedido),
+                'bags': _dashboard_numero(total_bag_expedido),
+                'scs': _dashboard_numero(total_sc_expedido),
+                'outros': _dashboard_numero(total_outros_expedido),
+                'equivalente_sc': _dashboard_numero(total_equivalente_sc),
+                'lotes': int(total_lotes_nas_cargas),
+                'placas': len(placas_unicas),
+                'baixas': int(total_baixas_expedicao),
+                'multiplas_baixas': int(cargas_multiplas_baixas),
+            },
+            'periodo': {
+                'inicio': expedicao_inicio.strftime('%d/%m/%Y'),
+                'fim': expedicao_fim.strftime('%d/%m/%Y'),
+            },
+            'cargas': cargas_lista[:30],
+        }
+
+        # --------------------------------------------------------
         # MOVIMENTAÇÕES RECENTES
         # --------------------------------------------------------
         movimentacoes = []
@@ -7836,6 +8172,7 @@ def dashboard_data(request):
             'success': True,
             'kpis': kpis,
             'graficos': graficos,
+            'expedicoes': expedicoes,
             'recentes': movimentacoes,
             'opcoes_filtros': (
                 opcoes_filtros
