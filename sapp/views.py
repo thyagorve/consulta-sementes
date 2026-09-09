@@ -8057,7 +8057,7 @@ def dashboard_data(request):
                 'carga': grupo['carga'],
                 'dt': (
                     timezone.localtime(grupo['data_hora']).strftime(
-                        '%d/%m/%Y %H:%M'
+                        '%d/%m/%Y'
                     )
                     if grupo['data_hora']
                     else '--'
