@@ -7907,6 +7907,14 @@ def dashboard_data(request):
                 expedicoes_qs = expedicoes_qs.filter(filtro_carga)
 
         cargas_agrupadas = {}
+        dias_expedicao = defaultdict(
+            lambda: {
+                'equivalente_sc': Decimal('0'),
+                'bags': Decimal('0'),
+                'scs': Decimal('0'),
+                'cargas': set(),
+            }
+        )
         placas_unicas = set()
         total_baixas_expedicao = 0
         volume_expedido = Decimal('0')
@@ -7952,6 +7960,19 @@ def dashboard_data(request):
                 total_outros_expedido += quantidade_mov
 
             total_equivalente_sc += equivalente_sc_mov
+
+            # Para o gráfico de vários dias, o volume é atribuído ao dia
+            # real de cada movimentação. Assim uma carga com vários lotes
+            # não perde o histórico diário por ter sido agrupada no resumo.
+            if mov.data_hora:
+                data_local_mov = timezone.localtime(mov.data_hora).date()
+                dia_mov = dias_expedicao[data_local_mov]
+                dia_mov['equivalente_sc'] += equivalente_sc_mov
+                if unidade_mov == 'BAG':
+                    dia_mov['bags'] += quantidade_mov
+                elif unidade_mov == 'SC':
+                    dia_mov['scs'] += quantidade_mov
+                dia_mov['cargas'].add(chave_carga)
 
             lote_mov = (
                 mov.lote_ref
@@ -8053,14 +8074,23 @@ def dashboard_data(request):
             if grupo['baixas'] > 1:
                 cargas_multiplas_baixas += 1
 
+            data_local_carga = (
+                timezone.localtime(grupo['data_hora'])
+                if grupo['data_hora']
+                else None
+            )
+
             cargas_lista.append({
                 'carga': grupo['carga'],
                 'dt': (
-                    timezone.localtime(grupo['data_hora']).strftime(
-                        '%d/%m/%Y'
-                    )
-                    if grupo['data_hora']
+                    data_local_carga.strftime('%d/%m/%Y')
+                    if data_local_carga
                     else '--'
+                ),
+                'data_iso': (
+                    data_local_carga.strftime('%Y-%m-%d')
+                    if data_local_carga
+                    else ''
                 ),
                 'qtd': _dashboard_numero(grupo['qtd']),
                 'qtd_bag': _dashboard_numero(grupo['qtd_bag']),
@@ -8075,6 +8105,164 @@ def dashboard_data(request):
                 'motorista': ' / '.join(sorted(grupo['motoristas'])) or '--',
                 'cliente': ' / '.join(sorted(grupo['clientes'])) or '--',
             })
+
+        # --------------------------------------------------------
+        # GRÁFICO DINÂMICO DE EXPEDIÇÃO
+        # --------------------------------------------------------
+        # 1 dia  -> compara as cargas daquele dia.
+        # >1 dia -> consolida o volume equivalente em SC por data.
+        # O gráfico usa todas as cargas filtradas, não apenas as 30
+        # exibidas na tabela.
+        grafico_modo = (
+            'cargas'
+            if expedicao_inicio == expedicao_fim
+            else 'dias'
+        )
+
+        grafico_labels = []
+        grafico_valores = []
+        grafico_bags = []
+        grafico_scs = []
+        grafico_cargas_qtd = []
+        grafico_detalhes = []
+
+        if grafico_modo == 'cargas':
+            cargas_grafico = sorted(
+                cargas_lista,
+                key=lambda item: (
+                    item.get('data_iso', ''),
+                    str(item.get('carga', '')),
+                ),
+            )
+
+            for carga_item in cargas_grafico:
+                grafico_labels.append(carga_item['carga'])
+                grafico_valores.append(carga_item['equivalente_sc'])
+                grafico_bags.append(carga_item['qtd_bag'])
+                grafico_scs.append(carga_item['qtd_sc'])
+                grafico_cargas_qtd.append(1)
+                grafico_detalhes.append({
+                    'carga': carga_item['carga'],
+                    'placa': carga_item['placa'],
+                    'cliente': carga_item['cliente'],
+                    'bags': carga_item['qtd_bag'],
+                    'scs': carga_item['qtd_sc'],
+                    'equivalente_sc': carga_item['equivalente_sc'],
+                })
+        else:
+            # Inclui também dias sem carregamento para o gráfico refletir
+            # fielmente todo o intervalo escolhido pelo usuário.
+            cursor_dia = expedicao_inicio
+            while cursor_dia <= expedicao_fim:
+                dia_info = dias_expedicao[cursor_dia]
+                grafico_labels.append(cursor_dia.strftime('%d/%m'))
+                grafico_valores.append(
+                    _dashboard_numero(dia_info['equivalente_sc'])
+                )
+                grafico_bags.append(_dashboard_numero(dia_info['bags']))
+                grafico_scs.append(_dashboard_numero(dia_info['scs']))
+                grafico_cargas_qtd.append(len(dia_info['cargas']))
+                grafico_detalhes.append({
+                    'data': cursor_dia.strftime('%d/%m/%Y'),
+                    'cargas': len(dia_info['cargas']),
+                    'bags': _dashboard_numero(dia_info['bags']),
+                    'scs': _dashboard_numero(dia_info['scs']),
+                    'equivalente_sc': _dashboard_numero(
+                        dia_info['equivalente_sc']
+                    ),
+                })
+                cursor_dia += timedelta(days=1)
+
+        total_cargas_grafico = len(cargas_agrupadas)
+        dias_periodo = max(
+            1,
+            (expedicao_fim - expedicao_inicio).days + 1,
+        )
+        dias_com_carga = sum(
+            1
+            for data_dia, info_dia in dias_expedicao.items()
+            if (
+                expedicao_inicio <= data_dia <= expedicao_fim
+                and bool(info_dia['cargas'])
+            )
+        )
+
+        media_por_carga_sc = (
+            total_equivalente_sc / Decimal(total_cargas_grafico)
+            if total_cargas_grafico
+            else Decimal('0')
+        )
+        media_por_dia_sc = (
+            total_equivalente_sc / Decimal(dias_periodo)
+            if dias_periodo
+            else Decimal('0')
+        )
+
+        maior_carga = None
+        if cargas_lista:
+            maior_carga = max(
+                cargas_lista,
+                key=lambda item: Decimal(
+                    str(item.get('equivalente_sc', 0) or 0)
+                ),
+            )
+
+        dia_pico_label = '--'
+        dia_pico_sc = Decimal('0')
+        if grafico_modo == 'dias' and grafico_valores:
+            indice_pico = max(
+                range(len(grafico_valores)),
+                key=lambda idx: Decimal(
+                    str(grafico_valores[idx] or 0)
+                ),
+            )
+            if grafico_detalhes[indice_pico].get('data'):
+                dia_pico_label = grafico_detalhes[indice_pico]['data']
+            dia_pico_sc = Decimal(
+                str(grafico_valores[indice_pico] or 0)
+            )
+
+        grafico_expedicao = {
+            'modo': grafico_modo,
+            'titulo': (
+                f'Cargas carregadas em {expedicao_inicio.strftime("%d/%m/%Y")}'
+                if grafico_modo == 'cargas'
+                else 'Volume carregado por dia'
+            ),
+            'subtitulo': (
+                'Comparativo do equivalente em sacos (SC) por carga.'
+                if grafico_modo == 'cargas'
+                else 'Volume equivalente em sacos (SC) dentro do período filtrado.'
+            ),
+            'labels': grafico_labels,
+            'valores': grafico_valores,
+            'bags': grafico_bags,
+            'scs': grafico_scs,
+            'cargas_qtd': grafico_cargas_qtd,
+            'detalhes': grafico_detalhes,
+            'resumo': {
+                'cargas': total_cargas_grafico,
+                'equivalente_sc': _dashboard_numero(total_equivalente_sc),
+                'bags': _dashboard_numero(total_bag_expedido),
+                'scs': _dashboard_numero(total_sc_expedido),
+                'media_por_carga_sc': _dashboard_numero(media_por_carga_sc),
+                'media_por_dia_sc': _dashboard_numero(media_por_dia_sc),
+                'dias_periodo': dias_periodo,
+                'dias_com_carga': dias_com_carga,
+                'maior_carga': (
+                    maior_carga['carga']
+                    if maior_carga
+                    else '--'
+                ),
+                'maior_carga_sc': (
+                    maior_carga['equivalente_sc']
+                    if maior_carga
+                    else 0
+                ),
+                'dia_pico': dia_pico_label,
+                'dia_pico_sc': _dashboard_numero(dia_pico_sc),
+            },
+        }
 
         # Mantém o painel leve em telas menores. Os KPIs consideram TODAS
         # as cargas do período; a tabela exibe as 30 mais recentes.
@@ -8095,6 +8283,7 @@ def dashboard_data(request):
                 'inicio': expedicao_inicio.strftime('%d/%m/%Y'),
                 'fim': expedicao_fim.strftime('%d/%m/%Y'),
             },
+            'grafico': grafico_expedicao,
             'cargas': cargas_lista[:30],
         }
 
