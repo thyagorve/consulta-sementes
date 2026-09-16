@@ -5575,6 +5575,53 @@ async function salvarEmpenho() {
         alert('Nenhuma alteração detectada');
         return;
     }
+
+    // OFFLINE: o empenho entra imediatamente na fila local. A decisão final
+    // continua sendo do servidor quando sincronizar, aplicando a regra de
+    // conflito por lote.
+    if (!navigator.onLine && window.InfinityOffline) {
+        const baseLotes = {};
+        const idsAfetados = new Set(adicionar.map(x => Number(x.lote_id)));
+        dataGrid.empenhadosData.forEach(item => {
+            if (remover.includes(item.id)) idsAfetados.add(Number(item.estoque_id));
+        });
+        for (const estoqueId of idsAfetados) {
+            const row = dataGrid.allData.find(x => Number(x.estoque_id || x.id) === Number(estoqueId))
+                || dataGrid.empenhadosData.find(x => Number(x.estoque_id) === Number(estoqueId));
+            const lote = String(row?.lote || '').trim();
+            if (lote) baseLotes[lote] = await window.InfinityOffline.getLotVersion(lote);
+        }
+        await window.InfinityOffline.enqueue({
+            tipo: 'SOLICITACAO_EMPENHAR',
+            lote: '',
+            base_lote_versao: 0,
+            payload: {
+                solicitacao_id: solicId,
+                adicionar,
+                remover,
+                base_lote_versoes: baseLotes
+            }
+        });
+        // Atualização otimista do estado da grade deste aparelho.
+        dataGrid.empenhadosData = dataGrid.empenhadosData.filter(item => !remover.includes(item.id));
+        adicionar.forEach(item => {
+            const row = dataGrid.allData.find(x => Number(x.estoque_id || x.id) === Number(item.lote_id));
+            if (row) {
+                dataGrid.empenhadosData.push({
+                    ...row,
+                    id: `offline-${item.lote_id}-${Date.now()}`,
+                    estoque_id: Number(item.lote_id),
+                    quantidade: Number(item.quantidade),
+                    quantidade_empenhada: Number(item.quantidade),
+                    empenho_salvo: true,
+                    empenho_do_card_atual: true
+                });
+            }
+        });
+        bootstrap.Modal.getInstance(document.getElementById('modalEmpenho'))?.hide();
+        alert('📴 Empenho salvo neste dispositivo. Será sincronizado quando houver conexão.');
+        return;
+    }
     
     const btn = document.getElementById('btnConfirmar');
     salvandoEmpenhoAgora = true;
@@ -6491,6 +6538,12 @@ window.abrirMovModal = async function(solId, acao) {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+    const cargaNumeroEl = document.getElementById('movCarga');
+    if (cargaNumeroEl) {
+        cargaNumeroEl.readOnly = false;
+        cargaNumeroEl.removeAttribute('aria-readonly');
+        cargaNumeroEl.title = '';
+    }
 
     const selectAll = document.getElementById('selAllMov');
 
@@ -6531,10 +6584,23 @@ window.abrirMovModal = async function(solId, acao) {
         if (acao === 'expedir') {
             const placaSolicitacao = String(d.solicitacao?.placa || '').trim().toUpperCase();
             const motoristaSolicitacao = String(d.solicitacao?.motorista || '').trim();
+            const tipoSolicitacao = String(d.solicitacao?.tipo_solicitacao || '').trim().toUpperCase();
+            const tituloSolicitacao = String(d.solicitacao?.titulo || '').trim();
             const placaEl = document.getElementById('movPlaca');
             const motoristaEl = document.getElementById('movMotorista');
+            const cargaEl = document.getElementById('movCarga');
             if (placaEl) placaEl.value = placaSolicitacao;
             if (motoristaEl) motoristaEl.value = motoristaSolicitacao;
+
+            // Carga criada pelo sistema sempre usa o identificador oficial do
+            // card (ex.: CARGA 700). Isso impede que data, pedido ou outro texto
+            // seja salvo como se fosse o número da carga.
+            if (cargaEl && tipoSolicitacao === 'CARGA' && tituloSolicitacao) {
+                cargaEl.value = tituloSolicitacao;
+                cargaEl.readOnly = true;
+                cargaEl.setAttribute('aria-readonly', 'true');
+                cargaEl.title = 'Número oficial definido pelo card da carga';
+            }
         }
 
         let pendentes = Array.isArray(d.itens_pendentes)
@@ -6787,7 +6853,15 @@ window.confirmarMov = async function() {
             return;
         }
 
-        const valido = await validarEnderecoMov(true);
+        let valido = true;
+        if (navigator.onLine) {
+            valido = await validarEnderecoMov(true);
+        } else if (window.InfinityOffline) {
+            const referencia = await window.InfinityOffline.getReference();
+            valido = (referencia?.cadastros?.enderecos || []).some(
+                item => String(item.codigo || '').trim().toUpperCase() === endereco
+            );
+        }
 
         if (!valido) {
             alert(
@@ -6827,6 +6901,40 @@ window.confirmarMov = async function() {
         )
             .trim()
             .toUpperCase();
+    }
+
+    // OFFLINE: guarda a mesma ação do card na fila local. O número oficial
+    // de uma nova carga gerada continua sendo responsabilidade do servidor
+    // quando houver sincronização.
+    if (!navigator.onLine && window.InfinityOffline) {
+        const checks = [...document.querySelectorAll('.mov-chk:checked')];
+        const baseVersoes = {};
+        for (const chk of checks) {
+            const lote = String(chk.dataset.lote || '').trim();
+            if (lote && baseVersoes[lote] === undefined) {
+                baseVersoes[lote] = await window.InfinityOffline.getLotVersion(lote);
+            }
+        }
+        await window.InfinityOffline.enqueue({
+            tipo: 'SOLICITACAO_MOVIMENTAR',
+            lote: String(checks[0]?.dataset.lote || ''),
+            payload: {
+                solicitacao_id: Number(movSolId),
+                dados: payload,
+                base_lote_versoes: baseVersoes
+            }
+        }, () => {
+            checks.forEach(chk => {
+                const row = chk.closest('tr');
+                if (row) {
+                    row.classList.add('opacity-50');
+                    chk.disabled = true;
+                }
+            });
+            bootstrap.Modal.getInstance(document.getElementById('modalMov'))?.hide();
+        });
+        alert('✅ Operação salva neste dispositivo. Ela será confirmada quando houver conexão.');
+        return;
     }
 
     const btn = document.getElementById('btnConfirmMov');

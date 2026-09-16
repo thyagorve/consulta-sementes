@@ -97,6 +97,7 @@ class ForcarTrocaSenhaMiddleware:
                     reverse('sapp:login'),
                     '/static/',
                     '/media/',
+                    '/sw.js',
                 ]
                 current_path = request.path
 

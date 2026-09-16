@@ -974,18 +974,113 @@
         gap: 5px;
         padding: 5px 8px;
         border-radius: 999px;
-        color: #8f1f1f;
-        background: #ffe8e8;
-        border: 1px solid #ffd2d2;
+        color: #166534;
+        background: #ecfdf3;
+        border: 1px solid #ccebd7;
         font-size: .58rem;
         font-weight: 950;
         white-space: nowrap;
     }
 
     .load-badge.avulsa {
-        color: #5d6570;
-        background: #f1f4f6;
-        border-color: #e1e6ea;
+        color: #b91c1c;
+        background: #fee2e2;
+        border-color: #fecaca;
+    }
+
+    .load-badge.legado {
+        color: #92400e;
+        background: #fef3c7;
+        border-color: #fde68a;
+    }
+
+    .load-origin-icon {
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 4px;
+        border-radius: 50%;
+        font-size: .55rem;
+        vertical-align: middle;
+    }
+
+    .load-origin-icon.avulsa { color:#b91c1c; background:#fee2e2; }
+    .load-origin-icon.gerada { color:#166534; background:#dcfce7; }
+    .load-origin-icon.legado { color:#92400e; background:#fef3c7; }
+
+    .expedition-table-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        padding: 8px 10px;
+        border-top: 1px solid #edf2ee;
+        background: #fbfdfb;
+    }
+
+    .expedition-page-size {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-right: auto;
+        color: #65756c;
+        font-size: .58rem;
+        font-weight: 800;
+    }
+
+    .expedition-page-size input {
+        width: 58px;
+        height: 29px;
+        padding: 3px 6px;
+        border: 1px solid #dbe5df;
+        border-radius: 8px;
+        background: #fff;
+        color: #31533e;
+        font-size: .62rem;
+        font-weight: 900;
+        text-align: center;
+        outline: none;
+    }
+
+    .expedition-page-size input:focus {
+        border-color: #86b79a;
+        box-shadow: 0 0 0 2px rgba(22, 101, 52, .08);
+    }
+
+    .expedition-page-nav {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .expedition-page-btn,
+    .expedition-chart-page-btn {
+        width: 29px;
+        height: 29px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #dbe5df;
+        border-radius: 8px;
+        color: #376448;
+        background: #fff;
+        cursor: pointer;
+    }
+
+    .expedition-page-btn:disabled,
+    .expedition-chart-page-btn:disabled {
+        opacity: .35;
+        cursor: default;
+    }
+
+    .expedition-page-info {
+        min-width: 118px;
+        color: #718078;
+        font-size: .54rem;
+        font-weight: 850;
+        text-align: center;
     }
 
     .lot-list {
@@ -1124,6 +1219,33 @@
         gap: 6px;
         flex-wrap: wrap;
         flex-shrink: 0;
+    }
+
+    .expedition-chart-pager {
+        display: none;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 999px;
+        background: #fff;
+    }
+
+    .expedition-chart-pager.show { display:flex; }
+
+    .expedition-chart-page-info {
+        min-width: 78px;
+        color: #64748b;
+        font-size: .49rem;
+        font-weight: 900;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .expedition-chart-page-btn {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
     }
 
     .expedition-chart-mode,
@@ -2704,6 +2826,18 @@
                 </tbody>
             </table>
         </div>
+        <div id="expedicaoTablePager" class="expedition-table-pagination">
+            <label class="expedition-page-size" for="expedicaoPageSize">
+                Mostrar
+                <input id="expedicaoPageSize" type="number" min="1" max="100" step="1" value="10" inputmode="numeric" onchange="alterarQuantidadeCargasPorPagina(this.value)">
+                cargas
+            </label>
+            <div id="expedicaoTableNav" class="expedition-page-nav" style="display:none;">
+                <button id="expedicaoTablePrev" type="button" class="expedition-page-btn" onclick="mudarPaginaExpedicoes(-1)" title="Cargas anteriores"><i class="fas fa-chevron-left"></i></button>
+                <span id="expedicaoTablePageInfo" class="expedition-page-info">--</span>
+                <button id="expedicaoTableNext" type="button" class="expedition-page-btn" onclick="mudarPaginaExpedicoes(1)" title="Próximas cargas"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
 
         <div class="expedition-chart-section">
             <div class="expedition-chart-card">
@@ -2891,6 +3025,10 @@
     let expedicaoGraficoFiltroAtivo = false;
     let expedicaoGraficoPadrao = {};
     let expedicaoGraficoCarregando = false;
+    let expedicaoGraficoFonte = {};
+    let expedicaoCargasCache = [];
+    let expedicaoCargasPagina = 1;
+    let expedicaoCargasPorPagina = 10;
 
     function formatNumber(
         valor,
@@ -3741,12 +3879,24 @@
         atualizarGraficoExpedicoes(expedicaoGraficoPadrao || {});
     }
 
-    function atualizarGraficoExpedicoes(grafico = {}) {
+    function atualizarGraficoExpedicoes(grafico = {}, resetPagina = true) {
+        if (resetPagina) {
+            expedicaoGraficoFonte = grafico || {};
+        } else {
+            grafico = expedicaoGraficoFonte || grafico || {};
+        }
+
         const modo = grafico.modo === 'cargas' ? 'cargas' : 'dias';
-        const labels = Array.isArray(grafico.labels) ? grafico.labels : [];
-        const valores = Array.isArray(grafico.valores) ? grafico.valores : [];
+        const labelsTodos = Array.isArray(grafico.labels) ? grafico.labels : [];
+        const valoresTodos = Array.isArray(grafico.valores) ? grafico.valores : [];
         const resumo = grafico.resumo || {};
-        const detalhes = Array.isArray(grafico.detalhes) ? grafico.detalhes : [];
+        const detalhesTodos = Array.isArray(grafico.detalhes) ? grafico.detalhes : [];
+
+        // O gráfico representa TODO o período selecionado. A limitação de
+        // quantidade vale somente para a lista de cargas abaixo dos KPIs.
+        const labels = labelsTodos;
+        const valores = valoresTodos;
+        const detalhes = detalhesTodos;
 
         expedicaoGraficoModo = modo;
         expedicaoGraficoDetalhes = detalhes;
@@ -3757,7 +3907,10 @@
         const resumoSubtitulo = document.getElementById('expedicaoSummarySubtitle');
 
         if (titulo) titulo.textContent = grafico.titulo || 'Carregamentos';
-        if (subtitulo) subtitulo.textContent = grafico.subtitulo || '';
+        if (subtitulo) {
+            const base = grafico.subtitulo || '';
+            subtitulo.textContent = base;
+        }
         if (badgeModo) {
             badgeModo.textContent = modo === 'cargas' ? 'Por carga' : 'Por dia';
         }
@@ -3818,16 +3971,10 @@
             }
         }
 
-        const vazio = !valores.some(value => Number(value) > 0);
+        const vazio = !valoresTodos.some(value => Number(value) > 0);
         document.getElementById('emptyExpedicaoChart')?.classList.toggle('show', vazio);
 
         if (!charts.expedicoes) return;
-
-        const paleta = [
-            '#2563eb', '#f59e0b', '#16a34a', '#9333ea',
-            '#0f766e', '#dc2626', '#0284c7', '#ca8a04',
-            '#4f46e5', '#059669', '#c026d3', '#ea580c',
-        ];
 
         const labelsGrafico = modo === 'cargas'
             ? labels.map((label, index) => {
@@ -3845,37 +3992,177 @@
             })
             : labels;
 
-        charts.expedicoes.data.labels = labelsGrafico;
-        charts.expedicoes.data.datasets[0].data = valores;
+        const corPorOrigem = (detalhe, value) => {
+            if (Number(value) <= 0) return 'rgba(148,163,184,.18)';
+            if (modo === 'cargas') {
+                const origem = String(detalhe?.origem || '').toUpperCase();
+                if (origem === 'AVULSA') return '#dc2626';
+                if (origem === 'GERADA') return '#16a34a';
+                return '#d97706';
+            }
+            const origens = Array.isArray(detalhe?.origens)
+                ? detalhe.origens.map(item => String(item || '').toUpperCase())
+                : [];
+            if (origens.length === 1 && origens[0] === 'AVULSA') return '#dc2626';
+            if (origens.length === 1 && origens[0] === 'GERADA') return '#16a34a';
+            if (origens.length === 1) return '#d97706';
+            return '#2563eb';
+        };
+
         const coresBarras = valores.map((value, index) =>
-            Number(value) > 0
-                ? paleta[index % paleta.length]
-                : 'rgba(148,163,184,.18)'
+            corPorOrigem(detalhes[index] || {}, value)
         );
 
+        charts.expedicoes.data.labels = labelsGrafico;
+        charts.expedicoes.data.datasets[0].data = valores;
         charts.expedicoes.data.datasets[0].backgroundColor = coresBarras;
         charts.expedicoes.data.datasets[0].borderColor = coresBarras;
         charts.expedicoes.data.datasets[0].hoverBackgroundColor = coresBarras;
         charts.expedicoes.data.datasets[0].hoverBorderColor = '#24362b';
-        charts.expedicoes.data.datasets[0].maxBarThickness = labels.length <= 6 ? 58 : (labels.length <= 12 ? 46 : 32);
-        charts.expedicoes.data.datasets[0].categoryPercentage = labels.length <= 6 ? .64 : .76;
+        charts.expedicoes.data.datasets[0].maxBarThickness = labels.length <= 6 ? 58 : 46;
+        charts.expedicoes.data.datasets[0].categoryPercentage = labels.length <= 6 ? .64 : .74;
         charts.expedicoes.data.datasets[0].barPercentage = .78;
         charts.expedicoes.data.datasets[0].label = modo === 'cargas'
             ? 'Equivalente da carga'
             : 'Volume diário equivalente';
 
-        charts.expedicoes.options.scales.x.ticks.maxTicksLimit = modo === 'cargas'
-            ? Math.max(8, Math.min(labels.length, 18))
-            : (window.innerWidth < 768 ? 8 : 16);
-        charts.expedicoes.options.plugins.datalabels.display = context => {
-            const value = Number(context.dataset.data[context.dataIndex] || 0);
-            if (value <= 0) return false;
-            if (modo === 'dias' && labels.length > 18) return false;
-            if (modo === 'cargas' && labels.length > 16 && window.innerWidth < 900) return false;
-            return true;
-        };
+        charts.expedicoes.options.scales.x.ticks.maxTicksLimit = 10;
+        charts.expedicoes.options.plugins.datalabels.display = context =>
+            Number(context.dataset.data[context.dataIndex] || 0) > 0;
 
         charts.expedicoes.update();
+    }
+
+    function metaOrigemCarga(origem) {
+        const valor = String(origem || 'GERADA').toUpperCase();
+        if (valor === 'AVULSA') {
+            return { classe: 'avulsa', icone: 'fa-bolt', titulo: 'Carga avulsa' };
+        }
+        if (valor === 'GERADA') {
+            return { classe: 'gerada', icone: 'fa-sun', titulo: 'Carga gerada pelo sistema' };
+        }
+        return { classe: 'legado', icone: 'fa-clock-rotate-left', titulo: 'Carga legada' };
+    }
+
+    function renderizarTabelaExpedicoes() {
+        const tbody = document.getElementById('listaExpedicoes');
+        if (!tbody) return;
+
+        const cargas = expedicaoCargasCache;
+        const pager = document.getElementById('expedicaoTablePager');
+        const nav = document.getElementById('expedicaoTableNav');
+        const pagerInfo = document.getElementById('expedicaoTablePageInfo');
+        const prev = document.getElementById('expedicaoTablePrev');
+        const next = document.getElementById('expedicaoTableNext');
+
+        if (!cargas.length) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="text-center py-4 text-muted">
+                        <i class="fas fa-truck me-1"></i>
+                        Nenhuma expedição encontrada para os filtros informados.
+                    </td>
+                </tr>
+            `;
+            if (nav) nav.style.display = 'none';
+            if (pager) pager.style.display = 'flex';
+            return;
+        }
+
+        const totalPaginas = Math.max(1, Math.ceil(cargas.length / expedicaoCargasPorPagina));
+        expedicaoCargasPagina = Math.min(Math.max(1, expedicaoCargasPagina), totalPaginas);
+        const inicio = (expedicaoCargasPagina - 1) * expedicaoCargasPorPagina;
+        const fim = Math.min(inicio + expedicaoCargasPorPagina, cargas.length);
+        const pagina = cargas.slice(inicio, fim);
+
+        if (pager) pager.style.display = 'flex';
+        if (nav) nav.style.display = cargas.length > expedicaoCargasPorPagina ? 'inline-flex' : 'none';
+        if (pagerInfo) pagerInfo.textContent = `${inicio + 1}-${fim} de ${cargas.length} cargas`;
+        if (prev) prev.disabled = expedicaoCargasPagina <= 1;
+        if (next) next.disabled = expedicaoCargasPagina >= totalPaginas;
+
+        tbody.innerHTML = pagina.map(carga => {
+            const lotes = Array.isArray(carga.lotes) ? carga.lotes : [];
+            const lotesHtml = lotes.length
+                ? lotes.map(item => `
+                    <span class="lot-chip" title="${escapeHtml(item.lote)}">
+                        <i class="fas fa-box"></i>
+                        ${escapeHtml(item.lote)}
+                        <b>${formatNumber(item.qtd || 0, 0)} ${escapeHtml(item.unidade || 'UN')}</b>
+                    </span>
+                `).join('')
+                : '<span class="text-muted">--</span>';
+
+            const cargaNome = String(carga.carga || 'AVULSA');
+            const meta = metaOrigemCarga(carga.origem);
+            const quantidadePartes = [];
+            if (Number(carga.qtd_bag || 0) > 0) {
+                quantidadePartes.push(
+                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_bag || 0, 0)} BAG</span>`
+                );
+            }
+            if (Number(carga.qtd_sc || 0) > 0) {
+                quantidadePartes.push(
+                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_sc || 0, 0)} SC</span>`
+                );
+            }
+            if (Number(carga.qtd_outros || 0) > 0) {
+                quantidadePartes.push(
+                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_outros || 0, 0)} UN</span>`
+                );
+            }
+            const quantidadeHtml = quantidadePartes.length
+                ? quantidadePartes.join('')
+                : '<span class="text-muted">0</span>';
+
+            return `
+                <tr>
+                    <td class="text-nowrap">${escapeHtml(carga.dt || '--')}</td>
+                    <td>
+                        <span class="load-badge ${meta.classe}">
+                            ${escapeHtml(cargaNome)}
+                        </span>
+                        <span class="load-origin-icon ${meta.classe}" title="${meta.titulo}" aria-label="${meta.titulo}">
+                            <i class="fas ${meta.icone}"></i>
+                        </span>
+                    </td>
+                    <td class="fw-bold text-nowrap">${escapeHtml(carga.placa || '--')}</td>
+                    <td>${escapeHtml(carga.motorista || '--')}</td>
+                    <td>${escapeHtml(carga.cliente || '--')}</td>
+                    <td><div class="lot-list">${lotesHtml}</div></td>
+                    <td><div class="expedition-quantity">${quantidadeHtml}</div></td>
+                    <td>
+                        <span class="expedition-equivalent">
+                            <i class="fas fa-equals"></i>
+                            ${formatNumber(carga.equivalente_sc || 0, 0)} SC
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function alterarQuantidadeCargasPorPagina(valor) {
+        const numero = Math.floor(Number(valor || 10));
+        expedicaoCargasPorPagina = Math.min(100, Math.max(1, Number.isFinite(numero) ? numero : 10));
+        const input = document.getElementById('expedicaoPageSize');
+        if (input) input.value = expedicaoCargasPorPagina;
+        expedicaoCargasPagina = 1;
+        renderizarTabelaExpedicoes();
+    }
+
+    function mudarPaginaExpedicoes(delta) {
+        const totalPaginas = Math.max(
+            1,
+            Math.ceil(expedicaoCargasCache.length / expedicaoCargasPorPagina)
+        );
+        const novaPagina = Math.min(
+            Math.max(1, expedicaoCargasPagina + Number(delta || 0)),
+            totalPaginas
+        );
+        if (novaPagina === expedicaoCargasPagina) return;
+        expedicaoCargasPagina = novaPagina;
+        renderizarTabelaExpedicoes();
     }
 
     function atualizarExpedicoes(d) {
@@ -3914,7 +4201,7 @@
 
         const nota = document.getElementById('expedicaoNota');
         if (nota) {
-            nota.textContent = 'Uma carga é contada uma única vez. Equivalência usada: 1 BAG = 25 SC; sacos físicos (SC) entram diretamente na soma.';
+            nota.textContent = 'Uma carga é contada uma única vez. Avulsas usam vermelho + raio; geradas usam verde + sol. O gráfico mostra todo o período e a lista respeita a quantidade escolhida.';
         }
 
         expedicaoGraficoPadrao = bloco.grafico || {};
@@ -3923,78 +4210,9 @@
             atualizarRotuloFiltroGrafico();
         }
 
-        const tbody = document.getElementById('listaExpedicoes');
-        if (!tbody) return;
-
-        if (!cargas.length) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="8" class="text-center py-4 text-muted">
-                        <i class="fas fa-truck me-1"></i>
-                        Nenhuma expedição encontrada para os filtros informados.
-                    </td>
-                </tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML = cargas.map(carga => {
-            const lotes = Array.isArray(carga.lotes) ? carga.lotes : [];
-            const lotesHtml = lotes.length
-                ? lotes.map(item => `
-                    <span class="lot-chip" title="${escapeHtml(item.lote)}">
-                        <i class="fas fa-box"></i>
-                        ${escapeHtml(item.lote)}
-                        <b>${formatNumber(item.qtd || 0, 0)} ${escapeHtml(item.unidade || 'UN')}</b>
-                    </span>
-                `).join('')
-                : '<span class="text-muted">--</span>';
-
-            const cargaNome = String(carga.carga || 'AVULSA');
-            const avulsa = cargaNome.toUpperCase() === 'AVULSA';
-            const quantidadePartes = [];
-            if (Number(carga.qtd_bag || 0) > 0) {
-                quantidadePartes.push(
-                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_bag || 0, 0)} BAG</span>`
-                );
-            }
-            if (Number(carga.qtd_sc || 0) > 0) {
-                quantidadePartes.push(
-                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_sc || 0, 0)} SC</span>`
-                );
-            }
-            if (Number(carga.qtd_outros || 0) > 0) {
-                quantidadePartes.push(
-                    `<span class="expedition-quantity-chip">${formatNumber(carga.qtd_outros || 0, 0)} UN</span>`
-                );
-            }
-            const quantidadeHtml = quantidadePartes.length
-                ? quantidadePartes.join('')
-                : '<span class="text-muted">0</span>';
-
-            return `
-                <tr>
-                    <td class="text-nowrap">${escapeHtml(carga.dt || '--')}</td>
-                    <td>
-                        <span class="load-badge ${avulsa ? 'avulsa' : ''}">
-                            <i class="fas ${avulsa ? 'fa-box-open' : 'fa-truck'}"></i>
-                            ${escapeHtml(cargaNome)}
-                        </span>
-                    </td>
-                    <td class="fw-bold text-nowrap">${escapeHtml(carga.placa || '--')}</td>
-                    <td>${escapeHtml(carga.motorista || '--')}</td>
-                    <td>${escapeHtml(carga.cliente || '--')}</td>
-                    <td><div class="lot-list">${lotesHtml}</div></td>
-                    <td><div class="expedition-quantity">${quantidadeHtml}</div></td>
-                    <td>
-                        <span class="expedition-equivalent">
-                            <i class="fas fa-equals"></i>
-                            ${formatNumber(carga.equivalente_sc || 0, 0)} SC
-                        </span>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+        expedicaoCargasCache = cargas;
+        expedicaoCargasPagina = 1;
+        renderizarTabelaExpedicoes();
     }
 
     function atualizarRecentes(d) {

@@ -374,7 +374,7 @@
             
             const self = this;
 
-            form.addEventListener('submit', function(e) {
+            form.addEventListener('submit', async function(e) {
                 const inputEndereco = document.getElementById('inputEndereco');
                 if (inputEndereco && !inputEndereco.classList.contains('is-valid')) {
                     e.preventDefault();
@@ -1384,7 +1384,7 @@
         }
 
         // PREVENÇÃO DE DUPLO ENVIO
-        form.addEventListener('submit', function(e) {
+        form.addEventListener('submit', async function(e) {
             if (isSubmitting) {
                 e.preventDefault();
                 return false;
@@ -1426,7 +1426,7 @@
                     return false;
                 }
                 
-                if (!enderecoInput.classList.contains('is-valid')) {
+                if (navigator.onLine && !enderecoInput.classList.contains('is-valid')) {
                     e.preventDefault();
                     alert('Endereço inválido! O endereço deve estar no formato R-C LN01 P03 e existir no sistema.');
                     enderecoInput.focus();
@@ -1450,6 +1450,56 @@ Deseja continuar?`
                     e.preventDefault();
                     return false;
                 }
+            }
+
+            // OFFLINE: salva a operação no IndexedDB e atualiza a tela sem
+            // bloquear o usuário. Fotos/anexos continuam exclusivamente online.
+            if (!navigator.onLine && window.InfinityOffline) {
+                e.preventDefault();
+                const fotos = form.querySelector('[name="fotos"]')?.files || [];
+                if (fotos.length) {
+                    alert('📎 Fotos/anexos exigem conexão. Remova os arquivos para registrar esta transferência offline.');
+                    return false;
+                }
+
+                if (tipoNormal.checked) {
+                    const referencia = await window.InfinityOffline.getReference();
+                    const endNormalizado = String(enderecoInput.value || '').trim().toUpperCase();
+                    const existeEndereco = (referencia?.cadastros?.enderecos || []).some(
+                        item => String(item.codigo || '').trim().toUpperCase() === endNormalizado
+                    );
+                    if (!existeEndereco) {
+                        alert('⚠️ Este endereço não existe na última referência salva no aparelho. Conecte-se para atualizar os cadastros.');
+                        return false;
+                    }
+                }
+
+                isSubmitting = true;
+                const itemId = Number(document.getElementById('transf_item_id').value || 0);
+                const lote = String(document.getElementById('transf_lote_display').value || '').trim();
+                const payload = {
+                    estoque_id: itemId,
+                    lote: lote,
+                    quantidade: qtdValue,
+                    endereco_destino: String(enderecoInput.value || '').trim(),
+                    az_destino: String(document.getElementById('transf_az').value || '').trim(),
+                    observacao: String(document.getElementById('transf_obs').value || '').trim()
+                };
+                await window.InfinityOffline.enqueue({
+                    tipo: tipoBeneficiamento.checked ? 'BENEFICIAMENTO' : 'TRANSFERENCIA',
+                    lote: lote,
+                    estoque_id: itemId,
+                    quantidade: qtdValue,
+                    payload
+                }, () => {
+                    const saldoEl = document.getElementById('transf_saldo_atual');
+                    const dispEl = document.getElementById('transf_disponivel_atual');
+                    if (saldoEl) saldoEl.textContent = String(Math.max(0, (Number(saldoEl.textContent)||0) - qtdValue));
+                    if (dispEl) dispEl.textContent = String(Math.max(0, (Number(dispEl.textContent)||0) - qtdValue));
+                    bootstrap.Modal.getInstance(modal)?.hide();
+                });
+                isSubmitting = false;
+                return false;
             }
 
             // Se passou pelas validações, bloquear duplo envio
@@ -1614,7 +1664,7 @@ Deseja continuar?`
                     <h5 class="modal-title"><i class="fas fa-truck-ramp-box me-2"></i>Expedição avulsa · {{ item.lote }}</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <form method="POST" action="{% url 'sapp:registrar_saida' item.id %}" enctype="multipart/form-data" class="js-expedicao-avulsa-form">
+                <form method="POST" action="{% url 'sapp:registrar_saida' item.id %}" enctype="multipart/form-data" class="js-expedicao-avulsa-form" data-estoque-id="{{ item.id }}" data-lote="{{ item.lote|escape }}">
                     {% csrf_token %}
                     <input type="hidden" name="operation_token" value="AV-{{ item.id }}-{{ item.saida }}-{{ estoque_modal_render_epoch }}">
                     <div class="modal-body">
@@ -1628,11 +1678,12 @@ Deseja continuar?`
                         {% endif %}
                         <div class="row g-3">
                             <div class="col-md-4"><label class="fw-bold">Quantidade *</label><input type="number" name="quantidade_saida" class="form-control border-danger fw-bold" max="{{ item.disponivel_ui }}" min="1" required placeholder="0"></div>
-                            <div class="col-md-4"><label class="fw-bold">Nº Carga *</label><input type="text" name="numero_carga" class="form-control" required></div>
-                            <div class="col-md-4"><label class="fw-bold">Placa *</label><input type="text" name="placa" class="form-control text-uppercase" required></div>
-                            <div class="col-md-6"><label class="fw-bold">Motorista *</label><input type="text" name="motorista" class="form-control" required></div>
+                            <div class="col-md-4"><label class="fw-bold">Nº Carga</label><input type="text" name="numero_carga" class="form-control" placeholder="Opcional"></div>
+                            <div class="col-md-8"><label class="fw-bold">Nome da carga avulsa</label><input type="text" name="nome_carga_avulsa" class="form-control" placeholder="Ex.: FAZENDA BOA VISTA"><small class="text-muted">Baixas repetidas com o mesmo nome serão agrupadas como uma única carga avulsa.</small></div>
+                            <div class="col-md-4"><label class="fw-bold">Placa</label><input type="text" name="placa" class="form-control text-uppercase" placeholder="Opcional"></div>
+                            <div class="col-md-6"><label class="fw-bold">Motorista</label><input type="text" name="motorista" class="form-control" placeholder="Opcional"></div>
                             <div class="col-md-6"><label>Cliente</label><input type="text" name="cliente" class="form-control" value="{{ item.cliente|default:'' }}"></div>
-                            <div class="col-12"><label><i class="fas fa-camera me-1"></i>Fotos *</label><input type="file" name="fotos" class="form-control" multiple accept="image/*" required><small class="text-muted">Adicione pelo menos uma foto da expedição.</small></div>
+                            <div class="col-12"><label><i class="fas fa-camera me-1"></i>Fotos</label><input type="file" name="fotos" class="form-control" multiple accept="image/*"><small class="text-muted">Opcional quando online. Fotos não podem ser adicionadas offline.</small></div>
                             <div class="col-12"><label>Observação</label><textarea name="observacao" class="form-control" rows="2" placeholder="Opcional"></textarea></div>
                         </div>
                     </div>
@@ -1883,10 +1934,50 @@ function atualizarPesoTotal(input) {
     function preparar(form){
         if(!form || form.dataset.singleSubmitReady==='1') return;
         form.dataset.singleSubmitReady='1'; form.dataset.submitting='0';
-        form.addEventListener('submit', function(e){
+        form.addEventListener('submit', async function(e){
             if(this.dataset.submitting==='1'){
                 e.preventDefault(); e.stopImmediatePropagation(); return false;
             }
+
+            // Offline: grava imediatamente no IndexedDB e fecha o modal.
+            // Anexos não entram na fila offline.
+            if(!navigator.onLine && window.InfinityOffline){
+                e.preventDefault(); e.stopImmediatePropagation();
+                const fd=new FormData(this);
+                const fotos=this.querySelector('[name="fotos"]')?.files || [];
+                if(fotos.length){
+                    alert('📎 Fotos/anexos exigem conexão. Remova as fotos para registrar esta carga offline.');
+                    return false;
+                }
+                const qtd=Number(fd.get('quantidade_saida')||0);
+                if(!(qtd>0)){ alert('Informe uma quantidade válida.'); return false; }
+                this.dataset.submitting='1';
+                await window.InfinityOffline.enqueue({
+                    tipo:'EXPEDICAO_AVULSA',
+                    lote:this.dataset.lote,
+                    estoque_id:Number(this.dataset.estoqueId),
+                    quantidade:qtd,
+                    payload:{
+                        estoque_id:Number(this.dataset.estoqueId),
+                        lote:this.dataset.lote,
+                        quantidade:qtd,
+                        numero_carga:String(fd.get('numero_carga')||''),
+                        nome_carga_avulsa:String(fd.get('nome_carga_avulsa')||''),
+                        placa:String(fd.get('placa')||''),
+                        motorista:String(fd.get('motorista')||''),
+                        cliente:String(fd.get('cliente')||''),
+                        observacao:String(fd.get('observacao')||'')
+                    }
+                }, ()=>{
+                    const modalEl=this.closest('.modal');
+                    bootstrap.Modal.getInstance(modalEl)?.hide();
+                    const saldo=modalEl?.querySelector('.fs-4.fw-bold.text-dark');
+                    if(saldo){ saldo.textContent=String(Math.max(0,(Number(saldo.textContent)||0)-qtd)); }
+                });
+                this.dataset.submitting='0';
+                return false;
+            }
+
             this.dataset.submitting='1';
             const btn=this.querySelector('.js-submit-expedicao');
             if(btn){

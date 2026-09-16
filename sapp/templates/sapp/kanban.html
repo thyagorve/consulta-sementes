@@ -860,7 +860,7 @@ function renderizarKanban(colunas) {
             </div>
         </section>`;
 
-    document.querySelectorAll('.kanban-card').forEach(card => {
+    document.querySelectorAll('.kanban-card:not([data-synthetic-avulsa="1"])').forEach(card => {
         card.addEventListener('dragstart', handleDragStart);
         card.addEventListener('dragend', handleDragEnd);
     });
@@ -943,7 +943,8 @@ function criarCardHTML(card) {
     };
     return `
         <div class="kanban-card ${prioridadeClass}" 
-             draggable="true" 
+             draggable="${card.synthetic_avulsa ? 'false' : 'true'}" 
+             data-synthetic-avulsa="${card.synthetic_avulsa ? '1' : '0'}"
              data-card-id="${card.id}"
              data-card-titulo="${card.titulo}"
              data-card-tipo="${card.tipo_solicitacao || 'TRANSFERENCIA'}">
@@ -957,6 +958,7 @@ function criarCardHTML(card) {
             <span class="badge ${card.tipo_solicitacao === 'CARGA' ? 'bg-danger' : 'bg-primary'} mt-1" style="font-size:.62rem;">
                 <i class="fas ${card.tipo_solicitacao === 'CARGA' ? 'fa-truck' : 'fa-right-left'} me-1"></i>${card.tipo_solicitacao_display || (card.tipo_solicitacao === 'CARGA' ? 'Carga' : 'Transferência')}
             </span>
+            ${card.tipo_solicitacao === 'CARGA' ? `<span class="badge ${card.synthetic_avulsa ? 'bg-dark' : 'bg-success'} mt-1 ms-1" style="font-size:.58rem;">${card.synthetic_avulsa ? 'AVULSA' : 'GERADA'}</span>` : ''}
             <div class="card-progress">
                 <div class="card-progress-bar ${percentual >= 100 ? 'bg-success' : percentual >= 50 ? 'bg-warning' : 'bg-danger'}" 
                      style="width: ${percentual}%"></div>
@@ -973,24 +975,17 @@ function criarCardHTML(card) {
             <div class="card-tags-premium">
                 ${(card.tags || []).map(tag => `<span class="card-tag-premium" style="background:${tag.cor || '#2f8f4e'};color:${tag.cor_texto || '#fff'}">${tag.icone ? `<i class="${tag.icone}"></i>` : ''}${tag.nome}</span>`).join('')}
             </div>
-            <div class="card-actions">
-                
-                <button class="btn btn-sm btn-outline-secondary"
-                        onclick="event.stopPropagation(); abrirModalMover(${card.id}, '${card.titulo.replace(/'/g, "\\'")}')"
-                        title="Mover card">
-                    <i class="fas fa-arrows-alt"></i>
-                </button>
-                <button class="btn btn-sm btn-card-tag"
-                        onclick="event.stopPropagation(); abrirTagsKanban(${card.id})"
-                        title="Trocar tags">
-                    <i class="fas fa-tags"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-info"
-                        onclick="event.stopPropagation(); imprimirCardKanban(${card.id})"
-                        title="Imprimir / visualizar">
-                    <i class="fas fa-print"></i>
-                </button>
-            </div>
+            ${card.synthetic_avulsa ? `
+                <div class="card-actions">
+                    <span class="small text-muted"><i class="fas fa-check-circle text-success me-1"></i>Avulsa concluída</span>
+                </div>
+            ` : `
+                <div class="card-actions">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation(); abrirModalMover(${card.id}, '${card.titulo.replace(/'/g, "\'")}')" title="Mover card"><i class="fas fa-arrows-alt"></i></button>
+                    <button class="btn btn-sm btn-card-tag" onclick="event.stopPropagation(); abrirTagsKanban(${card.id})" title="Trocar tags"><i class="fas fa-tags"></i></button>
+                    <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); imprimirCardKanban(${card.id})" title="Imprimir / visualizar"><i class="fas fa-print"></i></button>
+                </div>
+            `}
         </div>
     `;
 }

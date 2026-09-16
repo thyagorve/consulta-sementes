@@ -1044,6 +1044,7 @@ def registrar_saida(request, id):
                 # 1. Captura de Dados
                 qtd = int(request.POST.get('quantidade_saida', 0))
                 carga = request.POST.get('numero_carga', '')
+                nome_carga_avulsa = ' '.join(str(request.POST.get('nome_carga_avulsa', '') or '').strip().split())
                 motorista = request.POST.get('motorista', '')
                 placa = request.POST.get('placa', '')
                 cliente = request.POST.get('cliente', '')
@@ -1090,16 +1091,8 @@ def registrar_saida(request, id):
                         erros.append(
                             f"❌ Quantidade acima do disponível ({disponivel_avulso})."
                         )
-                if not motorista.strip(): 
-                    erros.append("❌ Motorista é obrigatório.")
-                if not placa.strip(): 
-                    erros.append("❌ Placa é obrigatória.")
-                if not carga.strip(): 
-                    erros.append("❌ Número da Carga é obrigatório.")
-                
-                # Fotos são obrigatórias para expedição
-                if len(fotos) == 0:
-                    erros.append("❌ Pelo menos uma foto é obrigatória na expedição.")
+                # Na carga avulsa, número, nome, placa, motorista, cliente e fotos
+                # são opcionais. Lote e quantidade continuam sendo a movimentação real.
                 
                 if erros:
                     for e in erros: 
@@ -1167,10 +1160,12 @@ def registrar_saida(request, id):
                     tipo='Expedição',
                     descricao=desc_html,
                     quantidade=qtd,
-                    numero_carga=carga,
-                    motorista=motorista,
-                    placa=placa,
-                    cliente=cliente
+                    numero_carga=carga or None,
+                    motorista=motorista or None,
+                    placa=placa or None,
+                    cliente=cliente or None,
+                    origem_carga='AVULSA',
+                    nome_carga_avulsa=nome_carga_avulsa,
                 )
 
                 print(f"✅ Histórico criado: ID {historico.id}")
@@ -4870,6 +4865,7 @@ def pagina_rascunho(request):
                             placa = normalizar_texto_cadastro(request.POST.get('placa', ''))
                             motorista_exp = ''
                             if solicitacao_vinculada and solicitacao_vinculada.tipo_solicitacao == 'CARGA':
+                                numero_carga = normalizar_texto_cadastro(solicitacao_vinculada.titulo)
                                 placa = placa or normalizar_texto_cadastro(solicitacao_vinculada.placa)
                                 motorista_exp = normalizar_texto_cadastro(solicitacao_vinculada.motorista)
                             
@@ -4899,7 +4895,12 @@ def pagina_rascunho(request):
                                 numero_carga=numero_carga or None,
                                 cliente=cliente_movimentacao,
                                 placa=placa or None,
-                                motorista=motorista_exp or None
+                                motorista=motorista_exp or None,
+                                origem_carga=(
+                                    'GERADA'
+                                    if solicitacao_vinculada and solicitacao_vinculada.tipo_solicitacao == 'CARGA'
+                                    else ''
+                                ),
                             )
                             
                             HistoricoItemEmpenho.objects.create(
@@ -5285,6 +5286,10 @@ def processar_expedicao_item(request, item, user, MARCA_ORIGEM, obs_global, empe
     numero_carga = request.POST.get('numero_carga', '').strip()
     cliente = request.POST.get('cliente', '').strip()
     placa = request.POST.get('placa', '').strip()
+
+    solicitacao_vinculada = getattr(empenho, 'solicitacao', None)
+    if solicitacao_vinculada and solicitacao_vinculada.tipo_solicitacao == 'CARGA':
+        numero_carga = str(solicitacao_vinculada.titulo or '').strip()
     
     if not numero_carga:
         raise ValueError("Número da carga/pedido não informado.")
@@ -5306,7 +5311,12 @@ def processar_expedicao_item(request, item, user, MARCA_ORIGEM, obs_global, empe
         ).strip(),
         numero_carga=numero_carga,
         cliente=cliente or origem.cliente,
-        placa=placa
+        placa=placa,
+        origem_carga=(
+            'GERADA'
+            if solicitacao_vinculada and solicitacao_vinculada.tipo_solicitacao == 'CARGA'
+            else ''
+        ),
     )
     
     # Criar histórico do item empenho (ANTES de excluir o item)
@@ -7901,7 +7911,10 @@ def dashboard_data(request):
             for termo_carga in termos_carga:
                 termo_carga = str(termo_carga or '').strip()
                 if termo_carga:
-                    filtro_carga |= Q(numero_carga__icontains=termo_carga)
+                    filtro_carga |= (
+                        Q(numero_carga__icontains=termo_carga)
+                        | Q(nome_carga_avulsa__icontains=termo_carga)
+                    )
 
             if filtro_carga:
                 expedicoes_qs = expedicoes_qs.filter(filtro_carga)
@@ -7913,6 +7926,7 @@ def dashboard_data(request):
                 'bags': Decimal('0'),
                 'scs': Decimal('0'),
                 'cargas': set(),
+                'origens': set(),
             }
         )
         placas_unicas = set()
@@ -7923,16 +7937,96 @@ def dashboard_data(request):
         total_outros_expedido = Decimal('0')
         total_equivalente_sc = Decimal('0')
 
-        for mov in expedicoes_qs:
-            chave_carga, nome_carga = _dashboard_normalizar_carga(
-                mov.numero_carga
+        # Compatibilidade com expedições GERADAS registradas em versões
+        # anteriores: alguns históricos guardavam no numero_carga um texto
+        # digitado no modal (por exemplo, uma data) e não o título oficial do
+        # card. O HistoricoItemEmpenho mantém o vínculo com a Solicitação e é
+        # usado aqui somente para recuperar a identidade correta sem alterar o
+        # histórico antigo no banco.
+        gerada_por_chave_exata = {}
+        gerada_por_chave_base = defaultdict(set)
+        historicos_itens_gerados = (
+            HistoricoItemEmpenho.objects
+            .filter(
+                tipo='expedicao',
+                processado_em__date__gte=expedicao_inicio,
+                processado_em__date__lte=expedicao_fim,
+                empenho__solicitacao__tipo_solicitacao='CARGA',
             )
+            .select_related('empenho__solicitacao')
+            .only(
+                'estoque_origem_id', 'quantidade', 'processado_por_id',
+                'processado_em', 'numero_carga',
+                'empenho__solicitacao__titulo',
+                'empenho__solicitacao__tipo_solicitacao',
+            )
+        )
+        for hist_item in historicos_itens_gerados:
+            solicitacao_hist = getattr(hist_item.empenho, 'solicitacao', None)
+            titulo_oficial = str(getattr(solicitacao_hist, 'titulo', '') or '').strip()
+            if not titulo_oficial or not hist_item.processado_em:
+                continue
+            data_hist = timezone.localtime(hist_item.processado_em).date()
+            chave_base_hist = (
+                hist_item.estoque_origem_id,
+                int(hist_item.quantidade or 0),
+                hist_item.processado_por_id,
+                data_hist,
+            )
+            numero_hist = normalizar_texto_cadastro(hist_item.numero_carga or '')
+            if numero_hist:
+                gerada_por_chave_exata[chave_base_hist + (numero_hist,)] = titulo_oficial
+            gerada_por_chave_base[chave_base_hist].add(titulo_oficial)
 
-            # Sem um número/nome de carga não é seguro unir duas baixas
-            # diferentes. Cada registro fica como uma expedição avulsa.
+        for mov in expedicoes_qs:
+            origem_carga = str(getattr(mov, 'origem_carga', '') or '').strip().upper()
+            nome_avulsa = ' '.join(str(getattr(mov, 'nome_carga_avulsa', '') or '').strip().split())
+            numero_carga_mov = str(getattr(mov, 'numero_carga', '') or '').strip()
+
+            # Se não é uma avulsa explicitamente identificada, tenta recuperar
+            # o card CARGA N que originou esta baixa. Isso corrige a exibição de
+            # dados antigos e faz 3 lotes da mesma carga aparecerem como UMA
+            # carga com 3 lotes.
+            if origem_carga != 'AVULSA' and not nome_avulsa and mov.data_hora:
+                data_mov_hist = timezone.localtime(mov.data_hora).date()
+                chave_base_mov = (
+                    mov.estoque_id,
+                    int(mov.quantidade or 0),
+                    mov.usuario_id,
+                    data_mov_hist,
+                )
+                numero_mov_norm = normalizar_texto_cadastro(numero_carga_mov)
+                titulo_oficial = None
+                if numero_mov_norm:
+                    titulo_oficial = gerada_por_chave_exata.get(
+                        chave_base_mov + (numero_mov_norm,)
+                    )
+                if not titulo_oficial:
+                    titulos_possiveis = gerada_por_chave_base.get(chave_base_mov, set())
+                    if len(titulos_possiveis) == 1:
+                        titulo_oficial = next(iter(titulos_possiveis))
+                if titulo_oficial:
+                    origem_carga = 'GERADA'
+                    numero_carga_mov = titulo_oficial
+
+            # Avulsa: o NOME é a identidade operacional. Várias baixas com o
+            # mesmo nome normalizado formam uma única carga, mesmo que o número
+            # humano se repita em uma carga GERADA.
+            if origem_carga == 'AVULSA' and nome_avulsa:
+                chave_nome = normalizar_texto_cadastro(nome_avulsa)
+                chave_carga = f'AVULSA:NOME:{chave_nome}'
+                nome_carga = nome_avulsa
+            else:
+                chave_carga, nome_carga = _dashboard_normalizar_carga(
+                    numero_carga_mov
+                )
+                if origem_carga == 'AVULSA' and chave_carga:
+                    chave_carga = f'AVULSA:NUM:{chave_carga}'
+
+            # Sem nome/número não é seguro unir duas avulsas distintas.
             if not chave_carga:
                 chave_carga = f'AVULSA:{mov.id}'
-                nome_carga = 'AVULSA'
+                nome_carga = nome_avulsa or 'AVULSA'
 
             quantidade_mov = Decimal(
                 str(getattr(mov, 'quantidade', 0) or 0)
@@ -7973,6 +8067,9 @@ def dashboard_data(request):
                 elif unidade_mov == 'SC':
                     dia_mov['scs'] += quantidade_mov
                 dia_mov['cargas'].add(chave_carga)
+                dia_mov['origens'].add(
+                    origem_carga or ('AVULSA' if nome_avulsa else 'GERADA')
+                )
 
             lote_mov = (
                 mov.lote_ref
@@ -7997,6 +8094,8 @@ def dashboard_data(request):
                 chave_carga,
                 {
                     'carga': nome_carga,
+                    'origem': origem_carga or ('AVULSA' if nome_avulsa else 'GERADA'),
+                    'numero_carga': numero_carga_mov,
                     'data_hora': mov.data_hora,
                     'qtd': Decimal('0'),
                     'qtd_bag': Decimal('0'),
@@ -8082,6 +8181,8 @@ def dashboard_data(request):
 
             cargas_lista.append({
                 'carga': grupo['carga'],
+                'origem': grupo.get('origem') or 'GERADA',
+                'numero_carga': grupo.get('numero_carga') or '',
                 'dt': (
                     data_local_carga.strftime('%d/%m/%Y')
                     if data_local_carga
@@ -8143,6 +8244,7 @@ def dashboard_data(request):
                 grafico_cargas_qtd.append(1)
                 grafico_detalhes.append({
                     'carga': carga_item['carga'],
+                    'origem': carga_item.get('origem') or 'GERADA',
                     'placa': carga_item['placa'],
                     'cliente': carga_item['cliente'],
                     'bags': carga_item['qtd_bag'],
@@ -8165,6 +8267,7 @@ def dashboard_data(request):
                 grafico_detalhes.append({
                     'data': cursor_dia.strftime('%d/%m/%Y'),
                     'cargas': len(dia_info['cargas']),
+                    'origens': sorted(dia_info['origens']),
                     'bags': _dashboard_numero(dia_info['bags']),
                     'scs': _dashboard_numero(dia_info['scs']),
                     'equivalente_sc': _dashboard_numero(
@@ -8264,8 +8367,8 @@ def dashboard_data(request):
             },
         }
 
-        # Mantém o painel leve em telas menores. Os KPIs consideram TODAS
-        # as cargas do período; a tabela exibe as 30 mais recentes.
+        # Os KPIs consideram TODAS as cargas do período. A interface faz
+        # paginação visual de 10 por vez para não criar uma lista gigante.
         expedicoes = {
             'resumo': {
                 'cargas': len(cargas_agrupadas),
@@ -8284,7 +8387,7 @@ def dashboard_data(request):
                 'fim': expedicao_fim.strftime('%d/%m/%Y'),
             },
             'grafico': grafico_expedicao,
-            'cargas': cargas_lista[:30],
+            'cargas': cargas_lista,
         }
 
         # --------------------------------------------------------
@@ -13360,6 +13463,13 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                     data.get('numero_carga') or ''
                 ).strip()
 
+                # Para uma solicitação do tipo CARGA, o identificador oficial
+                # é o título sequencial do card (CARGA N). Não aceitamos um
+                # texto digitado no modal como identidade da carga, pois isso
+                # quebraria o agrupamento de vários lotes da mesma expedição.
+                if str(getattr(solicitacao, 'tipo_solicitacao', '') or '').upper() == 'CARGA':
+                    numero_carga = str(getattr(solicitacao, 'titulo', '') or '').strip()
+
                 cliente_expedicao = str(
                     data.get('cliente') or ''
                 ).strip()
@@ -13810,6 +13920,7 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         cliente=cliente_movimentacao_item,
                         motorista=motorista_expedicao or None,
                         placa=placa or None,
+                        origem_carga='GERADA',
                     )
 
                     HistoricoItemEmpenho.objects.create(
@@ -15247,6 +15358,89 @@ def api_kanban_dados(request):
                 _serializar_card(solicitacao)
             )
 
+    # Cargas avulsas concluídas também aparecem na faixa de Expedição. Elas
+    # são cards somente de consulta e nunca se confundem com cargas GERADAS.
+    coluna_concluida = next(
+        (c for c in colunas if 'CONCLU' in str(c.nome or '').upper()),
+        (colunas[-1] if colunas else None),
+    )
+    if coluna_concluida:
+        grupos_avulsos = {}
+        movimentos_avulsos = (
+            HistoricoMovimentacao.objects
+            .filter(origem_carga='AVULSA')
+            .select_related('estoque', 'usuario')
+            .order_by('-data_hora', '-id')[:1500]
+        )
+        for mov in movimentos_avulsos:
+            nome = ' '.join(str(mov.nome_carga_avulsa or '').strip().split())
+            numero = ' '.join(str(mov.numero_carga or '').strip().split())
+            chave_base = normalizar_texto_cadastro(nome) if nome else normalizar_texto_cadastro(numero)
+            if not chave_base:
+                chave_base = f'REGISTRO-{mov.id}'
+            chave = f'AVULSA:{chave_base}'
+            grupo = grupos_avulsos.setdefault(chave, {
+                'nome': nome or (f'CARGA {numero}' if numero else 'CARGA AVULSA'),
+                'numero': numero,
+                'data': mov.data_hora,
+                'cliente': set(),
+                'placa': set(),
+                'motorista': set(),
+                'lotes': set(),
+                'qtd': Decimal('0'),
+                'embalagens': set(),
+                'usuario': mov.usuario,
+            })
+            grupo['qtd'] += Decimal(str(mov.quantidade or 0))
+            if mov.cliente: grupo['cliente'].add(str(mov.cliente).strip())
+            if mov.placa: grupo['placa'].add(str(mov.placa).strip().upper())
+            if mov.motorista: grupo['motorista'].add(str(mov.motorista).strip())
+            lote = str(mov.lote_ref or (mov.estoque.lote if mov.estoque else '') or '').strip()
+            if lote: grupo['lotes'].add(lote)
+            emb = str(mov.estoque.embalagem if mov.estoque else '').strip().upper()
+            if emb: grupo['embalagens'].add(emb)
+
+        for chave, grupo in grupos_avulsos.items():
+            card = {
+                'id': chave,
+                'synthetic_avulsa': True,
+                'titulo': grupo['nome'],
+                'tipo_solicitacao': 'CARGA',
+                'tipo_solicitacao_display': 'Carga avulsa',
+                'origem_carga': 'AVULSA',
+                'itens_carga': [],
+                'observacao': '',
+                'destino': '',
+                'motorista': ' / '.join(sorted(grupo['motorista'])),
+                'placa': ' / '.join(sorted(grupo['placa'])),
+                'criador_nome': _nome_usuario(grupo['usuario']),
+                'responsavel_nome': '',
+                'data_criacao': _formatar_data(grupo['data']),
+                'data_finalizacao': _formatar_data(grupo['data']),
+                'status': 'CONCLUIDO',
+                'status_display': 'Concluído',
+                'unidade_controle': 'EMBALAGEM',
+                'quantidade_solicitada': float(grupo['qtd']),
+                'quantidade_empenhada': float(grupo['qtd']),
+                'quantidade_empenhada_display': float(grupo['qtd']),
+                'quantidade_movimentada': float(grupo['qtd']),
+                'percentual_empenhado': 100.0,
+                'percentual_movimentado': 100.0,
+                'prioridade': 'MEDIA',
+                'coluna_id': coluna_concluida.id,
+                'coluna_nome': coluna_concluida.nome,
+                'criterios': {
+                    'cliente': ' / '.join(sorted(grupo['cliente'])),
+                    'destino': '',
+                    'motorista': ' / '.join(sorted(grupo['motorista'])),
+                    'placa': ' / '.join(sorted(grupo['placa'])),
+                },
+                'lotes': sorted(grupo['lotes']),
+                'embalagens': sorted(grupo['embalagens']),
+                'tags': [],
+            }
+            por_coluna[coluna_concluida.id].append(card)
+
     return JsonResponse({
         'success': True,
         'colunas': [
@@ -15725,3 +15919,453 @@ def api_atualizacoes_recentes(request):
         })
     
     return JsonResponse({'success': True, 'atualizacoes': data, 'total': len(data)})
+
+# ============================================================================
+# GESTÃO DE CARGAS - consulta e correções auditáveis
+# ============================================================================
+@login_required
+def gestao_cargas(request):
+    from collections import OrderedDict
+
+    data_inicio = (request.GET.get('data_inicio') or '').strip()
+    data_fim = (request.GET.get('data_fim') or '').strip()
+    origem = (request.GET.get('origem') or '').strip().upper()
+    busca = (request.GET.get('q') or '').strip()
+
+    qs = (
+        HistoricoMovimentacao.objects
+        .filter(Q(tipo__icontains='Expedi'))
+        .select_related('estoque', 'usuario')
+        .order_by('-data_hora', '-id')
+    )
+    if data_inicio:
+        qs = qs.filter(data_hora__date__gte=data_inicio)
+    if data_fim:
+        qs = qs.filter(data_hora__date__lte=data_fim)
+    if origem in {'GERADA', 'AVULSA'}:
+        qs = qs.filter(origem_carga=origem)
+    if busca:
+        qs = qs.filter(
+            Q(numero_carga__icontains=busca)
+            | Q(nome_carga_avulsa__icontains=busca)
+            | Q(cliente__icontains=busca)
+            | Q(placa__icontains=busca)
+            | Q(motorista__icontains=busca)
+            | Q(lote_ref__icontains=busca)
+        )
+
+    grupos = OrderedDict()
+    for mov in qs[:3000]:
+        origem_mov = str(mov.origem_carga or '').strip().upper() or 'LEGADO'
+        nome_avulsa = ' '.join(str(mov.nome_carga_avulsa or '').strip().split())
+        numero = ' '.join(str(mov.numero_carga or '').strip().split())
+        if origem_mov == 'AVULSA':
+            chave_base = normalizar_texto_cadastro(nome_avulsa) if nome_avulsa else normalizar_texto_cadastro(numero)
+            chave = f'AVULSA:{chave_base or mov.id}'
+            titulo = nome_avulsa or (f'CARGA {numero}' if numero else 'CARGA AVULSA')
+        elif origem_mov == 'GERADA':
+            chave = f'GERADA:{normalizar_texto_cadastro(numero) or mov.id}'
+            titulo = f'CARGA {numero}' if numero and not numero.upper().startswith('CARGA ') else (numero or 'CARGA GERADA')
+        else:
+            chave = f'LEGADO:{normalizar_texto_cadastro(numero) or mov.id}'
+            titulo = f'CARGA {numero}' if numero and not numero.upper().startswith('CARGA ') else (numero or 'EXPEDIÇÃO LEGADA')
+
+        grupo = grupos.setdefault(chave, {
+            'chave': chave,
+            'titulo': titulo,
+            'origem': origem_mov,
+            'numero': numero,
+            'nome_avulsa': nome_avulsa,
+            'data': mov.data_hora,
+            'quantidade': Decimal('0'),
+            'clientes': set(),
+            'placas': set(),
+            'motoristas': set(),
+            'lotes': set(),
+            'movimentos': [],
+        })
+        grupo['quantidade'] += Decimal(str(mov.quantidade or 0))
+        if mov.cliente: grupo['clientes'].add(str(mov.cliente).strip())
+        if mov.placa: grupo['placas'].add(str(mov.placa).strip().upper())
+        if mov.motorista: grupo['motoristas'].add(str(mov.motorista).strip())
+        lote = str(mov.lote_ref or (mov.estoque.lote if mov.estoque else '') or '').strip()
+        if lote: grupo['lotes'].add(lote)
+        grupo['movimentos'].append(mov)
+
+    grupos_lista = []
+    for grupo in grupos.values():
+        grupo['clientes_txt'] = ' / '.join(sorted(grupo['clientes'])) or '--'
+        grupo['placas_txt'] = ' / '.join(sorted(grupo['placas'])) or '--'
+        grupo['motoristas_txt'] = ' / '.join(sorted(grupo['motoristas'])) or '--'
+        grupo['lotes_txt'] = ', '.join(sorted(grupo['lotes'])) or '--'
+        grupo['data_txt'] = timezone.localtime(grupo['data']).strftime('%d/%m/%Y') if grupo['data'] else '--'
+        grupos_lista.append(grupo)
+
+    estoque_opcoes = list(
+        Estoque.objects
+        .select_related('cultivar')
+        .order_by('lote', 'endereco')
+        .values('id', 'lote', 'endereco', 'saldo', 'embalagem')
+    )
+
+    # Evita uma tela enorme quando o período possui dezenas ou centenas de
+    # cargas. A consulta e os filtros continuam considerando todo o período,
+    # mas a interface mostra somente 10 cargas por página.
+    total_grupos = len(grupos_lista)
+    paginator = Paginator(grupos_lista, 10)
+    page_obj = paginator.get_page(request.GET.get('page') or 1)
+
+    query_sem_pagina = request.GET.copy()
+    query_sem_pagina.pop('page', None)
+
+    return render(request, 'sapp/gestao_cargas.html', {
+        'grupos': list(page_obj.object_list),
+        'page_obj': page_obj,
+        'total_grupos': total_grupos,
+        'filtros_query': query_sem_pagina.urlencode(),
+        'estoque_opcoes': estoque_opcoes,
+        'filtros': {
+            'data_inicio': data_inicio,
+            'data_fim': data_fim,
+            'origem': origem,
+            'q': busca,
+        },
+    })
+
+
+@login_required
+@require_POST
+def editar_movimento_carga(request, historico_id):
+    """Corrige um item de carga preservando auditoria e coerência do saldo físico."""
+    from datetime import datetime as dt
+    from .models import CargaAjusteLog
+
+    motivo = (request.POST.get('motivo') or '').strip()
+    if not motivo:
+        messages.error(request, 'Informe o motivo da correção.')
+        return redirect('sapp:gestao_cargas')
+
+
+    try:
+        with transaction.atomic():
+            hist = (
+                HistoricoMovimentacao.objects
+                .select_for_update()
+                .select_related('estoque')
+                .get(pk=historico_id)
+            )
+            if 'EXPEDI' not in str(hist.tipo or '').upper():
+                raise ValueError('Este histórico não é uma expedição/carga.')
+
+            estoque_antigo = (
+                Estoque.objects.select_for_update().get(pk=hist.estoque_id)
+                if hist.estoque_id else None
+            )
+            qtd_antiga = int(hist.quantidade or 0)
+            novo_estoque_id = int(request.POST.get('estoque_id') or (hist.estoque_id or 0))
+            qtd_nova = int(request.POST.get('quantidade') or qtd_antiga)
+            if qtd_nova <= 0:
+                raise ValueError('Quantidade deve ser maior que zero.')
+
+            estoque_novo = (
+                estoque_antigo
+                if estoque_antigo and estoque_antigo.pk == novo_estoque_id
+                else Estoque.objects.select_for_update().get(pk=novo_estoque_id)
+            )
+
+            antes = {
+                'estoque_id': hist.estoque_id,
+                'lote': hist.lote_ref,
+                'quantidade': qtd_antiga,
+                'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                'numero_carga': hist.numero_carga or '',
+                'nome_carga_avulsa': hist.nome_carga_avulsa or '',
+                'origem_carga': hist.origem_carga or '',
+                'cliente': hist.cliente or '',
+                'placa': hist.placa or '',
+                'motorista': hist.motorista or '',
+            }
+
+            # Reverte o efeito antigo e aplica o novo. Isso permite corrigir
+            # quantidade/lote sem apagar o histórico original da auditoria.
+            if estoque_antigo:
+                nova_saida_antigo = int(estoque_antigo.saida or 0) - qtd_antiga
+                if nova_saida_antigo < 0:
+                    raise ValueError('Não é possível reverter esta movimentação: saída histórica inconsistente.')
+                estoque_antigo.saida = nova_saida_antigo
+                estoque_antigo.save()
+
+            # Quando lote/endereço não mudou, usa o objeto já revertido. Quando
+            # mudou, o destino foi travado separadamente.
+            if estoque_antigo and estoque_novo.pk == estoque_antigo.pk:
+                estoque_novo = estoque_antigo
+            if estoque_novo.saldo < qtd_nova:
+                raise ValueError(
+                    f'Saldo insuficiente no lote/endereço escolhido. Disponível físico após reversão: {estoque_novo.saldo} {estoque_novo.embalagem}.'
+                )
+            estoque_novo.saida = int(estoque_novo.saida or 0) + qtd_nova
+            estoque_novo.save()
+
+            hist.estoque = estoque_novo
+            hist.lote_ref = estoque_novo.lote
+            hist.quantidade = qtd_nova
+            hist.numero_carga = (request.POST.get('numero_carga') or '').strip() or None
+            hist.nome_carga_avulsa = ' '.join((request.POST.get('nome_carga_avulsa') or '').strip().split())
+            hist.cliente = (request.POST.get('cliente') or '').strip() or None
+            hist.placa = (request.POST.get('placa') or '').strip().upper() or None
+            hist.motorista = (request.POST.get('motorista') or '').strip() or None
+            origem_post = (request.POST.get('origem_carga') or hist.origem_carga or '').strip().upper()
+            if origem_post in {'GERADA', 'AVULSA'}:
+                hist.origem_carga = origem_post
+            hist.save(update_fields=[
+                'estoque', 'lote_ref', 'quantidade', 'numero_carga',
+                'nome_carga_avulsa', 'cliente', 'placa', 'motorista', 'origem_carga'
+            ])
+
+            data_txt = (request.POST.get('data_carga') or '').strip()
+            if data_txt and hist.data_hora:
+                nova_data = dt.strptime(data_txt, '%Y-%m-%d').date()
+                hora_local = timezone.localtime(hist.data_hora).timetz().replace(tzinfo=None)
+                nova_local = timezone.make_aware(dt.combine(nova_data, hora_local), timezone.get_current_timezone())
+                HistoricoMovimentacao.objects.filter(pk=hist.pk).update(data_hora=nova_local)
+                hist.data_hora = nova_local
+
+            # Se for uma carga gerada, tenta manter o histórico do empenho e o
+            # total movimentado do card alinhados com a correção física.
+            if hist.origem_carga == 'GERADA' and hist.numero_carga:
+                numero_limpo = str(hist.numero_carga).strip()
+                titulo = numero_limpo if numero_limpo.upper().startswith('CARGA ') else f'CARGA {numero_limpo}'
+                sol = Solicitacao.objects.filter(tipo_solicitacao='CARGA', titulo__iexact=titulo).first()
+                if sol:
+                    hie = (
+                        HistoricoItemEmpenho.objects
+                        .filter(
+                            empenho__solicitacao=sol,
+                            tipo='expedicao',
+                            lote__iexact=antes['lote'],
+                            quantidade=qtd_antiga,
+                            numero_carga__iexact=numero_limpo,
+                        )
+                        .order_by('id')
+                        .first()
+                    )
+                    if hie:
+                        hie.lote = estoque_novo.lote
+                        hie.quantidade = qtd_nova
+                        if hist.cliente:
+                            hie.cliente_solicitacao = hist.cliente
+                        hie.save(update_fields=['lote', 'quantidade', 'cliente_solicitacao'])
+                    total_mov = (
+                        HistoricoItemEmpenho.objects
+                        .filter(empenho__solicitacao=sol, tipo='expedicao')
+                        .aggregate(total=Sum('quantidade'))['total'] or Decimal('0')
+                    )
+                    sol.quantidade_movimentada = Decimal(str(total_mov))
+                    sol.save(update_fields=['quantidade_movimentada', 'data_atualizacao'])
+
+            depois = {
+                'estoque_id': estoque_novo.id,
+                'lote': estoque_novo.lote,
+                'quantidade': qtd_nova,
+                'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                'numero_carga': hist.numero_carga or '',
+                'nome_carga_avulsa': hist.nome_carga_avulsa or '',
+                'origem_carga': hist.origem_carga or '',
+                'cliente': hist.cliente or '',
+                'placa': hist.placa or '',
+                'motorista': hist.motorista or '',
+            }
+            CargaAjusteLog.objects.create(
+                historico=hist,
+                usuario=request.user,
+                antes=antes,
+                depois=depois,
+                motivo=motivo,
+            )
+
+            # Correção manual também muda a versão do lote para que aparelhos
+            # offline detectem conflito quando voltarem a sincronizar.
+            from .models import LoteSyncState, LoteSyncEvento
+            lotes_afetados = {str(antes.get('lote') or '').strip(), str(depois.get('lote') or '').strip()} - {''}
+            for lote_sync in lotes_afetados:
+                state, _ = LoteSyncState.objects.select_for_update().get_or_create(lote=lote_sync)
+                state.versao = int(state.versao or 0) + 1
+                state.atualizado_por = request.user
+                state.save(update_fields=['versao', 'atualizado_por', 'atualizado_em'])
+                LoteSyncEvento.objects.create(
+                    lote=lote_sync,
+                    versao=state.versao,
+                    usuario=request.user,
+                    historico=hist,
+                    tipo='CORRECAO_CARGA',
+                )
+
+            messages.success(request, '✅ Movimento da carga corrigido e auditado com sucesso.')
+    except Exception as exc:
+        messages.error(request, f'❌ Não foi possível corrigir a carga: {exc}')
+
+    return redirect('sapp:gestao_cargas')
+
+@login_required
+@require_POST
+def remover_movimento_carga(request, historico_id):
+    """Remove um lote/movimento de uma carga sem apagar a trilha de auditoria.
+
+    A saída física é revertida e o histórico deixa de ser tratado como
+    expedição ativa. Para cargas geradas, o histórico do item empenhado é
+    marcado como removido e a quantidade movimentada da solicitação é
+    recalculada.
+    """
+    from .models import CargaAjusteLog, LoteSyncState, LoteSyncEvento
+
+    motivo = (request.POST.get('motivo') or '').strip()
+    if not motivo:
+        messages.error(request, 'Informe o motivo para excluir o lote da carga.')
+        return redirect('sapp:gestao_cargas')
+
+    try:
+        with transaction.atomic():
+            hist = (
+                HistoricoMovimentacao.objects
+                .select_for_update()
+                .select_related('estoque')
+                .get(pk=historico_id)
+            )
+
+            if 'EXPEDI' not in str(hist.tipo or '').upper():
+                raise ValueError('Este lote não pertence mais a uma expedição ativa.')
+
+            estoque = (
+                Estoque.objects.select_for_update().get(pk=hist.estoque_id)
+                if hist.estoque_id else None
+            )
+            quantidade = int(hist.quantidade or 0)
+            if quantidade <= 0:
+                raise ValueError('A movimentação possui quantidade inválida para reversão.')
+
+            antes = {
+                'estoque_id': hist.estoque_id,
+                'lote': hist.lote_ref,
+                'quantidade': quantidade,
+                'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                'numero_carga': hist.numero_carga or '',
+                'nome_carga_avulsa': hist.nome_carga_avulsa or '',
+                'origem_carga': hist.origem_carga or '',
+                'cliente': hist.cliente or '',
+                'placa': hist.placa or '',
+                'motorista': hist.motorista or '',
+                'tipo': hist.tipo or '',
+            }
+
+            # Devolve ao estoque apenas o que esta movimentação retirou.
+            if estoque:
+                nova_saida = int(estoque.saida or 0) - quantidade
+                if nova_saida < 0:
+                    raise ValueError(
+                        'Não é possível excluir este lote: a saída atual do estoque é menor que a movimentação registrada.'
+                    )
+                estoque.saida = nova_saida
+                estoque.save(update_fields=['saida'])
+
+            # Carga gerada: preserva o histórico do item, mas ele deixa de
+            # contar como expedição ativa. Isso mantém rastreabilidade sem
+            # somar novamente o lote nos totais do card.
+            solicitacao = None
+            hie = None
+            if str(hist.origem_carga or '').strip().upper() == 'GERADA' and hist.numero_carga:
+                numero_limpo = str(hist.numero_carga).strip()
+                titulo = numero_limpo if numero_limpo.upper().startswith('CARGA ') else f'CARGA {numero_limpo}'
+                solicitacao = (
+                    Solicitacao.objects
+                    .select_for_update()
+                    .filter(tipo_solicitacao='CARGA', titulo__iexact=titulo)
+                    .first()
+                )
+                if solicitacao:
+                    hie = (
+                        HistoricoItemEmpenho.objects
+                        .select_for_update()
+                        .filter(
+                            empenho__solicitacao=solicitacao,
+                            tipo='expedicao',
+                            lote__iexact=str(hist.lote_ref or ''),
+                            quantidade=quantidade,
+                            numero_carga__iexact=numero_limpo,
+                        )
+                        .order_by('id')
+                        .first()
+                    )
+                    if hie:
+                        observacao_remocao = (
+                            f'[REMOVIDO DA CARGA em {timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M")} '
+                            f'por {request.user.get_full_name() or request.user.username}] {motivo}'
+                        )
+                        hie.tipo = 'removido'
+                        hie.observacao = (
+                            f'{hie.observacao}\n{observacao_remocao}'.strip()
+                            if hie.observacao else observacao_remocao
+                        )
+                        hie.save(update_fields=['tipo', 'observacao'])
+
+                    total_mov = (
+                        HistoricoItemEmpenho.objects
+                        .filter(empenho__solicitacao=solicitacao, tipo='expedicao')
+                        .aggregate(total=Sum('quantidade'))['total'] or Decimal('0')
+                    )
+                    solicitacao.quantidade_movimentada = Decimal(str(total_mov))
+                    if (
+                        solicitacao.status == 'CONCLUIDO'
+                        and solicitacao.quantidade_movimentada < Decimal(str(solicitacao.quantidade_solicitada or 0))
+                    ):
+                        solicitacao.status = 'MOVIMENTACAO_PARCIAL' if solicitacao.quantidade_movimentada > 0 else 'AGUARDANDO_EMPENHO'
+                    solicitacao.save(update_fields=['quantidade_movimentada', 'status', 'data_atualizacao'])
+
+            # Em vez de apagar a linha, muda o tipo. Assim ela some das cargas
+            # ativas e dos gráficos, mas continua disponível para auditoria.
+            usuario_nome = request.user.get_full_name() or request.user.username
+            marca_remocao = (
+                f'Removido da carga em {timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M")} '
+                f'por {usuario_nome}. Motivo: {motivo}'
+            )
+            hist.tipo = 'Carga removida'
+            hist.descricao = f'{hist.descricao or ""}\n{marca_remocao}'.strip()
+            hist.save(update_fields=['tipo', 'descricao'])
+
+            depois = {
+                **antes,
+                'tipo': 'Carga removida',
+                'removido_da_carga': True,
+                'estoque_saida_revertida': quantidade,
+            }
+            CargaAjusteLog.objects.create(
+                historico=hist,
+                usuario=request.user,
+                antes=antes,
+                depois=depois,
+                motivo=f'EXCLUSÃO DE LOTE DA CARGA: {motivo}',
+            )
+
+            lote_sync = str(antes.get('lote') or '').strip()
+            if lote_sync:
+                state, _ = LoteSyncState.objects.select_for_update().get_or_create(lote=lote_sync)
+                state.versao = int(state.versao or 0) + 1
+                state.atualizado_por = request.user
+                state.save(update_fields=['versao', 'atualizado_por', 'atualizado_em'])
+                LoteSyncEvento.objects.create(
+                    lote=lote_sync,
+                    versao=state.versao,
+                    usuario=request.user,
+                    historico=hist,
+                    tipo='REMOCAO_CARGA',
+                )
+
+            cache.delete('cards_version_hash')
+            messages.success(request, '✅ Lote excluído da carga, estoque revertido e auditoria preservada.')
+
+    except HistoricoMovimentacao.DoesNotExist:
+        messages.error(request, '❌ Movimento da carga não encontrado.')
+    except Exception as exc:
+        messages.error(request, f'❌ Não foi possível excluir o lote da carga: {exc}')
+
+    return redirect('sapp:gestao_cargas')
+

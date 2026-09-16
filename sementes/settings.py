@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'django_filters',
     'widget_tweaks',
+    'rest_framework',
     
     # Celery
     'django_celery_results',
@@ -55,6 +56,24 @@ PERMISSIONS_CONFIG = {
     'pode_gerenciar_usuarios': 'Pode gerenciar usuários',
     'pode_configuracoes': 'Pode alterar configurações',
 }
+
+
+# ========== API OFFLINE / JWT ==========
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=5),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=5),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
 # ========== MIDDLEWARE ==========
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -75,7 +94,7 @@ MIDDLEWARE = [
 ]
 
 # ========== AUTO LOGOUT ==========
-AUTO_LOGOUT_DELAY = env.int('AUTO_LOGOUT_DELAY', default=1800)  # 30 minutos
+AUTO_LOGOUT_DELAY = env.int('AUTO_LOGOUT_DELAY', default=18000)  # 5 horas
 
 # ========== URLS E TEMPLATES ==========
 ROOT_URLCONF = 'sementes.urls'

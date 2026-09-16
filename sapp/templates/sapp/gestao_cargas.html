@@ -1,0 +1,91 @@
+{% extends 'sapp/base.html' %}
+{% load static %}
+{% block title %}Gestão de Cargas - INFINITY STOCK{% endblock %}
+{% block content %}
+<style>
+.load-shell{max-width:1680px;margin:0 auto;padding:12px}.load-hero{background:linear-gradient(135deg,#163c28,#2f8f4e);color:#fff;border-radius:18px;padding:18px 20px;display:flex;justify-content:space-between;gap:14px;align-items:center;box-shadow:0 14px 35px rgba(20,70,38,.18);margin-bottom:12px}.load-hero h3{margin:0;font-weight:900}.load-hero p{margin:3px 0 0;font-size:.78rem;opacity:.8}.load-filter{background:#fff;border:1px solid #e1e9e3;border-radius:14px;margin-bottom:12px;overflow:hidden}.load-filter summary{list-style:none;padding:12px 14px;cursor:pointer;font-weight:900}.load-filter summary::-webkit-details-marker{display:none}.load-filter-body{padding:0 14px 14px}.load-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.load-card{background:#fff;border:1px solid #e2e8e4;border-left:4px solid #94a3b8;border-radius:15px;margin-bottom:10px;box-shadow:0 4px 16px rgba(24,70,40,.05);overflow:hidden}.load-card.origin-card-GERADA{border-left-color:#16a34a}.load-card.origin-card-AVULSA{border-left-color:#dc2626}.load-card.origin-card-LEGADO{border-left-color:#d97706}.load-card-head{padding:12px 14px;display:grid;grid-template-columns:minmax(180px,1.3fr) repeat(5,minmax(100px,.8fr)) 34px;gap:10px;align-items:center}.load-title{font-weight:950;color:#24362b}.origin-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-size:.64rem;font-weight:950;margin-left:6px;vertical-align:middle}.origin-GERADA{background:#dcfce7;color:#166534}.origin-AVULSA{background:#fee2e2;color:#b91c1c}.origin-LEGADO{background:#fef3c7;color:#92400e}.load-meta small{display:block;color:#7a877f;font-size:.56rem;text-transform:uppercase;font-weight:900}.load-meta strong{font-size:.69rem;color:#33483b}.load-toggle{border:0;background:#eef6f0;border-radius:9px;width:32px;height:32px}.load-items{display:none;border-top:1px solid #edf2ee;padding:10px;background:#fbfdfb}.load-card.open .load-items{display:block}.movement{background:#fff;border:1px solid #e5ebe7;border-radius:11px;padding:10px;margin-bottom:8px}.movement-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.movement label{font-size:.58rem;font-weight:900;text-transform:uppercase;color:#66756b}.movement .form-control,.movement .form-select{font-size:.7rem;min-height:35px}.movement-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:8px;flex-wrap:wrap}.audit-note{font-size:.62rem;color:#7b6152;background:#fff7ed;border:1px solid #fed7aa;padding:7px 9px;border-radius:8px;margin-top:7px}.empty-load{text-align:center;padding:45px;color:#94a3b8}.small-counter{font-size:.62rem;background:rgba(255,255,255,.18);padding:6px 9px;border-radius:999px;font-weight:900}.load-pagination{display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 0 4px}.load-pagination .page-info{font-size:.64rem;font-weight:900;color:#64748b;padding:7px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:9px}.load-pagination a{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid #dbe4dd;background:#fff;color:#2f7d48;text-decoration:none}.load-pagination a:hover{background:#eef8f1}
+@media(max-width:1050px){.load-card-head{grid-template-columns:1fr 1fr 1fr}.load-grid{grid-template-columns:1fr 1fr}.movement-grid{grid-template-columns:1fr 1fr}}@media(max-width:650px){.load-shell{padding:7px}.load-hero{padding:14px;align-items:flex-start;flex-direction:column}.load-grid{grid-template-columns:1fr}.load-card-head{grid-template-columns:1fr 1fr}.movement-grid{grid-template-columns:1fr}.load-card-head .load-toggle{grid-column:2;justify-self:end}.load-meta{min-width:0}}
+</style>
+<div class="load-shell">
+  <section class="load-hero">
+    <div><div class="small text-uppercase fw-bold opacity-75">Expedição</div><h3><i class="fas fa-truck-loading me-2"></i>Gestão de Cargas</h3><p>Geradas e avulsas separadas visualmente, com correções auditáveis.</p></div>
+    <span class="small-counter">{{ total_grupos }} carga(s)</span>
+  </section>
+
+  <details class="load-filter">
+    <summary><i class="fas fa-filter me-2 text-success"></i>Filtros <span class="text-muted small ms-1">clique para abrir</span></summary>
+    <form method="get" class="load-filter-body">
+      <div class="load-grid">
+        <div><label class="form-label small fw-bold">Data inicial</label><input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}"></div>
+        <div><label class="form-label small fw-bold">Data final</label><input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}"></div>
+        <div><label class="form-label small fw-bold">Origem</label><select name="origem" class="form-select"><option value="">Todas</option><option value="GERADA" {% if filtros.origem == 'GERADA' %}selected{% endif %}>Gerada</option><option value="AVULSA" {% if filtros.origem == 'AVULSA' %}selected{% endif %}>Avulsa</option></select></div>
+        <div><label class="form-label small fw-bold">Busca</label><input name="q" class="form-control" value="{{ filtros.q }}" placeholder="Carga, nome, cliente, placa, lote..."></div>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-2"><a href="{% url 'sapp:gestao_cargas' %}" class="btn btn-sm btn-outline-secondary">Limpar</a><button class="btn btn-sm btn-success"><i class="fas fa-search me-1"></i>Aplicar</button></div>
+    </form>
+  </details>
+
+  {% for grupo in grupos %}
+  <article class="load-card origin-card-{{ grupo.origem }}" id="carga-{{ forloop.counter }}">
+    <div class="load-card-head">
+      <div><div class="load-title">{{ grupo.titulo }}<span class="origin-badge origin-{{ grupo.origem }}" title="{{ grupo.origem }}" aria-label="{{ grupo.origem }}">{% if grupo.origem == 'AVULSA' %}<i class="fas fa-bolt"></i>{% elif grupo.origem == 'GERADA' %}<i class="fas fa-sun"></i>{% else %}<i class="fas fa-clock-rotate-left"></i>{% endif %}</span></div><div class="text-muted small">{{ grupo.lotes|length }} lote(s) · {{ grupo.movimentos|length }} movimento(s)</div></div>
+      <div class="load-meta"><small>Data</small><strong>{{ grupo.data_txt }}</strong></div>
+      <div class="load-meta"><small>Quantidade</small><strong>{{ grupo.quantidade }}</strong></div>
+      <div class="load-meta"><small>Cliente</small><strong>{{ grupo.clientes_txt }}</strong></div>
+      <div class="load-meta"><small>Placa</small><strong>{{ grupo.placas_txt }}</strong></div>
+      <div class="load-meta"><small>Lotes</small><strong title="{{ grupo.lotes_txt }}">{{ grupo.lotes_txt|truncatechars:38 }}</strong></div>
+      <button type="button" class="load-toggle" onclick="this.closest('.load-card').classList.toggle('open')"><i class="fas fa-chevron-down"></i></button>
+    </div>
+    <div class="load-items">
+      {% for mov in grupo.movimentos %}
+      <form method="post" action="{% url 'sapp:editar_movimento_carga' mov.id %}" class="movement" onsubmit="return confirmarAjusteCarga(this, event)">
+        {% csrf_token %}
+        <div class="d-flex justify-content-between align-items-center mb-2"><strong class="small">Movimento #{{ mov.id }} · {{ mov.lote_ref }}</strong><span class="badge bg-light text-dark">{{ mov.tipo }}</span></div>
+        <div class="movement-grid">
+          <div><label>Data da carga</label><input type="date" name="data_carga" class="form-control" value="{{ mov.data_hora|date:'Y-m-d' }}"></div>
+          <div><label>Quantidade</label><input type="number" min="1" step="1" name="quantidade" class="form-control" value="{{ mov.quantidade }}" required></div>
+          <div><label>Lote / endereço</label><select name="estoque_id" class="form-select" required>{% for est in estoque_opcoes %}<option value="{{ est.id }}" {% if est.id == mov.estoque_id %}selected{% endif %}>{{ est.lote }} · {{ est.endereco }} · saldo {{ est.saldo }} {{ est.embalagem }}</option>{% endfor %}</select></div>
+          <div><label>Origem</label><select name="origem_carga" class="form-select"><option value="GERADA" {% if mov.origem_carga == 'GERADA' %}selected{% endif %}>GERADA</option><option value="AVULSA" {% if mov.origem_carga == 'AVULSA' %}selected{% endif %}>AVULSA</option><option value="" {% if not mov.origem_carga %}selected{% endif %}>LEGADO/Não definido</option></select></div>
+          <div><label>Nº carga</label><input name="numero_carga" class="form-control" value="{{ mov.numero_carga|default:'' }}"></div>
+          <div><label>Nome carga avulsa</label><input name="nome_carga_avulsa" class="form-control" value="{{ mov.nome_carga_avulsa|default:'' }}" placeholder="Agrupa as baixas avulsas"></div>
+          <div><label>Cliente</label><input name="cliente" class="form-control" value="{{ mov.cliente|default:'' }}"></div>
+          <div><label>Placa</label><input name="placa" class="form-control text-uppercase" value="{{ mov.placa|default:'' }}"></div>
+          <div><label>Motorista</label><input name="motorista" class="form-control" value="{{ mov.motorista|default:'' }}"></div>
+          <div style="grid-column:span 3"><label>Motivo da correção *</label><input name="motivo" class="form-control" required placeholder="Ex.: data lançada depois / quantidade corrigida / lote informado incorretamente"></div>
+        </div>
+        <div class="audit-note"><i class="fas fa-shield-halved me-1"></i>Alterar quantidade/lote ajusta o saldo físico correspondente e grava antes/depois para auditoria. Ao excluir um lote da carga, a saída é revertida e o registro permanece auditável.</div>
+        <div class="movement-actions">
+          <button type="submit" formaction="{% url 'sapp:remover_movimento_carga' mov.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirmarExclusaoLoteCarga(this.form)"><i class="fas fa-trash-can me-1"></i>Excluir lote da carga</button>
+          <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-save me-1"></i>Salvar correção</button>
+        </div>
+      </form>
+      {% endfor %}
+    </div>
+  </article>
+  {% empty %}
+  <div class="load-card empty-load"><i class="fas fa-truck fa-2x mb-2"></i><div>Nenhuma carga encontrada.</div></div>
+  {% endfor %}
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="load-pagination" aria-label="Paginação das cargas">
+    {% if page_obj.has_previous %}<a href="?{% if filtros_query %}{{ filtros_query }}&{% endif %}page={{ page_obj.previous_page_number }}" title="Página anterior"><i class="fas fa-chevron-left"></i></a>{% endif %}
+    <span class="page-info">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }} · 10 por vez</span>
+    {% if page_obj.has_next %}<a href="?{% if filtros_query %}{{ filtros_query }}&{% endif %}page={{ page_obj.next_page_number }}" title="Próxima página"><i class="fas fa-chevron-right"></i></a>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+<script>
+function confirmarAjusteCarga(form, event){
+  const submitter = event?.submitter;
+  if(submitter && String(submitter.formAction || '').includes('/remover/')) return true;
+  if(!navigator.onLine){ alert('🌐 Correções de carga exigem conexão com a internet para validar o saldo atual.'); return false; }
+  return confirm('Salvar esta correção? O sistema ajustará o estoque quando quantidade ou lote forem alterados e manterá auditoria do antes/depois.');
+}
+function confirmarExclusaoLoteCarga(form){
+  if(!navigator.onLine){ alert('🌐 A exclusão do lote da carga exige conexão com a internet para reverter o estoque com segurança.'); return false; }
+  const motivo = (form.querySelector('[name="motivo"]')?.value || '').trim();
+  if(!motivo){ alert('Informe o motivo da exclusão no campo “Motivo da correção”.'); form.querySelector('[name="motivo"]')?.focus(); return false; }
+  return confirm('Excluir este lote da carga? A saída física será revertida e a operação ficará registrada na auditoria.');
+}
+</script>
+{% endblock %}

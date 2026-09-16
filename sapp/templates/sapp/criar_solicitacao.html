@@ -404,7 +404,7 @@ document.getElementById('placaCarga')?.addEventListener('input', function() {
 });
 updateTipo();
 
-document.getElementById('formSolicitacao').addEventListener('submit', function(e) {
+document.getElementById('formSolicitacao').addEventListener('submit', async function(e) {
     if (isCarga()) {
         const rows = [...document.querySelectorAll('.carga-row')];
         if (!rows.length) {
@@ -419,6 +419,34 @@ document.getElementById('formSolicitacao').addEventListener('submit', function(e
             motorista?.focus();
             return;
         }
+    }
+
+    // Nova solicitação/carga pode nascer offline. Para carga, o número oficial
+    // só será reservado pelo servidor no momento da sincronização.
+    if (!navigator.onLine && window.InfinityOffline) {
+        e.preventDefault();
+        const fd = new FormData(this);
+        const entries = [];
+        for (const [key, value] of fd.entries()) {
+            if (value instanceof File) {
+                if (value.size > 0) {
+                    alert('📎 Anexos não podem ser salvos offline. Remova o arquivo e tente novamente.');
+                    return;
+                }
+                continue;
+            }
+            entries.push([key, String(value)]);
+        }
+        await window.InfinityOffline.enqueue({
+            tipo: 'SOLICITACAO_CRIAR',
+            lote: '',
+            payload: { form_entries: entries }
+        });
+        alert(isCarga()
+            ? '✅ Carga salva neste dispositivo. O número oficial será gerado quando sincronizar.'
+            : '✅ Solicitação salva neste dispositivo e aguardando sincronização.');
+        window.location.href = '/solicitacoes/';
+        return;
     }
 
     const btn = this.querySelector('button[type="submit"]');

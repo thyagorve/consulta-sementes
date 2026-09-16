@@ -109,3 +109,34 @@ class ConfiguracaoLogoAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         # Permite exclusão apenas para superusuários
         return request.user.is_superuser
+# --- Auditoria offline / sincronização ---
+from .models import SyncLog, SyncOperation, SyncConflict, LoteSyncState, LoteSyncEvento
+
+@admin.register(SyncOperation)
+class SyncOperationAdmin(admin.ModelAdmin):
+    list_display = ('operacao_id', 'usuario', 'device_id', 'tipo', 'lote', 'status', 'recebido_em')
+    list_filter = ('status', 'tipo', 'recebido_em')
+    search_fields = ('operacao_id', 'device_id', 'lote', 'usuario__username')
+    readonly_fields = ('operacao_id', 'recebido_em', 'processado_em', 'payload', 'resultado')
+
+@admin.register(SyncConflict)
+class SyncConflictAdmin(admin.ModelAdmin):
+    list_display = ('id', 'lote', 'status', 'criado_em', 'resolvido_por', 'resolvido_em')
+    list_filter = ('status', 'criado_em')
+    search_fields = ('lote', 'operacao__operacao_id')
+    readonly_fields = ('contexto_servidor', 'resolucao', 'criado_em', 'resolvido_em')
+
+@admin.register(SyncLog)
+class SyncLogAdmin(admin.ModelAdmin):
+    list_display = ('id', 'usuario', 'device_id', 'recebido_em')
+    search_fields = ('device_id', 'usuario__username')
+    readonly_fields = ('payload', 'aceitos', 'rejeitados', 'conflitos', 'recebido_em')
+
+admin.site.register(LoteSyncState)
+admin.site.register(LoteSyncEvento)
+from .models import CargaAjusteLog
+
+@admin.register(CargaAjusteLog)
+class CargaAjusteLogAdmin(admin.ModelAdmin):
+    list_display = ('id', 'historico', 'usuario', 'criado_em')
+    readonly_fields = ('historico', 'usuario', 'criado_em', 'antes', 'depois', 'motivo')

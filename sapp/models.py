@@ -346,6 +346,20 @@ class HistoricoMovimentacao(models.Model):
     placa = models.CharField(max_length=20, blank=True, null=True)
     cliente = models.CharField(max_length=255, blank=True, null=True)
     ordem_entrega = models.CharField(max_length=50, blank=True, null=True)
+    origem_carga = models.CharField(
+        max_length=20,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text='GERADA para carga do card; AVULSA para expedição avulsa.',
+    )
+    nome_carga_avulsa = models.CharField(
+        max_length=180,
+        blank=True,
+        default='',
+        db_index=True,
+        help_text='Nome usado para agrupar várias baixas da mesma carga avulsa.',
+    )
     
     class Meta: ordering = ['-data_hora']
     
@@ -2295,3 +2309,158 @@ class ConfiguracaoAtualizacao(models.Model):
         return f"Config de {self.usuario.username}"
 
 
+
+# ============================================================================
+# OFFLINE / SINCRONIZAÇÃO
+# ============================================================================
+import uuid
+
+
+class LoteSyncState(models.Model):
+    """Versão conhecida de um lote para detecção de edição concorrente."""
+    lote = models.CharField(max_length=100, unique=True, db_index=True)
+    versao = models.PositiveBigIntegerField(default=0)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    atualizado_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='lotes_sync_atualizados',
+    )
+
+    class Meta:
+        verbose_name = 'Estado de sincronização do lote'
+        verbose_name_plural = 'Estados de sincronização dos lotes'
+
+    def __str__(self):
+        return f'{self.lote} v{self.versao}'
+
+
+class LoteSyncEvento(models.Model):
+    """Linha do tempo de versões usada para descobrir se outro usuário tocou no lote."""
+    lote = models.CharField(max_length=100, db_index=True)
+    versao = models.PositiveBigIntegerField(db_index=True)
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='eventos_sync_lote',
+    )
+    historico = models.ForeignKey(
+        HistoricoMovimentacao,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='eventos_sync',
+    )
+    tipo = models.CharField(max_length=80, blank=True, default='')
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['lote', 'versao']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['lote', 'versao'],
+                name='uniq_lote_sync_versao',
+            )
+        ]
+
+
+class SyncOperation(models.Model):
+    STATUS_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('ACEITA', 'Aceita'),
+        ('CONFLITO', 'Conflito'),
+        ('REJEITADA', 'Rejeitada'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+
+    operacao_id = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    usuario = models.ForeignKey(User, on_delete=models.PROTECT, related_name='sync_operacoes')
+    device_id = models.CharField(max_length=120, db_index=True)
+    tipo = models.CharField(max_length=60, db_index=True)
+    lote = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    base_lote_versao = models.PositiveBigIntegerField(default=0)
+    criado_local_em = models.DateTimeField(null=True, blank=True)
+    recebido_em = models.DateTimeField(auto_now_add=True)
+    processado_em = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE', db_index=True)
+    payload = models.JSONField(default=dict)
+    resultado = models.JSONField(default=dict, blank=True)
+    motivo = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-recebido_em']
+
+    def __str__(self):
+        return f'{self.operacao_id} | {self.tipo} | {self.status}'
+
+
+class SyncConflict(models.Model):
+    STATUS_CHOICES = [
+        ('PENDENTE', 'Pendente'),
+        ('APLICADA', 'Aplicada'),
+        ('AJUSTADA', 'Ajustada'),
+        ('CANCELADA', 'Cancelada'),
+    ]
+
+    operacao = models.OneToOneField(
+        SyncOperation,
+        on_delete=models.CASCADE,
+        related_name='conflito',
+    )
+    lote = models.CharField(max_length=100, db_index=True)
+    base_versao = models.PositiveBigIntegerField(default=0)
+    versao_atual = models.PositiveBigIntegerField(default=0)
+    contexto_servidor = models.JSONField(default=dict)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDENTE', db_index=True)
+    resolvido_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='conflitos_sync_resolvidos',
+    )
+    resolucao = models.JSONField(default=dict, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    resolvido_em = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-criado_em']
+
+
+class SyncLog(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='sync_logs')
+    device_id = models.CharField(max_length=120, db_index=True)
+    recebido_em = models.DateTimeField(auto_now_add=True, db_index=True)
+    payload = models.JSONField(default=dict)
+    aceitos = models.JSONField(default=list)
+    rejeitados = models.JSONField(default=list)
+    conflitos = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ['-recebido_em']
+
+    def __str__(self):
+        return f'Sync {self.device_id} em {self.recebido_em:%d/%m/%Y %H:%M}'
+
+class CargaAjusteLog(models.Model):
+    historico = models.ForeignKey(
+        HistoricoMovimentacao,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ajustes_carga',
+    )
+    usuario = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='ajustes_carga')
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True)
+    antes = models.JSONField(default=dict)
+    depois = models.JSONField(default=dict)
+    motivo = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-criado_em']
+        verbose_name = 'Ajuste de carga'
+        verbose_name_plural = 'Ajustes de cargas'

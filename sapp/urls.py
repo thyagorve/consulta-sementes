@@ -1,5 +1,6 @@
 from . import views
 from . import views_inventario
+from . import offline_api
 from .forms import CaseInsensitiveAuthenticationForm
 from django.contrib.auth import views as auth_views
 from django.conf import settings
@@ -13,12 +14,23 @@ app_name = 'sapp'
 
 
 urlpatterns = [
+    # PWA offline / sincronização
+    path('sw.js', offline_api.service_worker, name='service_worker'),
+    path('api/login/', offline_api.OfflineTokenObtainPairView.as_view(), name='api_offline_login'),
+    path('api/offline/session/', offline_api.OfflineSessionView.as_view(), name='api_offline_session'),
+    path('api/referencia/', offline_api.OfflineReferenceView.as_view(), name='api_offline_referencia'),
+    path('api/sync/', offline_api.SyncView.as_view(), name='api_sync'),
+    path('api/sync/central/', offline_api.SyncCentralView.as_view(), name='api_sync_central'),
+    path('api/sync/conflitos/<int:conflict_id>/resolver/', offline_api.SyncConflictResolveView.as_view(), name='api_sync_resolver_conflito'),
     path('login/', auth_views.LoginView.as_view(template_name='sapp/registration/login.html', authentication_form=CaseInsensitiveAuthenticationForm, redirect_authenticated_user=True), name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('mudar-senha/', views.mudar_senha, name='mudar_senha'),
     path('', views.redirecionar_usuario, name='redirecionar'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard-data/', views.dashboard_data, name='dashboard_data'),   
+    path('cargas/', views.gestao_cargas, name='gestao_cargas'),
+    path('cargas/movimento/<int:historico_id>/editar/', views.editar_movimento_carga, name='editar_movimento_carga'),
+    path('cargas/movimento/<int:historico_id>/remover/', views.remover_movimento_carga, name='remover_movimento_carga'),
     
     path('estoque/', views.lista_estoque, name='lista_estoque'),
     path('estoque/inventario/', views_inventario.inventario_estoque, name='inventario_estoque'),
