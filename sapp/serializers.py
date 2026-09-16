@@ -29,7 +29,7 @@ class SyncOperationInputSerializer(serializers.Serializer):
     tipo = serializers.CharField(max_length=60)
     lote = serializers.CharField(max_length=100, allow_blank=True, required=False)
     estoque_id = serializers.IntegerField(required=False, allow_null=True)
-    quantidade = serializers.DecimalField(max_digits=14, decimal_places=2, required=False)
+    quantidade = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True)
     base_lote_versao = serializers.IntegerField(min_value=0, default=0)
     criado_local_em = serializers.DateTimeField(required=False, allow_null=True)
     payload = serializers.JSONField(required=False, default=dict)

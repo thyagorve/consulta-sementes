@@ -267,10 +267,25 @@
     updateStatus();
     try {
       const deviceId = await getDeviceId();
-      const body = { device_id: deviceId, operacoes: pending.map(({status, motivo, atualizado_em, ...x}) => x) };
+      // Compatibilidade com filas criadas por versões anteriores: operações
+      // compostas (empenho/movimentação de card) não têm uma quantidade única
+      // no nível raiz. Não envie campos opcionais nulos, pois versões antigas
+      // do serializer podiam rejeitar o lote inteiro com HTTP 400.
+      const operacoes = pending.map(({status, motivo, atualizado_em, ...x}) => {
+        const clean = { ...x };
+        if (clean.quantidade === null || clean.quantidade === undefined || clean.quantidade === '') delete clean.quantidade;
+        if (clean.estoque_id === null || clean.estoque_id === undefined || clean.estoque_id === '') delete clean.estoque_id;
+        return clean;
+      });
+      const body = { device_id: deviceId, operacoes };
       const r = await authFetch('/api/sync/', { method: 'POST', body: JSON.stringify(body) });
       if (r.status === 401) { await updateStatus(); return; }
-      if (!r.ok) throw new Error(`SYNC_${r.status}`);
+      if (!r.ok) {
+        let detalhe = '';
+        try { detalhe = JSON.stringify(await r.json()); } catch (_) {}
+        console.warn('[OfflineSync] servidor recusou a fila:', r.status, detalhe);
+        throw new Error(`SYNC_${r.status}${detalhe ? `_${detalhe}` : ''}`);
+      }
       const data = await r.json();
       const accepted = new Map((data.aceitos || []).map(x => [String(x.id), x]));
       const conflicts = new Map((data.conflitos || []).map(x => [String(x.id), x]));
