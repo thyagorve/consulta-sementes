@@ -5593,10 +5593,10 @@ async function salvarEmpenho() {
         return;
     }
 
-    // OFFLINE: o empenho entra imediatamente na fila local. A decisão final
-    // continua sendo do servidor quando sincronizar, aplicando a regra de
-    // conflito por lote.
-    if (window.InfinityOffline) {
+    // EMPENHO: com internet confirmamos diretamente no servidor para que a
+    // reserva/status do card seja atualizado imediatamente. A fila local é
+    // usada somente quando o dispositivo estiver realmente offline.
+    if (window.InfinityOffline && !navigator.onLine) {
         const idsAfetados = new Set(adicionar.map(x => Number(x.lote_id)));
         dataGrid.empenhadosData.forEach(item => {
             if (remover.includes(item.id)) idsAfetados.add(Number(item.estoque_id));
@@ -5637,7 +5637,7 @@ async function salvarEmpenho() {
             }
         });
         bootstrap.Modal.getInstance(document.getElementById('modalEmpenho'))?.hide();
-        marcarCardFila(solicId, 'Empenho na fila');
+        marcarCardFila(solicId, 'Empenho offline na fila');
         return;
     }
     
@@ -5649,13 +5649,17 @@ async function salvarEmpenho() {
     try {
         // Remover itens
         for (const itemId of remover) {
-            await fetch(`/api/solicitacoes/${solicId}/remover-item/${itemId}/`, {
-                method: 'POST', 
+            const rRemover = await fetch(`/api/solicitacoes/${solicId}/remover-item/${itemId}/`, {
+                method: 'POST',
                 headers: {
                     'Content-Type':'application/json',
                     'X-CSRFToken':getCookie('csrftoken')
                 }
             });
+            const dRemover = await rRemover.json().catch(() => ({}));
+            if (!rRemover.ok || !dRemover.success) {
+                throw new Error(dRemover.error || 'Erro ao remover item do empenho.');
+            }
         }
         
         // Adicionar itens
@@ -5673,8 +5677,10 @@ async function salvarEmpenho() {
         }
         
         bootstrap.Modal.getInstance(document.getElementById('modalEmpenho')).hide();
-        carregarCards();
-        carregarFeed();
+        await Promise.allSettled([
+            carregarCards(),
+            carregarFeed()
+        ]);
         alert('✅ Alterações salvas com sucesso!');
     } catch(e) {
         alert('❌ ' + (e.message || 'Erro'));
