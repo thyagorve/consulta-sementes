@@ -137,6 +137,7 @@ urlpatterns = [
     # FASE 5 - Kanban e Workflow
     path('kanban/', views.pagina_kanban, name='pagina_kanban'),
     path('api/kanban/dados/', views.api_kanban_dados, name='api_kanban_dados'),
+    path('api/cargas/avulsa/impressao/', views.api_impressao_carga_avulsa, name='api_impressao_carga_avulsa'),
  
     path('api/workflow/config/', views.api_config_workflow, name='api_config_workflow'),
     path('configuracao-workflow/', views.pagina_config_workflow, name='pagina_config_workflow'),

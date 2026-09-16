@@ -1452,9 +1452,9 @@ Deseja continuar?`
                 }
             }
 
-            // OFFLINE: salva a operação no IndexedDB e atualiza a tela sem
-            // bloquear o usuário. Fotos/anexos continuam exclusivamente online.
-            if (!navigator.onLine && window.InfinityOffline) {
+            // FILA PRIMEIRO: com ou sem internet, salva a operação no IndexedDB e
+            // libera a tela imediatamente. Com fotos online mantém o envio direto.
+            if (window.InfinityOffline && (!(form.querySelector('[name="fotos"]')?.files || []).length || !navigator.onLine)) {
                 e.preventDefault();
                 const fotos = form.querySelector('[name="fotos"]')?.files || [];
                 if (fotos.length) {
@@ -1939,9 +1939,9 @@ function atualizarPesoTotal(input) {
                 e.preventDefault(); e.stopImmediatePropagation(); return false;
             }
 
-            // Offline: grava imediatamente no IndexedDB e fecha o modal.
-            // Anexos não entram na fila offline.
-            if(!navigator.onLine && window.InfinityOffline){
+            // Fila primeiro: sem anexos, grava no IndexedDB e fecha o modal imediatamente.
+            // Com anexos online mantém o envio direto; offline continua bloqueado.
+            if(window.InfinityOffline && (!(this.querySelector('[name="fotos"]')?.files || []).length || !navigator.onLine)){
                 e.preventDefault(); e.stopImmediatePropagation();
                 const fd=new FormData(this);
                 const fotos=this.querySelector('[name="fotos"]')?.files || [];

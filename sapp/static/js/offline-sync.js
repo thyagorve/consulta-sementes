@@ -184,13 +184,16 @@
     return r;
   }
 
-  async function refreshReference() {
+  async function refreshReference(force = false) {
     if (!navigator.onLine) return;
     try {
+      const ultimo = Number(await metaGet('reference_refreshed_at') || 0);
+      if (!force && ultimo && (Date.now() - ultimo) < 45000) return;
       const r = await authFetch('/api/referencia/');
       if (!r.ok) return;
       const data = await r.json();
       await referenceSet(data);
+      await metaSet('reference_refreshed_at', Date.now());
       updateStatus();
     } catch (_) {}
   }
@@ -203,15 +206,39 @@
     return Number(row?.versao_lote || 0);
   }
 
+  async function getLotVersions(lotes = []) {
+    const ref = await referenceGet();
+    const rows = ref?.estoques || [];
+    const index = new Map(
+      rows.map(row => [String(row.lote || '').trim().toUpperCase(), Number(row.versao_lote || 0)])
+    );
+    const result = {};
+    for (const lote of lotes) {
+      const key = String(lote || '').trim();
+      if (!key) continue;
+      result[key] = Number(index.get(key.toUpperCase()) || 0);
+    }
+    return result;
+  }
+
+  function emitQueueEvent(name, detail = {}) {
+    try {
+      window.dispatchEvent(new CustomEvent(name, { detail }));
+    } catch (_) {}
+  }
+
   async function enqueue(operation, optimisticFn) {
     const lote = String(operation.lote || operation.payload?.lote || '').trim();
+    const baseVersao = operation.base_lote_versao !== undefined
+      ? operation.base_lote_versao
+      : await getLotVersion(lote);
     const item = {
       id: operation.id || uuid(),
       tipo: String(operation.tipo || '').toUpperCase(),
       lote,
       estoque_id: operation.estoque_id ?? operation.payload?.estoque_id ?? null,
       quantidade: operation.quantidade ?? operation.payload?.quantidade ?? null,
-      base_lote_versao: operation.base_lote_versao ?? await getLotVersion(lote),
+      base_lote_versao: baseVersao,
       criado_local_em: new Date().toISOString(),
       payload: operation.payload || {},
       status: 'PENDENTE',
@@ -219,9 +246,13 @@
       atualizado_em: new Date().toISOString(),
     };
     await queuePut(item);
+
+    // A tela reage imediatamente. A leitura completa da fila e a sincronização
+    // ficam em segundo plano para não segurar o clique do operador.
     if (typeof optimisticFn === 'function') optimisticFn(item);
-    await updateStatus();
-    if (navigator.onLine) setTimeout(syncNow, 20);
+    emitQueueEvent('infinity:queue-changed', { action: 'queued', item });
+    updateStatus();
+    if (navigator.onLine) setTimeout(syncNow, 0);
     return item;
   }
 
@@ -244,6 +275,7 @@
       const accepted = new Map((data.aceitos || []).map(x => [String(x.id), x]));
       const conflicts = new Map((data.conflitos || []).map(x => [String(x.id), x]));
       const rejected = new Map((data.rejeitados || []).map(x => [String(x.id), x]));
+      const finalizados = [];
       for (const item of pending) {
         const id = String(item.id);
         if (accepted.has(id)) {
@@ -257,8 +289,16 @@
         }
         item.atualizado_em = new Date().toISOString();
         await queuePut(item);
+        finalizados.push({ id: item.id, tipo: item.tipo, status: item.status, resultado: item.resultado || {}, motivo: item.motivo || '' });
       }
-      await refreshReference();
+      emitQueueEvent('infinity:sync-finished', {
+        accepted: finalizados.filter(x => x.status === 'ACEITA'),
+        conflicts: finalizados.filter(x => x.status === 'CONFLITO'),
+        rejected: finalizados.filter(x => x.status === 'REJEITADA'),
+      });
+      // Atualizar a referência completa pode ser mais pesado que confirmar a
+      // operação. Fazemos isso depois, sem manter a bolinha presa no spinner.
+      setTimeout(() => refreshReference(true), 0);
     } catch (err) {
       console.warn('[OfflineSync] sync adiado:', err);
     } finally {
@@ -457,6 +497,7 @@
     refreshReference,
     getReference: referenceGet,
     getLotVersion,
+    getLotVersions,
     openCentral,
     blockOfflineUnsupported,
     requireOnline: feature => !blockOfflineUnsupported(`${feature || 'Esta função'} não está disponível offline.`),
@@ -471,12 +512,19 @@
     await registerSW();
     if (navigator.onLine) {
       await ensureSession(false);
-      await refreshReference();
-      await syncNow();
+      // Prioridade para a fila. A referência completa é atualizada depois sem
+      // competir com a primeira renderização da tela.
+      syncNow();
+      setTimeout(() => refreshReference(false), 900);
     }
     updateStatus();
   });
-  window.addEventListener('online', async () => { await ensureSession(true); await syncNow(); await refreshReference(); updateStatus(); });
+  window.addEventListener('online', async () => {
+    await ensureSession(true);
+    syncNow();
+    setTimeout(() => refreshReference(true), 350);
+    updateStatus();
+  });
   window.addEventListener('offline', updateStatus);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
   setInterval(syncNow, SYNC_INTERVAL);

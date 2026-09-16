@@ -2199,6 +2199,23 @@ and (orientation: landscape) {
     overflow-wrap: anywhere !important;
 }
 
+
+    .solicitacao-card.card-operacao-fila {
+        border-color: #f2b52f !important;
+        box-shadow: 0 0 0 2px rgba(242,181,47,.10), 0 8px 20px rgba(0,0,0,.06);
+    }
+    .card-fila-badge {
+        margin-top: 6px;
+        padding: 5px 8px;
+        border-radius: 8px;
+        background: #fff8e4;
+        border: 1px solid #f5d67c;
+        color: #8a6200;
+        font-size: .58rem;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: .25px;
+    }
 </style>
 <audio id="audioNotificacao" preload="auto" style="display:none;">
     <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACAf39/..." type="audio/wav">
@@ -5579,18 +5596,19 @@ async function salvarEmpenho() {
     // OFFLINE: o empenho entra imediatamente na fila local. A decisão final
     // continua sendo do servidor quando sincronizar, aplicando a regra de
     // conflito por lote.
-    if (!navigator.onLine && window.InfinityOffline) {
-        const baseLotes = {};
+    if (window.InfinityOffline) {
         const idsAfetados = new Set(adicionar.map(x => Number(x.lote_id)));
         dataGrid.empenhadosData.forEach(item => {
             if (remover.includes(item.id)) idsAfetados.add(Number(item.estoque_id));
         });
-        for (const estoqueId of idsAfetados) {
+        const lotesAfetados = [...idsAfetados].map(estoqueId => {
             const row = dataGrid.allData.find(x => Number(x.estoque_id || x.id) === Number(estoqueId))
                 || dataGrid.empenhadosData.find(x => Number(x.estoque_id) === Number(estoqueId));
-            const lote = String(row?.lote || '').trim();
-            if (lote) baseLotes[lote] = await window.InfinityOffline.getLotVersion(lote);
-        }
+            return String(row?.lote || '').trim();
+        }).filter(Boolean);
+        const baseLotes = window.InfinityOffline.getLotVersions
+            ? await window.InfinityOffline.getLotVersions(lotesAfetados)
+            : Object.fromEntries(await Promise.all(lotesAfetados.map(async lote => [lote, await window.InfinityOffline.getLotVersion(lote)])));
         await window.InfinityOffline.enqueue({
             tipo: 'SOLICITACAO_EMPENHAR',
             lote: '',
@@ -5619,7 +5637,7 @@ async function salvarEmpenho() {
             }
         });
         bootstrap.Modal.getInstance(document.getElementById('modalEmpenho'))?.hide();
-        alert('📴 Empenho salvo neste dispositivo. Será sincronizado quando houver conexão.');
+        marcarCardFila(solicId, 'Empenho na fila');
         return;
     }
     
@@ -6805,6 +6823,40 @@ window.abrirMovModal = async function(solId, acao) {
 };
 
 
+
+function marcarCardFila(solicitacaoId, texto = 'Operação na fila') {
+    const card = document.getElementById(`card-${solicitacaoId}`);
+    if (!card) return;
+    card.classList.add('card-operacao-fila');
+    let badge = card.querySelector('.card-fila-badge');
+    if (!badge) {
+        badge = document.createElement('div');
+        badge.className = 'card-fila-badge';
+        card.appendChild(badge);
+    }
+    badge.innerHTML = `<i class="fas fa-bolt me-1"></i>${texto}`;
+    const operacaoBtn = card.querySelector('.btn-outline-danger, .btn-outline-warning');
+    if (operacaoBtn) {
+        operacaoBtn.classList.remove('btn-outline-danger', 'btn-outline-warning');
+        operacaoBtn.classList.add('btn-warning');
+        operacaoBtn.disabled = true;
+        operacaoBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>';
+        operacaoBtn.title = texto;
+    }
+}
+
+window.addEventListener('infinity:sync-finished', (event) => {
+    const detail = event.detail || {};
+    const concluidas = [...(detail.accepted || []), ...(detail.conflicts || []), ...(detail.rejected || [])];
+    if (!concluidas.some(item => ['SOLICITACAO_MOVIMENTAR','SOLICITACAO_EMPENHAR'].includes(String(item.tipo || '').toUpperCase()))) return;
+    // O clique já terminou. A atualização do card acontece depois, sem travar o
+    // operador e sem recarregar a página inteira.
+    setTimeout(() => {
+        carregarCards();
+        carregarFeed();
+    }, 0);
+});
+
 let movimentacaoEmProcessamento = false;
 window.confirmarMov = async function() {
     if (movimentacaoEmProcessamento) return;
@@ -6855,7 +6907,13 @@ window.confirmarMov = async function() {
 
         let valido = true;
         if (navigator.onLine) {
-            valido = await validarEnderecoMov(true);
+            // Se o endereço já foi validado enquanto o operador digitava, não
+            // repete a chamada ao servidor no clique de confirmar.
+            valido = Boolean(
+                movEnderecoValido
+                && String(movEnderecoUltimoValidado || '').trim().toUpperCase() === endereco
+            );
+            if (!valido) valido = await validarEnderecoMov(true);
         } else if (window.InfinityOffline) {
             const referencia = await window.InfinityOffline.getReference();
             valido = (referencia?.cadastros?.enderecos || []).some(
@@ -6906,15 +6964,12 @@ window.confirmarMov = async function() {
     // OFFLINE: guarda a mesma ação do card na fila local. O número oficial
     // de uma nova carga gerada continua sendo responsabilidade do servidor
     // quando houver sincronização.
-    if (!navigator.onLine && window.InfinityOffline) {
+    if (window.InfinityOffline) {
         const checks = [...document.querySelectorAll('.mov-chk:checked')];
-        const baseVersoes = {};
-        for (const chk of checks) {
-            const lote = String(chk.dataset.lote || '').trim();
-            if (lote && baseVersoes[lote] === undefined) {
-                baseVersoes[lote] = await window.InfinityOffline.getLotVersion(lote);
-            }
-        }
+        const lotes = [...new Set(checks.map(chk => String(chk.dataset.lote || '').trim()).filter(Boolean))];
+        const baseVersoes = window.InfinityOffline.getLotVersions
+            ? await window.InfinityOffline.getLotVersions(lotes)
+            : Object.fromEntries(await Promise.all(lotes.map(async lote => [lote, await window.InfinityOffline.getLotVersion(lote)])));
         await window.InfinityOffline.enqueue({
             tipo: 'SOLICITACAO_MOVIMENTAR',
             lote: String(checks[0]?.dataset.lote || ''),
@@ -6933,7 +6988,7 @@ window.confirmarMov = async function() {
             });
             bootstrap.Modal.getInstance(document.getElementById('modalMov'))?.hide();
         });
-        alert('✅ Operação salva neste dispositivo. Ela será confirmada quando houver conexão.');
+        marcarCardFila(movSolId, movAcao === 'expedir' ? 'Expedição na fila' : 'Transferência na fila');
         return;
     }
 

@@ -600,9 +600,105 @@
 .kanban-lane .kanban-scrollbar-top { margin:0 12px 7px; width:calc(100% - 24px); }
 @media(max-width:768px){ .kanban-lane-header{padding:12px 44px;font-size:.82rem}.kanban-lane .kanban-wrapper{min-height:330px;padding-left:8px}.kanban-lane .kanban-scrollbar-top{display:none}.kanban-lane-header .lane-count{right:10px}.kanban-lane-header .lane-chevron{left:10px} }
 
+/* V11.3 - filtros múltiplos e modos de visualização */
+.kanban-filterbar {
+    display:grid;
+    grid-template-columns:minmax(280px,1.8fr) 155px 170px 170px auto auto;
+    gap:8px;
+    align-items:end;
+    margin:-4px 0 12px;
+    padding:10px 12px;
+    border:1px solid #dce7df;
+    border-radius:16px;
+    background:rgba(255,255,255,.92);
+    box-shadow:0 6px 20px rgba(27,52,34,.055);
+}
+.kanban-filter-field label {
+    display:block;
+    margin-bottom:4px;
+    color:#67776d;
+    font-size:.55rem;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+}
+.kanban-filter-field .form-control,
+.kanban-filter-field .form-select {
+    min-height:36px;
+    font-size:.7rem;
+    border-color:#d7e3da;
+    border-radius:10px;
+}
+.kanban-filter-help {
+    grid-column:1 / -1;
+    margin-top:-1px;
+    color:#7b887f;
+    font-size:.57rem;
+}
+.kanban-filter-help code {
+    color:#25623a;
+    background:#eef7f1;
+    border:1px solid #d7e9dc;
+    border-radius:6px;
+    padding:1px 4px;
+}
+.kanban-empty-toggle {
+    display:flex;
+    align-items:center;
+    gap:6px;
+    min-height:36px;
+    padding:0 9px;
+    border:1px solid #d7e3da;
+    border-radius:10px;
+    background:#f8fbf9;
+    color:#506158;
+    font-size:.63rem;
+    font-weight:800;
+    white-space:nowrap;
+}
+.kanban-filter-clear { min-height:36px; border-radius:10px; white-space:nowrap; }
+.kanban-filter-summary {
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    margin-left:6px;
+    padding:2px 7px;
+    border-radius:999px;
+    color:#245c37;
+    background:#eef8f1;
+    border:1px solid #d7eadc;
+    font-size:.55rem;
+    font-weight:900;
+}
+.kanban-page-shell.view-compact .kanban-column { min-width:265px; max-width:290px; }
+.kanban-page-shell.view-compact .kanban-card { padding:9px 10px; margin-bottom:7px; border-radius:12px; }
+.kanban-page-shell.view-compact .card-details-grid { gap:3px; margin:5px 0; font-size:.57rem; }
+.kanban-page-shell.view-compact .card-details-grid > span { padding:3px 5px; }
+.kanban-page-shell.view-compact .card-progress { margin:5px 0; height:4px; }
+.kanban-page-shell.view-compact .card-tags-premium { margin-top:5px; }
+.kanban-page-shell.view-essential .kanban-column { min-width:230px; max-width:255px; }
+.kanban-page-shell.view-essential .kanban-card { padding:9px; margin-bottom:6px; border-radius:11px; }
+.kanban-page-shell.view-essential .card-progress,
+.kanban-page-shell.view-essential .card-destination,
+.kanban-page-shell.view-essential .card-tags-premium { display:none; }
+.kanban-page-shell.view-essential .card-details-grid { grid-template-columns:1fr; margin:5px 0 2px; }
+.kanban-page-shell.view-essential .card-details-grid > span:not(:first-child) { display:none; }
+.kanban-page-shell.view-essential .card-actions { padding-top:5px; margin-top:4px; }
+.kanban-page-shell.view-essential .card-status-badge { margin-bottom:2px; }
+@media(max-width:1200px){
+    .kanban-filterbar{grid-template-columns:minmax(240px,1fr) repeat(2,minmax(140px,.55fr));}
+    .kanban-empty-toggle,.kanban-filter-clear{align-self:stretch;}
+}
+@media(max-width:768px){
+    .kanban-filterbar{grid-template-columns:1fr 1fr;margin:0 3px 10px;padding:9px;}
+    .kanban-filter-field:first-child{grid-column:1 / -1;}
+    .kanban-filter-help{grid-column:1 / -1;}
+    .kanban-empty-toggle{white-space:normal;}
+}
+
 </style>
 
-<div class="kanban-page-shell">
+<div class="kanban-page-shell view-full" id="kanbanPageShell">
     <!-- TOPO UNIFICADO -->
     <div class="kanban-premium-header">
         <div class="kanban-premium-title">
@@ -624,6 +720,49 @@
             <button class="btn btn-light btn-sm" onclick="recarregarKanban()">
                 <i class="fas fa-sync-alt me-1"></i> Atualizar
             </button>
+        </div>
+    </div>
+
+    <div class="kanban-filterbar" id="kanbanFilterBar">
+        <div class="kanban-filter-field">
+            <label for="kanbanMultiFilter">Filtrar vários campos</label>
+            <input id="kanbanMultiFilter" class="form-control" type="search" placeholder="Ex.: lote:PSM*; cliente:PROG*; carga:66*" autocomplete="off">
+        </div>
+        <div class="kanban-filter-field">
+            <label for="kanbanMatchMode">Combinação</label>
+            <select id="kanbanMatchMode" class="form-select">
+                <option value="any">Qualquer filtro</option>
+                <option value="all">Todos os filtros</option>
+            </select>
+        </div>
+        <div class="kanban-filter-field">
+            <label for="kanbanTypeFilter">Tipo</label>
+            <select id="kanbanTypeFilter" class="form-select">
+                <option value="all">Todos</option>
+                <option value="tsi">Somente TSI</option>
+                <option value="carga">Todas as cargas</option>
+                <option value="gerada">Cargas geradas</option>
+                <option value="avulsa">Cargas avulsas</option>
+            </select>
+        </div>
+        <div class="kanban-filter-field">
+            <label for="kanbanViewMode">Visualização</label>
+            <select id="kanbanViewMode" class="form-select">
+                <option value="full">Completa</option>
+                <option value="compact">Compacta</option>
+                <option value="essential">Essencial</option>
+            </select>
+        </div>
+        <label class="kanban-empty-toggle" title="Ao filtrar, esconde colunas que ficaram sem cards">
+            <input id="kanbanHideEmpty" type="checkbox" checked>
+            Ocultar vazias
+        </label>
+        <button type="button" class="btn btn-outline-secondary btn-sm kanban-filter-clear" onclick="limparFiltrosKanban()">
+            <i class="fas fa-eraser me-1"></i>Limpar
+        </button>
+        <div class="kanban-filter-help">
+            Use <code>*</code> como coringa. Campos: <code>lote:</code>, <code>cliente:</code>, <code>carga:</code>, <code>placa:</code>, <code>motorista:</code>, <code>status:</code>, <code>tag:</code>. Separe filtros com <code>;</code> ou vírgula.
+            <span id="kanbanFilterSummary" class="kanban-filter-summary"><i class="fas fa-layer-group"></i> Todos os cards</span>
         </div>
     </div>
 
@@ -769,8 +908,15 @@ let kanbanData = null;
 let cardArrastado = null;
 let colunaOrigem = null;
 let cardParaMover = null;
+let kanbanOcultarColunasVazias = true;
+let kanbanTipoFiltro = 'all';
+let kanbanModoFiltro = 'any';
+let kanbanTermosFiltro = [];
 
-document.addEventListener('DOMContentLoaded', carregarKanban);
+document.addEventListener('DOMContentLoaded', () => {
+    configurarFiltrosKanban();
+    carregarKanban();
+});
 
 async function carregarKanban() {
     try {
@@ -778,7 +924,7 @@ async function carregarKanban() {
         const data = await resp.json();
         if (data.success) {
             kanbanData = data;
-            renderizarKanban(data.colunas);
+            aplicarFiltrosKanbanLocal();
         }
     } catch (e) {
         console.error('Erro ao carregar Kanban:', e);
@@ -797,6 +943,7 @@ function renderizarColunasLane(colunas, tipo) {
             const isCarga = String(card.tipo_solicitacao || '').toUpperCase() === 'CARGA';
             return tipo === 'CARGA' ? isCarga : !isCarga;
         });
+        if (kanbanOcultarColunasVazias && cards.length === 0) return '';
         return `
             <div class="kanban-column" data-coluna-id="${coluna.id}" data-coluna-nome="${escaparHtmlKanban(coluna.nome)}">
                 <div class="kanban-column-header" style="background:${coluna.cor};">
@@ -836,7 +983,19 @@ function renderizarKanban(colunas) {
     const totalTsi = colunas.reduce((n,c)=>n+(c.cards||[]).filter(card=>String(card.tipo_solicitacao||'').toUpperCase()!=='CARGA').length,0);
     const totalCarga = colunas.reduce((n,c)=>n+(c.cards||[]).filter(card=>String(card.tipo_solicitacao||'').toUpperCase()==='CARGA').length,0);
 
-    board.innerHTML = `
+    if (!totalTsi && !totalCarga && (kanbanTermosFiltro.length || kanbanTipoFiltro !== 'all')) {
+        board.innerHTML = `<div class="text-center py-5 w-100 text-muted">
+            <i class="fas fa-filter fa-3x mb-3 opacity-50"></i>
+            <h6>Nenhum card corresponde aos filtros</h6>
+            <button type="button" class="btn btn-sm btn-outline-success mt-2" onclick="limparFiltrosKanban()">Limpar filtros</button>
+        </div>`;
+        atualizarResumoFiltroKanban(0);
+        return;
+    }
+
+    const mostrarTsi = kanbanTipoFiltro === 'all' || kanbanTipoFiltro === 'tsi';
+    const mostrarCarga = ['all','carga','gerada','avulsa'].includes(kanbanTipoFiltro);
+    const laneTsi = mostrarTsi ? `
         <section class="kanban-lane ${estadoLaneSalvo('tsi') ? 'collapsed' : ''}" data-lane="tsi">
             <button type="button" class="kanban-lane-header" onclick="toggleKanbanLane('tsi')">
                 <i class="fas fa-chevron-down lane-chevron"></i>
@@ -847,7 +1006,8 @@ function renderizarKanban(colunas) {
                 <div class="kanban-scrollbar-top"><div class="kanban-scrollbar-content"></div></div>
                 <div class="kanban-wrapper" data-lane-board="tsi">${renderizarColunasLane(colunas, 'TSI')}</div>
             </div>
-        </section>
+        </section>` : '';
+    const laneCarga = mostrarCarga ? `
         <section class="kanban-lane kanban-lane-carga ${estadoLaneSalvo('carga') ? 'collapsed' : ''}" data-lane="carga">
             <button type="button" class="kanban-lane-header" onclick="toggleKanbanLane('carga')">
                 <i class="fas fa-chevron-down lane-chevron"></i>
@@ -858,13 +1018,167 @@ function renderizarKanban(colunas) {
                 <div class="kanban-scrollbar-top"><div class="kanban-scrollbar-content"></div></div>
                 <div class="kanban-wrapper" data-lane-board="carga">${renderizarColunasLane(colunas, 'CARGA')}</div>
             </div>
-        </section>`;
+        </section>` : '';
+
+    board.innerHTML = laneTsi + laneCarga;
 
     document.querySelectorAll('.kanban-card:not([data-synthetic-avulsa="1"])').forEach(card => {
         card.addEventListener('dragstart', handleDragStart);
         card.addEventListener('dragend', handleDragEnd);
     });
+    atualizarResumoFiltroKanban(totalTsi + totalCarga);
     setTimeout(configurarScrollbarSuperior, 50);
+}
+
+function normalizarFiltroKanban(valor) {
+    return String(valor ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLocaleLowerCase('pt-BR')
+        .trim();
+}
+
+function regexCoringaKanban(valor) {
+    const normalizado = normalizarFiltroKanban(valor);
+    if (!/[?*]/.test(normalizado)) return null;
+    const escapado = normalizado.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+    try { return new RegExp(escapado, 'i'); } catch (_) { return null; }
+}
+
+function textoCampoCardKanban(card, campo) {
+    const tags = (card.tags || []).map(t => t.nome || '').join(' ');
+    const lotes = (card.lotes || []).join(' ');
+    const criterios = card.criterios || {};
+    const mapa = {
+        lote: lotes,
+        cliente: criterios.cliente || '',
+        carga: `${card.titulo || ''} ${card.id || ''}`,
+        titulo: card.titulo || '',
+        placa: criterios.placa || card.placa || '',
+        motorista: criterios.motorista || card.motorista || '',
+        status: `${card.status || ''} ${card.status_display || ''} ${card.coluna_nome || ''}`,
+        tag: tags,
+        destino: card.destino || criterios.destino || '',
+        tipo: `${card.tipo_solicitacao || ''} ${card.tipo_solicitacao_display || ''} ${card.origem_carga || ''}`,
+    };
+    if (campo && Object.prototype.hasOwnProperty.call(mapa, campo)) return normalizarFiltroKanban(mapa[campo]);
+    return normalizarFiltroKanban([
+        card.id, card.titulo, card.tipo_solicitacao, card.tipo_solicitacao_display,
+        card.origem_carga, card.status, card.status_display, card.coluna_nome,
+        card.criador_nome, card.responsavel_nome, card.destino,
+        criterios.cliente, criterios.destino, criterios.placa, criterios.motorista,
+        lotes, tags
+    ].join(' '));
+}
+
+function parseFiltrosKanban(valor) {
+    return String(valor || '')
+        .split(/[;,]+/)
+        .map(v => v.trim())
+        .filter(Boolean)
+        .map(token => {
+            const match = token.match(/^([a-zA-ZÀ-ÿ_]+)\s*:\s*(.+)$/);
+            if (!match) return { campo: '', valor: token };
+            const campo = normalizarFiltroKanban(match[1]);
+            const aliases = { lotes:'lote', clientes:'cliente', cargas:'carga', motor:'motorista', tags:'tag' };
+            return { campo: aliases[campo] || campo, valor: match[2].trim() };
+        });
+}
+
+function cardPassaFiltroKanban(card, filtro) {
+    const texto = textoCampoCardKanban(card, filtro.campo);
+    const valor = normalizarFiltroKanban(filtro.valor);
+    if (!valor) return true;
+    const re = regexCoringaKanban(valor);
+    return re ? re.test(texto) : texto.includes(valor);
+}
+
+function cardPassaTipoKanban(card) {
+    const isCarga = String(card.tipo_solicitacao || '').toUpperCase() === 'CARGA';
+    const origem = String(card.origem_carga || (card.synthetic_avulsa ? 'AVULSA' : '')).toUpperCase();
+    if (kanbanTipoFiltro === 'tsi') return !isCarga;
+    if (kanbanTipoFiltro === 'carga') return isCarga;
+    if (kanbanTipoFiltro === 'gerada') return isCarga && origem !== 'AVULSA';
+    if (kanbanTipoFiltro === 'avulsa') return isCarga && origem === 'AVULSA';
+    return true;
+}
+
+function filtrarColunasKanban(colunas) {
+    return (colunas || []).map(coluna => ({
+        ...coluna,
+        cards: (coluna.cards || []).filter(card => {
+            if (!cardPassaTipoKanban(card)) return false;
+            if (!kanbanTermosFiltro.length) return true;
+            const resultados = kanbanTermosFiltro.map(f => cardPassaFiltroKanban(card, f));
+            return kanbanModoFiltro === 'all' ? resultados.every(Boolean) : resultados.some(Boolean);
+        }),
+    }));
+}
+
+function aplicarFiltrosKanbanLocal() {
+    if (!kanbanData?.colunas) return;
+    const input = document.getElementById('kanbanMultiFilter');
+    const match = document.getElementById('kanbanMatchMode');
+    const tipo = document.getElementById('kanbanTypeFilter');
+    const hide = document.getElementById('kanbanHideEmpty');
+    kanbanTermosFiltro = parseFiltrosKanban(input?.value || '');
+    kanbanModoFiltro = match?.value === 'all' ? 'all' : 'any';
+    kanbanTipoFiltro = tipo?.value || 'all';
+    kanbanOcultarColunasVazias = hide ? hide.checked : true;
+    renderizarKanban(filtrarColunasKanban(kanbanData.colunas));
+}
+
+function aplicarVisualizacaoKanban(modo) {
+    const shell = document.getElementById('kanbanPageShell');
+    if (!shell) return;
+    const seguro = ['full','compact','essential'].includes(modo) ? modo : 'full';
+    shell.classList.remove('view-full','view-compact','view-essential');
+    shell.classList.add(`view-${seguro}`);
+    localStorage.setItem('kanban:viewMode', seguro);
+    setTimeout(configurarScrollbarSuperior, 40);
+}
+
+function configurarFiltrosKanban() {
+    const input = document.getElementById('kanbanMultiFilter');
+    const match = document.getElementById('kanbanMatchMode');
+    const tipo = document.getElementById('kanbanTypeFilter');
+    const view = document.getElementById('kanbanViewMode');
+    const hide = document.getElementById('kanbanHideEmpty');
+    const viewSalva = localStorage.getItem('kanban:viewMode') || 'full';
+    if (view) view.value = ['full','compact','essential'].includes(viewSalva) ? viewSalva : 'full';
+    aplicarVisualizacaoKanban(view?.value || 'full');
+    let timer = null;
+    input?.addEventListener('input', () => {
+        clearTimeout(timer);
+        timer = setTimeout(aplicarFiltrosKanbanLocal, 90);
+    });
+    match?.addEventListener('change', aplicarFiltrosKanbanLocal);
+    tipo?.addEventListener('change', aplicarFiltrosKanbanLocal);
+    hide?.addEventListener('change', aplicarFiltrosKanbanLocal);
+    view?.addEventListener('change', () => aplicarVisualizacaoKanban(view.value));
+}
+
+function limparFiltrosKanban() {
+    const input = document.getElementById('kanbanMultiFilter');
+    const match = document.getElementById('kanbanMatchMode');
+    const tipo = document.getElementById('kanbanTypeFilter');
+    const hide = document.getElementById('kanbanHideEmpty');
+    if (input) input.value = '';
+    if (match) match.value = 'any';
+    if (tipo) tipo.value = 'all';
+    if (hide) hide.checked = true;
+    aplicarFiltrosKanbanLocal();
+}
+
+function atualizarResumoFiltroKanban(total) {
+    const el = document.getElementById('kanbanFilterSummary');
+    if (!el) return;
+    const filtrando = kanbanTermosFiltro.length || kanbanTipoFiltro !== 'all';
+    el.innerHTML = filtrando
+        ? `<i class="fas fa-filter"></i> ${total} card(s) encontrado(s)`
+        : `<i class="fas fa-layer-group"></i> ${total} card(s)`;
 }
 
 function criarCardHTML(card) {
@@ -977,7 +1291,8 @@ function criarCardHTML(card) {
             </div>
             ${card.synthetic_avulsa ? `
                 <div class="card-actions">
-                    <span class="small text-muted"><i class="fas fa-check-circle text-success me-1"></i>Avulsa concluída</span>
+                    <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); imprimirCargaAvulsaKanban('${encodeURIComponent(card.impressao_nome || '')}', '${encodeURIComponent(card.impressao_numero || '')}')" title="Visualizar / imprimir lotes da carga avulsa"><i class="fas fa-print"></i></button>
+                    <span class="small text-muted align-self-center"><i class="fas fa-bolt text-danger me-1"></i>Avulsa concluída · ${Number(card.lotes?.length || 0)} lote(s)</span>
                 </div>
             ` : `
                 <div class="card-actions">
@@ -1391,7 +1706,7 @@ function abrirJanelaImpressaoMobile() {
 
 
 // ===== IMPRESSÃO CORRIGIDA (SEM ARMazém NO TOPO, MAIS LIMPA) =====
-function gerarImpressaoSolicitacao(id, janelaExistente = null) {
+function gerarImpressaoSolicitacao(id, janelaExistente = null, endpointOverride = null) {
     const isMobilePrint = (
         window.matchMedia(
             '(max-width: 900px)'
@@ -1446,7 +1761,8 @@ function gerarImpressaoSolicitacao(id, janelaExistente = null) {
         </body></html>
     `);
 
-    fetch(`/api/solicitacoes/${Number(id)}/impressao/`)
+    const endpointImpressao = endpointOverride || `/api/solicitacoes/${Number(id)}/impressao/`;
+    fetch(endpointImpressao)
         .then(async response => {
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.success) throw new Error(data.error || 'Erro ao carregar.');
@@ -2007,6 +2323,14 @@ tr { page-break-inside: avoid; }
 }
 function imprimirCardKanban(id) {
     gerarImpressaoSolicitacao(id);
+}
+function imprimirCargaAvulsaKanban(nomeCodificado, numeroCodificado) {
+    const nome = decodeURIComponent(String(nomeCodificado || ''));
+    const numero = decodeURIComponent(String(numeroCodificado || ''));
+    const params = new URLSearchParams();
+    if (nome) params.set('nome', nome);
+    if (numero) params.set('numero', numero);
+    gerarImpressaoSolicitacao(0, null, `/api/cargas/avulsa/impressao/?${params.toString()}`);
 }
 </script>
 {% endblock %}

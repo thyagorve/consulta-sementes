@@ -1,4 +1,4 @@
-const CACHE_NAME = 'infinity-stock-v11-shell-1';
+const CACHE_NAME = 'infinity-stock-v11-shell-2';
 const STATIC_FALLBACKS = [
   '/static/manifest.webmanifest',
   '/static/img/logo.png',

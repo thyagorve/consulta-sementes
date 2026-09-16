@@ -8378,6 +8378,7 @@ def dashboard_data(request):
                 'outros': _dashboard_numero(total_outros_expedido),
                 'equivalente_sc': _dashboard_numero(total_equivalente_sc),
                 'lotes': int(total_lotes_nas_cargas),
+                'media_por_carga_sc': _dashboard_numero(media_por_carga_sc),
                 'placas': len(placas_unicas),
                 'baixas': int(total_baixas_expedicao),
                 'multiplas_baixas': int(cargas_multiplas_baixas),
@@ -14754,6 +14755,7 @@ def api_dados_impressao_solicitacao(
         historicos = (
             HistoricoItemEmpenho.objects
             .filter(empenho__solicitacao_id=solicitacao.id)
+            .exclude(tipo='removido')
             .select_related(
                 'estoque_origem',
                 'estoque_origem__conferente',
@@ -15139,6 +15141,10 @@ def _lotes_da_solicitacao(solicitacao):
                 lotes.add(lote)
 
         for item in empenho.historico_itens.all():
+            # Itens removidos de uma carga continuam na auditoria, mas não
+            # podem voltar a aparecer como lote ativo no card/relatório.
+            if str(getattr(item, 'tipo', '') or '').lower() == 'removido':
+                continue
             lote = str(item.lote or '').strip()
             if lote:
                 lotes.add(lote)
@@ -15368,7 +15374,7 @@ def api_kanban_dados(request):
         grupos_avulsos = {}
         movimentos_avulsos = (
             HistoricoMovimentacao.objects
-            .filter(origem_carga='AVULSA')
+            .filter(origem_carga='AVULSA', tipo__icontains='Expedi')
             .select_related('estoque', 'usuario')
             .order_by('-data_hora', '-id')[:1500]
         )
@@ -15381,6 +15387,7 @@ def api_kanban_dados(request):
             chave = f'AVULSA:{chave_base}'
             grupo = grupos_avulsos.setdefault(chave, {
                 'nome': nome or (f'CARGA {numero}' if numero else 'CARGA AVULSA'),
+                'nome_filtro': nome,
                 'numero': numero,
                 'data': mov.data_hora,
                 'cliente': set(),
@@ -15408,6 +15415,8 @@ def api_kanban_dados(request):
                 'tipo_solicitacao': 'CARGA',
                 'tipo_solicitacao_display': 'Carga avulsa',
                 'origem_carga': 'AVULSA',
+                'impressao_nome': grupo.get('nome_filtro', ''),
+                'impressao_numero': grupo['numero'],
                 'itens_carga': [],
                 'observacao': '',
                 'destino': '',
@@ -15468,6 +15477,149 @@ def api_kanban_dados(request):
             ).order_by('ordem', 'nome')
         ],
         'timestamp': timezone.now().isoformat(),
+    })
+
+
+@login_required
+@require_GET
+def api_impressao_carga_avulsa(request):
+    """Retorna uma carga avulsa no mesmo contrato JSON usado pela impressão das cargas geradas."""
+    nome = ' '.join(str(request.GET.get('nome') or '').strip().split())
+    numero = ' '.join(str(request.GET.get('numero') or '').strip().split())
+
+    if not nome and not numero:
+        return JsonResponse({'success': False, 'error': 'Carga avulsa não informada.'}, status=400)
+
+    qs = (
+        HistoricoMovimentacao.objects
+        .filter(origem_carga='AVULSA', tipo__icontains='Expedi')
+        .select_related(
+            'estoque', 'estoque__categoria', 'estoque__peneira',
+            'estoque__cultivar', 'estoque__tratamento', 'estoque__especie',
+            'usuario',
+        )
+        .order_by('data_hora', 'id')
+    )
+    if nome:
+        qs = qs.filter(nome_carga_avulsa__iexact=nome)
+    else:
+        qs = qs.filter(numero_carga__iexact=numero)
+
+    movimentos = list(qs[:1000])
+    if not movimentos:
+        return JsonResponse({'success': False, 'error': 'Nenhum lote ativo encontrado para esta carga avulsa.'}, status=404)
+
+    itens = []
+    clientes = set()
+    placas = set()
+    motoristas = set()
+    embalagens = set()
+    total = Decimal('0')
+    peso_total_carga = Decimal('0')
+    produto_cache = {}
+
+    for mov in movimentos:
+        estoque = mov.estoque
+        qtd = Decimal(str(mov.quantidade or 0))
+        peso_unit = Decimal(str(getattr(estoque, 'peso_unitario', 0) or 0)) if estoque else Decimal('0')
+        peso_total = qtd * peso_unit
+        total += qtd
+        peso_total_carga += peso_total
+
+        cliente = str(mov.cliente or (estoque.cliente if estoque else '') or '').strip()
+        if cliente:
+            clientes.add(cliente)
+        if mov.placa:
+            placas.add(str(mov.placa).strip().upper())
+        if mov.motorista:
+            motoristas.add(str(mov.motorista).strip())
+        embalagem = str(estoque.embalagem if estoque else '').strip().upper()
+        if embalagem:
+            embalagens.add(embalagem)
+
+        codigo = str(estoque.produto if estoque else '').strip()
+        chave_codigo = codigo.upper()
+        if chave_codigo and chave_codigo not in produto_cache:
+            produto_cache[chave_codigo] = Produto.objects.filter(codigo__iexact=codigo).only('descricao').first()
+        produto_config = produto_cache.get(chave_codigo) if chave_codigo else None
+        itens.append({
+            'item_id': mov.id,
+            'item_carga_id': None,
+            'codigo': codigo,
+            'descricao': (produto_config.descricao if produto_config else '') or '',
+            'lote': str(mov.lote_ref or (estoque.lote if estoque else '') or '').strip(),
+            'quantidade': float(qtd),
+            'saldo_atual': 0,
+            'saldo_empenho': 0,
+            'endereco': str(estoque.endereco if estoque else '').strip(),
+            'az': str(estoque.az if estoque else '').strip(),
+            'armazem': str(estoque.az if estoque else '').strip(),
+            'produto': codigo,
+            'cultivar': str(estoque.cultivar.nome if estoque and estoque.cultivar else '').strip(),
+            'peneira': str(estoque.peneira.nome if estoque and estoque.peneira else '').strip(),
+            'categoria': str(estoque.categoria.nome if estoque and estoque.categoria else '').strip(),
+            'especie': str(estoque.especie.nome if estoque and estoque.especie else '').strip(),
+            'tratamento': str(estoque.tratamento.nome if estoque and estoque.tratamento else '').strip(),
+            'embalagem': embalagem,
+            'empresa': str(estoque.empresa if estoque else '').strip(),
+            'cliente': cliente or 'CS',
+            'peso_unitario': str(peso_unit),
+            'peso_total': str(peso_total),
+            'observacao': str(getattr(estoque, 'observacao', '') or ''),
+            'observacao_movimentacao': str(mov.descricao or ''),
+            'conferente': _nome_usuario(mov.usuario),
+            'tipo': 'Expedição',
+            'processado_em': _formatar_data(mov.data_hora),
+            'data_ultima_movimentacao': _formatar_data(mov.data_hora),
+            'situacao': 'expedido',
+            'endereco_destino': '',
+        })
+
+    primeiro = movimentos[0]
+    ultimo = movimentos[-1]
+    titulo = nome or (f'CARGA {numero}' if numero else 'CARGA AVULSA')
+    unidade = 'BAGS/SC'
+    if len(embalagens) == 1:
+        unidade = next(iter(embalagens))
+
+    return JsonResponse({
+        'success': True,
+        'emitido_em': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M'),
+        'empenho_id': None,
+        'solicitacao': {
+            'id': f'AVULSA-{primeiro.id}',
+            'titulo': titulo,
+            'tipo_solicitacao': 'CARGA',
+            'tipo_solicitacao_display': 'Carga avulsa',
+            'criador': _nome_usuario(primeiro.usuario),
+            'data_criacao': _formatar_data(primeiro.data_hora),
+            'data_atualizacao': _formatar_data(ultimo.data_hora),
+            'data_finalizacao': _formatar_data(ultimo.data_hora),
+            'quantidade_solicitada': float(total),
+            'quantidade_empenhada': float(total),
+            'quantidade_movimentada': float(total),
+            'unidade_controle': 'EMBALAGEM',
+            'status': 'CONCLUIDO',
+            'status_display': 'Concluído',
+            'destino': '',
+            'motorista': ' / '.join(sorted(motoristas)),
+            'placa': ' / '.join(sorted(placas)),
+            'observacao': 'Carga avulsa',
+            'criterios': {
+                'armazem': '',
+                'produto': '',
+                'especie': '',
+                'cliente': ' / '.join(sorted(clientes)) or 'CS',
+            },
+        },
+        'itens_pendentes': [],
+        'itens_processados': itens,
+        'resumo_avulsa': {
+            'lotes': len(itens),
+            'quantidade': float(total),
+            'peso_total': str(peso_total_carga),
+            'unidade': unidade,
+        },
     })
 
 
@@ -16048,10 +16200,13 @@ def editar_movimento_carga(request, historico_id):
 
     try:
         with transaction.atomic():
+            # Trava apenas a linha do histórico. O FK estoque é anulável;
+            # combinar select_for_update() com select_related('estoque') gera
+            # LEFT OUTER JOIN e o PostgreSQL recusa FOR UPDATE no lado nulo.
+            # O estoque é travado separadamente logo abaixo.
             hist = (
                 HistoricoMovimentacao.objects
-                .select_for_update()
-                .select_related('estoque')
+                .select_for_update(of=('self',))
                 .get(pk=historico_id)
             )
             if 'EXPEDI' not in str(hist.tipo or '').upper():
@@ -16225,10 +16380,13 @@ def remover_movimento_carga(request, historico_id):
 
     try:
         with transaction.atomic():
+            # Trava apenas a linha do histórico. O FK estoque é anulável;
+            # combinar select_for_update() com select_related('estoque') gera
+            # LEFT OUTER JOIN e o PostgreSQL recusa FOR UPDATE no lado nulo.
+            # O estoque é travado separadamente logo abaixo.
             hist = (
                 HistoricoMovimentacao.objects
-                .select_for_update()
-                .select_related('estoque')
+                .select_for_update(of=('self',))
                 .get(pk=historico_id)
             )
 
