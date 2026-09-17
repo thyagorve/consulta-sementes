@@ -3484,7 +3484,8 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarFeed();
     initColumnVisibilityModal();
     applyColumnOrder();
-    setInterval(carregarCards, 30000);
+    // A atualização ao vivo usa a versão leve dos cards. Evita baixar toda a
+    // lista a cada 30s mesmo quando nada mudou.
     
     // Detectar scroll para carregar mais
     const wrap = document.getElementById('modalTableWrapper');
@@ -5974,7 +5975,10 @@ function resetColumnsModal() {
 }
 
 // ==================== CARDS ====================
+let _carregarCardsPromise = null;
 async function carregarCards() {
+    if (_carregarCardsPromise) return _carregarCardsPromise;
+    _carregarCardsPromise = (async () => {
     try {
         const r = await fetch(
             '/api/solicitacoes/listar/'
@@ -5996,6 +6000,12 @@ async function carregarCards() {
             'Erro ao carregar cards:',
             e
         );
+    }
+    })();
+    try {
+        return await _carregarCardsPromise;
+    } finally {
+        _carregarCardsPromise = null;
     }
 }
 
@@ -7860,8 +7870,8 @@ let _pollingInterval = null;
 
 function iniciarPolling() {
     if (_pollingInterval) clearInterval(_pollingInterval);
-    _pollingInterval = setInterval(verificarAtualizacoes, 5000); // 5 segundos
-    console.log('✅ Polling iniciado a cada 30s');
+    _pollingInterval = setInterval(verificarAtualizacoes, 12000);
+    console.log('✅ Atualização leve iniciada a cada 12s');
 }
 
 async function verificarAtualizacoes() {
@@ -7908,6 +7918,9 @@ function tocarSomNotificacao() {
 // Iniciar automaticamente após 5 segundos
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(iniciarPolling, 5000);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) verificarAtualizacoes();
+    });
 });
 </script>
 {% endblock %}

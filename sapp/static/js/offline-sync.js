@@ -7,7 +7,10 @@
 
   const DB_NAME = `infinity-stock-offline-u${userId}`;
   const DB_VERSION = 1;
-  const SYNC_INTERVAL = 30000;
+  const SYNC_INTERVAL = 45000;
+  const REFERENCE_REFRESH_MS = 10 * 60 * 1000;
+  const OFFLINE_CACHE_VERSION = '11.9';
+  let softOffline = false;
   const WARN_QUEUE = 50;
   const CRITICAL_QUEUE = 200;
   let dbPromise = null;
@@ -114,8 +117,16 @@
     const u = new URL(url, location.origin);
     if (u.origin !== location.origin) return false;
     const p = u.pathname;
-    if (p.startsWith('/api/sync/') || p === '/api/sync/' || p === '/api/offline/session/' || p === '/api/login/') return false;
-    return p === '/dashboard-data/' || p.startsWith('/api/');
+    // Salvar somente leituras realmente usadas no modo offline. Antes toda
+    // chamada GET de /api/ era clonada e persistida, inclusive polling curto,
+    // causando I/O desnecessário no celular e no PC.
+    return (
+      p === '/dashboard-data/'
+      || p === '/api/solicitacoes/listar/'
+      || p === '/api/kanban/dados/'
+      || p === '/api/estoque-resumo/'
+      || p === '/api/estoque/opcoes-filtro/'
+    );
   }
 
   const nativeFetch = window.fetch.bind(window);
@@ -147,23 +158,28 @@
 
     try {
       const response = await nativeFetch(input, init);
+      softOffline = false;
+      window.dispatchEvent(new CustomEvent('infinity:server-live', { detail: { key } }));
       if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('json') || contentType.includes('text')) {
-          const body = await response.clone().text();
-          snapshotPut({
-            key,
-            body,
-            content_type: contentType,
-            updated_at: Date.now(),
-          }).catch(() => null);
+          // Não segure a renderização esperando IndexedDB. Clona a resposta e
+          // grava o snapshot fora do caminho crítico da navegação.
+          const copy = response.clone();
+          setTimeout(async () => {
+            try {
+              const body = await copy.text();
+              await snapshotPut({ key, body, content_type: contentType, updated_at: Date.now() });
+            } catch (_) {}
+          }, 0);
         }
       }
       return response;
     } catch (error) {
       const cached = await snapshotGet(key).catch(() => null);
       if (cached?.body != null) {
-        window.dispatchEvent(new CustomEvent('infinity:offline-snapshot', { detail: { key, cached_at: cached.updated_at } }));
+        softOffline = true;
+        window.dispatchEvent(new CustomEvent('infinity:offline-snapshot', { detail: { key, cached_at: cached.updated_at, network_error: true } }));
         return new Response(cached.body, {
           status: 200,
           headers: {
@@ -281,7 +297,7 @@
     if (!navigator.onLine) return;
     try {
       const ultimo = Number(await metaGet('reference_refreshed_at') || 0);
-      if (!force && ultimo && (Date.now() - ultimo) < 45000) return;
+      if (!force && ultimo && (Date.now() - ultimo) < REFERENCE_REFRESH_MS) return;
       const r = await authFetch('/api/referencia/');
       if (!r.ok) return;
       const data = await r.json();
@@ -406,7 +422,7 @@
       });
       // Atualizar a referência completa pode ser mais pesado que confirmar a
       // operação. Fazemos isso depois, sem manter a bolinha presa no spinner.
-      setTimeout(() => refreshReference(true), 0);
+      setTimeout(() => refreshReference(false), 2500);
     } catch (err) {
       console.warn('[OfflineSync] sync adiado:', err);
     } finally {
@@ -426,13 +442,13 @@
     const expired = loggedOut || sessionExpired(session);
     bubble.classList.remove('sync-green','sync-yellow','sync-red','sync-black');
     if (expired) bubble.classList.add('sync-black');
-    else if (!navigator.onLine && actionable.length) bubble.classList.add('sync-red');
+    else if ((!navigator.onLine || softOffline) && actionable.length) bubble.classList.add('sync-red');
     else if (actionable.length) bubble.classList.add('sync-yellow');
-    else if (!navigator.onLine) bubble.classList.add('sync-red');
+    else if (!navigator.onLine || softOffline) bubble.classList.add('sync-red');
     else bubble.classList.add('sync-green');
     bubble.classList.toggle('is-syncing', syncing);
     document.getElementById('offlineSyncCount').textContent = actionable.length;
-    bubble.title = expired ? 'Sessão expirada. Conecte-se e faça login novamente.' : (!navigator.onLine ? `${actionable.length} pendência(s) offline` : `${actionable.length} item(ns) para tratar`);
+    bubble.title = expired ? 'Sessão expirada. Conecte-se e faça login novamente.' : ((!navigator.onLine || softOffline) ? `${actionable.length} pendência(s) offline` : `${actionable.length} item(ns) para tratar`);
 
     const sessionBlock = document.getElementById('offlineSessionBlock');
     // Sem internet, uma sessão de 5h expirada bloqueia novas ações. Online,
@@ -451,10 +467,23 @@
     const ref = await referenceGet();
     const stale = !ref?.validade_ate || Date.now() > new Date(ref.validade_ate).getTime();
     const banner = document.getElementById('offlineStaleBanner');
-    banner.style.display = stale ? 'block' : 'none';
-    if (all.filter(x => x.status === 'PENDENTE').length >= CRITICAL_QUEUE) banner.textContent = '🔴 fila muito grande: conecte este dispositivo assim que possível';
-    else if (all.filter(x => x.status === 'PENDENTE').length >= WARN_QUEUE) banner.textContent = '⚠️ muitas operações aguardando sincronização';
-    else if (stale) banner.textContent = '⚠️ saldo pode estar desatualizado';
+    const operationalPath = /^\/(estoque|solicitacoes|kanban)(\/|$)/i.test(location.pathname);
+    const pendingCount = all.filter(x => x.status === 'PENDENTE').length;
+    if (pendingCount >= CRITICAL_QUEUE) {
+      banner.textContent = '🔴 fila muito grande: conecte este dispositivo assim que possível';
+      banner.style.display = 'block';
+    } else if (pendingCount >= WARN_QUEUE) {
+      banner.textContent = '⚠️ muitas operações aguardando sincronização';
+      banner.style.display = 'block';
+    } else if (!navigator.onLine || softOffline) {
+      banner.textContent = '⚠️ DADOS LOCAIS: aguardando confirmação do servidor';
+      banner.style.display = 'block';
+    } else if (operationalPath && stale) {
+      banner.textContent = '⏳ preparando referência offline em segundo plano';
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
   }
 
   function fmtDate(v) {
@@ -558,52 +587,29 @@
       const readyReg = await navigator.serviceWorker.ready;
       const worker = navigator.serviceWorker.controller || readyReg.active || reg.active || reg.waiting;
 
-      const shellUrls = [
-        '/',
-        '/dashboard/',
-        '/estoque/',
-        '/estoque/gestao/',
-        '/solicitacoes/',
-        '/kanban/',
-        '/cargas/',
-        '/historico-geral/',
-        location.pathname,
-        `${location.pathname}${location.search || ''}`,
-        '/static/manifest.webmanifest',
-        '/static/img/logo.png',
-        'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
-        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
-        'https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css',
-        'https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css',
-        'https://code.jquery.com/jquery-3.7.1.min.js',
-        'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
-        'https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js',
-        'https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js',
-        'https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js',
-        'https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap5.min.js',
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
-        'https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0',
-      ];
-
-      // Usa o worker ativo mesmo na PRIMEIRA instalação. Antes usávamos só
-      // navigator.serviceWorker.controller, que pode ser null até o reload.
-      worker?.postMessage({ type: 'CACHE_URLS', urls: shellUrls });
+      // Offline progressivo: armazena a tela que o operador realmente abriu.
+      // Não faz mais download de dashboard, estoque, kanban, cargas e várias
+      // CDNs em toda navegação.
+      const currentUrl = `${location.pathname}${location.search || ''}`;
+      const pageCacheKey = `page_cached:${OFFLINE_CACHE_VERSION}:${location.pathname}`;
+      const jaSolicitado = await metaGet(pageCacheKey).catch(() => false);
+      if (!jaSolicitado && worker) {
+        worker.postMessage({ type: 'CACHE_URLS', urls: [currentUrl] });
+        await metaSet(pageCacheKey, Date.now()).catch(() => null);
+      }
       return reg;
     } catch (e) { console.warn('[PWA] Service Worker:', e); }
   }
 
-  async function warmOfflineSnapshots() {
+  function scheduleReferenceRefresh() {
     if (!navigator.onLine) return;
-    const urls = [
-      '/api/solicitacoes/listar/',
-      '/api/kanban/dados/',
-      '/dashboard-data/?periodo=15',
-      '/api/estoque-resumo/',
-    ];
-    for (const url of urls) {
-      try {
-        await fetchComSnapshot(url, { credentials: 'same-origin' });
-      } catch (_) {}
+    const path = location.pathname.toLowerCase();
+    if (!(path.startsWith('/estoque') || path.startsWith('/solicitacoes') || path.startsWith('/kanban'))) return;
+    const run = () => refreshReference(false);
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(run, { timeout: 5000 });
+    } else {
+      setTimeout(run, 2500);
     }
   }
 
@@ -661,12 +667,16 @@
   window.addEventListener('infinity:offline-snapshot', event => {
     const banner = document.getElementById('offlineStaleBanner');
     if (!banner) return;
-    banner.textContent = '⚠️ modo offline: exibindo o último dado sincronizado';
+    banner.textContent = '⚠️ DADOS LOCAIS: aguardando confirmação do servidor';
     banner.style.display = 'block';
-    clearTimeout(window.__infinityOfflineBannerTimer);
-    window.__infinityOfflineBannerTimer = setTimeout(() => {
-      if (navigator.onLine) banner.style.display = 'none';
-    }, 8000);
+    updateStatus();
+  });
+
+  window.addEventListener('infinity:server-live', () => {
+    const banner = document.getElementById('offlineStaleBanner');
+    if (banner) banner.style.display = 'none';
+    softOffline = false;
+    updateStatus();
   });
 
   document.addEventListener('DOMContentLoaded', async () => {
@@ -677,19 +687,17 @@
     await registerSW();
     if (navigator.onLine) {
       await ensureSession(false);
-      setTimeout(() => warmOfflineSnapshots(), 1400);
-      // Prioridade para a fila. A referência completa é atualizada depois sem
-      // competir com a primeira renderização da tela.
+      // Prioridade para a fila. Referência offline pesada só é atualizada em
+      // telas operacionais e quando o navegador estiver ocioso.
       syncNow();
-      setTimeout(() => refreshReference(false), 900);
+      scheduleReferenceRefresh();
     }
     updateStatus();
   });
   window.addEventListener('online', async () => {
     await ensureSession(true);
     syncNow();
-    setTimeout(() => warmOfflineSnapshots(), 900);
-    setTimeout(() => refreshReference(true), 350);
+    scheduleReferenceRefresh();
     updateStatus();
   });
   window.addEventListener('offline', updateStatus);

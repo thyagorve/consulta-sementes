@@ -3527,6 +3527,7 @@
     let expedicaoCargasPagina = 1;
     let expedicaoCargasPorPagina = 10;
     let dashboardRequestController = null;
+    let dashboardUltimaAtualizacaoServidor = 0;
     const dashboardChartState = {
         cultivar: {labels: [], values: [], colors: []},
         peneira: {labels: [], values: [], colors: []},
@@ -5127,6 +5128,9 @@
                 selecoes,
                 params
             );
+            if (!response.headers.get('X-Infinity-Offline-Snapshot')) {
+                dashboardUltimaAtualizacaoServidor = Date.now();
+            }
 
         } catch (error) {
             if (error?.name !== 'AbortError') {
@@ -5746,6 +5750,16 @@
             atualizarContadorFiltrosExpedicao();
             atualizarRotuloFiltroGrafico();
             executarBusca();
+
+            const atualizarAoRetomar = () => {
+                if (!navigator.onLine || document.hidden) return;
+                if (!dashboardUltimaAtualizacaoServidor || (Date.now() - dashboardUltimaAtualizacaoServidor) > 45000) {
+                    aplicarFiltros();
+                }
+            };
+            document.addEventListener('visibilitychange', atualizarAoRetomar);
+            window.addEventListener('focus', atualizarAoRetomar);
+            window.addEventListener('online', atualizarAoRetomar);
         }
     );
 </script>

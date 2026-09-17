@@ -10003,26 +10003,38 @@ def exportar_estoque_excel(request):
 
 @login_required
 def api_versao_cards(request):
-    """
-    Retorna um hash/versão dos cards para verificar se houve alteração.
-    Usado pelo polling de 30 segundos.
-    """
+    """Versão leve para atualizar Lista/Kanban somente quando algo mudou."""
     from django.core.cache import cache
+    from django.db.models import Count, Max
     from hashlib import md5
-    
+    from .models import CargaAjusteLog
+
     cache_key = 'cards_version_hash'
     version = cache.get(cache_key)
-    
+
     if not version:
-        # Gerar hash baseado nos cards ativos
-        cards_data = Solicitacao.objects.exclude(
-            status='CONCLUIDO'
-        ).values_list('id', 'data_atualizacao', 'status', 'quantidade_empenhada')
-        
-        hash_input = str(list(cards_data)).encode('utf-8')
+        # Evita materializar todos os cards em Python a cada consulta. Os
+        # agregados também incluem expedições avulsas/ajustes, para celular e
+        # PC convergirem para a mesma versão do Kanban.
+        cards_state = Solicitacao.objects.exclude(status='CONCLUIDO').aggregate(
+            total=Count('id'),
+            atualizado=Max('data_atualizacao'),
+        )
+        avulsas_state = HistoricoMovimentacao.objects.filter(
+            origem_carga='AVULSA',
+            tipo__icontains='Expedi',
+        ).aggregate(
+            total=Count('id'),
+            ultimo_id=Max('id'),
+        )
+        ajustes_state = CargaAjusteLog.objects.aggregate(
+            total=Count('id'),
+            ultimo=Max('criado_em'),
+        )
+        hash_input = repr((cards_state, avulsas_state, ajustes_state)).encode('utf-8')
         version = md5(hash_input).hexdigest()
-        cache.set(cache_key, version, 5)  # Cache por 30 segundos
-    
+        cache.set(cache_key, version, 10)
+
     return JsonResponse({
         'success': True,
         'version': version,

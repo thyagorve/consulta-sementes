@@ -934,39 +934,82 @@ let kanbanOcultarColunasVazias = true;
 let kanbanTipoFiltro = 'all';
 let kanbanModoFiltro = 'any';
 let kanbanTermosFiltro = [];
+let kanbanLoadPromise = null;
+let kanbanLiveVersion = null;
+let kanbanVersionTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     configurarFiltrosKanban();
     carregarKanban();
+    setTimeout(iniciarAtualizacaoLeveKanban, 5000);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) verificarVersaoKanban();
+    });
 });
 
-async function carregarKanban() {
+async function carregarKanban(silencioso = false) {
+    if (kanbanLoadPromise) return kanbanLoadPromise;
+    kanbanLoadPromise = (async () => {
+        try {
+            const resp = await fetch('/api/kanban/dados/', {
+                headers: {'Accept': 'application/json'},
+                cache: 'no-store',
+            });
+            if (!resp.ok) {
+                throw new Error(`API Kanban respondeu HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            if (!data?.success || !Array.isArray(data?.colunas)) {
+                throw new Error(data?.error || 'Resposta inválida da API do Kanban');
+            }
+            kanbanData = data;
+            aplicarFiltrosKanbanLocal();
+        } catch (e) {
+            console.error('Erro ao carregar Kanban:', e);
+            if (!silencioso || !kanbanData) {
+                const mensagem = escaparHtmlKanban(e?.message || 'Falha inesperada');
+                document.getElementById('kanbanBoard').innerHTML = `
+                    <div class="text-center py-5 w-100 text-danger">
+                        <i class="fas fa-exclamation-circle fa-3x mb-3"></i>
+                        <h5>Erro ao carregar Kanban</h5>
+                        <small class="d-block mt-2 text-muted">${mensagem}</small>
+                        <button type="button" class="btn btn-sm btn-outline-success mt-3" onclick="carregarKanban()">Tentar novamente</button>
+                    </div>
+                `;
+            }
+        }
+    })();
     try {
-        const resp = await fetch('/api/kanban/dados/', {
-            headers: {'Accept': 'application/json'},
-            cache: 'no-store',
-        });
-        if (!resp.ok) {
-            throw new Error(`API Kanban respondeu HTTP ${resp.status}`);
-        }
-        const data = await resp.json();
-        if (!data?.success || !Array.isArray(data?.colunas)) {
-            throw new Error(data?.error || 'Resposta inválida da API do Kanban');
-        }
-        kanbanData = data;
-        aplicarFiltrosKanbanLocal();
-    } catch (e) {
-        console.error('Erro ao carregar Kanban:', e);
-        const mensagem = escaparHtmlKanban(e?.message || 'Falha inesperada');
-        document.getElementById('kanbanBoard').innerHTML = `
-            <div class="text-center py-5 w-100 text-danger">
-                <i class="fas fa-exclamation-circle fa-3x mb-3"></i>
-                <h5>Erro ao carregar Kanban</h5>
-                <small class="d-block mt-2 text-muted">${mensagem}</small>
-                <button type="button" class="btn btn-sm btn-outline-success mt-3" onclick="carregarKanban()">Tentar novamente</button>
-            </div>
-        `;
+        return await kanbanLoadPromise;
+    } finally {
+        kanbanLoadPromise = null;
     }
+}
+
+function iniciarAtualizacaoLeveKanban() {
+    if (kanbanVersionTimer) clearInterval(kanbanVersionTimer);
+    verificarVersaoKanban();
+    kanbanVersionTimer = setInterval(() => {
+        if (!document.hidden && navigator.onLine) verificarVersaoKanban();
+    }, 15000);
+}
+
+async function verificarVersaoKanban() {
+    if (!navigator.onLine) return;
+    try {
+        const resp = await fetch('/api/cards/versao/', { cache: 'no-store' });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data?.success || !data.version) return;
+        if (kanbanLiveVersion === null) {
+            kanbanLiveVersion = data.version;
+            return;
+        }
+        if (kanbanLiveVersion !== data.version) {
+            kanbanLiveVersion = data.version;
+            await carregarKanban(true);
+        }
+    } catch (_) {}
 }
 
 function renderizarColunasLane(colunas, tipo) {
