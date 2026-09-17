@@ -4964,7 +4964,7 @@ def pagina_rascunho(request):
                                 restante += Decimal(str(item_restante.quantidade or 0)) * Decimal(str(item_restante.estoque.peso_unitario or 0))
                             solicitacao_vinculada.quantidade_empenhada = restante
                         else:
-                            restante = empenho.itens.aggregate(total=Sum('quantidade'))['total'] or 0
+                            restante = empenho.itens.aggregate(total=Sum(quantidade_equivalente_sc))['total'] or 0
                             solicitacao_vinculada.quantidade_empenhada = Decimal(str(restante))
 
                         solicitado = Decimal(str(solicitacao_vinculada.quantidade_solicitada or 0))
@@ -6832,13 +6832,19 @@ def _dashboard_aplicar_filtros_movimentacao(
 
 def _dashboard_q_entrada():
     """
-    Entradas comuns e Transferência (Entrada).
+    Todas as movimentações que aumentam um endereço de estoque.
+    Inclui Entrada e Transferência (Entrada).
     """
     return (
         Q(
             tipo__icontains='Entrada'
         )
     )
+
+
+def _dashboard_q_nova_entrada():
+    """Somente recebimentos/novas entradas, sem transferência interna."""
+    return Q(tipo__iexact='Entrada')
 
 
 def _dashboard_q_saida():
@@ -7325,6 +7331,18 @@ def dashboard_data(request):
             _dashboard_q_saida()
         )
 
+        # Todos os gráficos de fluxo usam a mesma unidade do quadro de cargas:
+        # 1 BAG = 25 SC; SC permanece 1. Assim BAG e SC não são somados como
+        # se fossem unidades equivalentes.
+        quantidade_equivalente_sc = Case(
+            When(
+                estoque__embalagem__iexact='BAG',
+                then=F('quantidade') * Value(25),
+            ),
+            default=F('quantidade'),
+            output_field=IntegerField(),
+        )
+
         entradas_periodo = (
             tendencia_qs
             .filter(
@@ -7332,7 +7350,7 @@ def dashboard_data(request):
             )
             .aggregate(
                 total=Sum(
-                    'quantidade'
+                    quantidade_equivalente_sc
                 )
             )['total']
             or 0
@@ -7345,9 +7363,41 @@ def dashboard_data(request):
             )
             .aggregate(
                 total=Sum(
-                    'quantidade'
+                    quantidade_equivalente_sc
                 )
             )['total']
+            or 0
+        )
+
+        # Fluxo externo real: recebimento cadastrado versus expedição.
+        # Transferências internas não entram nestes dois indicadores.
+        q_nova_entrada = _dashboard_q_nova_entrada()
+        q_expedicao = _dashboard_q_expedicao()
+        # Transferência interna: contamos somente o lado de saída para não
+        # duplicar o mesmo deslocamento (o histórico também grava a entrada).
+        q_transferencia_saida = (
+            Q(tipo__iexact='Transferência (Saída)')
+            | Q(tipo__iexact='Transferencia (Saida)')
+        )
+
+        transferencias_periodo = (
+            tendencia_qs
+            .filter(q_transferencia_saida)
+            .aggregate(total=Sum(quantidade_equivalente_sc))['total']
+            or 0
+        )
+
+        novas_entradas_periodo = (
+            tendencia_qs
+            .filter(q_nova_entrada)
+            .aggregate(total=Sum(quantidade_equivalente_sc))['total']
+            or 0
+        )
+
+        expedicoes_periodo = (
+            tendencia_qs
+            .filter(q_expedicao)
+            .aggregate(total=Sum(quantidade_equivalente_sc))['total']
             or 0
         )
 
@@ -7382,6 +7432,21 @@ def dashboard_data(request):
                     saidas_periodo
                 )
             ),
+            'novas_entradas_periodo': (
+                _dashboard_numero(
+                    novas_entradas_periodo
+                )
+            ),
+            'expedicoes_periodo': (
+                _dashboard_numero(
+                    expedicoes_periodo
+                )
+            ),
+            'transferencias_periodo': (
+                _dashboard_numero(
+                    transferencias_periodo
+                )
+            ),
             'eventos_periodo': (
                 tendencia_qs.count()
             ),
@@ -7389,6 +7454,17 @@ def dashboard_data(request):
                 periodo_dias
             ),
         }
+
+        # Todos os gráficos de distribuição do estoque também usam SC
+        # equivalente para não misturar BAG e SC na mesma soma.
+        saldo_equivalente_sc = Case(
+            When(
+                embalagem__iexact='BAG',
+                then=F('saldo') * Value(25),
+            ),
+            default=F('saldo'),
+            output_field=IntegerField(),
+        )
 
         # --------------------------------------------------------
         # GRÁFICO CULTIVAR
@@ -7403,7 +7479,7 @@ def dashboard_data(request):
             )
             .annotate(
                 volume=Sum(
-                    'saldo'
+                    saldo_equivalente_sc
                 )
             )
             .filter(
@@ -7427,7 +7503,7 @@ def dashboard_data(request):
             )
             .annotate(
                 volume=Sum(
-                    'saldo'
+                    saldo_equivalente_sc
                 )
             )
             .filter(
@@ -7454,7 +7530,7 @@ def dashboard_data(request):
             )
             .annotate(
                 volume=Sum(
-                    'saldo'
+                    saldo_equivalente_sc
                 )
             )
             .filter(
@@ -7512,17 +7588,25 @@ def dashboard_data(request):
             )
             .annotate(
                 entradas=Sum(
-                    'quantidade',
+                    quantidade_equivalente_sc,
                     filter=
                         q_entrada,
                 ),
                 saidas=Sum(
-                    'quantidade',
+                    quantidade_equivalente_sc,
                     filter=
                         q_saida,
                 ),
                 eventos=Count(
                     'id'
+                ),
+                transferencias=Sum(
+                    quantidade_equivalente_sc,
+                    filter=q_transferencia_saida,
+                ),
+                eventos_transferencia=Count(
+                    'id',
+                    filter=q_transferencia_saida,
                 ),
             )
             .order_by(
@@ -7552,15 +7636,47 @@ def dashboard_data(request):
                     ]
                     or 0
                 ),
+                'transferencias': (
+                    _dashboard_numero(
+                        item['transferencias']
+                    )
+                ),
+                'eventos_transferencia': int(
+                    item['eventos_transferencia']
+                    or 0
+                ),
             }
             for item
             in tendencia_agregada
+        }
+
+        fluxo_agregado = list(
+            tendencia_qs
+            .annotate(dia=TruncDate('data_hora'))
+            .values('dia')
+            .annotate(
+                novas_entradas=Sum(quantidade_equivalente_sc, filter=q_nova_entrada),
+                expedicoes=Sum(quantidade_equivalente_sc, filter=q_expedicao),
+            )
+            .order_by('dia')
+        )
+
+        fluxo_por_dia = {
+            item['dia']: {
+                'novas_entradas': _dashboard_numero(item['novas_entradas']),
+                'expedicoes': _dashboard_numero(item['expedicoes']),
+            }
+            for item in fluxo_agregado
         }
 
         labels_tendencia = []
         entradas_tendencia = []
         saidas_tendencia = []
         eventos_tendencia = []
+        transferencias_tendencia = []
+        eventos_transferencia_tendencia = []
+        novas_entradas_tendencia = []
+        expedicoes_tendencia = []
 
         for indice in range(
             periodo_dias
@@ -7579,6 +7695,8 @@ def dashboard_data(request):
                         'entradas': 0,
                         'saidas': 0,
                         'eventos': 0,
+                        'transferencias': 0,
+                        'eventos_transferencia': 0,
                     },
                 )
             )
@@ -7605,6 +7723,26 @@ def dashboard_data(request):
                 valores[
                     'eventos'
                 ]
+            )
+            transferencias_tendencia.append(
+                valores['transferencias']
+            )
+            eventos_transferencia_tendencia.append(
+                valores['eventos_transferencia']
+            )
+
+            fluxo_dia = fluxo_por_dia.get(
+                dia,
+                {
+                    'novas_entradas': 0,
+                    'expedicoes': 0,
+                },
+            )
+            novas_entradas_tendencia.append(
+                fluxo_dia['novas_entradas']
+            )
+            expedicoes_tendencia.append(
+                fluxo_dia['expedicoes']
             )
 
         graficos = {
@@ -7693,6 +7831,13 @@ def dashboard_data(request):
                 'eventos': (
                     eventos_tendencia
                 ),
+                'transferencias': transferencias_tendencia,
+                'eventos_transferencia': eventos_transferencia_tendencia,
+            },
+            'fluxo_operacional': {
+                'labels': labels_tendencia,
+                'novas_entradas': novas_entradas_tendencia,
+                'expedicoes': expedicoes_tendencia,
             },
         }
 
@@ -7982,6 +8127,9 @@ def dashboard_data(request):
             origem_carga = str(getattr(mov, 'origem_carga', '') or '').strip().upper()
             nome_avulsa = ' '.join(str(getattr(mov, 'nome_carga_avulsa', '') or '').strip().split())
             numero_carga_mov = str(getattr(mov, 'numero_carga', '') or '').strip()
+            placa_identidade = ' '.join(str(getattr(mov, 'placa', '') or '').strip().upper().split())
+            data_identidade = timezone.localtime(mov.data_hora).date() if mov.data_hora else None
+            data_identidade_txt = data_identidade.isoformat() if data_identidade else 'SEM-DATA'
 
             # Se não é uma avulsa explicitamente identificada, tenta recuperar
             # o card CARGA N que originou esta baixa. Isso corrige a exibição de
@@ -8009,24 +8157,26 @@ def dashboard_data(request):
                     origem_carga = 'GERADA'
                     numero_carga_mov = titulo_oficial
 
-            # Avulsa: o NOME é a identidade operacional. Várias baixas com o
-            # mesmo nome normalizado formam uma única carga, mesmo que o número
-            # humano se repita em uma carga GERADA.
+            # Identidade operacional da avulsa: nome > número > placa.
+            # Se ela foi lançada sem nome/número, todos os lotes da mesma placa
+            # no mesmo dia são tratados como uma única carga.
             if origem_carga == 'AVULSA' and nome_avulsa:
                 chave_nome = normalizar_texto_cadastro(nome_avulsa)
                 chave_carga = f'AVULSA:NOME:{chave_nome}'
                 nome_carga = nome_avulsa
+            elif origem_carga == 'AVULSA' and numero_carga_mov:
+                chave_numero, nome_numero = _dashboard_normalizar_carga(numero_carga_mov)
+                chave_carga = f'AVULSA:NUM:{chave_numero}' if chave_numero else ''
+                nome_carga = nome_numero or numero_carga_mov
+            elif origem_carga == 'AVULSA' and placa_identidade:
+                chave_carga = f'AVULSA:PLACA:{normalizar_texto_cadastro(placa_identidade)}:{data_identidade_txt}'
+                nome_carga = f'CARGA {placa_identidade}'
             else:
-                chave_carga, nome_carga = _dashboard_normalizar_carga(
-                    numero_carga_mov
-                )
-                if origem_carga == 'AVULSA' and chave_carga:
-                    chave_carga = f'AVULSA:NUM:{chave_carga}'
+                chave_carga, nome_carga = _dashboard_normalizar_carga(numero_carga_mov)
 
-            # Sem nome/número não é seguro unir duas avulsas distintas.
             if not chave_carga:
-                chave_carga = f'AVULSA:{mov.id}'
-                nome_carga = nome_avulsa or 'AVULSA'
+                chave_carga = f'AVULSA:REGISTRO:{mov.id}' if origem_carga == 'AVULSA' else f'REGISTRO:{mov.id}'
+                nome_carga = nome_avulsa or (f'CARGA {placa_identidade}' if placa_identidade else 'AVULSA')
 
             quantidade_mov = Decimal(
                 str(getattr(mov, 'quantidade', 0) or 0)
@@ -8077,9 +8227,7 @@ def dashboard_data(request):
                 or '--'
             )
 
-            placa_mov = ' '.join(
-                str(mov.placa or '').strip().upper().split()
-            )
+            placa_mov = placa_identidade
             motorista_mov = ' '.join(
                 str(mov.motorista or '').strip().split()
             )
@@ -15381,14 +15529,35 @@ def api_kanban_dados(request):
         for mov in movimentos_avulsos:
             nome = ' '.join(str(mov.nome_carga_avulsa or '').strip().split())
             numero = ' '.join(str(mov.numero_carga or '').strip().split())
-            chave_base = normalizar_texto_cadastro(nome) if nome else normalizar_texto_cadastro(numero)
-            if not chave_base:
-                chave_base = f'REGISTRO-{mov.id}'
-            chave = f'AVULSA:{chave_base}'
+            placa_identidade = ' '.join(str(mov.placa or '').strip().upper().split())
+            data_identidade = timezone.localtime(mov.data_hora).date() if mov.data_hora else None
+            data_identidade_txt = data_identidade.isoformat() if data_identidade else ''
+            if nome:
+                chave = f'AVULSA:NOME:{normalizar_texto_cadastro(nome)}'
+                titulo_avulsa = nome
+                impressao_placa = ''
+                impressao_data = ''
+            elif numero:
+                chave = f'AVULSA:NUM:{normalizar_texto_cadastro(numero)}'
+                titulo_avulsa = f'CARGA {numero}' if not numero.upper().startswith('CARGA ') else numero
+                impressao_placa = ''
+                impressao_data = ''
+            elif placa_identidade:
+                chave = f'AVULSA:PLACA:{normalizar_texto_cadastro(placa_identidade)}:{data_identidade_txt or "SEM-DATA"}'
+                titulo_avulsa = f'CARGA {placa_identidade}'
+                impressao_placa = placa_identidade
+                impressao_data = data_identidade_txt
+            else:
+                chave = f'AVULSA:REGISTRO:{mov.id}'
+                titulo_avulsa = 'CARGA AVULSA SEM IDENTIFICAÇÃO'
+                impressao_placa = ''
+                impressao_data = ''
             grupo = grupos_avulsos.setdefault(chave, {
-                'nome': nome or (f'CARGA {numero}' if numero else 'CARGA AVULSA'),
+                'nome': titulo_avulsa,
                 'nome_filtro': nome,
                 'numero': numero,
+                'impressao_placa': impressao_placa,
+                'impressao_data': impressao_data,
                 'data': mov.data_hora,
                 'cliente': set(),
                 'placa': set(),
@@ -15417,6 +15586,8 @@ def api_kanban_dados(request):
                 'origem_carga': 'AVULSA',
                 'impressao_nome': grupo.get('nome_filtro', ''),
                 'impressao_numero': grupo['numero'],
+                'impressao_placa': grupo.get('impressao_placa', ''),
+                'impressao_data': grupo.get('impressao_data', ''),
                 'itens_carga': [],
                 'observacao': '',
                 'destino': '',
@@ -15486,8 +15657,10 @@ def api_impressao_carga_avulsa(request):
     """Retorna uma carga avulsa no mesmo contrato JSON usado pela impressão das cargas geradas."""
     nome = ' '.join(str(request.GET.get('nome') or '').strip().split())
     numero = ' '.join(str(request.GET.get('numero') or '').strip().split())
+    placa = ' '.join(str(request.GET.get('placa') or '').strip().upper().split())
+    data_carga = ' '.join(str(request.GET.get('data') or '').strip().split())
 
-    if not nome and not numero:
+    if not nome and not numero and not placa:
         return JsonResponse({'success': False, 'error': 'Carga avulsa não informada.'}, status=400)
 
     qs = (
@@ -15502,8 +15675,17 @@ def api_impressao_carga_avulsa(request):
     )
     if nome:
         qs = qs.filter(nome_carga_avulsa__iexact=nome)
-    else:
+    elif numero:
         qs = qs.filter(numero_carga__iexact=numero)
+    else:
+        # Carga avulsa lançada sem nome/número: a placa identifica a carga.
+        # A data evita juntar a mesma placa usada novamente em outro dia.
+        qs = qs.filter(
+            placa__iexact=placa,
+            nome_carga_avulsa='',
+        ).filter(Q(numero_carga__isnull=True) | Q(numero_carga=''))
+        if data_carga:
+            qs = qs.filter(data_hora__date=data_carga)
 
     movimentos = list(qs[:1000])
     if not movimentos:
@@ -15577,7 +15759,7 @@ def api_impressao_carga_avulsa(request):
 
     primeiro = movimentos[0]
     ultimo = movimentos[-1]
-    titulo = nome or (f'CARGA {numero}' if numero else 'CARGA AVULSA')
+    titulo = nome or (f'CARGA {numero}' if numero else (f'CARGA {placa}' if placa else 'CARGA AVULSA'))
     unidade = 'BAGS/SC'
     if len(embalagens) == 1:
         unidade = next(iter(embalagens))
@@ -16111,16 +16293,39 @@ def gestao_cargas(request):
         origem_mov = str(mov.origem_carga or '').strip().upper() or 'LEGADO'
         nome_avulsa = ' '.join(str(mov.nome_carga_avulsa or '').strip().split())
         numero = ' '.join(str(mov.numero_carga or '').strip().split())
+        placa_mov = ' '.join(str(mov.placa or '').strip().upper().split())
+        data_mov = timezone.localtime(mov.data_hora).date() if mov.data_hora else None
+        data_chave = data_mov.isoformat() if data_mov else 'SEM-DATA'
+
         if origem_mov == 'AVULSA':
-            chave_base = normalizar_texto_cadastro(nome_avulsa) if nome_avulsa else normalizar_texto_cadastro(numero)
-            chave = f'AVULSA:{chave_base or mov.id}'
-            titulo = nome_avulsa or (f'CARGA {numero}' if numero else 'CARGA AVULSA')
+            # Identidade da carga avulsa: nome > número > placa. Quando a
+            # operação foi lançada sem nome/número, todos os lotes da mesma
+            # placa no mesmo dia formam UMA carga. Isso recupera lançamentos
+            # antigos sem misturar a mesma placa usada em dias diferentes.
+            if nome_avulsa:
+                chave = f'AVULSA:NOME:{normalizar_texto_cadastro(nome_avulsa)}'
+                titulo = nome_avulsa
+                agrupada_por = 'NOME'
+            elif numero:
+                chave = f'AVULSA:NUM:{normalizar_texto_cadastro(numero)}'
+                titulo = f'CARGA {numero}' if not numero.upper().startswith('CARGA ') else numero
+                agrupada_por = 'NUMERO'
+            elif placa_mov:
+                chave = f'AVULSA:PLACA:{normalizar_texto_cadastro(placa_mov)}:{data_chave}'
+                titulo = f'CARGA {placa_mov}'
+                agrupada_por = 'PLACA'
+            else:
+                chave = f'AVULSA:REGISTRO:{mov.id}'
+                titulo = 'CARGA AVULSA SEM IDENTIFICAÇÃO'
+                agrupada_por = 'REGISTRO'
         elif origem_mov == 'GERADA':
             chave = f'GERADA:{normalizar_texto_cadastro(numero) or mov.id}'
             titulo = f'CARGA {numero}' if numero and not numero.upper().startswith('CARGA ') else (numero or 'CARGA GERADA')
+            agrupada_por = 'NUMERO'
         else:
             chave = f'LEGADO:{normalizar_texto_cadastro(numero) or mov.id}'
             titulo = f'CARGA {numero}' if numero and not numero.upper().startswith('CARGA ') else (numero or 'EXPEDIÇÃO LEGADA')
+            agrupada_por = 'NUMERO' if numero else 'REGISTRO'
 
         grupo = grupos.setdefault(chave, {
             'chave': chave,
@@ -16128,6 +16333,7 @@ def gestao_cargas(request):
             'origem': origem_mov,
             'numero': numero,
             'nome_avulsa': nome_avulsa,
+            'agrupada_por': agrupada_por,
             'data': mov.data_hora,
             'quantidade': Decimal('0'),
             'clientes': set(),
@@ -16151,6 +16357,11 @@ def gestao_cargas(request):
         grupo['motoristas_txt'] = ' / '.join(sorted(grupo['motoristas'])) or '--'
         grupo['lotes_txt'] = ', '.join(sorted(grupo['lotes'])) or '--'
         grupo['data_txt'] = timezone.localtime(grupo['data']).strftime('%d/%m/%Y') if grupo['data'] else '--'
+        grupo['data_iso'] = timezone.localtime(grupo['data']).strftime('%Y-%m-%d') if grupo['data'] else ''
+        grupo['movimentos_ids'] = ','.join(str(m.id) for m in grupo['movimentos'])
+        grupo['cliente_edicao'] = next(iter(grupo['clientes'])) if len(grupo['clientes']) == 1 else ''
+        grupo['placa_edicao'] = next(iter(grupo['placas'])) if len(grupo['placas']) == 1 else ''
+        grupo['motorista_edicao'] = next(iter(grupo['motoristas'])) if len(grupo['motoristas']) == 1 else ''
         grupos_lista.append(grupo)
 
     estoque_opcoes = list(
@@ -16183,6 +16394,130 @@ def gestao_cargas(request):
             'q': busca,
         },
     })
+
+
+@login_required
+@require_POST
+def editar_grupo_carga(request):
+    """Atualiza os dados operacionais de uma carga inteira sem refazer os lotes.
+
+    É especialmente útil para cargas avulsas lançadas sem nome: quando foram
+    agrupadas pela placa, o operador pode nomear a carga depois e normalizar
+    placa, motorista, cliente e data em todos os movimentos de uma vez.
+    """
+    from datetime import datetime as dt
+    from .models import CargaAjusteLog
+
+    motivo = (request.POST.get('motivo_grupo') or '').strip()
+    ids_txt = (request.POST.get('movimentos_ids') or '').strip()
+    try:
+        ids = sorted({int(item) for item in ids_txt.split(',') if str(item).strip().isdigit()})
+    except Exception:
+        ids = []
+
+    if not ids:
+        messages.error(request, '❌ Nenhum movimento foi informado para esta carga.')
+        return redirect('sapp:gestao_cargas')
+    if not motivo:
+        messages.error(request, 'Informe o motivo da correção da carga.')
+        return redirect('sapp:gestao_cargas')
+
+    nome_avulsa = ' '.join((request.POST.get('nome_carga_avulsa_grupo') or '').strip().split())
+    numero_carga = ' '.join((request.POST.get('numero_carga_grupo') or '').strip().split())
+    placa = ' '.join((request.POST.get('placa_grupo') or '').strip().upper().split())
+    motorista = ' '.join((request.POST.get('motorista_grupo') or '').strip().split())
+    cliente = ' '.join((request.POST.get('cliente_grupo') or '').strip().split())
+    data_txt = (request.POST.get('data_carga_grupo') or '').strip()
+
+    try:
+        with transaction.atomic():
+            movimentos = list(
+                HistoricoMovimentacao.objects
+                .select_for_update(of=('self',))
+                .filter(pk__in=ids, tipo__icontains='Expedi')
+                .order_by('id')
+            )
+            if len(movimentos) != len(ids):
+                raise ValueError('Um ou mais movimentos da carga não foram encontrados.')
+
+            origens = {str(m.origem_carga or '').strip().upper() or 'LEGADO' for m in movimentos}
+            if len(origens) > 1:
+                raise ValueError('A seleção contém movimentos de origens diferentes.')
+            origem = next(iter(origens))
+
+            nova_data = None
+            if data_txt:
+                nova_data = dt.strptime(data_txt, '%Y-%m-%d').date()
+
+            for hist in movimentos:
+                antes = {
+                    'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                    'numero_carga': hist.numero_carga or '',
+                    'nome_carga_avulsa': hist.nome_carga_avulsa or '',
+                    'origem_carga': hist.origem_carga or '',
+                    'cliente': hist.cliente or '',
+                    'placa': hist.placa or '',
+                    'motorista': hist.motorista or '',
+                    'lote': hist.lote_ref or '',
+                    'quantidade': int(hist.quantidade or 0),
+                }
+
+                # O número de uma carga GERADA identifica o card original e não
+                # deve ser trocado em lote por esta tela. Para AVULSA/LEGADO, o
+                # número pode ser corrigido normalmente.
+                if origem != 'GERADA' and numero_carga:
+                    hist.numero_carga = numero_carga
+                if origem == 'AVULSA' and nome_avulsa:
+                    hist.nome_carga_avulsa = nome_avulsa
+                # Campos vazios no editor em lote significam “manter como está”.
+                # Assim uma carga que por acaso tenha valores diferentes não perde
+                # dados quando o operador estiver corrigindo somente o nome/data.
+                if placa:
+                    hist.placa = placa
+                if motorista:
+                    hist.motorista = motorista
+                if cliente:
+                    hist.cliente = cliente
+                hist.save(update_fields=[
+                    'numero_carga', 'nome_carga_avulsa', 'placa', 'motorista', 'cliente'
+                ])
+
+                if nova_data and hist.data_hora:
+                    hora_local = timezone.localtime(hist.data_hora).timetz().replace(tzinfo=None)
+                    nova_local = timezone.make_aware(
+                        dt.combine(nova_data, hora_local),
+                        timezone.get_current_timezone(),
+                    )
+                    HistoricoMovimentacao.objects.filter(pk=hist.pk).update(data_hora=nova_local)
+                    hist.data_hora = nova_local
+
+                depois = {
+                    'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                    'numero_carga': hist.numero_carga or '',
+                    'nome_carga_avulsa': hist.nome_carga_avulsa or '',
+                    'origem_carga': hist.origem_carga or '',
+                    'cliente': hist.cliente or '',
+                    'placa': hist.placa or '',
+                    'motorista': hist.motorista or '',
+                    'lote': hist.lote_ref or '',
+                    'quantidade': int(hist.quantidade or 0),
+                }
+                CargaAjusteLog.objects.create(
+                    historico=hist,
+                    usuario=request.user,
+                    antes=antes,
+                    depois=depois,
+                    motivo=f'[AJUSTE DA CARGA] {motivo}',
+                )
+
+            messages.success(
+                request,
+                f'✅ Dados da carga atualizados em {len(movimentos)} movimento(s).'
+            )
+    except Exception as exc:
+        messages.error(request, f'❌ Não foi possível atualizar a carga: {exc}')
+
+    return redirect('sapp:gestao_cargas')
 
 
 @login_required

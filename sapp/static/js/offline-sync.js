@@ -88,6 +88,99 @@
     return (await requestValue(t.objectStore('reference').get('snapshot')))?.value || null;
   }
 
+  async function snapshotGet(key) {
+    const db = await openDB();
+    const t = db.transaction('reference', 'readonly');
+    return (await requestValue(t.objectStore('reference').get(`http:${key}`)))?.value || null;
+  }
+
+  async function snapshotPut(item) {
+    const db = await openDB();
+    const t = db.transaction('reference', 'readwrite');
+    t.objectStore('reference').put({ key: `http:${item.key}`, value: item });
+    return new Promise((resolve, reject) => {
+      t.oncomplete = resolve;
+      t.onerror = () => reject(t.error);
+    });
+  }
+
+  function snapshotKey(url) {
+    const u = new URL(url, location.origin);
+    return `${u.pathname}${u.search}`;
+  }
+
+  function podeSalvarSnapshot(url, method = 'GET') {
+    if (String(method || 'GET').toUpperCase() !== 'GET') return false;
+    const u = new URL(url, location.origin);
+    if (u.origin !== location.origin) return false;
+    const p = u.pathname;
+    if (p.startsWith('/api/sync/') || p === '/api/sync/' || p === '/api/offline/session/' || p === '/api/login/') return false;
+    return p === '/dashboard-data/' || p.startsWith('/api/');
+  }
+
+  const nativeFetch = window.fetch.bind(window);
+
+  async function fetchComSnapshot(input, init = {}) {
+    const request = input instanceof Request ? input : null;
+    const method = String(init.method || request?.method || 'GET').toUpperCase();
+    const rawUrl = request?.url || String(input || '');
+
+    if (!podeSalvarSnapshot(rawUrl, method)) {
+      return nativeFetch(input, init);
+    }
+
+    const key = snapshotKey(rawUrl);
+
+    if (!navigator.onLine) {
+      const cached = await snapshotGet(key).catch(() => null);
+      if (cached?.body != null) {
+        window.dispatchEvent(new CustomEvent('infinity:offline-snapshot', { detail: { key, cached_at: cached.updated_at } }));
+        return new Response(cached.body, {
+          status: 200,
+          headers: {
+            'Content-Type': cached.content_type || 'application/json; charset=utf-8',
+            'X-Infinity-Offline-Snapshot': '1',
+          },
+        });
+      }
+    }
+
+    try {
+      const response = await nativeFetch(input, init);
+      if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('json') || contentType.includes('text')) {
+          const body = await response.clone().text();
+          snapshotPut({
+            key,
+            body,
+            content_type: contentType,
+            updated_at: Date.now(),
+          }).catch(() => null);
+        }
+      }
+      return response;
+    } catch (error) {
+      const cached = await snapshotGet(key).catch(() => null);
+      if (cached?.body != null) {
+        window.dispatchEvent(new CustomEvent('infinity:offline-snapshot', { detail: { key, cached_at: cached.updated_at } }));
+        return new Response(cached.body, {
+          status: 200,
+          headers: {
+            'Content-Type': cached.content_type || 'application/json; charset=utf-8',
+            'X-Infinity-Offline-Snapshot': '1',
+          },
+        });
+      }
+      throw error;
+    }
+  }
+
+  // Todas as leituras comuns continuam usando fetch normal quando online.
+  // Quando a conexão cai, somente GETs previamente sincronizados usam o
+  // snapshot IndexedDB deste usuário. POST/PUT/DELETE nunca passam por aqui.
+  window.fetch = fetchComSnapshot;
+
   async function getDeviceId() {
     let id = await metaGet('device_id');
     if (!id) {
@@ -462,10 +555,56 @@
     if (!('serviceWorker' in navigator) || location.protocol !== 'https:' && location.hostname !== 'localhost') return;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      await navigator.serviceWorker.ready;
-      navigator.serviceWorker.controller?.postMessage({ type:'CACHE_URLS', urls:['/', location.href] });
+      const readyReg = await navigator.serviceWorker.ready;
+      const worker = navigator.serviceWorker.controller || readyReg.active || reg.active || reg.waiting;
+
+      const shellUrls = [
+        '/',
+        '/dashboard/',
+        '/estoque/',
+        '/estoque/gestao/',
+        '/solicitacoes/',
+        '/kanban/',
+        '/cargas/',
+        '/historico-geral/',
+        location.pathname,
+        `${location.pathname}${location.search || ''}`,
+        '/static/manifest.webmanifest',
+        '/static/img/logo.png',
+        'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
+        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+        'https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css',
+        'https://cdn.datatables.net/responsive/2.4.1/css/responsive.bootstrap5.min.css',
+        'https://code.jquery.com/jquery-3.7.1.min.js',
+        'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
+        'https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js',
+        'https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js',
+        'https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js',
+        'https://cdn.datatables.net/responsive/2.4.1/js/responsive.bootstrap5.min.js',
+        'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+        'https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0',
+      ];
+
+      // Usa o worker ativo mesmo na PRIMEIRA instalação. Antes usávamos só
+      // navigator.serviceWorker.controller, que pode ser null até o reload.
+      worker?.postMessage({ type: 'CACHE_URLS', urls: shellUrls });
       return reg;
     } catch (e) { console.warn('[PWA] Service Worker:', e); }
+  }
+
+  async function warmOfflineSnapshots() {
+    if (!navigator.onLine) return;
+    const urls = [
+      '/api/solicitacoes/listar/',
+      '/api/kanban/dados/',
+      '/dashboard-data/?periodo=15',
+      '/api/estoque-resumo/',
+    ];
+    for (const url of urls) {
+      try {
+        await fetchComSnapshot(url, { credentials: 'same-origin' });
+      } catch (_) {}
+    }
   }
 
   function protectLogout() {
@@ -519,6 +658,17 @@
     status: updateStatus,
   };
 
+  window.addEventListener('infinity:offline-snapshot', event => {
+    const banner = document.getElementById('offlineStaleBanner');
+    if (!banner) return;
+    banner.textContent = '⚠️ modo offline: exibindo o último dado sincronizado';
+    banner.style.display = 'block';
+    clearTimeout(window.__infinityOfflineBannerTimer);
+    window.__infinityOfflineBannerTimer = setTimeout(() => {
+      if (navigator.onLine) banner.style.display = 'none';
+    }, 8000);
+  });
+
   document.addEventListener('DOMContentLoaded', async () => {
     injectUI();
     protectLogout();
@@ -527,6 +677,7 @@
     await registerSW();
     if (navigator.onLine) {
       await ensureSession(false);
+      setTimeout(() => warmOfflineSnapshots(), 1400);
       // Prioridade para a fila. A referência completa é atualizada depois sem
       // competir com a primeira renderização da tela.
       syncNow();
@@ -537,6 +688,7 @@
   window.addEventListener('online', async () => {
     await ensureSession(true);
     syncNow();
+    setTimeout(() => warmOfflineSnapshots(), 900);
     setTimeout(() => refreshReference(true), 350);
     updateStatus();
   });

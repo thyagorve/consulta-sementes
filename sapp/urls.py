@@ -29,6 +29,7 @@ urlpatterns = [
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard-data/', views.dashboard_data, name='dashboard_data'),   
     path('cargas/', views.gestao_cargas, name='gestao_cargas'),
+    path('cargas/grupo/editar/', views.editar_grupo_carga, name='editar_grupo_carga'),
     path('cargas/movimento/<int:historico_id>/editar/', views.editar_movimento_carga, name='editar_movimento_carga'),
     path('cargas/movimento/<int:historico_id>/remover/', views.remover_movimento_carga, name='remover_movimento_carga'),
     

@@ -1,0 +1,73 @@
+INFINITY STOCK - V11.4
+======================
+
+FOCO DESTA REVISAO
+------------------
+1. Offline real mais robusto
+2. Dashboard profissional/responsivo
+3. Modelos alternativos de graficos
+4. Separacao entre movimentacao de estoque e fluxo operacional real
+
+OFFLINE
+-------
+- Service Worker shell-5.
+- Corrigido o primeiro carregamento: o worker ativo recebe a lista para cache
+  mesmo quando navigator.serviceWorker.controller ainda esta null.
+- Pre-cache das telas operacionais principais apos login online.
+- Snapshot IndexedDB por usuario para GETs de leitura (/api/* e dashboard-data).
+- Quando a rede cai, leituras ja sincronizadas podem ser respondidas pelo
+  snapshot local, sem afetar POST/PUT/DELETE.
+- Warm-up online de solicitacoes, kanban, dashboard e resumo do estoque.
+- Banner informa quando dado local/sincronizado esta sendo exibido.
+- Pagina fallback amigavel se uma rota nunca tiver sido armazenada.
+
+IMPORTANTE: o primeiro uso neste dispositivo ainda precisa ser online para
+login, registro do PWA e obtencao dos dados. Fotos/anexos continuam exigindo
+internet.
+
+DASHBOARD
+---------
+- Marca d'agua INFINITY STOCK nos cards de graficos.
+- Modelo de grafico selecionavel e persistido no navegador:
+  * Cultivares: rosca / pizza / polar
+  * Peneiras: pizza / rosca / polar
+  * Armazens: barras horizontais / barras / linha
+  * Movimentacoes: linha / barras
+  * Fluxo operacional: linha / barras
+  * Cargas: barras / linha
+- Layout responsivo, com grafico operacional em largura total no desktop.
+- Novas mini-metricas do fluxo operacional.
+
+CONCEITO CORRIGIDO
+------------------
+O antigo "Entradas x Saidas" misturava movimentacoes internas:
+- Entrada
+- Transferencia (Entrada)
+- Saida
+- Transferencia (Saida)
+- Expedicao
+
+Agora ele se chama "Movimentacoes de estoque".
+
+Foi criado um grafico separado:
+"Novas entradas x Expedicoes"
+- Nova entrada: somente HistoricoMovimentacao.tipo = Entrada
+- Expedicao: tipos de Expedicao/Expedicao via Sistema
+- Transferencias internas nao entram nesse comparativo.
+
+Os fluxos sao exibidos em SC equivalente:
+1 BAG = 25 SC.
+
+BANCO
+-----
+Nenhuma migration nova nesta revisao.
+
+DEPLOY
+------
+1. Fazer backup.
+2. Subir o codigo.
+3. Rodar collectstatic no fluxo normal do projeto/Easypanel.
+4. Reiniciar/rebuild da aplicacao.
+5. Abrir online uma vez e usar Ctrl+F5 para garantir a troca do Service Worker.
+6. Testar: abrir solicitacoes/kanban, desligar a internet, atualizar a pagina e
+   confirmar que a tela e os dados sincronizados continuam disponiveis.

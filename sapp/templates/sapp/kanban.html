@@ -600,10 +600,25 @@
 .kanban-lane .kanban-scrollbar-top { margin:0 12px 7px; width:calc(100% - 24px); }
 @media(max-width:768px){ .kanban-lane-header{padding:12px 44px;font-size:.82rem}.kanban-lane .kanban-wrapper{min-height:330px;padding-left:8px}.kanban-lane .kanban-scrollbar-top{display:none}.kanban-lane-header .lane-count{right:10px}.kanban-lane-header .lane-chevron{left:10px} }
 
+/* V11.5 - uma única pesquisa + filtros avançados recolhidos */
+.kanban-search-box input { padding-right: 78px; }
+.kanban-search-status {
+    position:absolute; right:10px; top:10px; z-index:2;
+    min-width:50px; height:26px; display:inline-flex; align-items:center; justify-content:center;
+    padding:0 8px; border-radius:999px; color:#1f6a38; background:#eaf7ee;
+    border:1px solid #cfe7d6; font-size:.56rem; font-weight:950; pointer-events:none;
+}
+.kanban-filter-toggle.active {
+    color:#17683a !important; background:#eaf7ee !important; border-color:#bfe1c9 !important;
+}
+.kanban-filterbar { display:none !important; }
+.kanban-filterbar.show { display:grid !important; animation:kbFilterIn .16s ease; }
+@keyframes kbFilterIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
 /* V11.3 - filtros múltiplos e modos de visualização */
 .kanban-filterbar {
     display:grid;
-    grid-template-columns:minmax(280px,1.8fr) 155px 170px 170px auto auto;
+    grid-template-columns:155px 180px 180px auto auto;
     gap:8px;
     align-items:end;
     margin:-4px 0 12px;
@@ -686,13 +701,12 @@
 .kanban-page-shell.view-essential .card-actions { padding-top:5px; margin-top:4px; }
 .kanban-page-shell.view-essential .card-status-badge { margin-bottom:2px; }
 @media(max-width:1200px){
-    .kanban-filterbar{grid-template-columns:minmax(240px,1fr) repeat(2,minmax(140px,.55fr));}
+    .kanban-filterbar.show{grid-template-columns:repeat(3,minmax(140px,1fr)) auto auto;}
     .kanban-empty-toggle,.kanban-filter-clear{align-self:stretch;}
 }
 @media(max-width:768px){
-    .kanban-filterbar{grid-template-columns:1fr 1fr;margin:0 3px 10px;padding:9px;}
-    .kanban-filter-field:first-child{grid-column:1 / -1;}
-    .kanban-filter-help{grid-column:1 / -1;}
+    .kanban-filterbar.show{grid-template-columns:1fr 1fr;margin:0 3px 10px;padding:9px;}
+        .kanban-filter-help{grid-column:1 / -1;}
     .kanban-empty-toggle{white-space:normal;}
 }
 
@@ -707,10 +721,13 @@
         </div>
         <div class="kanban-search-box">
             <i class="fas fa-search"></i>
-            <input id="kanbanSearchInput" type="search" placeholder="Pesquisar lote, título, destino..." autocomplete="off">
-            <div id="kanbanSearchResults" class="kanban-search-results"></div>
+            <input id="kanbanSearchInput" type="search" placeholder="Pesquisar lote, carga, cliente, placa, destino..." autocomplete="off" title="Aceita coringa * e filtros como lote:PSM*; cliente:PROG*">
+            <span id="kanbanSearchStatus" class="kanban-search-status">Todos</span>
         </div>
         <div class="kanban-header-actions">
+            <button id="kanbanAdvancedToggle" type="button" class="btn btn-light btn-sm kanban-filter-toggle" onclick="toggleKanbanFilters()">
+                <i class="fas fa-sliders me-1"></i> Filtros
+            </button>
             <a href="{% url 'sapp:pagina_solicitacoes' %}" class="btn btn-light btn-sm">
                 <i class="fas fa-list me-1"></i> Lista
             </a>
@@ -725,11 +742,7 @@
 
     <div class="kanban-filterbar" id="kanbanFilterBar">
         <div class="kanban-filter-field">
-            <label for="kanbanMultiFilter">Filtrar vários campos</label>
-            <input id="kanbanMultiFilter" class="form-control" type="search" placeholder="Ex.: lote:PSM*; cliente:PROG*; carga:66*" autocomplete="off">
-        </div>
-        <div class="kanban-filter-field">
-            <label for="kanbanMatchMode">Combinação</label>
+            <label for="kanbanMatchMode">Quando usar vários termos</label>
             <select id="kanbanMatchMode" class="form-select">
                 <option value="any">Qualquer filtro</option>
                 <option value="all">Todos os filtros</option>
@@ -761,7 +774,7 @@
             <i class="fas fa-eraser me-1"></i>Limpar
         </button>
         <div class="kanban-filter-help">
-            Use <code>*</code> como coringa. Campos: <code>lote:</code>, <code>cliente:</code>, <code>carga:</code>, <code>placa:</code>, <code>motorista:</code>, <code>status:</code>, <code>tag:</code>. Separe filtros com <code>;</code> ou vírgula.
+            A barra de pesquisa acima é a única busca do Kanban. Ela aceita texto normal ou filtros como <code>lote:PSM*</code>, <code>cliente:PROG*</code>, <code>carga:66*</code>, <code>placa:</code>, <code>motorista:</code>, <code>status:</code> e <code>tag:</code>. Separe vários termos com <code>;</code>.
             <span id="kanbanFilterSummary" class="kanban-filter-summary"><i class="fas fa-layer-group"></i> Todos os cards</span>
         </div>
     </div>
@@ -904,6 +917,15 @@ function mostrarToast(mensagem) {
 }
 
 // ===== KANBAN PRINCIPAL =====
+function escaparHtmlKanban(valor) {
+    return String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 let kanbanData = null;
 let cardArrastado = null;
 let colunaOrigem = null;
@@ -920,18 +942,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function carregarKanban() {
     try {
-        const resp = await fetch('/api/kanban/dados/');
-        const data = await resp.json();
-        if (data.success) {
-            kanbanData = data;
-            aplicarFiltrosKanbanLocal();
+        const resp = await fetch('/api/kanban/dados/', {
+            headers: {'Accept': 'application/json'},
+            cache: 'no-store',
+        });
+        if (!resp.ok) {
+            throw new Error(`API Kanban respondeu HTTP ${resp.status}`);
         }
+        const data = await resp.json();
+        if (!data?.success || !Array.isArray(data?.colunas)) {
+            throw new Error(data?.error || 'Resposta inválida da API do Kanban');
+        }
+        kanbanData = data;
+        aplicarFiltrosKanbanLocal();
     } catch (e) {
         console.error('Erro ao carregar Kanban:', e);
+        const mensagem = escaparHtmlKanban(e?.message || 'Falha inesperada');
         document.getElementById('kanbanBoard').innerHTML = `
             <div class="text-center py-5 w-100 text-danger">
                 <i class="fas fa-exclamation-circle fa-3x mb-3"></i>
                 <h5>Erro ao carregar Kanban</h5>
+                <small class="d-block mt-2 text-muted">${mensagem}</small>
+                <button type="button" class="btn btn-sm btn-outline-success mt-3" onclick="carregarKanban()">Tentar novamente</button>
             </div>
         `;
     }
@@ -1117,9 +1149,19 @@ function filtrarColunasKanban(colunas) {
     }));
 }
 
+function toggleKanbanFilters(force) {
+    const bar = document.getElementById('kanbanFilterBar');
+    const btn = document.getElementById('kanbanAdvancedToggle');
+    if (!bar) return;
+    const abrir = typeof force === 'boolean' ? force : !bar.classList.contains('show');
+    bar.classList.toggle('show', abrir);
+    btn?.classList.toggle('active', abrir);
+    btn?.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+
 function aplicarFiltrosKanbanLocal() {
     if (!kanbanData?.colunas) return;
-    const input = document.getElementById('kanbanMultiFilter');
+    const input = document.getElementById('kanbanSearchInput');
     const match = document.getElementById('kanbanMatchMode');
     const tipo = document.getElementById('kanbanTypeFilter');
     const hide = document.getElementById('kanbanHideEmpty');
@@ -1141,7 +1183,7 @@ function aplicarVisualizacaoKanban(modo) {
 }
 
 function configurarFiltrosKanban() {
-    const input = document.getElementById('kanbanMultiFilter');
+    const input = document.getElementById('kanbanSearchInput');
     const match = document.getElementById('kanbanMatchMode');
     const tipo = document.getElementById('kanbanTypeFilter');
     const view = document.getElementById('kanbanViewMode');
@@ -1161,7 +1203,7 @@ function configurarFiltrosKanban() {
 }
 
 function limparFiltrosKanban() {
-    const input = document.getElementById('kanbanMultiFilter');
+    const input = document.getElementById('kanbanSearchInput');
     const match = document.getElementById('kanbanMatchMode');
     const tipo = document.getElementById('kanbanTypeFilter');
     const hide = document.getElementById('kanbanHideEmpty');
@@ -1174,11 +1216,16 @@ function limparFiltrosKanban() {
 
 function atualizarResumoFiltroKanban(total) {
     const el = document.getElementById('kanbanFilterSummary');
-    if (!el) return;
-    const filtrando = kanbanTermosFiltro.length || kanbanTipoFiltro !== 'all';
-    el.innerHTML = filtrando
-        ? `<i class="fas fa-filter"></i> ${total} card(s) encontrado(s)`
-        : `<i class="fas fa-layer-group"></i> ${total} card(s)`;
+    const status = document.getElementById('kanbanSearchStatus');
+    const btn = document.getElementById('kanbanAdvancedToggle');
+    const filtrando = Boolean(kanbanTermosFiltro.length || kanbanTipoFiltro !== 'all');
+    if (el) {
+        el.innerHTML = filtrando
+            ? `<i class="fas fa-filter"></i> ${total} card(s) encontrado(s)`
+            : `<i class="fas fa-layer-group"></i> ${total} card(s)`;
+    }
+    if (status) status.textContent = filtrando ? String(total) : 'Todos';
+    btn?.classList.toggle('has-filter', filtrando);
 }
 
 function criarCardHTML(card) {
@@ -1291,7 +1338,7 @@ function criarCardHTML(card) {
             </div>
             ${card.synthetic_avulsa ? `
                 <div class="card-actions">
-                    <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); imprimirCargaAvulsaKanban('${encodeURIComponent(card.impressao_nome || '')}', '${encodeURIComponent(card.impressao_numero || '')}')" title="Visualizar / imprimir lotes da carga avulsa"><i class="fas fa-print"></i></button>
+                    <button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); imprimirCargaAvulsaKanban('${encodeURIComponent(card.impressao_nome || '')}', '${encodeURIComponent(card.impressao_numero || '')}', '${encodeURIComponent(card.impressao_placa || '')}', '${encodeURIComponent(card.impressao_data || '')}')" title="Visualizar / imprimir lotes da carga avulsa"><i class="fas fa-print"></i></button>
                     <span class="small text-muted align-self-center"><i class="fas fa-bolt text-danger me-1"></i>Avulsa concluída · ${Number(card.lotes?.length || 0)} lote(s)</span>
                 </div>
             ` : `
@@ -1437,133 +1484,8 @@ function configurarScrollbarSuperior() {
 window.addEventListener('resize', configurarScrollbarSuperior, {passive:true});
 
 // ===== PESQUISA =====
-let kanbanSearchTimer = null;
-document.addEventListener('DOMContentLoaded', () => {
-    const input = document.getElementById('kanbanSearchInput');
-    if (!input) return;
-    input.addEventListener('input', () => {
-        clearTimeout(kanbanSearchTimer);
-        kanbanSearchTimer = setTimeout(() => pesquisarNoKanban(input.value), 280);
-    });
-    document.addEventListener('click', event => {
-        if (!event.target.closest('.kanban-search-box')) {
-            const box = document.getElementById('kanbanSearchResults');
-            if (box) box.style.display = 'none';
-        }
-    });
-});
-
-async function pesquisarNoKanban(termo) {
-    const box = document.getElementById('kanbanSearchResults');
-    termo = String(termo || '').trim();
-    if (termo.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
-    try {
-        const resposta = await fetch(`/api/kanban/pesquisar/?q=${encodeURIComponent(termo)}`);
-        const dados = await resposta.json();
-        const resultados = dados.resultados || [];
-        box.innerHTML = resultados.length ? resultados.map(item => `
-            <div class="kanban-result-item" onclick="localizarCardKanban(${item.id})">
-                <strong>#${item.id} · ${escaparHtmlKanban(item.titulo)}</strong>
-                <small>${escaparHtmlKanban(item.coluna_nome || 'Sem coluna')} ${item.lotes?.length ? `· Lote(s): ${item.lotes.map(escaparHtmlKanban).join(', ')}` : ''} ${item.destino ? `· Destino: ${escaparHtmlKanban(item.destino)}` : ''}</small>
-            </div>`).join('') : '<div class="p-3 small text-muted">Nenhum card encontrado.</div>';
-        box.style.display = 'block';
-    } catch (erro) {
-        console.error(erro);
-        box.innerHTML = '<div class="p-3 small text-danger">Erro ao pesquisar.</div>';
-        box.style.display = 'block';
-    }
-}
-function escaparHtmlKanban(valor) {
-    const div = document.createElement('div');
-    div.textContent = valor ?? '';
-    return div.innerHTML;
-}
-function localizarCardKanban(id) {
-    const resultados = document.getElementById(
-        'kanbanSearchResults'
-    );
-
-    if (resultados) {
-        resultados.style.display = 'none';
-    }
-
-    const card = document.querySelector(
-        `[data-card-id="${id}"]`
-    );
-
-    if (!card) return;
-
-    const lane = card.closest('.kanban-lane');
-    if (lane?.classList.contains('collapsed')) {
-        lane.classList.remove('collapsed');
-        localStorage.setItem(`kanbanLane:${lane.dataset.lane}`, 'open');
-    }
-
-    const wrapper = card.closest('.kanban-wrapper');
-    const coluna = card.closest(
-        '.kanban-column'
-    );
-
-    if (!wrapper || !coluna) return;
-
-    if (!coluna) return;
-
-    /*
-     * Não usamos scrollIntoView().
-     * Ele pode deslocar o BODY inteiro.
-     * Movemos somente o scroll interno do Kanban.
-     */
-    const colunaLeft = coluna.offsetLeft;
-    const colunaWidth = coluna.offsetWidth;
-    const viewportWidth = wrapper.clientWidth;
-
-    const destinoHorizontal = Math.max(
-        0,
-        colunaLeft
-        - ((viewportWidth - colunaWidth) / 2)
-    );
-
-    wrapper.scrollTo({
-        left: destinoHorizontal,
-        behavior: 'smooth'
-    });
-
-    const corpoColuna = card.closest(
-        '.kanban-column-body'
-    );
-
-    if (corpoColuna) {
-        const destinoVertical = Math.max(
-            0,
-            card.offsetTop
-            - (corpoColuna.clientHeight / 2)
-            + (card.offsetHeight / 2)
-        );
-
-        corpoColuna.scrollTo({
-            top: destinoVertical,
-            behavior: 'smooth'
-        });
-    }
-
-    card.classList.remove(
-        'search-highlight'
-    );
-
-    void card.offsetWidth;
-
-    card.classList.add(
-        'search-highlight'
-    );
-
-    setTimeout(
-        () => card.classList.remove(
-            'search-highlight'
-        ),
-        1700
-    );
-}
-
+// A busca principal agora filtra o Kanban localmente. Isso evita duas barras
+// competindo entre si e também continua funcionando com o snapshot offline.
 // ===== TAGS =====
 let cardTagsKanbanId = null;
 let tagsSelecionadasKanban = new Set();
@@ -2324,12 +2246,16 @@ tr { page-break-inside: avoid; }
 function imprimirCardKanban(id) {
     gerarImpressaoSolicitacao(id);
 }
-function imprimirCargaAvulsaKanban(nomeCodificado, numeroCodificado) {
+function imprimirCargaAvulsaKanban(nomeCodificado, numeroCodificado, placaCodificada, dataCodificada) {
     const nome = decodeURIComponent(String(nomeCodificado || ''));
     const numero = decodeURIComponent(String(numeroCodificado || ''));
+    const placa = decodeURIComponent(String(placaCodificada || ''));
+    const data = decodeURIComponent(String(dataCodificada || ''));
     const params = new URLSearchParams();
     if (nome) params.set('nome', nome);
     if (numero) params.set('numero', numero);
+    if (placa) params.set('placa', placa);
+    if (data) params.set('data', data);
     gerarImpressaoSolicitacao(0, null, `/api/cargas/avulsa/impressao/?${params.toString()}`);
 }
 </script>
