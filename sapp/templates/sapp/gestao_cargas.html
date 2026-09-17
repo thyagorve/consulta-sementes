@@ -19,7 +19,7 @@
         <div><label class="form-label small fw-bold">Data inicial</label><input type="date" name="data_inicio" class="form-control" value="{{ filtros.data_inicio }}"></div>
         <div><label class="form-label small fw-bold">Data final</label><input type="date" name="data_fim" class="form-control" value="{{ filtros.data_fim }}"></div>
         <div><label class="form-label small fw-bold">Origem</label><select name="origem" class="form-select"><option value="">Todas</option><option value="GERADA" {% if filtros.origem == 'GERADA' %}selected{% endif %}>Gerada</option><option value="AVULSA" {% if filtros.origem == 'AVULSA' %}selected{% endif %}>Avulsa</option></select></div>
-        <div><label class="form-label small fw-bold">Busca</label><input name="q" class="form-control" value="{{ filtros.q }}" placeholder="Carga, nome, cliente, placa, lote..."></div>
+        <div><label class="form-label small fw-bold">Busca</label><input name="q" class="form-control" value="{{ filtros.q }}" placeholder="Carga, cliente, placa, motorista, lote..."></div>
       </div>
       <div class="d-flex justify-content-end gap-2 mt-2"><a href="{% url 'sapp:gestao_cargas' %}" class="btn btn-sm btn-outline-secondary">Limpar</a><button class="btn btn-sm btn-success"><i class="fas fa-search me-1"></i>Aplicar</button></div>
     </form>
@@ -28,7 +28,7 @@
   {% for grupo in grupos %}
   <article class="load-card origin-card-{{ grupo.origem }}" id="carga-{{ forloop.counter }}">
     <div class="load-card-head">
-      <div><div class="load-title">{{ grupo.titulo }}<span class="origin-badge origin-{{ grupo.origem }}" title="{{ grupo.origem }}" aria-label="{{ grupo.origem }}">{% if grupo.origem == 'AVULSA' %}<i class="fas fa-bolt"></i>{% elif grupo.origem == 'GERADA' %}<i class="fas fa-sun"></i>{% else %}<i class="fas fa-clock-rotate-left"></i>{% endif %}</span>{% if grupo.agrupada_por == 'PLACA' %}<span class="identity-badge" title="Carga sem nome identificada automaticamente pela placa"><i class="fas fa-car-side"></i> pela placa</span>{% endif %}</div><div class="text-muted small">{{ grupo.lotes|length }} lote(s) · {{ grupo.movimentos|length }} movimento(s)</div></div>
+      <div><div class="load-title">{{ grupo.titulo }}<span class="origin-badge origin-{{ grupo.origem }}" title="{{ grupo.origem }}" aria-label="{{ grupo.origem }}">{% if grupo.origem == 'AVULSA' %}<i class="fas fa-bolt"></i>{% elif grupo.origem == 'GERADA' %}<i class="fas fa-sun"></i>{% else %}<i class="fas fa-clock-rotate-left"></i>{% endif %}</span>{% if grupo.agrupada_por == 'PLACA' %}<span class="identity-badge" title="Carga sem número identificada automaticamente pela placa"><i class="fas fa-car-side"></i> pela placa</span>{% endif %}</div><div class="text-muted small">{{ grupo.lotes|length }} lote(s) · {{ grupo.movimentos|length }} movimento(s)</div></div>
       <div class="load-meta"><small>Data</small><strong>{{ grupo.data_txt }}</strong></div>
       <div class="load-meta"><small>Quantidade</small><strong>{{ grupo.quantidade }}</strong></div>
       <div class="load-meta"><small>Cliente</small><strong>{{ grupo.clientes_txt }}</strong></div>
@@ -38,20 +38,20 @@
     </div>
     <div class="load-items">
       <details class="group-edit">
-        <summary><i class="fas fa-pen-to-square"></i>Editar dados desta carga inteira <span class="ms-auto text-muted fw-normal">nome, placa, motorista, cliente e data</span></summary>
+        <summary><i class="fas fa-pen-to-square"></i>Editar dados desta carga inteira <span class="ms-auto text-muted fw-normal">número, placa, motorista, cliente e data</span></summary>
         <form method="post" action="{% url 'sapp:editar_grupo_carga' %}" class="group-edit-body" onsubmit="return confirmarAjusteGrupoCarga(this)">
           {% csrf_token %}
           <input type="hidden" name="movimentos_ids" value="{{ grupo.movimentos_ids }}">
           <div class="group-edit-grid">
-            <div><label>{% if grupo.origem == 'AVULSA' %}Nome da carga avulsa{% else %}Identificação da carga{% endif %}</label><input name="nome_carga_avulsa_grupo" class="form-control" value="{% if grupo.origem == 'AVULSA' %}{{ grupo.nome_avulsa|default:'' }}{% else %}{{ grupo.titulo }}{% endif %}" {% if grupo.origem != 'AVULSA' %}readonly{% endif %} placeholder="Ex.: Carga Fazenda Primavera"></div>
-            <div><label>Nº da carga</label><input name="numero_carga_grupo" class="form-control" value="{{ grupo.numero|default:'' }}" {% if grupo.origem == 'GERADA' %}readonly title="O número de carga gerada pertence ao card original" {% endif %} placeholder="Opcional"></div>
+            <div><label>Identificação atual</label><input class="form-control" value="{{ grupo.titulo }}" readonly></div>
+            <div><label>Nº da carga</label><input name="numero_carga_grupo" class="form-control" value="{{ grupo.numero_edicao|default:'' }}" {% if grupo.origem == 'GERADA' %}readonly title="O número de carga gerada pertence ao card original"{% else %}type="number" min="1" step="1" inputmode="numeric"{% endif %} placeholder="Ex.: 10"><small class="text-muted">Nas avulsas, 10 será salvo como CARGA 10.</small></div>
             <div><label>Placa</label><input name="placa_grupo" class="form-control text-uppercase" value="{{ grupo.placa_edicao|default:'' }}" placeholder="{{ grupo.placas_txt }}"></div>
             <div><label>Motorista</label><input name="motorista_grupo" class="form-control" value="{{ grupo.motorista_edicao|default:'' }}" placeholder="{{ grupo.motoristas_txt }}"></div>
             <div><label>Cliente</label><input name="cliente_grupo" class="form-control" value="{{ grupo.cliente_edicao|default:'' }}" placeholder="{{ grupo.clientes_txt }}"></div>
             <div><label>Data da carga</label><input type="date" name="data_carga_grupo" class="form-control" value="{{ grupo.data_iso }}"></div>
-            <div style="grid-column:1/-1"><label>Motivo da correção *</label><input name="motivo_grupo" class="form-control" required placeholder="Ex.: carga foi lançada sem nome / corrigir placa e motorista"></div>
+            <div style="grid-column:1/-1"><label>Motivo da correção *</label><input name="motivo_grupo" class="form-control" required placeholder="Ex.: carga foi lançada sem número / corrigir placa e motorista"></div>
           </div>
-          <div class="group-hint"><i class="fas fa-circle-info me-1"></i>Esta edição aplica os dados a <strong>todos os {{ grupo.movimentos|length }} movimento(s)</strong> desta carga sem alterar os lotes ou quantidades. {% if grupo.agrupada_por == 'PLACA' %}Como ela foi lançada sem nome, o sistema a identificou pela placa; ao informar um nome, os lotes continuam juntos nessa nova identificação.{% endif %}</div>
+          <div class="group-hint"><i class="fas fa-circle-info me-1"></i>Esta edição aplica os dados a <strong>todos os {{ grupo.movimentos|length }} movimento(s)</strong> desta carga sem alterar os lotes ou quantidades. {% if grupo.agrupada_por == 'PLACA' %}Como ela foi lançada sem número, o sistema a identificou pela placa; ao informar um número, os lotes continuam juntos nessa nova identificação.{% endif %}</div>
           <div class="group-edit-actions"><button type="submit" class="btn btn-sm btn-success"><i class="fas fa-floppy-disk me-1"></i>Salvar dados da carga</button></div>
         </form>
       </details>
@@ -64,8 +64,7 @@
           <div><label>Quantidade</label><input type="number" min="1" step="1" name="quantidade" class="form-control" value="{{ mov.quantidade }}" required></div>
           <div><label>Lote / endereço</label><select name="estoque_id" class="form-select" required>{% for est in estoque_opcoes %}<option value="{{ est.id }}" {% if est.id == mov.estoque_id %}selected{% endif %}>{{ est.lote }} · {{ est.endereco }} · saldo {{ est.saldo }} {{ est.embalagem }}</option>{% endfor %}</select></div>
           <div><label>Origem</label><select name="origem_carga" class="form-select"><option value="GERADA" {% if mov.origem_carga == 'GERADA' %}selected{% endif %}>GERADA</option><option value="AVULSA" {% if mov.origem_carga == 'AVULSA' %}selected{% endif %}>AVULSA</option><option value="" {% if not mov.origem_carga %}selected{% endif %}>LEGADO/Não definido</option></select></div>
-          <div><label>Nº carga</label><input name="numero_carga" class="form-control" value="{{ mov.numero_carga|default:'' }}"></div>
-          <div><label>Nome carga avulsa</label><input name="nome_carga_avulsa" class="form-control" value="{{ mov.nome_carga_avulsa|default:'' }}" placeholder="Agrupa as baixas avulsas"></div>
+          <div><label>Nº carga</label><input name="numero_carga" class="form-control" value="{% if mov.origem_carga == 'AVULSA' %}{% if mov.numero_carga %}{{ mov.numero_carga|cut:'CARGA '|cut:'carga ' }}{% endif %}{% else %}{{ mov.numero_carga|default:'' }}{% endif %}" {% if mov.origem_carga == 'AVULSA' %}type="number" min="1" step="1" inputmode="numeric"{% endif %}></div>
           <div><label>Cliente</label><input name="cliente" class="form-control" value="{{ mov.cliente|default:'' }}"></div>
           <div><label>Placa</label><input name="placa" class="form-control text-uppercase" value="{{ mov.placa|default:'' }}"></div>
           <div><label>Motorista</label><input name="motorista" class="form-control" value="{{ mov.motorista|default:'' }}"></div>

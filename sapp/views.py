@@ -1043,8 +1043,8 @@ def registrar_saida(request, id):
 
                 # 1. Captura de Dados
                 qtd = int(request.POST.get('quantidade_saida', 0))
-                carga = request.POST.get('numero_carga', '')
-                nome_carga_avulsa = ' '.join(str(request.POST.get('nome_carga_avulsa', '') or '').strip().split())
+                carga_bruta = str(request.POST.get('numero_carga', '') or '').strip()
+                carga = _normalizar_numero_carga_avulsa(carga_bruta)
                 motorista = request.POST.get('motorista', '')
                 placa = request.POST.get('placa', '')
                 cliente = request.POST.get('cliente', '')
@@ -1079,6 +1079,8 @@ def registrar_saida(request, id):
                 erros = []
                 if qtd <= 0: 
                     erros.append("❌ Quantidade inválida.")
+                if carga_bruta and not carga:
+                    erros.append("❌ Nº da carga inválido. Informe apenas o número, por exemplo: 10.")
                 disponivel_avulso = max(0, int(item.disponivel or 0))
                 if qtd > disponivel_avulso:
                     if item.empenhado > 0:
@@ -1091,8 +1093,9 @@ def registrar_saida(request, id):
                         erros.append(
                             f"❌ Quantidade acima do disponível ({disponivel_avulso})."
                         )
-                # Na carga avulsa, número, nome, placa, motorista, cliente e fotos
-                # são opcionais. Lote e quantidade continuam sendo a movimentação real.
+                # Na carga avulsa, número, placa, motorista, cliente e fotos
+                # são opcionais. Quando informado, o número é salvo no padrão CARGA N.
+                # Lote e quantidade continuam sendo a movimentação real.
                 
                 if erros:
                     for e in erros: 
@@ -1165,7 +1168,7 @@ def registrar_saida(request, id):
                     placa=placa or None,
                     cliente=cliente or None,
                     origem_carga='AVULSA',
-                    nome_carga_avulsa=nome_carga_avulsa,
+                    nome_carga_avulsa='',
                 )
 
                 print(f"✅ Histórico criado: ID {historico.id}")
@@ -6976,6 +6979,26 @@ def _dashboard_data_segura(
         return None
 
 
+def _normalizar_numero_carga_avulsa(valor):
+    """Normaliza o número digitado na expedição avulsa para ``CARGA N``.
+
+    Aceita entradas antigas como ``10``, ``CARGA 10``, ``carga-10`` ou
+    ``carga: 10``. Retorna string vazia para valores não numéricos, porque
+    o campo representa exclusivamente o número da carga.
+    """
+    texto = str(valor or '').strip().upper()
+    if not texto:
+        return ''
+    texto = texto.replace('-', ' ').replace(':', ' ')
+    texto = ' '.join(texto.split())
+    if texto.startswith('CARGA'):
+        texto = texto[5:].strip()
+    if not texto.isdigit():
+        return ''
+    numero = texto.lstrip('0') or '0'
+    return f'CARGA {numero}'
+
+
 def _dashboard_normalizar_carga(valor):
     """
     Normaliza o identificador da carga para agrupamento no dashboard.
@@ -8157,17 +8180,18 @@ def dashboard_data(request):
                     origem_carga = 'GERADA'
                     numero_carga_mov = titulo_oficial
 
-            # Identidade operacional da avulsa: nome > número > placa.
-            # Se ela foi lançada sem nome/número, todos os lotes da mesma placa
-            # no mesmo dia são tratados como uma única carga.
-            if origem_carga == 'AVULSA' and nome_avulsa:
-                chave_nome = normalizar_texto_cadastro(nome_avulsa)
-                chave_carga = f'AVULSA:NOME:{chave_nome}'
-                nome_carga = nome_avulsa
-            elif origem_carga == 'AVULSA' and numero_carga_mov:
-                chave_numero, nome_numero = _dashboard_normalizar_carga(numero_carga_mov)
-                chave_carga = f'AVULSA:NUM:{chave_numero}' if chave_numero else ''
-                nome_carga = nome_numero or numero_carga_mov
+            # Identidade operacional da avulsa: número > placa + data.
+            # O antigo campo de nome não participa mais do agrupamento. Se houver
+            # número, ele sempre aparece no padrão CARGA N. Sem número, a placa
+            # identifica a carga naquele dia.
+            numero_avulsa_canonico = (
+                _normalizar_numero_carga_avulsa(numero_carga_mov)
+                if origem_carga == 'AVULSA' and numero_carga_mov else ''
+            )
+            if origem_carga == 'AVULSA' and numero_avulsa_canonico:
+                numero_carga_mov = numero_avulsa_canonico
+                chave_carga = f'AVULSA:NUM:{normalizar_texto_cadastro(numero_avulsa_canonico)}'
+                nome_carga = numero_avulsa_canonico
             elif origem_carga == 'AVULSA' and placa_identidade:
                 chave_carga = f'AVULSA:PLACA:{normalizar_texto_cadastro(placa_identidade)}:{data_identidade_txt}'
                 nome_carga = f'CARGA {placa_identidade}'
@@ -8176,7 +8200,7 @@ def dashboard_data(request):
 
             if not chave_carga:
                 chave_carga = f'AVULSA:REGISTRO:{mov.id}' if origem_carga == 'AVULSA' else f'REGISTRO:{mov.id}'
-                nome_carga = nome_avulsa or (f'CARGA {placa_identidade}' if placa_identidade else 'AVULSA')
+                nome_carga = f'CARGA {placa_identidade}' if placa_identidade else 'CARGA AVULSA SEM IDENTIFICAÇÃO'
 
             quantidade_mov = Decimal(
                 str(getattr(mov, 'quantidade', 0) or 0)
@@ -8218,7 +8242,7 @@ def dashboard_data(request):
                     dia_mov['scs'] += quantidade_mov
                 dia_mov['cargas'].add(chave_carga)
                 dia_mov['origens'].add(
-                    origem_carga or ('AVULSA' if nome_avulsa else 'GERADA')
+                    origem_carga or ('AVULSA' if (numero_carga_mov or placa_identidade) else 'GERADA')
                 )
 
             lote_mov = (
@@ -8242,7 +8266,7 @@ def dashboard_data(request):
                 chave_carga,
                 {
                     'carga': nome_carga,
-                    'origem': origem_carga or ('AVULSA' if nome_avulsa else 'GERADA'),
+                    'origem': origem_carga or ('AVULSA' if (numero_carga_mov or placa_identidade) else 'GERADA'),
                     'numero_carga': numero_carga_mov,
                     'data_hora': mov.data_hora,
                     'qtd': Decimal('0'),
@@ -15532,14 +15556,11 @@ def api_kanban_dados(request):
             placa_identidade = ' '.join(str(mov.placa or '').strip().upper().split())
             data_identidade = timezone.localtime(mov.data_hora).date() if mov.data_hora else None
             data_identidade_txt = data_identidade.isoformat() if data_identidade else ''
-            if nome:
-                chave = f'AVULSA:NOME:{normalizar_texto_cadastro(nome)}'
-                titulo_avulsa = nome
-                impressao_placa = ''
-                impressao_data = ''
-            elif numero:
-                chave = f'AVULSA:NUM:{normalizar_texto_cadastro(numero)}'
-                titulo_avulsa = f'CARGA {numero}' if not numero.upper().startswith('CARGA ') else numero
+            numero_canonico = _normalizar_numero_carga_avulsa(numero) if numero else ''
+            if numero_canonico:
+                numero = numero_canonico
+                chave = f'AVULSA:NUM:{normalizar_texto_cadastro(numero_canonico)}'
+                titulo_avulsa = numero_canonico
                 impressao_placa = ''
                 impressao_data = ''
             elif placa_identidade:
@@ -15584,7 +15605,7 @@ def api_kanban_dados(request):
                 'tipo_solicitacao': 'CARGA',
                 'tipo_solicitacao_display': 'Carga avulsa',
                 'origem_carga': 'AVULSA',
-                'impressao_nome': grupo.get('nome_filtro', ''),
+                'impressao_nome': '',
                 'impressao_numero': grupo['numero'],
                 'impressao_placa': grupo.get('impressao_placa', ''),
                 'impressao_data': grupo.get('impressao_data', ''),
@@ -15673,19 +15694,26 @@ def api_impressao_carga_avulsa(request):
         )
         .order_by('data_hora', 'id')
     )
-    if nome:
-        qs = qs.filter(nome_carga_avulsa__iexact=nome)
-    elif numero:
-        qs = qs.filter(numero_carga__iexact=numero)
-    else:
-        # Carga avulsa lançada sem nome/número: a placa identifica a carga.
-        # A data evita juntar a mesma placa usada novamente em outro dia.
+    if numero:
+        numero_canonico = _normalizar_numero_carga_avulsa(numero)
+        if not numero_canonico:
+            return JsonResponse({'success': False, 'error': 'Nº da carga inválido.'}, status=400)
+        numero_so_digitos = numero_canonico[6:]
         qs = qs.filter(
-            placa__iexact=placa,
-            nome_carga_avulsa='',
-        ).filter(Q(numero_carga__isnull=True) | Q(numero_carga=''))
+            Q(numero_carga__iexact=numero_canonico)
+            | Q(numero_carga__iexact=numero_so_digitos)
+        )
+    elif placa:
+        # Sem número, placa + data identifica a carga avulsa. O antigo nome da
+        # carga não participa mais do agrupamento, mas permanece no histórico.
+        qs = qs.filter(placa__iexact=placa).filter(
+            Q(numero_carga__isnull=True) | Q(numero_carga='')
+        )
         if data_carga:
             qs = qs.filter(data_hora__date=data_carga)
+    elif nome:
+        # Compatibilidade somente para links antigos ainda abertos em cache.
+        qs = qs.filter(nome_carga_avulsa__iexact=nome)
 
     movimentos = list(qs[:1000])
     if not movimentos:
@@ -16298,17 +16326,13 @@ def gestao_cargas(request):
         data_chave = data_mov.isoformat() if data_mov else 'SEM-DATA'
 
         if origem_mov == 'AVULSA':
-            # Identidade da carga avulsa: nome > número > placa. Quando a
-            # operação foi lançada sem nome/número, todos os lotes da mesma
-            # placa no mesmo dia formam UMA carga. Isso recupera lançamentos
-            # antigos sem misturar a mesma placa usada em dias diferentes.
-            if nome_avulsa:
-                chave = f'AVULSA:NOME:{normalizar_texto_cadastro(nome_avulsa)}'
-                titulo = nome_avulsa
-                agrupada_por = 'NOME'
-            elif numero:
-                chave = f'AVULSA:NUM:{normalizar_texto_cadastro(numero)}'
-                titulo = f'CARGA {numero}' if not numero.upper().startswith('CARGA ') else numero
+            # Identidade da carga avulsa: número > placa + data. O campo antigo
+            # de nome é mantido apenas no histórico legado e não agrupa mais.
+            numero_canonico = _normalizar_numero_carga_avulsa(numero) if numero else ''
+            if numero_canonico:
+                numero = numero_canonico
+                chave = f'AVULSA:NUM:{normalizar_texto_cadastro(numero_canonico)}'
+                titulo = numero_canonico
                 agrupada_por = 'NUMERO'
             elif placa_mov:
                 chave = f'AVULSA:PLACA:{normalizar_texto_cadastro(placa_mov)}:{data_chave}'
@@ -16362,6 +16386,11 @@ def gestao_cargas(request):
         grupo['cliente_edicao'] = next(iter(grupo['clientes'])) if len(grupo['clientes']) == 1 else ''
         grupo['placa_edicao'] = next(iter(grupo['placas'])) if len(grupo['placas']) == 1 else ''
         grupo['motorista_edicao'] = next(iter(grupo['motoristas'])) if len(grupo['motoristas']) == 1 else ''
+        if grupo['origem'] == 'AVULSA' and grupo.get('numero'):
+            numero_canonico = _normalizar_numero_carga_avulsa(grupo['numero'])
+            grupo['numero_edicao'] = numero_canonico[6:] if numero_canonico.startswith('CARGA ') else ''
+        else:
+            grupo['numero_edicao'] = grupo.get('numero') or ''
         grupos_lista.append(grupo)
 
     estoque_opcoes = list(
@@ -16401,8 +16430,8 @@ def gestao_cargas(request):
 def editar_grupo_carga(request):
     """Atualiza os dados operacionais de uma carga inteira sem refazer os lotes.
 
-    É especialmente útil para cargas avulsas lançadas sem nome: quando foram
-    agrupadas pela placa, o operador pode nomear a carga depois e normalizar
+    É especialmente útil para cargas avulsas lançadas sem número: quando foram
+    agrupadas pela placa, o operador pode informar o número depois e normalizar
     placa, motorista, cliente e data em todos os movimentos de uma vez.
     """
     from datetime import datetime as dt
@@ -16422,8 +16451,11 @@ def editar_grupo_carga(request):
         messages.error(request, 'Informe o motivo da correção da carga.')
         return redirect('sapp:gestao_cargas')
 
-    nome_avulsa = ' '.join((request.POST.get('nome_carga_avulsa_grupo') or '').strip().split())
-    numero_carga = ' '.join((request.POST.get('numero_carga_grupo') or '').strip().split())
+    numero_bruto = ' '.join((request.POST.get('numero_carga_grupo') or '').strip().split())
+    numero_carga = _normalizar_numero_carga_avulsa(numero_bruto) if numero_bruto else ''
+    if numero_bruto and not numero_carga:
+        messages.error(request, '❌ Nº da carga inválido. Informe apenas o número, por exemplo: 10.')
+        return redirect('sapp:gestao_cargas')
     placa = ' '.join((request.POST.get('placa_grupo') or '').strip().upper().split())
     motorista = ' '.join((request.POST.get('motorista_grupo') or '').strip().split())
     cliente = ' '.join((request.POST.get('cliente_grupo') or '').strip().split())
@@ -16467,8 +16499,10 @@ def editar_grupo_carga(request):
                 # número pode ser corrigido normalmente.
                 if origem != 'GERADA' and numero_carga:
                     hist.numero_carga = numero_carga
-                if origem == 'AVULSA' and nome_avulsa:
-                    hist.nome_carga_avulsa = nome_avulsa
+                if origem == 'AVULSA':
+                    # Nome de carga avulsa foi descontinuado. O valor legado é
+                    # limpo ao editar; a identidade passa a ser número ou placa.
+                    hist.nome_carga_avulsa = ''
                 # Campos vazios no editor em lote significam “manter como está”.
                 # Assim uma carga que por acaso tenha valores diferentes não perde
                 # dados quando o operador estiver corrigindo somente o nome/data.
@@ -16599,12 +16633,19 @@ def editar_movimento_carga(request, historico_id):
             hist.estoque = estoque_novo
             hist.lote_ref = estoque_novo.lote
             hist.quantidade = qtd_nova
-            hist.numero_carga = (request.POST.get('numero_carga') or '').strip() or None
-            hist.nome_carga_avulsa = ' '.join((request.POST.get('nome_carga_avulsa') or '').strip().split())
+            origem_post = (request.POST.get('origem_carga') or hist.origem_carga or '').strip().upper()
+            numero_post = (request.POST.get('numero_carga') or '').strip()
+            if origem_post == 'AVULSA':
+                numero_normalizado = _normalizar_numero_carga_avulsa(numero_post) if numero_post else ''
+                if numero_post and not numero_normalizado:
+                    raise ValueError('Nº da carga inválido. Informe apenas o número, por exemplo: 10.')
+                hist.numero_carga = numero_normalizado or None
+                hist.nome_carga_avulsa = ''
+            else:
+                hist.numero_carga = numero_post or None
             hist.cliente = (request.POST.get('cliente') or '').strip() or None
             hist.placa = (request.POST.get('placa') or '').strip().upper() or None
             hist.motorista = (request.POST.get('motorista') or '').strip() or None
-            origem_post = (request.POST.get('origem_carga') or hist.origem_carga or '').strip().upper()
             if origem_post in {'GERADA', 'AVULSA'}:
                 hist.origem_carga = origem_post
             hist.save(update_fields=[

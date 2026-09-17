@@ -215,19 +215,40 @@ def _contexto_conflito(lote, base_versao, user):
     }
 
 
+def _normalizar_numero_carga_avulsa(valor):
+    texto = str(valor or '').strip().upper()
+    if not texto:
+        return ''
+    texto = texto.replace('-', ' ').replace(':', ' ')
+    texto = ' '.join(texto.split())
+    if texto.startswith('CARGA'):
+        texto = texto[5:].strip()
+    if not texto.isdigit():
+        return ''
+    return f"CARGA {texto.lstrip('0') or '0'}"
+
+
 def _registrar_historico_saida(estoque, user, qtd, tipo, descricao, payload):
+    origem = str(payload.get('origem_carga') or '').strip().upper()
+    numero_bruto = str(payload.get('numero_carga') or '').strip()
+    if origem == 'AVULSA':
+        numero = _normalizar_numero_carga_avulsa(numero_bruto) if numero_bruto else ''
+        if numero_bruto and not numero:
+            raise ValueError('Nº da carga inválido. Informe apenas o número, por exemplo: 10.')
+    else:
+        numero = numero_bruto
     return HistoricoMovimentacao.objects.create(
         estoque=estoque,
         usuario=user,
         quantidade=qtd,
         tipo=tipo,
         descricao=descricao,
-        numero_carga=(str(payload.get('numero_carga') or '').strip() or None),
+        numero_carga=(numero or None),
         motorista=(str(payload.get('motorista') or '').strip() or None),
-        placa=(str(payload.get('placa') or '').strip() or None),
+        placa=(str(payload.get('placa') or '').strip().upper() or None),
         cliente=(str(payload.get('cliente') or '').strip() or None),
-        origem_carga=('AVULSA' if 'nome_carga_avulsa' in payload else ''),
-        nome_carga_avulsa=' '.join(str(payload.get('nome_carga_avulsa') or '').strip().split()),
+        origem_carga=('AVULSA' if origem == 'AVULSA' else ''),
+        nome_carga_avulsa='',
     )
 
 
@@ -456,14 +477,21 @@ def _aplicar_operacao(op, user, ignorar_conflito=False):
     qtd = _decimal_quantidade(payload.get('quantidade'))
 
     if tipo in {'SAIDA', 'EXPEDICAO', 'EXPEDICAO_AVULSA', 'BENEFICIAMENTO'}:
+        # Compatibilidade com filas criadas em versões anteriores: a operação
+        # EXPEDICAO_AVULSA por si só já define a origem, mesmo que o payload
+        # antigo ainda não tenha o campo origem_carga.
+        if tipo == 'EXPEDICAO_AVULSA':
+            payload['origem_carga'] = 'AVULSA'
         if estoque.saldo < qtd:
             raise ValueError(f'Saldo insuficiente. Saldo atual: {estoque.saldo} {estoque.embalagem}.')
         estoque.saida = int(estoque.saida or 0) + qtd
         estoque.save()
-        nome_avulsa = str(payload.get('nome_carga_avulsa') or '').strip()
+        numero_avulsa = str(payload.get('numero_carga') or '').strip()
         descricao = f'Operação offline sincronizada: saída de {qtd} {estoque.embalagem} do lote {lote}.'
-        if nome_avulsa:
-            descricao += f' Carga avulsa: {nome_avulsa}.'
+        if tipo == 'EXPEDICAO_AVULSA' and numero_avulsa:
+            numero_canonico = _normalizar_numero_carga_avulsa(numero_avulsa)
+            if numero_canonico:
+                descricao += f' {numero_canonico}.'
         _registrar_historico_saida(
             estoque,
             user,
