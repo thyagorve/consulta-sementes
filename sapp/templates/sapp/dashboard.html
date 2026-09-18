@@ -4341,6 +4341,7 @@
 
         try {
             const params = parametrosGraficoExpedicao(inicio, fim);
+            params.set('_fresh', String(Date.now()));
             const response = await fetch(`/dashboard-data/?${params.toString()}`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 cache: 'no-store',
@@ -4691,7 +4692,10 @@
 
             return `
                 <tr>
-                    <td class="text-nowrap">${escapeHtml(carga.dt || '--')}</td>
+                    <td class="text-nowrap">
+                        ${escapeHtml(carga.dt || '--')}
+                        ${carga.data_divergente ? '<span class="badge text-bg-warning ms-1" title="Esta carga possui movimentos ativos em datas diferentes">datas diferentes</span>' : ''}
+                    </td>
                     <td>
                         <span class="load-badge ${meta.classe}">
                             ${escapeHtml(cargaNome)}
@@ -5044,6 +5048,10 @@
             if (value) params.set(key, value);
         });
         atualizarContadorFiltrosExpedicao();
+        // Também muda a URL de cada leitura. Isso impede proxy/CDN/navegador
+        // de devolver uma resposta anterior mesmo em ambientes que não respeitem
+        // corretamente Cache-Control. O backend ignora este parâmetro.
+        params.set('_fresh', String(Date.now()));
 
         if (!primeiraCarga && !silencioso) {
             showLoading(true);
@@ -5163,7 +5171,7 @@
         if (dashboardVerificandoVersao || !navigator.onLine || document.hidden) return;
         dashboardVerificandoVersao = true;
         try {
-            const response = await fetch('/api/cards/versao/', {
+            const response = await fetch(`/api/cargas/versao/?_=${Date.now()}`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 cache: 'no-store',
             });
@@ -5173,6 +5181,16 @@
 
             if (dashboardVersaoOperacional === null) {
                 dashboardVersaoOperacional = data.version;
+                // Ao retomar uma aba antiga, não usamos a primeira leitura apenas
+                // como baseline: forçar significa buscar o estado atual agora.
+                if (forcar && !dashboardAtualizacaoAutomatica) {
+                    dashboardAtualizacaoAutomatica = true;
+                    try {
+                        await executarBusca({ silencioso: true });
+                    } finally {
+                        dashboardAtualizacaoAutomatica = false;
+                    }
+                }
                 return;
             }
 
@@ -5791,20 +5809,22 @@
 
             atualizarContadorFiltrosExpedicao();
             atualizarRotuloFiltroGrafico();
-            executarBusca();
 
-            // Sincroniza a Dashboard com qualquer edição/exclusão feita na
-            // Gestão de Cargas, inclusive em outro PC/celular. Consulta somente
-            // uma versão leve e baixa o dashboard completo apenas quando mudou.
-            verificarVersaoOperacionalDashboard();
-            window.setInterval(() => verificarVersaoOperacionalDashboard(), 10000);
+            // Primeiro renderiza dados frescos do servidor; só depois guarda a
+            // versão-base das cargas. Isso evita considerar como "atual" uma
+            // Dashboard antiga que ficou aberta em outra aba/dispositivo.
+            Promise.resolve(executarBusca()).finally(() => {
+                verificarVersaoOperacionalDashboard();
+            });
+
+            // Versão exclusiva das cargas: é uma consulta mínima, sem cache, e
+            // não baixa o Dashboard inteiro quando nada mudou.
+            window.setInterval(() => verificarVersaoOperacionalDashboard(), 2500);
 
             const atualizarAoRetomar = () => {
                 if (!navigator.onLine || document.hidden) return;
-                verificarVersaoOperacionalDashboard();
-                if (!dashboardUltimaAtualizacaoServidor || (Date.now() - dashboardUltimaAtualizacaoServidor) > 45000) {
-                    executarBusca({ silencioso: true });
-                }
+                // Voltar para a aba/foco exige leitura nova imediatamente.
+                verificarVersaoOperacionalDashboard(true);
             };
             document.addEventListener('visibilitychange', atualizarAoRetomar);
             window.addEventListener('focus', atualizarAoRetomar);

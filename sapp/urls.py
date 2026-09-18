@@ -129,6 +129,7 @@ urlpatterns = [
     # ADICIONAR no urlpatterns
 
     # FASE 4 - Atualização ao vivo, feed e som
+    path('api/cargas/versao/', views.api_versao_cargas, name='api_versao_cargas'),
     path('api/cards/versao/', views.api_versao_cards, name='api_versao_cards'),
     path('api/cards/atualizacoes/', views.api_atualizacoes_recentes, name='api_atualizacoes_recentes'),
     path('api/cards/html/', views.api_html_cards_atualizados, name='api_html_cards'),

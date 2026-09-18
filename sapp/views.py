@@ -8456,6 +8456,10 @@ def dashboard_data(request):
                     'origem': origem_carga or ('AVULSA' if (numero_carga_mov or placa_identidade) else 'GERADA'),
                     'numero_carga': numero_carga_mov,
                     'data_hora': mov.data_hora,
+                    # Não confia mais apenas no primeiro movimento do grupo.
+                    # A data exibida é derivada de TODOS os movimentos ativos
+                    # da carga, evitando manter a data antiga após uma edição.
+                    'datas': set(),
                     'qtd': Decimal('0'),
                     'qtd_bag': Decimal('0'),
                     'qtd_sc': Decimal('0'),
@@ -8469,8 +8473,9 @@ def dashboard_data(request):
                 },
             )
 
-            # Como o queryset está do mais novo para o mais antigo,
-            # a primeira data já representa a última baixa da carga.
+            if data_identidade:
+                grupo['datas'].add(data_identidade)
+
             grupo['qtd'] += quantidade_mov
             grupo['equivalente_sc'] += equivalente_sc_mov
             grupo['baixas'] += 1
@@ -8532,26 +8537,39 @@ def dashboard_data(request):
             if grupo['baixas'] > 1:
                 cargas_multiplas_baixas += 1
 
-            data_local_carga = (
-                timezone.localtime(grupo['data_hora'])
-                if grupo['data_hora']
-                else None
-            )
+            datas_carga = sorted(grupo.get('datas') or [])
+            data_divergente = len(datas_carga) > 1
+            if len(datas_carga) == 1:
+                data_carga = datas_carga[0]
+                data_txt_carga = data_carga.strftime('%d/%m/%Y')
+                data_iso_carga = data_carga.isoformat()
+            elif data_divergente:
+                # Se algum movimento da mesma carga ainda estiver em outra data,
+                # não escondemos a divergência escolhendo silenciosamente a mais
+                # nova. Isso torna qualquer resíduo legado imediatamente visível.
+                data_carga = datas_carga[-1]
+                data_txt_carga = (
+                    f"{datas_carga[0].strftime('%d/%m/%Y')} a "
+                    f"{datas_carga[-1].strftime('%d/%m/%Y')}"
+                )
+                data_iso_carga = data_carga.isoformat()
+            else:
+                data_local_carga = (
+                    timezone.localtime(grupo['data_hora'])
+                    if grupo['data_hora']
+                    else None
+                )
+                data_txt_carga = data_local_carga.strftime('%d/%m/%Y') if data_local_carga else '--'
+                data_iso_carga = data_local_carga.strftime('%Y-%m-%d') if data_local_carga else ''
 
             cargas_lista.append({
                 'carga': grupo['carga'],
                 'origem': grupo.get('origem') or 'GERADA',
                 'numero_carga': grupo.get('numero_carga') or '',
-                'dt': (
-                    data_local_carga.strftime('%d/%m/%Y')
-                    if data_local_carga
-                    else '--'
-                ),
-                'data_iso': (
-                    data_local_carga.strftime('%Y-%m-%d')
-                    if data_local_carga
-                    else ''
-                ),
+                'dt': data_txt_carga,
+                'data_iso': data_iso_carga,
+                'data_divergente': data_divergente,
+                'datas': [dia.isoformat() for dia in datas_carga],
                 'qtd': _dashboard_numero(grupo['qtd']),
                 'qtd_bag': _dashboard_numero(grupo['qtd_bag']),
                 'qtd_sc': _dashboard_numero(grupo['qtd_sc']),
@@ -10194,6 +10212,43 @@ def exportar_estoque_excel(request):
 # ============================================================================
 # FASE 4 - ATUALIZAÇÃO AO VIVO, FEED E SOM
 # ============================================================================
+
+@login_required
+def api_versao_cargas(request):
+    """Versão leve e SEM CACHE das expedições/cargas.
+
+    A Dashboard usa este endpoint para perceber edição de quantidade, exclusão,
+    placa/cliente/motorista e, principalmente, mudança de DATA sem depender do
+    cache geral dos cards.  Uma criação nova muda o maior id de expedição; uma
+    correção/exclusão feita pela Gestão muda o último CargaAjusteLog.
+    """
+    from hashlib import md5
+    from django.db.models import Max
+    from .models import CargaAjusteLog
+
+    ativos = _expedicoes_ativas_qs().aggregate(
+        ultimo_id=Max('id'),
+        ultima_data=Max('data_hora'),
+    )
+    ultimo_ajuste = (
+        CargaAjusteLog.objects
+        .order_by('-id')
+        .values('id', 'criado_em')
+        .first()
+    )
+
+    hash_input = repr((ativos, ultimo_ajuste)).encode('utf-8')
+    version = md5(hash_input).hexdigest()
+    response = JsonResponse({
+        'success': True,
+        'version': version,
+        'timestamp': timezone.now().isoformat(),
+    })
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    response['Expires'] = '0'
+    return response
+
 
 @login_required
 def api_versao_cards(request):
@@ -16596,6 +16651,7 @@ def gestao_cargas(request):
             'nome_avulsa': nome_avulsa,
             'agrupada_por': agrupada_por,
             'data': mov.data_hora,
+            'datas': set(),
             'quantidade': Decimal('0'),
             'clientes': set(),
             'placas': set(),
@@ -16603,6 +16659,8 @@ def gestao_cargas(request):
             'lotes': set(),
             'movimentos': [],
         })
+        if data_mov:
+            grupo['datas'].add(data_mov)
         grupo['quantidade'] += Decimal(str(mov.quantidade or 0))
         if mov.cliente: grupo['clientes'].add(str(mov.cliente).strip())
         if mov.placa: grupo['placas'].add(str(mov.placa).strip().upper())
@@ -16617,8 +16675,17 @@ def gestao_cargas(request):
         grupo['placas_txt'] = ' / '.join(sorted(grupo['placas'])) or '--'
         grupo['motoristas_txt'] = ' / '.join(sorted(grupo['motoristas'])) or '--'
         grupo['lotes_txt'] = ', '.join(sorted(grupo['lotes'])) or '--'
-        grupo['data_txt'] = timezone.localtime(grupo['data']).strftime('%d/%m/%Y') if grupo['data'] else '--'
-        grupo['data_iso'] = timezone.localtime(grupo['data']).strftime('%Y-%m-%d') if grupo['data'] else ''
+        datas_grupo = sorted(grupo.get('datas') or [])
+        grupo['data_divergente'] = len(datas_grupo) > 1
+        if len(datas_grupo) == 1:
+            grupo['data_txt'] = datas_grupo[0].strftime('%d/%m/%Y')
+            grupo['data_iso'] = datas_grupo[0].isoformat()
+        elif datas_grupo:
+            grupo['data_txt'] = f"{datas_grupo[0].strftime('%d/%m/%Y')} a {datas_grupo[-1].strftime('%d/%m/%Y')}"
+            grupo['data_iso'] = datas_grupo[-1].isoformat()
+        else:
+            grupo['data_txt'] = timezone.localtime(grupo['data']).strftime('%d/%m/%Y') if grupo['data'] else '--'
+            grupo['data_iso'] = timezone.localtime(grupo['data']).strftime('%Y-%m-%d') if grupo['data'] else ''
         grupo['movimentos_ids'] = ','.join(str(m.id) for m in grupo['movimentos'])
         grupo['cliente_edicao'] = next(iter(grupo['clientes'])) if len(grupo['clientes']) == 1 else ''
         grupo['placa_edicao'] = next(iter(grupo['placas'])) if len(grupo['placas']) == 1 else ''
@@ -16781,6 +16848,53 @@ def editar_grupo_carga(request):
                     motivo=f'[AJUSTE DA CARGA] {motivo}',
                 )
 
+            # Uma carga GERADA possui duas trilhas históricas: a movimentação
+            # física e o HistoricoItemEmpenho do card. Antes, mudar a data na
+            # Gestão alterava somente a primeira e o sistema podia continuar
+            # carregando a data antiga em consultas derivadas. Ao editar a
+            # carga inteira, ambas passam a representar a mesma data operacional.
+            if nova_data and origem == 'GERADA' and movimentos:
+                numero_gerado = str(movimentos[0].numero_carga or '').strip()
+                if numero_gerado:
+                    titulo_gerado = (
+                        numero_gerado
+                        if numero_gerado.upper().startswith('CARGA ')
+                        else f'CARGA {numero_gerado}'
+                    )
+                    solicitacao_gerada = (
+                        Solicitacao.objects
+                        .filter(tipo_solicitacao='CARGA', titulo__iexact=titulo_gerado)
+                        .first()
+                    )
+                    if solicitacao_gerada:
+                        historicos_empenho = list(
+                            HistoricoItemEmpenho.objects
+                            .select_for_update()
+                            .filter(
+                                empenho__solicitacao=solicitacao_gerada,
+                                tipo='expedicao',
+                            )
+                        )
+                        atualizar_hie = []
+                        for hie in historicos_empenho:
+                            if not hie.processado_em:
+                                continue
+                            hora_hie = (
+                                timezone.localtime(hie.processado_em)
+                                .timetz()
+                                .replace(tzinfo=None)
+                            )
+                            hie.processado_em = timezone.make_aware(
+                                dt.combine(nova_data, hora_hie),
+                                timezone.get_current_timezone(),
+                            )
+                            atualizar_hie.append(hie)
+                        if atualizar_hie:
+                            HistoricoItemEmpenho.objects.bulk_update(
+                                atualizar_hie,
+                                ['processado_em'],
+                            )
+
             transaction.on_commit(_invalidar_dados_cargas)
             messages.success(
                 request,
@@ -16930,7 +17044,16 @@ def editar_movimento_carga(request, historico_id):
                         hie.quantidade = qtd_nova
                         if hist.cliente:
                             hie.cliente_solicitacao = hist.cliente
-                        hie.save(update_fields=['lote', 'quantidade', 'cliente_solicitacao'])
+                        campos_hie = ['lote', 'quantidade', 'cliente_solicitacao']
+                        if data_txt and hist.data_hora and hie.processado_em:
+                            nova_data_hie = timezone.localtime(hist.data_hora).date()
+                            hora_hie = timezone.localtime(hie.processado_em).timetz().replace(tzinfo=None)
+                            hie.processado_em = timezone.make_aware(
+                                dt.combine(nova_data_hie, hora_hie),
+                                timezone.get_current_timezone(),
+                            )
+                            campos_hie.append('processado_em')
+                        hie.save(update_fields=campos_hie)
                     total_mov = (
                         HistoricoItemEmpenho.objects
                         .filter(empenho__solicitacao=sol, tipo='expedicao')
