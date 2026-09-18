@@ -5594,102 +5594,123 @@ async function salvarEmpenho() {
         return;
     }
 
-    // EMPENHO: com internet confirmamos diretamente no servidor para que a
-    // reserva/status do card seja atualizado imediatamente. A fila local é
-    // usada somente quando o dispositivo estiver realmente offline.
-    if (window.InfinityOffline && !navigator.onLine) {
+    // FILA PRIMEIRO, INCLUSIVE ONLINE.
+    // A tela não espera o servidor: fecha o modal, marca o card e a bolinha
+    // confirma a sincronização logo atrás. A versão do lote vem da própria
+    // grade recém-carregada, evitando conflitos falsos por snapshot antigo.
+    if (window.InfinityOffline) {
+        const removerServidor = remover.filter(id => /^\d+$/.test(String(id)));
+        if (removerServidor.length !== remover.length) {
+            alert('Existe uma alteração deste empenho ainda aguardando sincronização. Aguarde a bolinha ficar verde antes de editar novamente.');
+            return;
+        }
+
         const idsAfetados = new Set(adicionar.map(x => Number(x.lote_id)));
         dataGrid.empenhadosData.forEach(item => {
-            if (remover.includes(item.id)) idsAfetados.add(Number(item.estoque_id));
+            if (removerServidor.includes(item.id)) idsAfetados.add(Number(item.estoque_id));
         });
-        const lotesAfetados = [...idsAfetados].map(estoqueId => {
-            const row = dataGrid.allData.find(x => Number(x.estoque_id || x.id) === Number(estoqueId))
-                || dataGrid.empenhadosData.find(x => Number(x.estoque_id) === Number(estoqueId));
-            return String(row?.lote || '').trim();
-        }).filter(Boolean);
-        const baseLotes = window.InfinityOffline.getLotVersions
-            ? await window.InfinityOffline.getLotVersions(lotesAfetados)
-            : Object.fromEntries(await Promise.all(lotesAfetados.map(async lote => [lote, await window.InfinityOffline.getLotVersion(lote)])));
-        await window.InfinityOffline.enqueue({
-            tipo: 'SOLICITACAO_EMPENHAR',
-            lote: '',
-            base_lote_versao: 0,
-            payload: {
-                solicitacao_id: solicId,
-                adicionar,
-                remover,
-                base_lote_versoes: baseLotes
+
+        const linhasAfetadas = [...idsAfetados].map(estoqueId =>
+            dataGrid.allData.find(x => Number(x.estoque_id || x.id) === Number(estoqueId))
+            || dataGrid.empenhadosData.find(x => Number(x.estoque_id) === Number(estoqueId))
+        ).filter(Boolean);
+
+        const baseLotes = {};
+        const lotesSemVersao = [];
+        linhasAfetadas.forEach(row => {
+            const lote = String(row?.lote || '').trim();
+            if (!lote) return;
+            if (row?.versao_lote !== undefined && row?.versao_lote !== null) {
+                baseLotes[lote] = Number(row.versao_lote || 0);
+            } else {
+                lotesSemVersao.push(lote);
             }
         });
-        // Atualização otimista do estado da grade deste aparelho.
-        dataGrid.empenhadosData = dataGrid.empenhadosData.filter(item => !remover.includes(item.id));
-        adicionar.forEach(item => {
-            const row = dataGrid.allData.find(x => Number(x.estoque_id || x.id) === Number(item.lote_id));
-            if (row) {
-                dataGrid.empenhadosData.push({
-                    ...row,
-                    id: `offline-${item.lote_id}-${Date.now()}`,
-                    estoque_id: Number(item.lote_id),
-                    quantidade: Number(item.quantidade),
-                    quantidade_empenhada: Number(item.quantidade),
-                    empenho_salvo: true,
-                    empenho_do_card_atual: true
+
+        if (lotesSemVersao.length) {
+            const fallback = window.InfinityOffline.getLotVersions
+                ? await window.InfinityOffline.getLotVersions(lotesSemVersao)
+                : Object.fromEntries(await Promise.all(lotesSemVersao.map(async lote => [lote, await window.InfinityOffline.getLotVersion(lote)])));
+            Object.assign(baseLotes, fallback || {});
+        }
+
+        salvandoEmpenhoAgora = true;
+        try {
+            await window.InfinityOffline.enqueue({
+                tipo: 'SOLICITACAO_EMPENHAR',
+                lote: '',
+                base_lote_versao: 0,
+                payload: {
+                    solicitacao_id: solicId,
+                    adicionar,
+                    remover: removerServidor,
+                    base_lote_versoes: baseLotes
+                }
+            }, () => {
+                // Estado otimista local: o operador continua trabalhando sem
+                // spinner. O servidor continua sendo a fonte final da verdade.
+                dataGrid.empenhadosData = dataGrid.empenhadosData.filter(item => !removerServidor.includes(item.id));
+                adicionar.forEach(item => {
+                    const row = dataGrid.allData.find(x => Number(x.estoque_id || x.id) === Number(item.lote_id));
+                    if (row) {
+                        dataGrid.empenhadosData.push({
+                            ...row,
+                            id: `fila-${item.lote_id}-${Date.now()}`,
+                            estoque_id: Number(item.lote_id),
+                            quantidade: Number(item.quantidade),
+                            quantidade_empenhada: Number(item.quantidade),
+                            empenho_salvo: true,
+                            empenho_do_card_atual: true
+                        });
+                    }
                 });
-            }
-        });
-        bootstrap.Modal.getInstance(document.getElementById('modalEmpenho'))?.hide();
-        marcarCardFila(solicId, 'Empenho offline na fila');
+                bootstrap.Modal.getInstance(document.getElementById('modalEmpenho'))?.hide();
+            });
+
+            marcarCardFila(
+                solicId,
+                navigator.onLine ? 'Empenho sincronizando' : 'Empenho offline na fila'
+            );
+        } catch (e) {
+            alert('❌ Não foi possível colocar o empenho na fila: ' + (e.message || 'erro desconhecido'));
+        } finally {
+            salvandoEmpenhoAgora = false;
+        }
         return;
     }
-    
+
+    // Fallback para navegador sem suporte ao módulo offline.
     const btn = document.getElementById('btnConfirmar');
     salvandoEmpenhoAgora = true;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Salvando...';
-    
     try {
-        // Remover itens
         for (const itemId of remover) {
             const rRemover = await fetch(`/api/solicitacoes/${solicId}/remover-item/${itemId}/`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type':'application/json',
-                    'X-CSRFToken':getCookie('csrftoken')
-                }
+                headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}
             });
             const dRemover = await rRemover.json().catch(() => ({}));
-            if (!rRemover.ok || !dRemover.success) {
-                throw new Error(dRemover.error || 'Erro ao remover item do empenho.');
-            }
+            if (!rRemover.ok || !dRemover.success) throw new Error(dRemover.error || 'Erro ao remover item do empenho.');
         }
-        
-        // Adicionar itens
         if (adicionar.length > 0) {
             const r = await fetch(`/api/solicitacoes/${solicId}/empenhar/`, {
-                method: 'POST', 
-                headers: {
-                    'Content-Type':'application/json',
-                    'X-CSRFToken':getCookie('csrftoken')
-                },
-                body: JSON.stringify({ itens: adicionar })
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')},
+                body: JSON.stringify({itens: adicionar})
             });
             const d = await r.json();
-            if (!d.success) throw new Error(d.error);
+            if (!r.ok || !d.success) throw new Error(d.error || 'Erro ao salvar empenho.');
         }
-        
-        bootstrap.Modal.getInstance(document.getElementById('modalEmpenho')).hide();
-        await Promise.allSettled([
-            carregarCards(),
-            carregarFeed()
-        ]);
-        alert('✅ Alterações salvas com sucesso!');
+        bootstrap.Modal.getInstance(document.getElementById('modalEmpenho'))?.hide();
+        carregarCards();
+        carregarFeed();
     } catch(e) {
         alert('❌ ' + (e.message || 'Erro'));
     } finally {
         salvandoEmpenhoAgora = false;
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-save me-1"></i> Salvar Alterações';
     }
+
 }
 
 // ==================== GERENCIADOR DE COLUNAS ====================
@@ -6864,12 +6885,14 @@ function marcarCardFila(solicitacaoId, texto = 'Operação na fila') {
 window.addEventListener('infinity:sync-finished', (event) => {
     const detail = event.detail || {};
     const concluidas = [...(detail.accepted || []), ...(detail.conflicts || []), ...(detail.rejected || [])];
-    if (!concluidas.some(item => ['SOLICITACAO_MOVIMENTAR','SOLICITACAO_EMPENHAR'].includes(String(item.tipo || '').toUpperCase()))) return;
+    if (!concluidas.some(item => ['SOLICITACAO_CRIAR','SOLICITACAO_MOVIMENTAR','SOLICITACAO_EMPENHAR'].includes(String(item.tipo || '').toUpperCase()))) return;
     // O clique já terminou. A atualização do card acontece depois, sem travar o
     // operador e sem recarregar a página inteira.
-    setTimeout(() => {
-        carregarCards();
-        carregarFeed();
+    setTimeout(async () => {
+        await Promise.allSettled([carregarCards(), carregarFeed()]);
+        // A próxima consulta leve parte do estado que acabou de chegar.
+        _ultimaVersao = null;
+        setTimeout(verificarAtualizacoes, 250);
     }, 0);
 });
 

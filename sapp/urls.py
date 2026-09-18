@@ -63,6 +63,7 @@ urlpatterns = [
     path('api/buscar-lotes/', views.api_buscar_lotes, name='api_buscar_lotes'),
     path('api/buscar-lote-completo/', views.api_buscar_lote_completo, name='api_buscar_lote_completo'),
     path('api/verificar-lote/', views.api_verificar_lote, name='api_verificar_lote'),
+    path('api/estoque/estado/', views.api_estoque_estado, name='api_estoque_estado'),
     path('api/estoque-resumo/', views.api_estoque_resumo, name='api_estoque_resumo'),
     path('api/ultimas-movimentacoes/', views.api_ultimas_movimentacoes, name='api_ultimas_movimentacoes'),
     path('api/itens-empenhos/', views.api_itens_empenhos, name='api_itens_empenhos'),

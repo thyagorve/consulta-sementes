@@ -1492,10 +1492,9 @@ Deseja continuar?`
                     quantidade: qtdValue,
                     payload
                 }, () => {
-                    const saldoEl = document.getElementById('transf_saldo_atual');
-                    const dispEl = document.getElementById('transf_disponivel_atual');
-                    if (saldoEl) saldoEl.textContent = String(Math.max(0, (Number(saldoEl.textContent)||0) - qtdValue));
-                    if (dispEl) dispEl.textContent = String(Math.max(0, (Number(dispEl.textContent)||0) - qtdValue));
+                    if (typeof window.aplicarTransferenciaOtimista === 'function') {
+                        window.aplicarTransferenciaOtimista(itemId, qtdValue, enderecoInput.value);
+                    }
                     bootstrap.Modal.getInstance(modal)?.hide();
                 });
                 isSubmitting = false;
@@ -1970,8 +1969,9 @@ function atualizarPesoTotal(input) {
                 }, ()=>{
                     const modalEl=this.closest('.modal');
                     bootstrap.Modal.getInstance(modalEl)?.hide();
-                    const saldo=modalEl?.querySelector('.fs-4.fw-bold.text-dark');
-                    if(saldo){ saldo.textContent=String(Math.max(0,(Number(saldo.textContent)||0)-qtd)); }
+                    if (typeof window.aplicarSaidaAvulsaOtimista === 'function') {
+                        window.aplicarSaidaAvulsaOtimista(Number(this.dataset.estoqueId), qtd);
+                    }
                 });
                 this.dataset.submitting='0';
                 return false;

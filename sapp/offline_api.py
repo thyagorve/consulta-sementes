@@ -477,15 +477,20 @@ def _aplicar_operacao(op, user, ignorar_conflito=False):
     qtd = _decimal_quantidade(payload.get('quantidade'))
 
     if tipo in {'SAIDA', 'EXPEDICAO', 'EXPEDICAO_AVULSA', 'BENEFICIAMENTO'}:
-        # Compatibilidade com filas criadas em versões anteriores: a operação
-        # EXPEDICAO_AVULSA por si só já define a origem, mesmo que o payload
-        # antigo ainda não tenha o campo origem_carga.
+        # Saídas avulsas/beneficiamento nunca podem consumir reserva de card.
+        # A fila precisa obedecer exatamente a mesma regra da operação online.
         if tipo == 'EXPEDICAO_AVULSA':
             payload['origem_carga'] = 'AVULSA'
-        if estoque.saldo < qtd:
-            raise ValueError(f'Saldo insuficiente. Saldo atual: {estoque.saldo} {estoque.embalagem}.')
+        disponivel = max(0, int(estoque.saldo or 0) - int(estoque.empenhado or 0))
+        if qtd > disponivel:
+            raise ValueError(
+                f'Quantidade indisponível. Saldo físico: {estoque.saldo}; '
+                f'empenhado: {estoque.empenhado}; disponível avulso: {disponivel} {estoque.embalagem}.'
+            )
         estoque.saida = int(estoque.saida or 0) + qtd
         estoque.save()
+        from .views import _validar_integridade_estoque
+        _validar_integridade_estoque(estoque)
         numero_avulsa = str(payload.get('numero_carga') or '').strip()
         descricao = f'Operação offline sincronizada: saída de {qtd} {estoque.embalagem} do lote {lote}.'
         if tipo == 'EXPEDICAO_AVULSA' and numero_avulsa:
@@ -503,15 +508,33 @@ def _aplicar_operacao(op, user, ignorar_conflito=False):
         return 'ACEITA', {'lote': lote, 'saldo': estoque.saldo, 'estoque_id': estoque.id}
 
     if tipo == 'TRANSFERENCIA':
-        destino_endereco = str(payload.get('endereco_destino') or '').strip()
+        destino_endereco = str(payload.get('endereco_destino') or '').strip().upper()
         if not destino_endereco:
             raise ValueError('Endereço de destino não informado.')
+        if str(estoque.endereco or '').strip().upper() == destino_endereco:
+            raise ValueError('O endereço de destino deve ser diferente do endereço atual.')
         if estoque.saldo < qtd:
             raise ValueError(f'Saldo insuficiente. Saldo atual: {estoque.saldo} {estoque.embalagem}.')
 
+        # Não mistura registros apenas porque lote/endereço são iguais. Os
+        # atributos físicos/comerciais precisam representar o mesmo estoque.
         destino = (
-            Estoque.objects.select_for_update()
-            .filter(lote__iexact=lote, endereco__iexact=destino_endereco)
+            Estoque.objects.select_for_update(of=('self',))
+            .filter(
+                lote__iexact=estoque.lote,
+                produto=estoque.produto,
+                cultivar=estoque.cultivar,
+                peneira=estoque.peneira,
+                categoria=estoque.categoria,
+                tratamento=estoque.tratamento,
+                especie=estoque.especie,
+                endereco__iexact=destino_endereco,
+                empresa=estoque.empresa,
+                embalagem=estoque.embalagem,
+                cliente=estoque.cliente,
+                peso_unitario=estoque.peso_unitario,
+            )
+            .order_by('id')
             .first()
         )
         if destino is None:
@@ -532,34 +555,56 @@ def _aplicar_operacao(op, user, ignorar_conflito=False):
                 empresa=estoque.empresa,
                 embalagem=estoque.embalagem,
                 peso_unitario=estoque.peso_unitario,
-                az=str(payload.get('az_destino') or ''),
+                az=str(payload.get('az_destino') or '').strip().upper(),
                 cliente=estoque.cliente,
+                observacao=estoque.observacao,
+                status_sistemico=estoque.status_sistemico,
             )
         else:
             destino.entrada = int(destino.entrada or 0) + qtd
+            destino.conferente = user
             destino.save()
 
         estoque.saida = int(estoque.saida or 0) + qtd
+        estoque.conferente = user
         estoque.save()
+
+        # Regra central: os livres saem primeiro; se a transferência ultrapassa
+        # o livre, a fração empenhada viaja junto para o novo endereço.
+        from .views import _realocar_empenho_apos_transferencia_avulsa, _validar_integridade_estoque
+        reserva_realocada = _realocar_empenho_apos_transferencia_avulsa(estoque, destino)
+        _validar_integridade_estoque(estoque, destino)
+
         HistoricoMovimentacao.objects.create(
             estoque=estoque,
             usuario=user,
             quantidade=qtd,
             tipo='Transferência (Saída)',
-            descricao=f'Operação offline sincronizada: {qtd} de {estoque.endereco} para {destino_endereco}.',
+            descricao=(
+                f'Operação da fila sincronizada: {qtd} de {estoque.endereco} para {destino_endereco}. '
+                f'Reserva acompanhando o lote: {reserva_realocada}.'
+            ),
         )
         HistoricoMovimentacao.objects.create(
             estoque=destino,
             usuario=user,
             quantidade=qtd,
             tipo='Transferência (Entrada)',
-            descricao=f'Operação offline sincronizada: {qtd} recebidos de {estoque.endereco}.',
+            descricao=f'Operação da fila sincronizada: {qtd} recebidos de {estoque.endereco}.',
         )
+        estoque.refresh_from_db(fields=['saldo', 'empenhado'])
+        destino.refresh_from_db(fields=['saldo', 'empenhado'])
         return 'ACEITA', {
             'lote': lote,
-            'saldo_origem': estoque.saldo,
             'estoque_origem_id': estoque.id,
+            'saldo_origem': estoque.saldo,
+            'empenhado_origem': estoque.empenhado,
+            'disponivel_origem': estoque.disponivel,
             'estoque_destino_id': destino.id,
+            'saldo_destino': destino.saldo,
+            'empenhado_destino': destino.empenhado,
+            'disponivel_destino': destino.disponivel,
+            'reserva_realocada': reserva_realocada,
         }
 
     raise ValueError(

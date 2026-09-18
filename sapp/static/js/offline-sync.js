@@ -9,7 +9,7 @@
   const DB_VERSION = 1;
   const SYNC_INTERVAL = 45000;
   const REFERENCE_REFRESH_MS = 10 * 60 * 1000;
-  const OFFLINE_CACHE_VERSION = '11.9';
+  const OFFLINE_CACHE_VERSION = '11.10';
   let softOffline = false;
   const WARN_QUEUE = 50;
   const CRITICAL_QUEUE = 200;

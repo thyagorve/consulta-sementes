@@ -166,10 +166,10 @@
             </section>
 
             <section class="form-section carga-field" style="display:none">
-                <div class="section-head"><div class="section-icon"><i class="fas fa-boxes"></i></div><div><strong>Itens da carga</strong><small>Na solicitação informe somente cliente, código e quantidade. O lote é definido no empenho.</small></div></div>
+                <div class="section-head"><div class="section-icon"><i class="fas fa-boxes"></i></div><div><strong>Itens da carga</strong><small>Na solicitação informe cliente e quantidade. O código é opcional; o lote é definido no empenho.</small></div></div>
                 <div class="info-strip">
                     <i class="fas fa-info-circle mt-1"></i>
-                    <div>A <strong>descrição</strong> é buscada pelo código em Configurações quando existir. Se o código não estiver cadastrado, a solicitação continua normalmente. Categoria, peneira, AZ, endereço e peso serão obtidos do lote empenhado.</div>
+                    <div>A <strong>descrição</strong> é buscada pelo código em Configurações quando existir. Se o código ficar em branco ou não estiver cadastrado, a solicitação continua normalmente. Categoria, peneira, AZ, endereço e peso serão obtidos do lote empenhado.</div>
                 </div>
                 <div class="load-box">
                     <div class="load-toolbar">
@@ -178,7 +178,7 @@
                     </div>
                     <div class="load-table-wrap">
                         <table class="table table-sm load-table">
-                            <thead><tr><th>Cliente *</th><th>Código *</th><th>Descrição</th><th style="width:130px">Qtd (opcional)</th><th style="width:52px"></th></tr></thead>
+                            <thead><tr><th>Cliente *</th><th>Código <span class="text-muted fw-normal">(opcional)</span></th><th>Descrição</th><th style="width:130px">Qtd (opcional)</th><th style="width:52px"></th></tr></thead>
                             <tbody id="cargaBody">
                             {% for item in itens_carga_edicao %}
                                 <tr class="carga-row {% if item.edicao_bloqueada %}row-locked{% endif %}" data-locked="{% if item.edicao_bloqueada %}1{% else %}0{% endif %}">
@@ -186,7 +186,7 @@
                                         <input type="hidden" name="carga_item_id[]" value="{{ item.id }}">
                                         <input name="carga_cliente[]" class="form-control carga-cliente" value="{{ item.cliente }}" required {% if item.edicao_bloqueada %}readonly{% endif %}>
                                     </td>
-                                    <td><input name="carga_codigo[]" class="form-control carga-codigo" value="{{ item.codigo }}" list="produtosCarga" required {% if item.edicao_bloqueada %}readonly{% endif %}></td>
+                                    <td><input name="carga_codigo[]" class="form-control carga-codigo" value="{{ item.codigo }}" list="produtosCarga" {% if item.edicao_bloqueada %}readonly{% endif %}></td>
                                     <td>
                                         <div class="product-info"><strong>{{ item.descricao|default:'Sem descrição cadastrada' }}</strong></div>
                                         {% if item.edicao_bloqueada %}<span class="lock-badge"><i class="fas fa-lock"></i>{{ item.quantidade_empenhada_edicao|stringformat:'g' }} empenhado(s)</span>{% endif %}
@@ -378,7 +378,7 @@ function addCargaRow(focarCliente = true) {
     tr.dataset.locked = '0';
     tr.innerHTML = `
         <td><input type="hidden" name="carga_item_id[]" value=""><input name="carga_cliente[]" class="form-control carga-cliente" required placeholder="Cliente"></td>
-        <td><input name="carga_codigo[]" class="form-control carga-codigo" list="produtosCarga" required placeholder="Código"></td>
+        <td><input name="carga_codigo[]" class="form-control carga-codigo" list="produtosCarga" placeholder="Opcional"></td>
         <td><div class="product-info text-muted">Sem descrição cadastrada</div></td>
         <td><input type="number" name="carga_quantidade[]" class="form-control carga-qtd" min="0" step="1" placeholder="Carga aberta"></td>
         <td><button type="button" class="btn-remove-line" title="Remover item"><i class="fas fa-trash"></i></button></td>`;
@@ -404,6 +404,8 @@ document.getElementById('placaCarga')?.addEventListener('input', function() {
 });
 updateTipo();
 
+const solicitacaoEmEdicaoId = Number('{{ solicitacao.id|default:"0" }}') || 0;
+
 document.getElementById('formSolicitacao').addEventListener('submit', async function(e) {
     if (isCarga()) {
         const rows = [...document.querySelectorAll('.carga-row')];
@@ -421,9 +423,10 @@ document.getElementById('formSolicitacao').addEventListener('submit', async func
         }
     }
 
-    // Nova solicitação/carga pode nascer offline. Para carga, o número oficial
-    // só será reservado pelo servidor no momento da sincronização.
-    if (!navigator.onLine && window.InfinityOffline) {
+    // Nova solicitação/carga também usa fila primeiro quando online. Assim o
+    // clique não fica preso em "Salvando...". Edições estruturais existentes
+    // continuam diretas porque precisam devolver validações na própria tela.
+    if (!solicitacaoEmEdicaoId && window.InfinityOffline) {
         e.preventDefault();
         const fd = new FormData(this);
         const entries = [];
@@ -443,8 +446,8 @@ document.getElementById('formSolicitacao').addEventListener('submit', async func
             payload: { form_entries: entries }
         });
         alert(isCarga()
-            ? '✅ Carga salva neste dispositivo. O número oficial será gerado quando sincronizar.'
-            : '✅ Solicitação salva neste dispositivo e aguardando sincronização.');
+            ? (navigator.onLine ? '✅ Carga enviada para a fila. O número oficial será confirmado em segundos.' : '✅ Carga salva neste dispositivo. O número oficial será gerado quando sincronizar.')
+            : (navigator.onLine ? '✅ Solicitação enviada para a fila de sincronização.' : '✅ Solicitação salva neste dispositivo e aguardando sincronização.'));
         window.location.href = '/solicitacoes/';
         return;
     }

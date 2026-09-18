@@ -338,6 +338,9 @@
                     {% for item in estoque %}
                     <tr onclick="toggleDetails('details-{{ item.id }}')" style="cursor: pointer;" class="align-middle"
                         data-stock-id="{{ item.id }}"
+                        data-lote="{{ item.lote|escape }}"
+                        data-endereco="{{ item.endereco|escape }}"
+                        data-embalagem="{{ item.embalagem|escape }}"
                         data-saldo="{{ item.saldo }}"
                         data-disponivel="{{ item.disponivel_ui }}"
                         data-empenhado="{{ item.empenhado }}"
@@ -545,6 +548,170 @@
 let scannerAtivo = false;
 let html5QrCode = null;
 let scannerIniciando = false;
+let estoqueLiveInFlight = false;
+
+function aplicarEstadoEstoqueLinha(estado) {
+    if (!estado || !estado.id) return;
+    const row = document.querySelector(`tr[data-stock-id="${estado.id}"]`);
+    if (!row) return;
+
+    const saldo = Math.max(0, Number(estado.saldo || 0));
+    const empenhado = Math.max(0, Number(estado.empenhado || 0));
+    const disponivel = Math.max(0, Number(estado.disponivel ?? (saldo - empenhado)));
+    const embalagem = String(estado.embalagem || row.dataset.embalagem || '');
+
+    row.dataset.saldo = String(saldo);
+    row.dataset.empenhado = String(empenhado);
+    row.dataset.disponivel = String(disponivel);
+    if (estado.lote !== undefined) row.dataset.lote = String(estado.lote || '');
+    if (estado.endereco !== undefined) row.dataset.endereco = String(estado.endereco || '');
+
+    const saldoPill = row.querySelector('.stock-mini-pill.saldo');
+    const dispPill = row.querySelector('.stock-mini-pill.disponivel');
+    const summary = row.querySelector('.stock-summary-inline');
+    if (saldoPill) saldoPill.textContent = `Saldo ${saldo}`;
+    if (dispPill) dispPill.textContent = `Disp. ${disponivel} ${embalagem}`;
+
+    let empPill = row.querySelector('.stock-mini-pill.empenhado');
+    if (empenhado > 0) {
+        if (!empPill && summary && dispPill) {
+            empPill = document.createElement('span');
+            empPill.className = 'stock-mini-pill empenhado';
+            empPill.title = 'Reserva vinculada a este registro';
+            summary.insertBefore(empPill, dispPill);
+        }
+        if (empPill) empPill.textContent = `Emp. ${empenhado}`;
+    } else if (empPill) {
+        empPill.remove();
+    }
+
+    const flowIn = row.querySelector('.flow-in');
+    const flowOut = row.querySelector('.flow-out, .flow-zero');
+    if (flowIn && estado.entrada !== undefined) flowIn.innerHTML = `<i class="fas fa-arrow-down"></i> ${Number(estado.entrada || 0)}`;
+    if (flowOut && estado.saida !== undefined) {
+        flowOut.classList.toggle('flow-out', Number(estado.saida || 0) > 0);
+        flowOut.classList.toggle('flow-zero', Number(estado.saida || 0) <= 0);
+        flowOut.innerHTML = `<i class="fas fa-arrow-up"></i> ${Number(estado.saida || 0)}`;
+    }
+
+    const statusCell = row.querySelector('td:last-child');
+    if (statusCell) {
+        statusCell.innerHTML = disponivel > 0
+            ? `<span class="badge bg-success bg-opacity-10 text-success border border-success">${disponivel} disponível</span>`
+            : (saldo > 0 && empenhado > 0
+                ? '<span class="badge bg-warning bg-opacity-10 text-warning-emphasis border border-warning">Reservado</span>'
+                : '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Esgotado</span>');
+    }
+
+    const modalSaida = document.getElementById(`modalSaida${estado.id}`);
+    const qtdSaida = modalSaida?.querySelector('[name="quantidade_saida"]');
+    if (qtdSaida) qtdSaida.max = String(disponivel);
+}
+
+function aplicarTransferenciaOtimista(origemId, quantidade, enderecoDestino) {
+    const row = document.querySelector(`tr[data-stock-id="${origemId}"]`);
+    if (!row) return;
+    const qtd = Math.max(0, Number(quantidade || 0));
+    const saldoAntes = Number(row.dataset.saldo || 0);
+    const empAntes = Number(row.dataset.empenhado || 0);
+    const dispAntes = Math.max(0, saldoAntes - empAntes);
+    const saldoDepois = Math.max(0, saldoAntes - qtd);
+    const reservaMovida = Math.max(0, Math.min(empAntes, qtd - Math.min(qtd, dispAntes)));
+    const empDepois = Math.max(0, empAntes - reservaMovida);
+
+    aplicarEstadoEstoqueLinha({
+        id: Number(origemId),
+        lote: row.dataset.lote || '',
+        endereco: row.dataset.endereco || '',
+        saldo: saldoDepois,
+        empenhado: empDepois,
+        disponivel: Math.max(0, saldoDepois - empDepois),
+        embalagem: row.dataset.embalagem || ''
+    });
+
+    const destinoNorm = String(enderecoDestino || '').trim().toUpperCase();
+    const loteNorm = String(row.dataset.lote || '').trim().toUpperCase();
+    const destinoRow = [...document.querySelectorAll('tr[data-stock-id]')].find(r =>
+        String(r.dataset.lote || '').trim().toUpperCase() === loteNorm
+        && String(r.dataset.endereco || '').trim().toUpperCase() === destinoNorm
+        && Number(r.dataset.stockId || 0) !== Number(origemId)
+    );
+    if (destinoRow) {
+        const destSaldo = Number(destinoRow.dataset.saldo || 0) + qtd;
+        const destEmp = Number(destinoRow.dataset.empenhado || 0) + reservaMovida;
+        aplicarEstadoEstoqueLinha({
+            id: Number(destinoRow.dataset.stockId),
+            lote: destinoRow.dataset.lote || '',
+            endereco: destinoRow.dataset.endereco || '',
+            saldo: destSaldo,
+            empenhado: destEmp,
+            disponivel: Math.max(0, destSaldo - destEmp),
+            embalagem: destinoRow.dataset.embalagem || ''
+        });
+    }
+}
+
+function aplicarSaidaAvulsaOtimista(estoqueId, quantidade) {
+    const row = document.querySelector(`tr[data-stock-id="${estoqueId}"]`);
+    if (!row) return;
+    const qtd = Math.max(0, Number(quantidade || 0));
+    const saldo = Math.max(0, Number(row.dataset.saldo || 0) - qtd);
+    const empenhado = Math.max(0, Number(row.dataset.empenhado || 0));
+    aplicarEstadoEstoqueLinha({
+        id: Number(estoqueId),
+        lote: row.dataset.lote || '',
+        endereco: row.dataset.endereco || '',
+        saldo,
+        empenhado,
+        disponivel: Math.max(0, saldo - empenhado),
+        embalagem: row.dataset.embalagem || ''
+    });
+}
+
+window.aplicarTransferenciaOtimista = aplicarTransferenciaOtimista;
+window.aplicarSaidaAvulsaOtimista = aplicarSaidaAvulsaOtimista;
+
+async function atualizarEstoqueVisivel(idsEspecificos = null) {
+    if (estoqueLiveInFlight || !navigator.onLine || document.visibilityState === 'hidden') return;
+    let ids = Array.isArray(idsEspecificos) ? idsEspecificos.map(Number).filter(Boolean) : [];
+    if (!ids.length) {
+        ids = [...document.querySelectorAll('tr[data-stock-id]')]
+            .map(row => Number(row.dataset.stockId || 0))
+            .filter(Boolean);
+    }
+    ids = [...new Set(ids)].slice(0, 200);
+    if (!ids.length) return;
+    estoqueLiveInFlight = true;
+    try {
+        const r = await fetch(`/api/estoque/estado/?ids=${encodeURIComponent(ids.join(','))}`, {cache:'no-store'});
+        const data = await r.json();
+        if (r.ok && data.success) (data.itens || []).forEach(aplicarEstadoEstoqueLinha);
+    } catch (_) {
+        // Offline/instabilidade: a fila e o snapshot continuam responsáveis.
+    } finally {
+        estoqueLiveInFlight = false;
+    }
+}
+
+window.addEventListener('infinity:sync-finished', event => {
+    const aceitas = event.detail?.accepted || [];
+    const tiposEstoque = new Set(['TRANSFERENCIA','EXPEDICAO_AVULSA','BENEFICIAMENTO','SAIDA','EXPEDICAO']);
+    const relevantes = aceitas.filter(item => tiposEstoque.has(String(item.tipo || '').toUpperCase()));
+    if (!relevantes.length) return;
+    const ids = [];
+    relevantes.forEach(item => {
+        const result = item.resultado || {};
+        [result.estoque_id, result.estoque_origem_id, result.estoque_destino_id].forEach(id => {
+            if (Number(id) > 0) ids.push(Number(id));
+        });
+    });
+    setTimeout(() => atualizarEstoqueVisivel(ids), 0);
+});
+
+setInterval(() => atualizarEstoqueVisivel(), 15000);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') atualizarEstoqueVisivel();
+});
 
 // ============================================
 // 1. INICIALIZAÇÃO PRINCIPAL

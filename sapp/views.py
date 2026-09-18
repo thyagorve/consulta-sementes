@@ -1129,6 +1129,7 @@ def registrar_saida(request, id):
                     item.observacao = obs_historico
                 
                 item.save()
+                _validar_integridade_estoque(item)
                 print(f"✅ Item atualizado: {item.lote} | Saldo anterior: {saldo_anterior} → Novo saldo: {item.saldo}")
 
                 # 5. Descrição Rica em HTML para o Histórico
@@ -1215,30 +1216,75 @@ def registrar_saida(request, id):
 
 from django.views.decorators.csrf import csrf_protect
 
+def _validar_integridade_estoque(*registros):
+    """
+    Barreira final das operações físicas.
+
+    O backend nunca confirma uma operação que deixe:
+    - saldo físico negativo;
+    - empenho negativo;
+    - empenho maior que o saldo físico do endereço.
+
+    Deve ser chamada dentro de transaction.atomic(); qualquer erro provoca
+    rollback da movimentação inteira.
+    """
+    vistos = set()
+    for registro in registros:
+        if not registro or not getattr(registro, 'pk', None) or registro.pk in vistos:
+            continue
+        vistos.add(registro.pk)
+        atual = Estoque.objects.select_for_update(of=('self',)).get(pk=registro.pk)
+        saldo = int(atual.saldo or 0)
+        empenhado = int(atual.empenhado or 0)
+        if saldo < 0:
+            raise ValueError(
+                f'Integridade do estoque: o lote {atual.lote} ficaria com saldo negativo ({saldo}) '
+                f'no endereço {atual.endereco}. Operação cancelada.'
+            )
+        if empenhado < 0:
+            raise ValueError(
+                f'Integridade do estoque: o lote {atual.lote} possui empenho negativo ({empenhado}). '
+                'Operação cancelada.'
+            )
+        if empenhado > saldo:
+            raise ValueError(
+                f'Integridade do estoque: o lote {atual.lote} ficaria com {empenhado} empenhado(s) '
+                f'e apenas {saldo} físico(s) no endereço {atual.endereco}. Operação cancelada.'
+            )
+    return True
+
+
 def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
     """
-    Mantém o empenho vivo quando uma transferência AVULSA desloca fisicamente
-    um lote para outro endereço.
+    Faz a reserva acompanhar o lote numa transferência física avulsa.
 
-    A reserva só é realocada se o saldo restante da origem não for suficiente
-    para sustentar o empenho atualmente vinculado àquele registro.
-    A transferência não consome a reserva. O consumo continua acontecendo
-    apenas nas movimentações feitas pelo card.
+    Exemplo: origem = 10 físicos / 5 empenhados. Ao transferir 7, os 5 livres
+    saem primeiro e 2 unidades da reserva passam para o destino. A solicitação,
+    o item comercial da carga e a quantidade reservada continuam os mesmos.
     """
     origem.refresh_from_db(fields=['saldo', 'empenhado'])
     destino.refresh_from_db(fields=['saldo', 'empenhado'])
 
     excesso = max(0, int(origem.empenhado or 0) - int(origem.saldo or 0))
     if excesso <= 0:
+        _validar_integridade_estoque(origem, destino)
         return 0
 
     itens = list(
         ItemEmpenho.objects
         .select_for_update()
-        .filter(estoque=origem)
+        .filter(estoque=origem, quantidade__gt=0)
         .select_related('empenho')
         .order_by('id')
     )
+
+    reservado_rastreavel = sum(int(item.quantidade or 0) for item in itens)
+    if reservado_rastreavel < excesso:
+        raise ValueError(
+            f'Integridade do empenho: o lote {origem.lote} precisa mover {excesso} unidade(s) '
+            f'de reserva, mas somente {reservado_rastreavel} estão vinculadas a itens de empenho. '
+            'A transferência foi cancelada para não perder rastreabilidade.'
+        )
 
     restante = excesso
     movido = 0
@@ -1252,10 +1298,15 @@ def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
         if qtd_mover <= 0:
             continue
 
+        # Não mistura duas linhas comerciais diferentes da mesma carga.
         destino_item = (
             ItemEmpenho.objects
             .select_for_update()
-            .filter(empenho=item.empenho, estoque=destino)
+            .filter(
+                empenho_id=item.empenho_id,
+                estoque=destino,
+                item_carga_id=item.item_carga_id,
+            )
             .first()
         )
 
@@ -1264,8 +1315,8 @@ def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
                 ItemEmpenho.objects.filter(pk=destino_item.pk).update(
                     quantidade=F('quantidade') + qtd_mover
                 )
-                # QuerySet.delete() é intencional: não chama ItemEmpenho.delete(),
-                # pois os contadores de estoque são ajustados manualmente abaixo.
+                # QuerySet.delete() evita disparar ItemEmpenho.delete(), pois os
+                # contadores são realocados manualmente ao final desta função.
                 ItemEmpenho.objects.filter(pk=item.pk).delete()
             else:
                 ItemEmpenho.objects.filter(pk=item.pk).update(estoque=destino)
@@ -1279,11 +1330,10 @@ def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
                     quantidade=F('quantidade') + qtd_mover
                 )
             else:
-                # Criação por bulk_create para preservar o snapshot original
-                # sem disparar ItemEmpenho.save() e duplicar os contadores.
                 clone = ItemEmpenho(
-                    empenho=item.empenho,
+                    empenho_id=item.empenho_id,
                     estoque=destino,
+                    item_carga_id=item.item_carga_id,
                     quantidade=qtd_mover,
                     endereco_origem=item.endereco_origem,
                     endereco_destino=item.endereco_destino,
@@ -1299,6 +1349,9 @@ def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
                     embalagem_snapshot=item.embalagem_snapshot,
                     empresa_snapshot=item.empresa_snapshot,
                     cliente_snapshot=item.cliente_snapshot,
+                    cliente_solicitacao_snapshot=item.cliente_solicitacao_snapshot,
+                    codigo_produto_snapshot=item.codigo_produto_snapshot,
+                    descricao_produto_snapshot=item.descricao_produto_snapshot,
                     az_origem=item.az_origem,
                     peso_unitario_snapshot=item.peso_unitario_snapshot,
                     observacao_snapshot=item.observacao_snapshot,
@@ -1309,16 +1362,24 @@ def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
         restante -= qtd_mover
         movido += qtd_mover
 
-    if movido:
-        Estoque.objects.filter(pk=origem.pk).update(
-            empenhado=F('empenhado') - movido
+    if restante > 0 or movido != excesso:
+        raise ValueError(
+            f'Não foi possível acompanhar integralmente o empenho do lote {origem.lote}. '
+            'A transferência foi cancelada.'
         )
-        Estoque.objects.filter(pk=destino.pk).update(
-            empenhado=F('empenhado') + movido
-        )
-        origem.refresh_from_db(fields=['saldo', 'empenhado'])
-        destino.refresh_from_db(fields=['saldo', 'empenhado'])
 
+    Estoque.objects.filter(pk=origem.pk).update(
+        empenhado=F('empenhado') - movido
+    )
+    Estoque.objects.filter(pk=destino.pk).update(
+        empenhado=F('empenhado') + movido
+    )
+    origem.refresh_from_db(fields=['saldo', 'empenhado'])
+    destino.refresh_from_db(fields=['saldo', 'empenhado'])
+
+    _validar_integridade_estoque(origem, destino)
+    if movido:
+        cache.delete('cards_version_hash')
     return movido
 
 
@@ -1410,6 +1471,7 @@ def transferir(request, id):
                     for f in request.FILES.getlist('fotos'):
                         FotoMovimentacao.objects.create(historico=historico_beneficiamento, arquivo=f)
                     
+                    _validar_integridade_estoque(origem)
                     messages.success(
                         request, 
                         f"✅ Lote enviado para beneficiamento! Quantidade baixada: {qtd} {origem.embalagem}"
@@ -1471,6 +1533,7 @@ def transferir(request, id):
                     # Primeiro, montar dicionário com todos os campos EXCETO saldo__gt
                     campos_base = {
                         'lote': origem.lote,
+                        'produto': request.POST.get('produto', origem.produto or ''),
                         'cultivar': obj_cultivar,
                         'especie': obj_especie,
                         'peneira': obj_peneira,
@@ -1480,24 +1543,36 @@ def transferir(request, id):
                         'empresa': request.POST.get('empresa', origem.empresa or ''),
                         'cliente': request.POST.get('cliente', origem.cliente or ''),
                         'endereco': novo_end,
+                        'az': request.POST.get('az', origem.az or ''),
                     }
                     
                     # Buscar registro existente com MESMO PESO
-                    destino_existente = Estoque.objects.filter(
-                        **campos_base,
-                        peso_unitario=novo_peso,
-                        saldo__gt=0  # 🔥 AGORA CORRETO: um único argumento saldo__gt
-                    ).first()
+                    destino_existente = (
+                        Estoque.objects
+                        .select_for_update(of=('self',))
+                        .filter(
+                            **campos_base,
+                            peso_unitario=novo_peso,
+                            saldo__gt=0
+                        )
+                        .order_by('id')
+                        .first()
+                    )
                     
                     # 🔥 CORREÇÃO: Buscar registro com PESO DIFERENTE
                     destino_peso_diferente = None
                     if not destino_existente:
-                        destino_peso_diferente = Estoque.objects.filter(
-                            **campos_base,  # Mesmos campos base
-                            saldo__gt=0  # 🔥 AGORA CORRETO
-                        ).exclude(
-                            peso_unitario=novo_peso  # Exclui quem tem o mesmo peso
-                        ).first()
+                        destino_peso_diferente = (
+                            Estoque.objects
+                            .select_for_update(of=('self',))
+                            .filter(
+                                **campos_base,
+                                saldo__gt=0
+                            )
+                            .exclude(peso_unitario=novo_peso)
+                            .order_by('id')
+                            .first()
+                        )
                     
                     if destino_existente:
                         # 🔥 CASO 1: MESMO PESO - PODE SOMAR
@@ -1740,6 +1815,8 @@ def nova_entrada(request):
                 endereco = normalizar_texto_cadastro(request.POST.get('endereco', ''))
                 produto = _normalizar_codigo_produto(request.POST.get('produto', ''))
                 qtd = int(request.POST.get('entrada', 0))
+                if qtd <= 0:
+                    raise ValueError('A quantidade de entrada deve ser maior que zero.')
                 
                 # 🔥 NOVO: Capturar o checkbox
                 ultimo_lote_linha = request.POST.get('ultimo_lote_linha') == 'on'
@@ -1776,13 +1853,19 @@ def nova_entrada(request):
                     produto = produto_resolvido
 
                 # Buscar item existente
-                item = Estoque.objects.filter(
-                    lote=lote, 
-                    endereco=endereco,
-                    produto=produto,
-                    cultivar=cultivar,
-                    peso_unitario=novo_peso
-                ).first()
+                item = (
+                    Estoque.objects
+                    .select_for_update(of=('self',))
+                    .filter(
+                        lote=lote,
+                        endereco=endereco,
+                        produto=produto,
+                        cultivar=cultivar,
+                        peso_unitario=novo_peso,
+                    )
+                    .order_by('id')
+                    .first()
+                )
                 
                 if item:
                     # Soma ao existente
@@ -1850,6 +1933,7 @@ def nova_entrada(request):
                 
                 _aplicar_produto_ao_lote_por_codigo(item, produto_obj)
                 item.save()
+                _validar_integridade_estoque(item)
                 
                 # Calcular peso total
                 if item.peso_unitario and item.peso_unitario > 0:
@@ -1882,6 +1966,7 @@ def nova_entrada(request):
 
 @login_required
 @permission_required('sapp.pode_ver_estoque', raise_exception=True)
+@transaction.atomic
 def nova_saida(request):
     print("veio aqui na função  nova_saida")
     """Registra uma nova saída geral (para qualquer lote)"""
@@ -1898,7 +1983,7 @@ def nova_saida(request):
                 messages.error(request, "❌ Dados inválidos.")
                 return redirect('sapp:lista_estoque')
             
-            item = Estoque.objects.get(id=lote_id)
+            item = Estoque.objects.select_for_update(of=('self',)).get(id=lote_id)
             
             disponivel_avulso = max(0, int(item.disponivel or 0))
             if quantidade > disponivel_avulso:
@@ -1938,6 +2023,7 @@ def nova_saida(request):
                     item.observacao = f"[EXPEDIÇÃO GERAL {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}]: {observacao}"
             
             item.save()
+            _validar_integridade_estoque(item)
             
             # Registrar histórico
             historico = HistoricoMovimentacao.objects.create(
@@ -1969,8 +2055,10 @@ def nova_saida(request):
             messages.success(request, f"✅ Expedição de {quantidade} unidades registrada para o lote {item.lote}!")
             
         except Estoque.DoesNotExist:
+            transaction.set_rollback(True)
             messages.error(request, "❌ Lote não encontrado.")
         except Exception as e:
+            transaction.set_rollback(True)
             messages.error(request, f"❌ Erro ao registrar expedição: {str(e)}")
             import traceback
             print(f"🔍 Erro detalhado: {traceback.format_exc()}")
@@ -2274,6 +2362,10 @@ def editar(request, id):
     if request.method == 'POST':
         try:
             with transaction.atomic():
+                # Releitura bloqueada: evita que uma edição administrativa
+                # concorra com transferência/expedição do mesmo endereço.
+                item = Estoque.objects.select_for_update(of=('self',)).get(pk=id)
+
                 # 1. CAPTURA O ESTADO ANTIGO (Para histórico)
                 antigo = {
                     'lote': item.lote,
@@ -2405,6 +2497,21 @@ def editar(request, id):
                     if str(valor_antigo or '') != str(valor_novo or ''):
                         mudancas.append(f"{label}: {valor_antigo} → <b>{valor_novo}</b>")
 
+                # Antes de alterar a entrada, protege as duas invariantes
+                # centrais do estoque: físico nunca negativo e reserva nunca
+                # maior que o físico. A saída histórica não é apagada pela edição.
+                saldo_resultante = int(nova_entrada or 0) - int(item.saida or 0)
+                if saldo_resultante < 0:
+                    raise ValueError(
+                        f'A entrada não pode ser reduzida para {nova_entrada}: existem '
+                        f'{item.saida} unidade(s) de saída já registradas. Saldo resultaria em {saldo_resultante}.'
+                    )
+                if int(item.empenhado or 0) > saldo_resultante:
+                    raise ValueError(
+                        f'A edição deixaria apenas {saldo_resultante} unidade(s) físicas, mas '
+                        f'{item.empenhado} estão empenhadas. Libere/movimente o empenho antes de reduzir a entrada.'
+                    )
+
                 # 5. ATUALIZAR O OBJETO
                 item.lote = novo_lote
                 item.endereco = novo_endereco
@@ -2430,6 +2537,7 @@ def editar(request, id):
                 
                 # 6. SALVAR (o método save() recalcula saldo e peso_total automaticamente)
                 item.save()
+                _validar_integridade_estoque(item)
 
                 # 7. VERIFICAR SE HOUVE MUDANÇA NA QUANTIDADE E CRIAR HISTÓRICO ESPECÍFICO
                 if antigo['entrada'] != nova_entrada:
@@ -4536,6 +4644,38 @@ def api_verificar_lote(request):
 
 @login_required
 @permission_required('sapp.pode_ver_estoque', raise_exception=True)
+def api_estoque_estado(request):
+    """Retorna somente saldos dos registros visíveis para atualização leve da tela."""
+    ids_raw = request.GET.get('ids', '')
+    ids = []
+    for parte in str(ids_raw or '').split(','):
+        parte = parte.strip()
+        if parte.isdigit():
+            ids.append(int(parte))
+    ids = list(dict.fromkeys(ids))[:200]
+    if not ids:
+        return JsonResponse({'success': True, 'itens': []})
+
+    itens = []
+    for item in Estoque.objects.filter(id__in=ids).only(
+        'id', 'lote', 'endereco', 'saldo', 'empenhado', 'embalagem', 'entrada', 'saida'
+    ):
+        itens.append({
+            'id': item.id,
+            'lote': item.lote or '',
+            'endereco': item.endereco or '',
+            'saldo': int(item.saldo or 0),
+            'empenhado': int(item.empenhado or 0),
+            'disponivel': max(0, int(item.saldo or 0) - int(item.empenhado or 0)),
+            'entrada': int(item.entrada or 0),
+            'saida': int(item.saida or 0),
+            'embalagem': item.embalagem or '',
+        })
+    return JsonResponse({'success': True, 'itens': itens})
+
+
+@login_required
+@permission_required('sapp.pode_ver_estoque', raise_exception=True)
 def api_estoque_resumo(request):
     """API para resumo do estoque (usado no dashboard)"""
     total_lotes = Estoque.objects.count()
@@ -4933,8 +5073,14 @@ def pagina_rascunho(request):
                                 processado_por=user
                             )
                         
-                        # SÓ AGORA excluir o item processado
+                        # SÓ AGORA excluir o item processado. O delete libera a
+                        # reserva consumida por esta operação; a barreira abaixo
+                        # garante que nenhum caminho legado deixe saldo/empenho inválido.
                         item.delete()
+                        _validar_integridade_estoque(
+                            origem,
+                            destino if acao == 'transferir' else None,
+                        )
                     
                     # Atualizar status do card
                     empenho.refresh_from_db()
@@ -10031,7 +10177,15 @@ def api_versao_cards(request):
             total=Count('id'),
             ultimo=Max('criado_em'),
         )
-        hash_input = repr((cards_state, avulsas_state, ajustes_state)).encode('utf-8')
+        # Se um lote empenhado muda de endereço por uma transferência física,
+        # a solicitação em si não muda. Incluímos a movimentação física atual
+        # dos estoques vinculados ao empenho para o outro PC/celular atualizar
+        # o endereço sem precisar de F5.
+        empenhos_state = ItemEmpenho.objects.aggregate(
+            total=Count('id'),
+            atualizado=Max('estoque__data_ultima_movimentacao'),
+        )
+        hash_input = repr((cards_state, avulsas_state, ajustes_state, empenhos_state)).encode('utf-8')
         version = md5(hash_input).hexdigest()
         cache.set(cache_key, version, 10)
 
@@ -10556,10 +10710,10 @@ def _ler_itens_carga_post(request):
     """
     Lê as linhas comerciais da carga.
 
-    A solicitação guarda somente cliente + código + quantidade.
-    A descrição é apenas um complemento do cadastro Produto e NÃO é
-    obrigatória. Lote, categoria, peneira, AZ, endereço e peso pertencem
-    ao lote escolhido no empenho.
+    A solicitação guarda cliente + código opcional + quantidade.
+    Quando o código fica em branco, a linha comercial pode ser atendida por
+    qualquer lote compatível com os demais filtros; o lote é escolhido no empenho.
+    A descrição é apenas um complemento do cadastro Produto.
     """
     ids = request.POST.getlist('carga_item_id[]') or request.POST.getlist('carga_item_id')
     clientes = request.POST.getlist('carga_cliente[]') or request.POST.getlist('carga_cliente')
@@ -10578,9 +10732,9 @@ def _ler_itens_carga_post(request):
         if not any([item_id_txt, cliente, codigo, qtd_txt]):
             continue
 
-        if not cliente or not codigo:
+        if not cliente:
             raise ValueError(
-                f'Linha {idx + 1} da carga: Cliente e Código são obrigatórios.'
+                f'Linha {idx + 1} da carga: Cliente é obrigatório.'
             )
 
         # Quantidade vazia/zero significa CARGA ABERTA: não existe teto de empenho.
@@ -10605,6 +10759,7 @@ def _ler_itens_carga_post(request):
             Produto.objects
             .filter(codigo__iexact=codigo)
             .first()
+            if codigo else None
         )
 
         itens.append({
@@ -11884,7 +12039,10 @@ def api_lotes_disponiveis_para_solicitacao(
     if solicitacao.tipo_solicitacao == 'CARGA':
         if item_carga_ativo:
             codigo_item = _normalizar_codigo_produto(item_carga_ativo.codigo)
-            qs = qs.filter(produto_normalizado=codigo_item)
+            # Código vazio = linha comercial aberta. O operador escolhe o lote
+            # no empenho sem o sistema inventar um código para a solicitação.
+            if codigo_item:
+                qs = qs.filter(produto_normalizado=codigo_item)
         else:
             qs = qs.none()
     else:
@@ -11932,8 +12090,9 @@ def api_lotes_disponiveis_para_solicitacao(
                 str(item_carga_ativo.categoria or ''),
                 str(item_carga_ativo.peneira or ''),
             ]).casefold()
-            if termo in texto_item:
-                filtro_busca |= Q(produto_normalizado=_normalizar_codigo_produto(item_carga_ativo.codigo))
+            codigo_ativo_busca = _normalizar_codigo_produto(item_carga_ativo.codigo)
+            if termo in texto_item and codigo_ativo_busca:
+                filtro_busca |= Q(produto_normalizado=codigo_ativo_busca)
 
         qs = qs.filter(filtro_busca)
 
@@ -12059,6 +12218,16 @@ def api_lotes_disponiveis_para_solicitacao(
 
     lotes_qs = list(qs[start:end])
 
+    # A versão atual do lote viaja junto com a grade de empenho. Assim, quando
+    # o operador confirma usando a fila (mesmo online), não dependemos de uma
+    # referência offline possivelmente antiga para detectar concorrência.
+    from .models import LoteSyncState
+    lotes_pagina_nomes = {str(lote.lote or '').strip() for lote in lotes_qs if str(lote.lote or '').strip()}
+    versoes_lote_pagina = {
+        str(row['lote']).strip().upper(): int(row['versao'] or 0)
+        for row in LoteSyncState.objects.filter(lote__in=lotes_pagina_nomes).values('lote', 'versao')
+    }
+
     codigos_pagina = {
         _normalizar_codigo_produto(lote.produto)
         for lote in lotes_qs
@@ -12119,13 +12288,10 @@ def api_lotes_disponiveis_para_solicitacao(
         )
 
         item_carga_match = None
-        if (
-            solicitacao.tipo_solicitacao == 'CARGA'
-            and item_carga_ativo
-            and _normalizar_codigo_produto(item_carga_ativo.codigo)
-                == _normalizar_codigo_produto(lote.produto)
-        ):
-            item_carga_match = item_carga_ativo
+        if solicitacao.tipo_solicitacao == 'CARGA' and item_carga_ativo:
+            codigo_linha = _normalizar_codigo_produto(item_carga_ativo.codigo)
+            if (not codigo_linha) or codigo_linha == _normalizar_codigo_produto(lote.produto):
+                item_carga_match = item_carga_ativo
 
         lotes.append({
             'id': lote.id,
@@ -12136,6 +12302,7 @@ def api_lotes_disponiveis_para_solicitacao(
             'quantidade_solicitada_item': float(item_carga_match.quantidade_solicitada or 0) if item_carga_match else 0,
 
             'lote': lote.lote,
+            'versao_lote': int(versoes_lote_pagina.get(str(lote.lote or '').strip().upper(), 0)),
             'produto': lote.produto or '',
             'descricao': (
                 item_carga_match.descricao
@@ -12267,11 +12434,16 @@ def api_lotes_disponiveis_para_solicitacao(
     itens_empenhados = []
 
     if ids_empenhados_no_card:
-        itens_qs = itens_ativos_card.select_related('estoque', 'empenho').order_by(
+        itens_qs = list(itens_ativos_card.select_related('estoque', 'empenho').order_by(
             'lote',
             'endereco_origem',
             'id',
-        )
+        ))
+        lotes_empenhados_nomes = {str((item.estoque.lote if item.estoque else item.lote) or '').strip() for item in itens_qs}
+        versoes_lote_empenhado = {
+            str(row['lote']).strip().upper(): int(row['versao'] or 0)
+            for row in LoteSyncState.objects.filter(lote__in=lotes_empenhados_nomes).values('lote', 'versao')
+        }
 
         for item in itens_qs:
             estoque = item.estoque
@@ -12286,6 +12458,7 @@ def api_lotes_disponiveis_para_solicitacao(
                 'cliente_solicitacao': item.cliente_solicitacao_snapshot or '',
                 'codigo_solicitacao': item.codigo_produto_snapshot or '',
                 'lote': item.lote,
+                'versao_lote': int(versoes_lote_empenhado.get(str((estoque.lote if estoque else item.lote) or '').strip().upper(), 0)),
 
                 'quantidade': float(
                     item.quantidade or 0
@@ -12652,7 +12825,8 @@ def empenhar_na_solicitacao(
                     if not item_carga:
                         raise ValueError('Item da carga não encontrado.')
 
-                    if _normalizar_codigo_produto(lote.produto) != _normalizar_codigo_produto(item_carga.codigo):
+                    codigo_linha = _normalizar_codigo_produto(item_carga.codigo)
+                    if codigo_linha and _normalizar_codigo_produto(lote.produto) != codigo_linha:
                         raise ValueError(
                             f'O produto do lote {lote.lote} não corresponde ao código {item_carga.codigo} da carga.'
                         )
@@ -13691,6 +13865,7 @@ def api_movimentar_solicitacao(request, solicitacao_id):
             #   o retrato do lote no momento em que foi empenhado.
             # ================================================================
             for item in itens:
+                destino = None
 
                 # ------------------------------------------------------------
                 # BLOQUEAR SOMENTE O ESTOQUE DE ORIGEM
@@ -14320,6 +14495,7 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                 # existente em Estoque.empenhado.
                 # ------------------------------------------------------------
                 item.delete()
+                _validar_integridade_estoque(origem, destino)
 
             # ================================================================
             # QUANTIDADE MOVIMENTADA NESTA OPERAÇÃO
@@ -16635,12 +16811,19 @@ def editar_movimento_carga(request, historico_id):
             # mudou, o destino foi travado separadamente.
             if estoque_antigo and estoque_novo.pk == estoque_antigo.pk:
                 estoque_novo = estoque_antigo
-            if estoque_novo.saldo < qtd_nova:
+            disponivel_correcao = max(0, int(estoque_novo.saldo or 0) - int(estoque_novo.empenhado or 0))
+            if qtd_nova > disponivel_correcao:
                 raise ValueError(
-                    f'Saldo insuficiente no lote/endereço escolhido. Disponível físico após reversão: {estoque_novo.saldo} {estoque_novo.embalagem}.'
+                    f'Quantidade indisponível no lote/endereço escolhido após a reversão. '
+                    f'Físico: {estoque_novo.saldo}; empenhado: {estoque_novo.empenhado}; '
+                    f'disponível livre: {disponivel_correcao} {estoque_novo.embalagem}. '
+                    'A correção não pode consumir reserva de outra solicitação.'
                 )
             estoque_novo.saida = int(estoque_novo.saida or 0) + qtd_nova
             estoque_novo.save()
+            _validar_integridade_estoque(estoque_novo)
+            if estoque_antigo and estoque_antigo.pk != estoque_novo.pk:
+                _validar_integridade_estoque(estoque_antigo)
 
             hist.estoque = estoque_novo
             hist.lote_ref = estoque_novo.lote
@@ -16811,7 +16994,10 @@ def remover_movimento_carga(request, historico_id):
                         'Não é possível excluir este lote: a saída atual do estoque é menor que a movimentação registrada.'
                     )
                 estoque.saida = nova_saida
-                estoque.save(update_fields=['saida'])
+                # Estoque.save() recalcula saldo/status/peso. Não limitar update_fields
+                # aqui, senão o banco pode ficar com `saida` nova e `saldo` antigo.
+                estoque.save()
+                _validar_integridade_estoque(estoque)
 
             # Carga gerada: preserva o histórico do item, mas ele deixa de
             # contar como expedição ativa. Isso mantém rastreabilidade sem
