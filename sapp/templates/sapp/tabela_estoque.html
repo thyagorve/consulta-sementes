@@ -343,8 +343,9 @@
                         data-embalagem="{{ item.embalagem|escape }}"
                         data-saldo="{{ item.saldo }}"
                         data-disponivel="{{ item.disponivel_ui }}"
-                        data-empenhado="{{ item.empenhado }}"
-                        data-empenhado-lote="{{ item.empenhado_lote_ui }}">
+                        data-empenhado="{{ item.empenhado_local_ui }}"
+                        data-empenhado-lote="{{ item.empenhado_lote_ui }}"
+                        data-integridade-invalida="{% if item.integridade_invalida_ui %}1{% else %}0{% endif %}">
                         <td class="text-center"><i class="fas fa-chevron-right text-primary transition-icon" id="chevron-{{ item.id }}"></i></td>
                         <td>
                             <div class="fw-bold text-dark">{{ item.lote }}</div>
@@ -372,15 +373,19 @@
                                 <span class="flow-badge {% if item.saida > 0 %}flow-out{% else %}flow-zero{% endif %}" title="Saída"><i class="fas fa-arrow-up"></i> {{ item.saida }}</span>
                                 <div class="stock-summary-inline ms-1">
                                     <span class="stock-mini-pill saldo" title="Saldo físico">Saldo {{ item.saldo }}</span>
-                                    {% if item.empenhado > 0 %}<span class="stock-mini-pill empenhado" title="Reserva vinculada a este registro">Emp. {{ item.empenhado }}</span>{% endif %}
+                                    {% if item.empenhado_local_ui > 0 %}<span class="stock-mini-pill empenhado" title="Reserva rastreada neste endereço">Emp. {{ item.empenhado_local_ui }}</span>{% endif %}
                                     <span class="stock-mini-pill disponivel" title="Saldo menos empenho">Disp. {{ item.disponivel_ui }} {{ item.embalagem }}</span>
                                 </div>
                             </div>
                         </td>
                         <td class="text-center">
-                            {% if item.disponivel_ui > 0 %}
+                            {% if item.integridade_invalida_ui %}
+                            <span class="badge bg-danger text-white border border-danger" title="Saldo/empenho legado inconsistente. Execute a auditoria antes de movimentar.">
+                                <i class="fas fa-triangle-exclamation me-1"></i>Revisar estoque
+                            </span>
+                            {% elif item.disponivel_ui > 0 %}
                             <span class="badge bg-success bg-opacity-10 text-success border border-success">{{ item.disponivel_ui }} disponível</span>
-                            {% elif item.saldo > 0 and item.empenhado > 0 %}
+                            {% elif item.saldo > 0 and item.empenhado_local_ui > 0 %}
                             <span class="badge bg-warning bg-opacity-10 text-warning-emphasis border border-warning">Reservado</span>
                             {% else %}
                             <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Esgotado</span>
@@ -410,19 +415,26 @@
                                             </div>
 
                                             <div class="d-grid gap-2">
-                                                {% if item.disponivel_ui > 0 %}
-                                                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalSaida{{ item.id }}">
-                                                    <i class="fas fa-truck-ramp-box me-2"></i> Expedição avulsa
-                                                </button>
-                                                {% elif item.saldo > 0 and item.empenhado > 0 %}
-                                                <button class="btn btn-outline-warning" type="button" disabled title="A parte empenhada só pode ser expedida pelo card">
-                                                    <i class="fas fa-lock me-2"></i> Expedição pelo card
-                                                </button>
-                                                {% endif %}
-                                                {% if item.saldo > 0 %}
-                                                <button class="btn btn-warning text-dark fw-bold" onclick="abrirModalTransferencia({{ item.id }})">
-                                                    <i class="fas fa-right-left me-2"></i> Transferir / Ajustar
-                                                </button>
+                                                {% if item.integridade_invalida_ui %}
+                                                <div class="alert alert-danger py-2 px-3 small mb-0">
+                                                    <i class="fas fa-shield-halved me-1"></i>
+                                                    <strong>Movimentação bloqueada.</strong> Este registro possui saldo/empenho inconsistente de versão anterior. Rode a auditoria antes de corrigir o legado.
+                                                </div>
+                                                {% else %}
+                                                    {% if item.disponivel_ui > 0 %}
+                                                    <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#modalSaida{{ item.id }}">
+                                                        <i class="fas fa-truck-ramp-box me-2"></i> Expedição avulsa
+                                                    </button>
+                                                    {% elif item.saldo > 0 and item.empenhado_local_ui > 0 %}
+                                                    <button class="btn btn-outline-warning" type="button" disabled title="A parte empenhada só pode ser expedida pelo card">
+                                                        <i class="fas fa-lock me-2"></i> Expedição pelo card
+                                                    </button>
+                                                    {% endif %}
+                                                    {% if item.saldo > 0 %}
+                                                    <button class="btn btn-warning text-dark fw-bold" onclick="abrirModalTransferencia({{ item.id }})">
+                                                        <i class="fas fa-right-left me-2"></i> Transferir / Ajustar
+                                                    </button>
+                                                    {% endif %}
                                                 {% endif %}
                                                 <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#modalEditar{{ item.id }}">
                                                     <i class="fas fa-pen-to-square me-2"></i> Editar Dados
@@ -1477,20 +1489,46 @@ function abrirModalTransferencia(id) {
     const disponivelAtual = parseInt(row?.dataset.disponivel || '0', 10) || 0;
     const empenhadoAtual = parseInt(row?.dataset.empenhado || '0', 10) || 0;
     const empenhadoLote = parseInt(row?.dataset.empenhadoLote || '0', 10) || 0;
+    const integridadeInvalida = row?.dataset.integridadeInvalida === '1'
+        || saldoAtual < 0
+        || empenhadoAtual < 0
+        || empenhadoAtual > saldoAtual;
+
+    if (integridadeInvalida) {
+        alert(
+            `🔒 Movimentação bloqueada por integridade.\n\n` +
+            `Saldo físico neste endereço: ${saldoAtual}\n` +
+            `Empenhado neste endereço: ${empenhadoAtual}\n\n` +
+            `Esse registro precisa ser revisado antes de uma nova movimentação.`
+        );
+        return;
+    }
 
     document.getElementById('transf_saldo_atual').innerText = saldoAtual;
     document.getElementById('transf_disponivel_atual').innerText = disponivelAtual;
-    document.getElementById('transf_empenhado_atual').innerText = empenhadoLote;
+    document.getElementById('transf_empenhado_atual').innerText = empenhadoAtual;
+    const totalInfo = document.getElementById('transf_empenho_total_info');
+    if (totalInfo) {
+        totalInfo.innerHTML = `Reserva total deste lote em todos os endereços: <strong>${empenhadoLote}</strong>`;
+    }
     document.getElementById('transf_saldo').value = saldoAtual;
     document.getElementById('transf_entrada').value = getVal('entrada') || "";
     document.getElementById('transf_endereco_atual').innerText = "Endereço Atual: " + getVal('endereco');
 
     const aviso = document.getElementById('transf_empenho_alerta');
     if (aviso) {
-        aviso.classList.toggle('show', empenhadoLote > 0);
-        aviso.innerHTML = empenhadoLote > 0
-            ? `<i class="fas fa-triangle-exclamation me-1"></i><strong>Lote empenhado:</strong> ${empenhadoLote} unidade(s) reservada(s). A transferência avulsa é permitida e não consome o empenho. Se necessário, a reserva acompanhará o lote no novo endereço.`
-            : '';
+        aviso.classList.toggle('show', empenhadoAtual > 0);
+        aviso.innerHTML = empenhadoAtual > 0
+            ? `<i class="fas fa-triangle-exclamation me-1"></i>` +
+              `<strong>${empenhadoAtual} unidade(s) reservada(s) neste endereço.</strong> ` +
+              `O lote possui ${empenhadoLote} reservada(s) no total. ` +
+              `Os itens livres são transferidos primeiro; somente quando a movimentação ultrapassa o livre ` +
+              `a parte necessária da reserva acompanha o lote para o novo endereço.`
+            : (empenhadoLote > 0
+                ? `<i class="fas fa-circle-info me-1"></i>Este endereço não possui reserva. ` +
+                  `O lote possui ${empenhadoLote} unidade(s) reservada(s) em outros endereços.`
+                : '');
+        aviso.classList.toggle('show', empenhadoLote > 0 || empenhadoAtual > 0);
     }
 
     const inputQtd = document.getElementById('transf_quantidade');

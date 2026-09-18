@@ -553,16 +553,18 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     # ================================================================
     # RESERVAS / EMPENHOS POR LOTE
     # ================================================================
-    # O estoque físico continua separado por endereço, mas o usuário precisa
-    # enxergar quando o LOTE possui reserva em qualquer endereço.
+    # Para a leitura operacional, ItemEmpenho é a fonte rastreável da reserva.
+    # O campo Estoque.empenhado continua sendo o contador rápido usado nas
+    # operações, mas qualquer divergência entre os dois é tratada como problema
+    # de integridade e não é escondida do operador.
     lotes_visiveis = list(qs.values_list('lote', flat=True).distinct())
     empenhos_por_lote = {
-        row['lote']: int(row['total'] or 0)
+        row['estoque__lote']: int(row['total'] or 0)
         for row in (
-            Estoque.objects
-            .filter(lote__in=lotes_visiveis)
-            .values('lote')
-            .annotate(total=Sum('empenhado'))
+            ItemEmpenho.objects
+            .filter(estoque__lote__in=lotes_visiveis, quantidade__gt=0)
+            .values('estoque__lote')
+            .annotate(total=Sum('quantidade'))
         )
     }
 
@@ -588,11 +590,34 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         del query_params['page']
     
     # Atributos transitórios usados apenas pelo template.
-    # disponivel = saldo físico deste endereço - reserva atribuída a este registro.
-    # empenhado_lote = reserva total do lote, independentemente do endereço.
+    # O valor local mostrado ao usuário vem da soma dos ItemEmpenho daquele
+    # endereço. Se o contador rápido Estoque.empenhado divergir, o registro fica
+    # bloqueado para revisão em vez de continuar propagando uma inconsistência.
+    ids_pagina = [item.pk for item in page_obj.object_list]
+    empenhos_por_estoque = {
+        row['estoque_id']: int(row['total'] or 0)
+        for row in (
+            ItemEmpenho.objects
+            .filter(estoque_id__in=ids_pagina, quantidade__gt=0)
+            .values('estoque_id')
+            .annotate(total=Sum('quantidade'))
+        )
+    }
+
     for item in page_obj.object_list:
-        item.disponivel_ui = max(0, int(item.disponivel or 0))
+        saldo_local = int(item.saldo or 0)
+        empenhado_registrado = int(item.empenhado or 0)
+        empenhado_local = empenhos_por_estoque.get(item.pk, 0)
+        item.empenhado_local_ui = empenhado_local
+        item.empenhado_registrado_ui = empenhado_registrado
+        item.disponivel_ui = max(0, saldo_local - empenhado_local)
         item.empenhado_lote_ui = empenhos_por_lote.get(item.lote, 0)
+        item.integridade_invalida_ui = (
+            saldo_local < 0
+            or empenhado_local < 0
+            or empenhado_local > saldo_local
+            or empenhado_registrado != empenhado_local
+        )
 
     context = {
         'estoque': page_obj,
