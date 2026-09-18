@@ -1,0 +1,97 @@
+INFINITY STOCK - V11 - AJUSTE DE GESTAO DE CARGAS E GRAFICOS
+Data: 15/09/2026
+Base: consulta-sementes-main-atualizado-20260915-v11 (derivada da V10.2)
+
+OBJETIVO
+========
+Este pacote preserva os recursos existentes da V11 (offline/sincronizacao,
+central de conflitos e gestao de cargas) e adiciona ajustes pontuais sem nova
+migration.
+
+1) EXCLUIR LOTE DE UMA CARGA
+============================
+- Nova acao "Excluir lote da carga" dentro de cada movimento da Gestao de Cargas.
+- Exige motivo e conexao online.
+- A saida fisica do estoque e revertida dentro de transaction.atomic().
+- O HistoricoMovimentacao NAO e apagado: passa a "Carga removida" e recebe
+  descricao com usuario, data/hora e motivo.
+- CargaAjusteLog guarda antes/depois e motivo.
+- LoteSyncState/LoteSyncEvento sao atualizados para os dispositivos offline
+  detectarem a alteracao.
+- Em carga GERADA, o HistoricoItemEmpenho correspondente e marcado como
+  "removido", deixando de contar como expedicao ativa; a quantidade movimentada
+  da solicitacao e recalculada.
+
+2) IDENTIFICACAO VISUAL DAS CARGAS
+==================================
+- AVULSA: vermelho + icone de raio.
+- GERADA: verde + icone de sol.
+- LEGADO: ambar + icone de historico.
+- Na tabela do dashboard, a origem deixa de ocupar espaco com um badge textual
+  grande; fica um icone compacto ao final do nome da carga.
+
+3) GESTAO DE CARGAS - LISTA COMPACTA
+====================================
+- A tela agora mostra 10 cargas por pagina.
+- Filtros de data, origem e busca sao preservados ao navegar entre paginas.
+- O contador do topo continua mostrando o total de cargas encontradas.
+
+4) DASHBOARD - TABELA DE EXPEDICOES
+===================================
+- A API continua calculando KPIs com todas as cargas filtradas.
+- A lista visual mostra apenas 10 cargas por vez.
+- Setas permitem navegar pelas proximas/anteriores sem poluir a tela.
+- Assim, periodos com 100, 200 ou mais cargas continuam legiveis.
+
+5) GRAFICO DE EXPEDICOES
+========================
+- Mostra no maximo 10 barras por vez.
+- Navegacao por setas exibe os proximos blocos de 10.
+- O resumo (total, media, maior carga/dia de pico) continua considerando TODO o
+  periodo, nao apenas as 10 barras visiveis.
+- Em modo por carga: AVULSA = vermelho; GERADA = verde; LEGADO = ambar.
+- Em modo por dia: dia somente avulso = vermelho; somente gerado = verde;
+  misto = azul; legado = ambar.
+
+ARQUIVOS ALTERADOS
+==================
+- sapp/views.py
+- sapp/urls.py
+- sapp/templates/sapp/gestao_cargas.html
+- sapp/templates/sapp/dashboard.html
+
+MIGRATIONS
+==========
+Nenhuma migration nova.
+
+VALIDACOES FEITAS
+=================
+- python -m py_compile nos arquivos Python alterados: OK.
+- node --check no JavaScript inline do dashboard: OK.
+- node --check no JavaScript inline da Gestao de Cargas: OK.
+- python manage.py check NAO foi executado porque o ambiente de montagem nao
+  possui Django instalado. Rode no seu venv/servidor antes do deploy.
+
+ANTES DO DEPLOY
+===============
+1. Faca backup do banco.
+2. Ative o venv.
+3. Rode: python manage.py check
+4. Rode: python manage.py migrate --plan
+5. Teste primeiro em uma carga de homologacao:
+   - editar um lote;
+   - excluir um lote;
+   - confirmar retorno do saldo;
+   - confirmar auditoria;
+   - testar carga avulsa e carga gerada;
+   - testar grafico com periodo de 30 dias.
+
+
+REVISAO POSTERIOR - 15/09/2026
+==============================
+A regra de 10 barras por vez do grafico foi substituida: o grafico agora mostra
+TODO o periodo. O limite passou a existir somente na lista de cargas, com campo
+configuravel pelo usuario (1 a 100 por pagina). Tambem foi reforcada a identidade
+das cargas GERADAS para usar o titulo oficial CARGA N e corrigir a exibicao de
+historicos antigos quando o vinculo com o card puder ser recuperado.
+Consulte: LEIA-ME_V11_AJUSTE_DASHBOARD_CARGAS.txt

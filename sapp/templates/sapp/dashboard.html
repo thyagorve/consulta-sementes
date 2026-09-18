@@ -3528,6 +3528,9 @@
     let expedicaoCargasPorPagina = 10;
     let dashboardRequestController = null;
     let dashboardUltimaAtualizacaoServidor = 0;
+    let dashboardVersaoOperacional = null;
+    let dashboardVerificandoVersao = false;
+    let dashboardAtualizacaoAutomatica = false;
     const dashboardChartState = {
         cultivar: {labels: [], values: [], colors: []},
         peneira: {labels: [], values: [], colors: []},
@@ -4340,6 +4343,7 @@
             const params = parametrosGraficoExpedicao(inicio, fim);
             const response = await fetch(`/dashboard-data/?${params.toString()}`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                cache: 'no-store',
             });
             const data = await response.json();
             if (!response.ok || !data.success) {
@@ -4959,7 +4963,8 @@
         );
     }
 
-    async function executarBusca() {
+    async function executarBusca(opcoes = {}) {
+        const silencioso = Boolean(opcoes.silencioso);
         const selecoes = capturarSelecoes();
 
         const params = new URLSearchParams();
@@ -5040,7 +5045,7 @@
         });
         atualizarContadorFiltrosExpedicao();
 
-        if (!primeiraCarga) {
+        if (!primeiraCarga && !silencioso) {
             showLoading(true);
         }
 
@@ -5058,6 +5063,7 @@
                         'X-Requested-With':
                             'XMLHttpRequest',
                     },
+                    cache: 'no-store',
                     signal: requestController.signal,
                 }
             );
@@ -5150,6 +5156,42 @@
                 dashboardRequestController = null;
                 showLoading(false);
             }
+        }
+    }
+
+    async function verificarVersaoOperacionalDashboard(forcar = false) {
+        if (dashboardVerificandoVersao || !navigator.onLine || document.hidden) return;
+        dashboardVerificandoVersao = true;
+        try {
+            const response = await fetch('/api/cards/versao/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                cache: 'no-store',
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (!data?.success || !data.version) return;
+
+            if (dashboardVersaoOperacional === null) {
+                dashboardVersaoOperacional = data.version;
+                return;
+            }
+
+            if (forcar || data.version !== dashboardVersaoOperacional) {
+                dashboardVersaoOperacional = data.version;
+                if (!dashboardAtualizacaoAutomatica) {
+                    dashboardAtualizacaoAutomatica = true;
+                    try {
+                        await executarBusca({ silencioso: true });
+                    } finally {
+                        dashboardAtualizacaoAutomatica = false;
+                    }
+                }
+            }
+        } catch (error) {
+            // A atualização ao vivo é auxiliar. Offline continua usando o snapshot.
+            console.debug('Versão operacional indisponível:', error?.message || error);
+        } finally {
+            dashboardVerificandoVersao = false;
         }
     }
 
@@ -5751,15 +5793,24 @@
             atualizarRotuloFiltroGrafico();
             executarBusca();
 
+            // Sincroniza a Dashboard com qualquer edição/exclusão feita na
+            // Gestão de Cargas, inclusive em outro PC/celular. Consulta somente
+            // uma versão leve e baixa o dashboard completo apenas quando mudou.
+            verificarVersaoOperacionalDashboard();
+            window.setInterval(() => verificarVersaoOperacionalDashboard(), 10000);
+
             const atualizarAoRetomar = () => {
                 if (!navigator.onLine || document.hidden) return;
+                verificarVersaoOperacionalDashboard();
                 if (!dashboardUltimaAtualizacaoServidor || (Date.now() - dashboardUltimaAtualizacaoServidor) > 45000) {
-                    aplicarFiltros();
+                    executarBusca({ silencioso: true });
                 }
             };
             document.addEventListener('visibilitychange', atualizarAoRetomar);
             window.addEventListener('focus', atualizarAoRetomar);
-            window.addEventListener('online', atualizarAoRetomar);
+            window.addEventListener('online', () => {
+                verificarVersaoOperacionalDashboard(true);
+            });
         }
     );
 </script>

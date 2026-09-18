@@ -1,0 +1,66 @@
+INFINITY STOCK - AJUSTES V7 - 03/09/2026
+
+BASE
+- Esta versão foi construída sobre a V6 já corrigida.
+
+1) LISTAS PESQUISÁVEIS
+- Selects do sistema continuam pesquisáveis digitando.
+- No celular e computador, tocar/arrastar o texto da opção NÃO seleciona.
+- A escolha só acontece ao marcar explicitamente o checkbox da opção.
+- O menu continua aberto depois da seleção e durante a rolagem.
+- O menu fecha ao clicar fora (ou por Escape/Tab no teclado).
+- Select nativo continua sendo a fonte dos valores e eventos change/input.
+
+2) TSI / EMPENHO
+- Cliente da solicitação é o cliente comercial exibido no empenho.
+- Se Cliente ficar em branco em TSI, o backend grava CS.
+- Cliente não restringe mais o cliente/proprietário gravado no lote de estoque.
+- No modal de empenho, Descrição substitui Cultivar.
+- Descrição é obtida do cadastro de Produto pelo código.
+- Snapshot de Cliente/Código/Descrição é salvo também para TSI.
+- Impressão TSI usa Descrição e Cliente da solicitação.
+
+3) NUMERAÇÃO AUTOMÁTICA DAS CARGAS
+- Ao selecionar Carga, o título mostra automaticamente CARGA N.
+- O servidor reserva a numeração dentro de transação com bloqueio.
+- A migration 0042 inicia a sequência após o maior CARGA N já existente.
+- O contador fica persistido e não volta para trás.
+
+MIGRATION NOVA:
+  sapp/migrations/0042_configuracao_proximo_numero_carga.py
+
+Depois de atualizar:
+  python manage.py migrate
+
+4) KANBAN
+- Duas swimlanes recolhíveis:
+  1. TSI
+  2. EXPEDIÇÃO / CARREGAMENTO
+- Na primeira visita ficam recolhidas; clique na faixa para expandir.
+- Estado aberto/recolhido fica salvo no navegador.
+- Carga permanece na faixa inferior e TSI na superior.
+- Situação fica identificada no card.
+- Carga aberta mostra quantidade empenhada + ABERTA e 100% após haver empenho.
+
+5) CONFIGURAÇÕES / EDITAR PRODUTO
+- Corrigido texto que aparecia como \\u002D.
+- Editar Produto preenche corretamente:
+  Código, Cultivar, Descrição, Empresa, Tipo, Ativo,
+  Peneira, Espécie, Categoria e Tratamento.
+- Selects programaticamente preenchidos sincronizam com o campo pesquisável visual.
+- Usuário/Login continua preservando maiúsculas/minúsculas conforme V6.
+
+6) IMPRESSÃO
+- Solicitações e Kanban possuem, no topo do preview, pesquisa + lista para trocar
+  entre solicitações/cargas já cadastradas sem fechar a visualização.
+- O seletor não aparece no papel/PDF impresso.
+- Assinaturas de Conferente e Motorista das cargas permanecem preservadas.
+
+VALIDAÇÕES REALIZADAS
+- py_compile: models.py, views.py, urls.py e migration 0042.
+- node --check nos JavaScripts modificados dos templates.
+- Modal de empenho: 21 cabeçalhos / 21 definições de coluna correspondentes.
+
+OBSERVAÇÃO
+- O ambiente de montagem não possui Django instalado, portanto manage.py check
+  deve ser executado no seu ambiente/servidor após instalar/subir o projeto.

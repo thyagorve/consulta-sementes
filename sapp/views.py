@@ -7200,11 +7200,28 @@ def _dashboard_normalizar_carga(valor):
 
 
 def _dashboard_q_expedicao():
-    """Reconhece expedições com ou sem acento em históricos antigos."""
+    """Reconhece somente movimentações que ainda representam expedição ativa."""
     return (
         Q(tipo__icontains='Expedição')
         | Q(tipo__icontains='Expedicao')
     )
+
+
+def _expedicoes_ativas_qs(queryset=None):
+    """Fonte única das cargas ativas usada por Gestão, Dashboard, Kanban e impressão.
+
+    Uma exclusão da Gestão de Cargas preserva o histórico mudando ``tipo`` para
+    ``Carga removida``. Como todos os consumidores passam por este helper, o
+    movimento some simultaneamente de totais, gráficos, impressão e cards sem
+    apagar a auditoria.
+    """
+    base = queryset if queryset is not None else HistoricoMovimentacao.objects.all()
+    return base.filter(_dashboard_q_expedicao())
+
+
+def _invalidar_dados_cargas():
+    """Invalida a versão leve observada por Dashboard/Kanban após ajuste de carga."""
+    cache.delete('cards_version_hash')
 
 
 def _dashboard_tipo_inclui_expedicao(tipo_mov):
@@ -8201,9 +8218,8 @@ def dashboard_data(request):
         expedicao_fim = exp_data_fim or data_fim or hoje
 
         expedicoes_qs = (
-            mov_qs
+            _expedicoes_ativas_qs(mov_qs)
             .filter(
-                _dashboard_q_expedicao(),
                 data_hora__date__gte=expedicao_inicio,
                 data_hora__date__lte=expedicao_fim,
             )
@@ -8804,7 +8820,7 @@ def dashboard_data(request):
                 'us': usuario,
             })
 
-        return JsonResponse({
+        response = JsonResponse({
             'success': True,
             'kpis': kpis,
             'graficos': graficos,
@@ -8813,7 +8829,14 @@ def dashboard_data(request):
             'opcoes_filtros': (
                 opcoes_filtros
             ),
+            # Ajuda o frontend a distinguir resposta nova do servidor de um
+            # snapshot offline sem depender apenas do relógio do navegador.
+            'server_timestamp': timezone.now().isoformat(),
         })
+        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+        return response
 
     except Exception as erro:
         import traceback
@@ -10191,9 +10214,8 @@ def api_versao_cards(request):
             total=Count('id'),
             atualizado=Max('data_atualizacao'),
         )
-        avulsas_state = HistoricoMovimentacao.objects.filter(
+        avulsas_state = _expedicoes_ativas_qs().filter(
             origem_carga='AVULSA',
-            tipo__icontains='Expedi',
         ).aggregate(
             total=Count('id'),
             ultimo_id=Max('id'),
@@ -10214,11 +10236,14 @@ def api_versao_cards(request):
         version = md5(hash_input).hexdigest()
         cache.set(cache_key, version, 10)
 
-    return JsonResponse({
+    response = JsonResponse({
         'success': True,
         'version': version,
         'timestamp': timezone.now().isoformat(),
     })
+    response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response['Pragma'] = 'no-cache'
+    return response
 
 
 
@@ -15758,8 +15783,8 @@ def api_kanban_dados(request):
     if coluna_concluida:
         grupos_avulsos = {}
         movimentos_avulsos = (
-            HistoricoMovimentacao.objects
-            .filter(origem_carga='AVULSA', tipo__icontains='Expedi')
+            _expedicoes_ativas_qs()
+            .filter(origem_carga='AVULSA')
             .select_related('estoque', 'usuario')
             .order_by('-data_hora', '-id')[:1500]
         )
@@ -15898,8 +15923,8 @@ def api_impressao_carga_avulsa(request):
         return JsonResponse({'success': False, 'error': 'Carga avulsa não informada.'}, status=400)
 
     qs = (
-        HistoricoMovimentacao.objects
-        .filter(origem_carga='AVULSA', tipo__icontains='Expedi')
+        _expedicoes_ativas_qs()
+        .filter(origem_carga='AVULSA')
         .select_related(
             'estoque', 'estoque__categoria', 'estoque__peneira',
             'estoque__cultivar', 'estoque__tratamento', 'estoque__especie',
@@ -16508,8 +16533,7 @@ def gestao_cargas(request):
     busca = (request.GET.get('q') or '').strip()
 
     qs = (
-        HistoricoMovimentacao.objects
-        .filter(Q(tipo__icontains='Expedi'))
+        _expedicoes_ativas_qs()
         .select_related('estoque', 'usuario')
         .order_by('-data_hora', '-id')
     )
@@ -16757,6 +16781,7 @@ def editar_grupo_carga(request):
                     motivo=f'[AJUSTE DA CARGA] {motivo}',
                 )
 
+            transaction.on_commit(_invalidar_dados_cargas)
             messages.success(
                 request,
                 f'✅ Dados da carga atualizados em {len(movimentos)} movimento(s).'
@@ -16951,6 +16976,7 @@ def editar_movimento_carga(request, historico_id):
                     tipo='CORRECAO_CARGA',
                 )
 
+            transaction.on_commit(_invalidar_dados_cargas)
             messages.success(request, '✅ Movimento da carga corrigido e auditado com sucesso.')
     except Exception as exc:
         messages.error(request, f'❌ Não foi possível corrigir a carga: {exc}')
@@ -17116,7 +17142,7 @@ def remover_movimento_carga(request, historico_id):
                     tipo='REMOCAO_CARGA',
                 )
 
-            cache.delete('cards_version_hash')
+            transaction.on_commit(_invalidar_dados_cargas)
             messages.success(request, '✅ Lote excluído da carga, estoque revertido e auditoria preservada.')
 
     except HistoricoMovimentacao.DoesNotExist:
