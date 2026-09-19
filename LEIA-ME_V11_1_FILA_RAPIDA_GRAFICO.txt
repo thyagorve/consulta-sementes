@@ -1,0 +1,96 @@
+INFINITY STOCK / CONSULTA SEMENTES - V11.1 FILA RAPIDA + GRAFICO DE CARGAS
+Data: 15/09/2026
+
+OBJETIVO DESTA REVISAO
+----------------------
+Esta revisao mantem a base da V11 e prioriza resposta imediata na operacao,
+sincronizacao em segundo plano e leitura mais limpa do painel de expedicoes.
+
+1. MOVIMENTACOES COM FILA PRIMEIRO
+----------------------------------
+- Operacoes principais suportadas pelo offline passam primeiro pela fila local,
+  inclusive quando o aparelho esta ONLINE.
+- A interface e liberada imediatamente apos o clique.
+- O indicador de sincronizacao acompanha o estado da fila.
+- A sincronizacao com o servidor ocorre logo em seguida, em segundo plano.
+- Conflitos/rejeicoes permanecem visiveis na Central de Sincronizacao.
+- Botoes/cards de operacoes em fila recebem indicacao visual enquanto aguardam
+  confirmacao do servidor.
+
+Importante:
+- Operacoes com fotos/anexos continuam usando envio online direto.
+- Isso evita marcar como concluido um upload que nao foi realmente enviado.
+
+2. MELHORIA DE DESEMPENHO
+-------------------------
+- A atualizacao pesada da referencia offline nao bloqueia mais a primeira
+  renderizacao da pagina.
+- A referencia offline foi protegida contra atualizacoes completas repetidas
+  em intervalos muito curtos.
+- Leitura de versoes de varios lotes e feita em uma unica passagem.
+- O dashboard cancela requisicoes antigas quando um novo filtro e solicitado,
+  evitando varias consultas concorrendo ao mesmo tempo.
+- O indicador de carregamento do dashboard ficou pequeno e nao bloqueia a tela.
+
+3. DASHBOARD / GRAFICO DE CARGAS
+--------------------------------
+- Visual aproximado do painel laranja de referencia enviado pelo usuario.
+- Carga gerada: laranja/sol.
+- Carga avulsa: vermelho/raio.
+- O grafico NAO e limitado pela paginacao da lista de cargas.
+- Todos os pontos/barras do periodo selecionado ficam disponiveis no grafico.
+- Quando existem muitas cargas/dias, a area do grafico usa rolagem horizontal,
+  mantendo as barras legiveis em vez de comprimi-las.
+- Animacoes pesadas do grafico foram removidas para resposta mais rapida.
+- A lista de cargas continua respeitando a quantidade escolhida pelo usuario.
+
+4. OFFLINE
+----------
+A V11 possui:
+- IndexedDB para fila local;
+- Service Worker/PWA;
+- identificacao do dispositivo;
+- operacoes idempotentes por UUID;
+- sincronizacao automatica ao recuperar conexao;
+- sinalizacao de online, pendente, sincronizando, offline e conflito.
+
+Para funcionar offline corretamente:
+- o usuario precisa ter efetuado login online anteriormente;
+- a pagina e os recursos necessarios precisam ter sido carregados/cacheados;
+- em producao o sistema deve estar em HTTPS para o Service Worker;
+- fotos/anexos e algumas configuracoes administrativas continuam online-only.
+
+5. CACHE
+--------
+- Versao do cache do Service Worker atualizada.
+- offline-sync.js recebeu nova versao de query string para evitar que navegador
+  continue usando o JavaScript antigo armazenado em cache.
+
+6. BANCO / MIGRATIONS
+---------------------
+- Esta revisao nao cria migration nova.
+- Se estiver saindo diretamente da V10.2 para a V11, execute as migrations que
+  ja fazem parte da V11 antes de usar o sistema.
+
+7. VALIDACOES REALIZADAS
+------------------------
+- Python compileall: OK.
+- Sintaxe de offline-sync.js: OK.
+- Sintaxe de service-worker.js: OK.
+- Sintaxe dos scripts inline de dashboard.html: OK.
+- Sintaxe dos scripts inline de pagina_solicitacoes.html: OK.
+- Sintaxe dos scripts inline de modals/estoque.html: OK.
+
+O comando `python manage.py check` nao foi executado neste ambiente porque ele
+nao possui Django instalado. Execute no ambiente virtual do servidor antes da
+publicacao.
+
+PASSOS RECOMENDADOS PARA PUBLICACAO
+-----------------------------------
+1. Fazer backup do banco e da versao atual.
+2. Ativar o venv.
+3. python manage.py check
+4. python manage.py migrate   (principalmente se vier da V10.2)
+5. python manage.py collectstatic --noinput   (se seu deploy usa collectstatic)
+6. Reiniciar o servico Django/Gunicorn/Uvicorn.
+7. Abrir o sistema online uma vez para atualizar o Service Worker/cache.

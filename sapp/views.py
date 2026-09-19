@@ -1536,13 +1536,51 @@ def transferir(request, id):
                     else:
                         obj_categoria = origem.categoria
                     
-                    # Tratamento
-                    tratamento_id = request.POST.get('tratamento')
-                    if tratamento_id and tratamento_id.strip() != '':
-                        obj_tratamento = get_object_or_404(Tratamento, id=tratamento_id)
+                    # Tratamento. Se o campo veio vazio, isso significa
+                    # explicitamente "Sem tratamento"; não reaplica o tratamento
+                    # antigo silenciosamente.
+                    if 'tratamento' in request.POST:
+                        tratamento_id = request.POST.get('tratamento')
+                        if tratamento_id and tratamento_id.strip() != '':
+                            obj_tratamento = get_object_or_404(Tratamento, id=tratamento_id)
+                        else:
+                            obj_tratamento = None
                     else:
                         obj_tratamento = origem.tratamento
-                    
+
+                    # Código e classificação precisam caminhar juntos. Se o
+                    # usuário trocou o código, o cadastro do código preenche o
+                    # tratamento. Se trocou Cultivar/Tratamento mantendo o código
+                    # antigo, a nova base tenta resolver outro código; sem cadastro
+                    # compatível, o código antigo é limpo.
+                    novo_produto = _normalizar_codigo_produto(
+                        request.POST.get('produto', origem.produto or '')
+                    )
+                    novo_empresa = normalizar_texto_cadastro(
+                        request.POST.get('empresa', origem.empresa or '')
+                    )
+                    novo_cliente = normalizar_texto_cadastro(
+                        request.POST.get('cliente', origem.cliente or '')
+                    )
+                    novo_emb = request.POST.get('embalagem', origem.embalagem)
+
+                    produto_obj, novo_produto, origem_resolucao = _resolver_identidade_produto_alteracao(
+                        novo_produto,
+                        obj_cultivar,
+                        obj_tratamento,
+                        codigo_original=origem.produto or '',
+                        cultivar_original=origem.cultivar,
+                        tratamento_original=origem.tratamento,
+                    )
+                    if produto_obj:
+                        obj_cultivar = produto_obj.cultivar or obj_cultivar
+                        obj_tratamento = produto_obj.tratamento
+                        obj_peneira = produto_obj.peneira if produto_obj.peneira_id is not None else obj_peneira
+                        obj_categoria = produto_obj.categoria if produto_obj.categoria_id is not None else obj_categoria
+                        obj_especie = produto_obj.especie if produto_obj.especie_id is not None else obj_especie
+                        if produto_obj.empresa:
+                            novo_empresa = produto_obj.empresa
+
                     # Processar peso unitário
                     peso_raw = request.POST.get('peso_unitario', origem.peso_unitario or '0')
                     try:
@@ -1558,15 +1596,15 @@ def transferir(request, id):
                     # Primeiro, montar dicionário com todos os campos EXCETO saldo__gt
                     campos_base = {
                         'lote': origem.lote,
-                        'produto': request.POST.get('produto', origem.produto or ''),
+                        'produto': novo_produto,
                         'cultivar': obj_cultivar,
                         'especie': obj_especie,
                         'peneira': obj_peneira,
                         'categoria': obj_categoria,
                         'tratamento': obj_tratamento,
-                        'embalagem': request.POST.get('embalagem', origem.embalagem),
-                        'empresa': request.POST.get('empresa', origem.empresa or ''),
-                        'cliente': request.POST.get('cliente', origem.cliente or ''),
+                        'embalagem': novo_emb,
+                        'empresa': novo_empresa,
+                        'cliente': novo_cliente,
                         'endereco': novo_end,
                         'az': request.POST.get('az', origem.az or ''),
                     }
@@ -1607,8 +1645,8 @@ def transferir(request, id):
                         
                         # Atualizar campos que podem ter mudado
                         destino_existente.peso_unitario = novo_peso  # Mantém o mesmo peso
-                        destino_existente.empresa = request.POST.get('empresa', destino_existente.empresa or '')
-                        destino_existente.cliente = request.POST.get('cliente', destino_existente.cliente or '')
+                        destino_existente.empresa = novo_empresa
+                        destino_existente.cliente = novo_cliente
                         destino_existente.az = request.POST.get('az', destino_existente.az or '')
                         destino_existente.conferente = request.user
                         
@@ -1649,12 +1687,12 @@ def transferir(request, id):
                             origem_destino=f"Transferência de {origem.endereco}",
                             
                             # Campos de texto com fallback
-                            produto=request.POST.get('produto', origem.produto or ''),
-                            cliente=request.POST.get('cliente', origem.cliente or ''),
-                            empresa=request.POST.get('empresa', origem.empresa or ''),
+                            produto=novo_produto,
+                            cliente=novo_cliente,
+                            empresa=novo_empresa,
                             az=request.POST.get('az', origem.az or ''),
                             peso_unitario=novo_peso,  # Peso NOVO
-                            embalagem=request.POST.get('embalagem', origem.embalagem),
+                            embalagem=novo_emb,
                             observacao=request.POST.get('observacao', origem.observacao or '') + f" [Peso: {novo_peso} kg - DIFERENTE DO EXISTENTE]",
                             
                             # Foreign Keys (Objetos, não IDs)
@@ -1677,12 +1715,12 @@ def transferir(request, id):
                             origem_destino=f"Transferência de {origem.endereco}",
                             
                             # Campos de texto com fallback
-                            produto=request.POST.get('produto', origem.produto or ''),
-                            cliente=request.POST.get('cliente', origem.cliente or ''),
-                            empresa=request.POST.get('empresa', origem.empresa or ''),
+                            produto=novo_produto,
+                            cliente=novo_cliente,
+                            empresa=novo_empresa,
                             az=request.POST.get('az', origem.az or ''),
                             peso_unitario=novo_peso,
-                            embalagem=request.POST.get('embalagem', origem.embalagem),
+                            embalagem=novo_emb,
                             observacao=request.POST.get('observacao', origem.observacao or ''),
                             
                             # Foreign Keys (Objetos, não IDs)
@@ -1810,6 +1848,76 @@ def _resolver_produto_para_lote(codigo, cultivar, tratamento):
             f'{tratamento or "SEM TRATAMENTO"}. Informe o código para identificar corretamente.'
         )
     return None, ''
+
+
+def _resolver_identidade_produto_alteracao(
+    codigo_informado,
+    cultivar,
+    tratamento,
+    *,
+    codigo_original='',
+    cultivar_original=None,
+    tratamento_original=None,
+):
+    """Mantém Código, Cultivar e Tratamento coerentes ao editar/transferir.
+
+    Regras operacionais:
+    - se o usuário mudou o CÓDIGO, o cadastro desse código tem prioridade e
+      seus dados técnicos acompanham o código;
+    - se o código ficou igual, mas Cultivar/Tratamento mudaram, a nova
+      classificação tem prioridade. Se houver exatamente um Produto ativo para
+      a combinação, o código acompanha automaticamente;
+    - se não existir código cadastrado (ou houver ambiguidade) para a nova
+      classificação, o código antigo é LIMPO. Assim ele não volta a impor o
+      tratamento antigo no save seguinte.
+    - sem mudança de código/base, nada é reinterpretado.
+    """
+    codigo = _normalizar_codigo_produto(codigo_informado)
+    codigo_antigo = _normalizar_codigo_produto(codigo_original)
+
+    cultivar_id = getattr(cultivar, 'pk', None)
+    tratamento_id = getattr(tratamento, 'pk', None)
+    cultivar_antigo_id = getattr(cultivar_original, 'pk', None)
+    tratamento_antigo_id = getattr(tratamento_original, 'pk', None)
+
+    codigo_mudou = codigo != codigo_antigo
+    base_mudou = (
+        cultivar_id != cultivar_antigo_id
+        or tratamento_id != tratamento_antigo_id
+    )
+
+    if codigo_mudou:
+        if not codigo:
+            return None, '', 'codigo_limpo'
+        produto = (
+            Produto.objects
+            .filter(codigo__iexact=codigo, ativo=True)
+            .select_related('cultivar', 'peneira', 'especie', 'categoria', 'tratamento')
+            .first()
+        )
+        return produto, codigo, ('codigo_cadastrado' if produto else 'codigo_manual')
+
+    if base_mudou:
+        if not cultivar_id:
+            return None, '', 'base_sem_codigo'
+        qs = (
+            Produto.objects
+            .filter(cultivar_id=cultivar_id, ativo=True)
+            .select_related('cultivar', 'peneira', 'especie', 'categoria', 'tratamento')
+        )
+        if tratamento_id is None:
+            qs = qs.filter(tratamento__isnull=True)
+        else:
+            qs = qs.filter(tratamento_id=tratamento_id)
+        encontrados = list(qs.order_by('id')[:2])
+        if len(encontrados) == 1:
+            produto = encontrados[0]
+            return produto, _normalizar_codigo_produto(produto.codigo), 'base_cadastrada'
+        # O ponto mais importante: não preservar o código antigo quando ele não
+        # representa mais o tratamento/cultivar selecionados.
+        return None, '', ('base_ambigua' if len(encontrados) > 1 else 'base_sem_codigo')
+
+    return None, codigo, 'inalterado'
 
 
 def _aplicar_produto_ao_lote_por_codigo(item, produto):
@@ -2481,14 +2589,21 @@ def editar(request, id):
                 else:
                     obj_tratamento = None
 
-                produto_obj, codigo_resolvido = _resolver_produto_para_lote(
-                    novo_produto, obj_cultivar, obj_tratamento
+                produto_obj, codigo_resolvido, origem_resolucao = _resolver_identidade_produto_alteracao(
+                    novo_produto,
+                    obj_cultivar,
+                    obj_tratamento,
+                    codigo_original=antigo['produto'],
+                    cultivar_original=item.cultivar,
+                    tratamento_original=item.tratamento,
                 )
-                if codigo_resolvido:
-                    novo_produto = codigo_resolvido
+                novo_produto = codigo_resolvido
                 if produto_obj:
+                    # Quando o usuário muda o código, o cadastro do código manda.
+                    # Quando muda Cultivar/Tratamento e existe cadastro único, o
+                    # código e os demais dados técnicos acompanham a nova base.
                     obj_cultivar = produto_obj.cultivar or obj_cultivar
-                    obj_tratamento = produto_obj.tratamento if produto_obj.tratamento_id is not None else obj_tratamento
+                    obj_tratamento = produto_obj.tratamento
                     obj_peneira = produto_obj.peneira if produto_obj.peneira_id is not None else obj_peneira
                     obj_categoria = produto_obj.categoria if produto_obj.categoria_id is not None else obj_categoria
                     obj_especie = produto_obj.especie if produto_obj.especie_id is not None else obj_especie

@@ -1109,8 +1109,9 @@
                             <input type="text" class="form-control bg-light" id="transf_lote_display" readonly>
                         </div>
                         <div class="col-sm-9">
-                            <label>Produto</label>
+                            <label>Código do produto</label>
                             <input type="text" name="produto" id="transf_produto" class="form-control">
+                            <small id="transf_produto_sync_feedback" class="text-muted"></small>
                         </div>
                         
                         <!-- Linha 2 - Responsiva -->
@@ -1493,6 +1494,16 @@ Deseja continuar?`
                     quantidade: qtdValue,
                     endereco_destino: String(enderecoInput.value || '').trim(),
                     az_destino: String(document.getElementById('transf_az').value || '').trim(),
+                    produto: String(document.getElementById('transf_produto').value || '').trim(),
+                    especie_id: String(document.getElementById('transf_especie').value || ''),
+                    cultivar_id: String(document.getElementById('transf_cultivar').value || ''),
+                    peneira_id: String(document.getElementById('transf_peneira').value || ''),
+                    categoria_id: String(document.getElementById('transf_categoria').value || ''),
+                    tratamento_id: String(document.getElementById('transf_tratamento').value || ''),
+                    empresa: String(document.getElementById('transf_empresa').value || '').trim(),
+                    cliente: String(document.getElementById('transf_cliente').value || '').trim(),
+                    peso_unitario: String(document.getElementById('transf_peso').value || '').trim(),
+                    embalagem: String(document.getElementById('transf_embalagem').value || '').trim(),
                     observacao: String(document.getElementById('transf_obs').value || '').trim()
                 };
                 await window.InfinityOffline.enqueue({
@@ -1802,8 +1813,9 @@ Deseja continuar?`
                     <h6 class="fw-bold text-info border-bottom pb-2 mb-3"><i class="fas fa-truck me-1"></i> Logística e Informações</h6>
                     <div class="row g-3">
                         <div class="col-md-4">
-                            <label class="form-label">Produto / Descrição</label>
-                            <input type="text" name="produto" class="form-control" value="{{ item.produto|default:'' }}">
+                            <label class="form-label">Código do produto</label>
+                            <input type="text" name="produto" class="form-control js-produto-codigo" value="{{ item.produto|default:'' }}">
+                            <small class="text-muted js-produto-sync-feedback"></small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Cliente / Proprietário</label>
@@ -1935,6 +1947,158 @@ function atualizarPesoTotal(input) {
 }
 </script>
 {% endfor %}
+
+<script>
+// V11.14 - Código e Tratamento formam uma única identidade comercial.
+// Funciona tanto no Editar quanto no Transferir. A última alteração do usuário
+// decide a direção da sincronização:
+//   Código -> puxa Tratamento/Cultivar cadastrados.
+//   Tratamento/Cultivar -> procura o código correspondente; sem cadastro único,
+//   limpa o código antigo para ele não reimpor o tratamento anterior no backend.
+(function(){
+    const timers = new WeakMap();
+    const sequencias = new WeakMap();
+
+    function feedback(form, texto, tipo='muted') {
+        const el = form.querySelector('.js-produto-sync-feedback')
+            || form.querySelector('#transf_produto_sync_feedback');
+        if (!el) return;
+        el.className = tipo === 'danger'
+            ? 'text-danger js-produto-sync-feedback'
+            : tipo === 'warning'
+                ? 'text-warning js-produto-sync-feedback'
+                : tipo === 'success'
+                    ? 'text-success js-produto-sync-feedback'
+                    : 'text-muted js-produto-sync-feedback';
+        el.textContent = texto || '';
+    }
+
+    function proximaSequencia(form) {
+        const seq = (sequencias.get(form) || 0) + 1;
+        sequencias.set(form, seq);
+        return seq;
+    }
+
+    function aindaAtual(form, seq) {
+        return sequencias.get(form) === seq;
+    }
+
+    function campo(form, nome) {
+        return form.querySelector(`[name="${nome}"]`);
+    }
+
+    function setSelect(form, nome, valor) {
+        const el = campo(form, nome);
+        if (!el || el.tagName !== 'SELECT') return;
+        const normalizado = valor == null ? '' : String(valor);
+        const existe = Array.from(el.options).some(opt => String(opt.value) === normalizado);
+        if (existe || normalizado === '') el.value = normalizado;
+    }
+
+    function aplicarProduto(form, dados) {
+        const codigo = campo(form, 'produto');
+        if (codigo) codigo.value = dados.codigo || '';
+        setSelect(form, 'cultivar', dados.cultivar_id);
+        setSelect(form, 'tratamento', dados.tratamento_id);
+        setSelect(form, 'peneira', dados.peneira_id);
+        setSelect(form, 'categoria', dados.categoria_id);
+        setSelect(form, 'especie', dados.especie_id);
+        const empresa = campo(form, 'empresa');
+        if (empresa && dados.empresa) empresa.value = dados.empresa;
+    }
+
+    async function buscarPorCodigo(form) {
+        const codigoEl = campo(form, 'produto');
+        const codigo = String(codigoEl?.value || '').trim();
+        const seq = proximaSequencia(form);
+        if (!codigo) {
+            feedback(form, 'Sem código: Cultivar e Tratamento serão mantidos manualmente.');
+            return;
+        }
+        feedback(form, 'Buscando cadastro do código...');
+        try {
+            const resp = await fetch(`/api/buscar-produto/?codigo=${encodeURIComponent(codigo)}`, {
+                cache: 'no-store',
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            });
+            const data = await resp.json();
+            if (!aindaAtual(form, seq)) return;
+            if (data.encontrado) {
+                aplicarProduto(form, data.dados || {});
+                feedback(form, 'Código reconhecido: tratamento e classificação atualizados.', 'success');
+            } else {
+                feedback(form, 'Código sem cadastro: os dados técnicos escolhidos serão mantidos.', 'warning');
+            }
+        } catch (err) {
+            if (aindaAtual(form, seq)) feedback(form, 'Não foi possível consultar o código agora.', 'warning');
+        }
+    }
+
+    async function buscarPorBase(form) {
+        const cultivar = campo(form, 'cultivar');
+        const tratamento = campo(form, 'tratamento');
+        const codigoEl = campo(form, 'produto');
+        if (!cultivar?.value) return;
+
+        const seq = proximaSequencia(form);
+        const params = new URLSearchParams({cultivar_id: cultivar.value});
+        if (tratamento && tratamento.value) params.set('tratamento_id', tratamento.value);
+        feedback(form, 'Procurando código para a nova classificação...');
+        try {
+            const resp = await fetch(`/api/buscar-produto/?${params.toString()}`, {
+                cache: 'no-store',
+                headers: {'X-Requested-With': 'XMLHttpRequest'}
+            });
+            const data = await resp.json();
+            if (!aindaAtual(form, seq)) return;
+            if (data.encontrado) {
+                aplicarProduto(form, data.dados || {});
+                feedback(form, `Código ajustado para ${data.dados?.codigo || ''}.`, 'success');
+                return;
+            }
+
+            // Regra essencial: classificação mudou e não existe UM código que a
+            // represente. O código antigo precisa sair, senão ele traz o tratamento
+            // antigo de volta no backend.
+            if (codigoEl) codigoEl.value = '';
+            if (data.ambiguo) {
+                feedback(form, 'Há mais de um código para essa classificação. Informe o código correto.', 'warning');
+            } else {
+                feedback(form, 'Não há código cadastrado para essa classificação. O código antigo foi limpo.', 'warning');
+            }
+        } catch (err) {
+            if (aindaAtual(form, seq)) feedback(form, 'Não foi possível consultar a classificação agora.', 'warning');
+        }
+    }
+
+    function preparar(form) {
+        if (!form || form.dataset.produtoTratamentoSync === '1') return;
+        form.dataset.produtoTratamentoSync = '1';
+        const codigo = campo(form, 'produto');
+        const cultivar = campo(form, 'cultivar');
+        const tratamento = campo(form, 'tratamento');
+        if (!codigo || !cultivar || !tratamento) return;
+
+        codigo.addEventListener('input', () => {
+            clearTimeout(timers.get(form));
+            timers.set(form, setTimeout(() => buscarPorCodigo(form), 450));
+        });
+        codigo.addEventListener('change', () => {
+            clearTimeout(timers.get(form));
+            buscarPorCodigo(form);
+        });
+        cultivar.addEventListener('change', () => buscarPorBase(form));
+        tratamento.addEventListener('change', () => buscarPorBase(form));
+    }
+
+    function iniciar() {
+        document.querySelectorAll('[id^="modalEditar"] form').forEach(preparar);
+        preparar(document.getElementById('formTransferencia'));
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
+    else iniciar();
+})();
+</script>
 
 <script>
 // Expedição avulsa: o primeiro submit bloqueia imediatamente os próximos cliques.

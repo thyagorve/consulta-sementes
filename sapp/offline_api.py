@@ -516,23 +516,72 @@ def _aplicar_operacao(op, user, ignorar_conflito=False):
         if estoque.saldo < qtd:
             raise ValueError(f'Saldo insuficiente. Saldo atual: {estoque.saldo} {estoque.embalagem}.')
 
+        # A transferência rápida também precisa respeitar as alterações feitas
+        # no modal. Antes, a fila levava só endereço/quantidade e recriava o
+        # destino com Código/Tratamento antigos.
+        def fk_payload(model, chave, atual, permitir_nulo=False):
+            if chave not in payload:
+                return atual
+            bruto = payload.get(chave)
+            if bruto in (None, ''):
+                return None if permitir_nulo else atual
+            try:
+                return model.objects.get(pk=int(bruto))
+            except (TypeError, ValueError, model.DoesNotExist):
+                raise ValueError(f'Cadastro inválido para {chave}: {bruto}.')
+
+        obj_cultivar = fk_payload(Cultivar, 'cultivar_id', estoque.cultivar)
+        obj_tratamento = fk_payload(Tratamento, 'tratamento_id', estoque.tratamento, permitir_nulo=True)
+        obj_peneira = fk_payload(Peneira, 'peneira_id', estoque.peneira)
+        obj_categoria = fk_payload(Categoria, 'categoria_id', estoque.categoria)
+        obj_especie = fk_payload(Especie, 'especie_id', estoque.especie, permitir_nulo=True)
+
+        novo_produto = str(payload.get('produto', estoque.produto or '') or '').strip()
+        novo_empresa = str(payload.get('empresa', estoque.empresa or '') or '').strip()
+        novo_cliente = str(payload.get('cliente', estoque.cliente or '') or '').strip()
+        nova_embalagem = str(payload.get('embalagem', estoque.embalagem or 'BAG') or 'BAG').strip().upper()
+        nova_obs = str(payload.get('observacao', estoque.observacao or '') or '').strip()
+
+        try:
+            novo_peso = Decimal(str(payload.get('peso_unitario', estoque.peso_unitario or 0) or 0).replace(',', '.'))
+        except (InvalidOperation, TypeError, ValueError):
+            novo_peso = estoque.peso_unitario
+
+        from .views import _resolver_identidade_produto_alteracao
+        produto_obj, novo_produto, _origem_resolucao = _resolver_identidade_produto_alteracao(
+            novo_produto,
+            obj_cultivar,
+            obj_tratamento,
+            codigo_original=estoque.produto or '',
+            cultivar_original=estoque.cultivar,
+            tratamento_original=estoque.tratamento,
+        )
+        if produto_obj:
+            obj_cultivar = produto_obj.cultivar or obj_cultivar
+            obj_tratamento = produto_obj.tratamento
+            obj_peneira = produto_obj.peneira if produto_obj.peneira_id is not None else obj_peneira
+            obj_categoria = produto_obj.categoria if produto_obj.categoria_id is not None else obj_categoria
+            obj_especie = produto_obj.especie if produto_obj.especie_id is not None else obj_especie
+            if produto_obj.empresa:
+                novo_empresa = produto_obj.empresa
+
         # Não mistura registros apenas porque lote/endereço são iguais. Os
         # atributos físicos/comerciais precisam representar o mesmo estoque.
         destino = (
             Estoque.objects.select_for_update(of=('self',))
             .filter(
                 lote__iexact=estoque.lote,
-                produto=estoque.produto,
-                cultivar=estoque.cultivar,
-                peneira=estoque.peneira,
-                categoria=estoque.categoria,
-                tratamento=estoque.tratamento,
-                especie=estoque.especie,
+                produto=novo_produto,
+                cultivar=obj_cultivar,
+                peneira=obj_peneira,
+                categoria=obj_categoria,
+                tratamento=obj_tratamento,
+                especie=obj_especie,
                 endereco__iexact=destino_endereco,
-                empresa=estoque.empresa,
-                embalagem=estoque.embalagem,
-                cliente=estoque.cliente,
-                peso_unitario=estoque.peso_unitario,
+                empresa=novo_empresa,
+                embalagem=nova_embalagem,
+                cliente=novo_cliente,
+                peso_unitario=novo_peso,
             )
             .order_by('id')
             .first()
@@ -540,29 +589,31 @@ def _aplicar_operacao(op, user, ignorar_conflito=False):
         if destino is None:
             destino = Estoque.objects.create(
                 lote=estoque.lote,
-                produto=estoque.produto,
-                cultivar=estoque.cultivar,
-                peneira=estoque.peneira,
-                categoria=estoque.categoria,
-                tratamento=estoque.tratamento,
-                especie=estoque.especie,
+                produto=novo_produto,
+                cultivar=obj_cultivar,
+                peneira=obj_peneira,
+                categoria=obj_categoria,
+                tratamento=obj_tratamento,
+                especie=obj_especie,
                 endereco=destino_endereco,
                 entrada=qtd,
                 saida=0,
                 empenhado=0,
                 conferente=user,
                 origem_destino=estoque.endereco,
-                empresa=estoque.empresa,
-                embalagem=estoque.embalagem,
-                peso_unitario=estoque.peso_unitario,
+                empresa=novo_empresa,
+                embalagem=nova_embalagem,
+                peso_unitario=novo_peso,
                 az=str(payload.get('az_destino') or '').strip().upper(),
-                cliente=estoque.cliente,
-                observacao=estoque.observacao,
+                cliente=novo_cliente,
+                observacao=nova_obs,
                 status_sistemico=estoque.status_sistemico,
             )
         else:
             destino.entrada = int(destino.entrada or 0) + qtd
             destino.conferente = user
+            if nova_obs:
+                destino.observacao = nova_obs
             destino.save()
 
         estoque.saida = int(estoque.saida or 0) + qtd
