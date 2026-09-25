@@ -7370,6 +7370,47 @@ function gerarImpressaoSolicitacao(id, janelaExistente = null) {
             const pesoBr = valor => Number(valor || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
             const tituloRelatorio = isCarga ? 'RELATÓRIO DE CARGA / EXPEDIÇÃO' : 'RELATÓRIO DE SOLICITAÇÃO';
 
+            const limparTituloCarga = valor => {
+                let texto = String(valor || '').trim();
+                if (!isCarga) return texto || 'Solicitação';
+                let resto = texto;
+                while (/^CARGA(?:\s|[-:])+?/i.test(resto)) {
+                    resto = resto.replace(/^CARGA(?:\s|[-:])*/i, '').trim();
+                }
+                return resto ? `CARGA ${resto}` : 'CARGA';
+            };
+
+            const totalizarVolumeFisico = lista => {
+                return (lista || []).reduce((acc, item) => {
+                    const unidadeItem = normalizarEmbalagem(item.embalagem);
+                    const qtd = Number(item.quantidade || 0);
+                    if (unidadeItem === 'BAG') acc.bag += qtd;
+                    else if (unidadeItem === 'SC') acc.sc += qtd;
+                    else acc.outros += qtd;
+                    return acc;
+                }, {bag: 0, sc: 0, outros: 0});
+            };
+
+            const formatarVolumeFisico = totais => {
+                const partes = [];
+                if (Number(totais?.bag || 0) > 0) partes.push(`${num(totais.bag)} BAG`);
+                if (Number(totais?.sc || 0) > 0) partes.push(`${num(totais.sc)} SC`);
+                if (Number(totais?.outros || 0) > 0) partes.push(`${num(totais.outros)} UN`);
+                return partes.join(' + ');
+            };
+
+            const totaisFisicosItens = totalizarVolumeFisico(itens);
+            const resumoAvulsa = data.resumo_avulsa || null;
+            const volumeFisicoCarga = resumoAvulsa?.volume_fisico
+                || formatarVolumeFisico(totaisFisicosItens);
+            const equivalenteCarga = resumoAvulsa
+                ? Number(resumoAvulsa.equivalente_sc || 0)
+                : (Number(totaisFisicosItens.bag || 0) * 25 + Number(totaisFisicosItens.sc || 0));
+            const tituloCargaLimpo = limparTituloCarga(sol.titulo || 'Solicitação');
+            const quantidadeResumoAvulsa = isCarga && resumoAvulsa && volumeFisicoCarga
+                ? `${volumeFisicoCarga} · ${num(equivalenteCarga)} SC eq.`
+                : '';
+
             // TSI mantém a coluna Situação.
             // Carga não precisa de Situação e começa diretamente por Cliente.
             const cabecalhoSituacao = isCarga
@@ -7384,9 +7425,9 @@ function gerarImpressaoSolicitacao(id, janelaExistente = null) {
                 const celulaSituacao = isCarga
                     ? ''
                     : `<td class="col-status-print"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td>`;
-                return `<tr>${celulaSituacao}<td class="col-cliente-print">${esc(item.cliente || sol.criterios?.cliente || 'CS')}</td><td class="col-codigo-print"><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td class="col-lote-print">${esc(item.lote || '-')}</td><td class="col-descricao-impressao">${esc(item.descricao || '-')}</td><td class="col-categoria-print">${esc(item.categoria || '-')}</td><td class="col-peneira-print">${esc(item.peneira || '-')}</td><td class="col-az-print">${esc(item.az || item.armazem || '-')}</td><td class="col-endereco-print">${esc(item.endereco || '-')}</td><td class="col-qtd">${num(item.quantidade)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`;
+                return `<tr>${celulaSituacao}<td class="col-cliente-print">${esc(item.cliente || sol.criterios?.cliente || 'CS')}</td><td class="col-codigo-print"><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td class="col-lote-print">${esc(item.lote || '-')}</td><td class="col-descricao-impressao">${esc(item.descricao || '-')}</td><td class="col-categoria-print">${esc(item.categoria || '-')}</td><td class="col-peneira-print">${esc(item.peneira || '-')}</td><td class="col-az-print">${esc(item.az || item.armazem || '-')}</td><td class="col-endereco-print">${esc(item.endereco || '-')}</td><td class="col-qtd">${isCarga ? `${num(item.quantidade)} ${esc(normalizarEmbalagem(item.embalagem) || 'UN')}` : num(item.quantidade)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`;
               }).join('')}</tbody>
-              <tfoot><tr class="total"><td colspan="${isCarga ? 8 : 9}" style="text-align:right">TOTAL</td><td class="col-qtd">${num(totalItens)}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
+              <tfoot><tr class="total"><td colspan="${isCarga ? 8 : 9}" style="text-align:right">TOTAL</td><td class="col-qtd">${isCarga && volumeFisicoCarga ? esc(volumeFisicoCarga) : num(totalItens)}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
             </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
 
             win.document.open();
@@ -7493,7 +7534,7 @@ tr { page-break-inside: avoid; }
 .tabela-solicitacao .col-peneira-print { width: 58px; text-align: center; }
 .tabela-solicitacao .col-az-print { width: 65px; }
 .tabela-solicitacao .col-endereco-print { width: 92px; }
-.tabela-solicitacao .col-qtd { width: 48px; text-align: center; }
+.tabela-solicitacao .col-qtd { width: 78px; text-align: center; font-weight: 800; }
 .tabela-solicitacao .col-peso { width: 75px; text-align: right; font-weight: 800; }
 .badge-situacao { display: inline-block; max-width: 100%; padding: 3px 6px; overflow: hidden; border-radius: 999px; font-size: 6.8px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
 .badge-pendente { color: #795900; background: #ffefad; }
@@ -7676,15 +7717,15 @@ tr { page-break-inside: avoid; }
     </div>
     <div class="numero-card">
       <small>ID</small>
-      <strong>${esc(sol.titulo || 'Solicitação')}</strong>
+      <strong>${esc(isCarga ? tituloCargaLimpo : (sol.titulo || 'Solicitação'))}</strong>
     </div>
   </header>
 
   <section class="resumo">
     <div class="indicador indicador-status"><b>Status</b><strong class="${statusClasse}">${esc(sol.status_display || sol.status || '-')}</strong></div>
-    <div class="indicador indicador-solicitado"><b>Quantidade solicitada</b><strong>${num(sol.quantidade_solicitada)} ${unidade}</strong></div>
-    <div class="indicador indicador-empenhado"><b>Quantidade empenhada</b><strong>${num(qtdEmp)} ${unidade}</strong></div>
-    <div class="indicador indicador-movimentado"><b>Quantidade movimentada</b><strong>${num(sol.quantidade_movimentada)} ${unidade}</strong></div>
+    <div class="indicador indicador-solicitado"><b>Quantidade solicitada</b><strong>${quantidadeResumoAvulsa || `${num(sol.quantidade_solicitada)} ${unidade}`}</strong></div>
+    <div class="indicador indicador-empenhado"><b>Quantidade empenhada</b><strong>${quantidadeResumoAvulsa || `${num(qtdEmp)} ${unidade}`}</strong></div>
+    <div class="indicador indicador-movimentado"><b>Quantidade movimentada</b><strong>${quantidadeResumoAvulsa || `${num(sol.quantidade_movimentada)} ${unidade}`}</strong></div>
   </section>
 
   <section class="info-grid">
@@ -7712,7 +7753,7 @@ tr { page-break-inside: avoid; }
 
   <div class="titulo-itens">
     <span>${isCarga ? 'Itens da carga' : 'Itens da solicitação'}</span>
-    <span>${itens.length} registro(s) · Total ${num(totalItens)} ${unidade}${isCarga ? ` · ${pesoBr(totalPesoCarga)} kg` : ''}</span>
+    <span>${itens.length} registro(s) · Total ${isCarga && volumeFisicoCarga ? `${esc(volumeFisicoCarga)} · ${num(equivalenteCarga)} SC eq.` : `${num(totalItens)} ${unidade}`}${isCarga ? ` · ${pesoBr(totalPesoCarga)} kg` : ''}</span>
   </div>
 
   <div class="tabela-container">

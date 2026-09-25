@@ -2500,6 +2500,84 @@
         .chart-switch-btn { min-width:auto; padding:5px 8px; }
         .chart-card-pro::after, .expedition-chart-card::after { display:none; }
     }
+
+
+    /* Unidade do gráfico de carregamentos */
+    .expedition-unit-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 3px;
+        border: 1px solid #d7e2da;
+        border-radius: 12px;
+        background: #f5f8f6;
+        box-shadow: inset 0 1px 2px rgba(26, 64, 40, .04);
+    }
+
+    .expedition-unit-btn {
+        border: 0;
+        background: transparent;
+        color: #66756c;
+        border-radius: 9px;
+        min-height: 30px;
+        padding: 0 10px;
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .01em;
+        cursor: pointer;
+        transition: all .16s ease;
+        white-space: nowrap;
+    }
+
+    .expedition-unit-btn:hover {
+        color: #174e30;
+        background: #e9f3ed;
+    }
+
+    .expedition-unit-btn.active {
+        color: #fff;
+        background: linear-gradient(135deg, #237a47, #2f9a58);
+        box-shadow: 0 4px 10px rgba(35, 122, 71, .20);
+    }
+
+    .expedition-chart-head h6 {
+        font-size: 1rem;
+        line-height: 1.2;
+        font-weight: 850;
+        letter-spacing: -.015em;
+        color: #22372a;
+    }
+
+    .expedition-chart-head small {
+        font-size: .76rem;
+        line-height: 1.35;
+        color: #66776d;
+        font-weight: 600;
+    }
+
+    .expedition-chart-mode,
+    .expedition-chart-period {
+        font-size: .68rem;
+        font-weight: 800;
+    }
+
+    .expedition-chart-summary strong {
+        font-weight: 850;
+        color: #21372a;
+    }
+
+    @media (max-width: 900px) {
+        .expedition-unit-switch {
+            order: 3;
+            width: 100%;
+            justify-content: stretch;
+        }
+        .expedition-unit-btn {
+            flex: 1 1 0;
+            padding-inline: 8px;
+        }
+    }
+
 </style>
 
 <div class="dashboard-shell">
@@ -3345,6 +3423,11 @@
                         <button type="button" id="expedicaoChartType" class="chart-switch-btn" onclick="alternarModeloGraficoExpedicao()" title="Trocar visualização do gráfico de cargas">
                             <i class="fas fa-chart-column"></i><span id="expedicaoChartTypeLabel">Barras</span>
                         </button>
+                        <div class="expedition-unit-switch" role="group" aria-label="Unidade do gráfico de carregamentos">
+                            <button type="button" class="expedition-unit-btn active" data-exp-unit="equivalente" onclick="trocarUnidadeGraficoExpedicao('equivalente')" title="Volume total convertido: 1 BAG = 25 SC">Volume (SC eq.)</button>
+                            <button type="button" class="expedition-unit-btn" data-exp-unit="bag" onclick="trocarUnidadeGraficoExpedicao('bag')" title="Mostrar quantidade de BAG">BAG</button>
+                            <button type="button" class="expedition-unit-btn" data-exp-unit="sc" onclick="trocarUnidadeGraficoExpedicao('sc')" title="Mostrar sacos físicos">SC físico</button>
+                        </div>
                         <span id="expedicaoChartMode" class="expedition-chart-mode">--</span>
                         <span id="expedicaoChartPeriod" class="expedition-chart-period">Mesmo período da expedição</span>
                         <button type="button" class="expedition-chart-filter-btn" onclick="toggleExpeditionChartFilters()">
@@ -3523,6 +3606,10 @@
     let expedicaoGraficoPadrao = {};
     let expedicaoGraficoCarregando = false;
     let expedicaoGraficoFonte = {};
+    let expedicaoGraficoUnidade = (() => {
+        const salvo = localStorage.getItem('infinityDashboardExpedicaoUnidadeV2');
+        return ['equivalente', 'bag', 'sc'].includes(salvo) ? salvo : 'equivalente';
+    })();
     let expedicaoCargasCache = [];
     let expedicaoCargasPagina = 1;
     let expedicaoCargasPorPagina = 10;
@@ -4392,6 +4479,60 @@
         atualizarGraficoExpedicoes(expedicaoGraficoPadrao || {});
     }
 
+    function formatarComposicaoExpedicao(detalhe = {}) {
+        const partes = [];
+        if (Number(detalhe.bags || 0) > 0) partes.push(`${formatNumber(detalhe.bags || 0, 0)} BAG`);
+        if (Number(detalhe.scs || 0) > 0) partes.push(`${formatNumber(detalhe.scs || 0, 0)} SC`);
+        return partes.join(' + ') || '0';
+    }
+
+    function metaUnidadeGraficoExpedicao(unidade = expedicaoGraficoUnidade) {
+        if (unidade === 'bag') {
+            return {
+                chave: 'bags',
+                sigla: 'BAG',
+                eixo: 'Quantidade carregada (BAG)',
+                datasetCarga: 'BAG por carga',
+                datasetDia: 'BAG por dia',
+                tituloResumo: 'BAG',
+            };
+        }
+        if (unidade === 'sc') {
+            return {
+                chave: 'scs',
+                sigla: 'SC',
+                eixo: 'Sacos físicos carregados (SC)',
+                datasetCarga: 'SC físicos por carga',
+                datasetDia: 'SC físicos por dia',
+                tituloResumo: 'SC físicos',
+            };
+        }
+        return {
+            chave: 'valores',
+            sigla: 'SC eq.',
+            eixo: 'Equivalente em sacos (SC)',
+            datasetCarga: 'Equivalente por carga',
+            datasetDia: 'Volume diário equivalente',
+            tituloResumo: 'SC equivalente',
+        };
+    }
+
+    function atualizarBotoesUnidadeGraficoExpedicao() {
+        document.querySelectorAll('[data-exp-unit]').forEach(botao => {
+            const ativo = botao.dataset.expUnit === expedicaoGraficoUnidade;
+            botao.classList.toggle('active', ativo);
+            botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+        });
+    }
+
+    function trocarUnidadeGraficoExpedicao(unidade) {
+        if (!['equivalente', 'bag', 'sc'].includes(unidade)) return;
+        expedicaoGraficoUnidade = unidade;
+        localStorage.setItem('infinityDashboardExpedicaoUnidadeV2', unidade);
+        atualizarBotoesUnidadeGraficoExpedicao();
+        atualizarGraficoExpedicoes(expedicaoGraficoFonte || expedicaoGraficoPadrao || {}, false);
+    }
+
     function atualizarGraficoExpedicoes(grafico = {}, resetPagina = true) {
         if (resetPagina) {
             expedicaoGraficoFonte = grafico || {};
@@ -4401,7 +4542,12 @@
 
         const modo = grafico.modo === 'cargas' ? 'cargas' : 'dias';
         const labelsTodos = Array.isArray(grafico.labels) ? grafico.labels : [];
-        const valoresTodos = Array.isArray(grafico.valores) ? grafico.valores : [];
+        const metaUnidade = metaUnidadeGraficoExpedicao();
+        const valoresTodos = expedicaoGraficoUnidade === 'bag'
+            ? (Array.isArray(grafico.bags) ? grafico.bags : [])
+            : expedicaoGraficoUnidade === 'sc'
+                ? (Array.isArray(grafico.scs) ? grafico.scs : [])
+                : (Array.isArray(grafico.valores) ? grafico.valores : []);
         const resumo = grafico.resumo || {};
         const detalhesTodos = Array.isArray(grafico.detalhes) ? grafico.detalhes : [];
 
@@ -4421,8 +4567,9 @@
 
         if (titulo) titulo.textContent = grafico.titulo || 'Carregamentos';
         if (subtitulo) {
-            const base = grafico.subtitulo || '';
-            subtitulo.textContent = base;
+            subtitulo.textContent = modo === 'cargas'
+                ? `Comparativo por carga em ${metaUnidade.tituloResumo}.`
+                : `Evolução diária do volume em ${metaUnidade.tituloResumo}.`;
         }
         if (badgeModo) {
             badgeModo.textContent = modo === 'cargas' ? 'Por carga' : 'Por dia';
@@ -4444,18 +4591,21 @@
         const destaqueEl = document.getElementById('exp-summary-destaque');
         const destaqueSubEl = document.getElementById('exp-summary-destaque-sub');
 
+        const totalSelecionado = expedicaoGraficoUnidade === 'bag'
+            ? Number(resumo.bags || 0)
+            : expedicaoGraficoUnidade === 'sc'
+                ? Number(resumo.scs || 0)
+                : Number(resumo.equivalente_sc || 0);
+
         if (totalEl) {
-            totalEl.textContent = `${formatNumber(resumo.equivalente_sc || 0, 0)} SC`;
+            totalEl.textContent = `${formatNumber(totalSelecionado, 0)} ${metaUnidade.sigla}`;
         }
         if (breakdownEl) {
-            const partes = [];
-            if (Number(resumo.bags || 0) > 0) {
-                partes.push(`${formatNumber(resumo.bags || 0, 0)} BAG`);
-            }
-            if (Number(resumo.scs || 0) > 0) {
-                partes.push(`${formatNumber(resumo.scs || 0, 0)} SC físicos`);
-            }
-            breakdownEl.textContent = partes.length ? partes.join(' · ') : 'Sem volume carregado';
+            const partesFisicas = [];
+            if (Number(resumo.bags || 0) > 0) partesFisicas.push(`${formatNumber(resumo.bags || 0, 0)} BAG`);
+            if (Number(resumo.scs || 0) > 0) partesFisicas.push(`${formatNumber(resumo.scs || 0, 0)} SC`);
+            const fisico = partesFisicas.join(' + ') || '0';
+            breakdownEl.textContent = `${fisico} = ${formatNumber(resumo.equivalente_sc || 0, 0)} SC eq.`;
         }
         if (cargasEl) cargasEl.textContent = formatNumber(resumo.cargas || 0, 0);
         if (cargasSubEl) {
@@ -4464,24 +4614,41 @@
                 : `${formatNumber(resumo.dias_com_carga || 0, 0)} de ${formatNumber(resumo.dias_periodo || 0, 0)} dias com carga`;
         }
 
-        if (modo === 'cargas') {
-            if (mediaLabelEl) mediaLabelEl.textContent = 'Média por carga';
-            if (mediaEl) mediaEl.textContent = `${formatNumber(resumo.media_por_carga_sc || 0, 0)} SC`;
-            if (mediaSubEl) mediaSubEl.textContent = 'equivalente médio por caminhão';
-            if (destaqueLabelEl) destaqueLabelEl.textContent = 'Maior carga';
-            if (destaqueEl) destaqueEl.textContent = resumo.maior_carga || '--';
-            if (destaqueSubEl) {
-                destaqueSubEl.textContent = `${formatNumber(resumo.maior_carga_sc || 0, 0)} SC equivalentes`;
+        const divisorMedia = modo === 'cargas'
+            ? Number(resumo.cargas || 0)
+            : Number(resumo.dias_periodo || 0);
+        const mediaSelecionada = divisorMedia > 0 ? totalSelecionado / divisorMedia : 0;
+        if (mediaLabelEl) mediaLabelEl.textContent = modo === 'cargas' ? 'Média por carga' : 'Média por dia';
+        if (mediaEl) mediaEl.textContent = `${formatNumber(mediaSelecionada, 0)} ${metaUnidade.sigla}`;
+        if (mediaSubEl) {
+            mediaSubEl.textContent = modo === 'cargas'
+                ? `média em ${metaUnidade.tituloResumo.toLowerCase()} por carga`
+                : `média em ${metaUnidade.tituloResumo.toLowerCase()} por dia`;
+        }
+
+        let indiceDestaque = -1;
+        let maiorValorSelecionado = -1;
+        valoresTodos.forEach((valor, indice) => {
+            const numero = Number(valor || 0);
+            if (numero > maiorValorSelecionado) {
+                maiorValorSelecionado = numero;
+                indiceDestaque = indice;
             }
-        } else {
-            if (mediaLabelEl) mediaLabelEl.textContent = 'Média por dia';
-            if (mediaEl) mediaEl.textContent = `${formatNumber(resumo.media_por_dia_sc || 0, 0)} SC`;
-            if (mediaSubEl) mediaSubEl.textContent = 'considerando todos os dias do filtro';
-            if (destaqueLabelEl) destaqueLabelEl.textContent = 'Dia de pico';
-            if (destaqueEl) destaqueEl.textContent = resumo.dia_pico || '--';
-            if (destaqueSubEl) {
-                destaqueSubEl.textContent = `${formatNumber(resumo.dia_pico_sc || 0, 0)} SC equivalentes`;
+        });
+        if (destaqueLabelEl) destaqueLabelEl.textContent = modo === 'cargas' ? 'Maior carga' : 'Dia de pico';
+        if (destaqueEl) {
+            if (indiceDestaque >= 0 && maiorValorSelecionado > 0) {
+                destaqueEl.textContent = modo === 'cargas'
+                    ? String(labelsTodos[indiceDestaque] || '--')
+                    : String((detalhesTodos[indiceDestaque] || {}).data || labelsTodos[indiceDestaque] || '--');
+            } else {
+                destaqueEl.textContent = '--';
             }
+        }
+        if (destaqueSubEl) {
+            destaqueSubEl.textContent = maiorValorSelecionado > 0
+                ? `${formatNumber(maiorValorSelecionado, 0)} ${metaUnidade.sigla}`
+                : `0 ${metaUnidade.sigla}`;
         }
 
         const vazio = !valoresTodos.some(value => Number(value) > 0);
@@ -4492,15 +4659,16 @@
         const labelsGrafico = modo === 'cargas'
             ? labels.map((label, index) => {
                 const detalhe = detalhes[index] || {};
-                const volume = [];
-                if (Number(detalhe.bags || 0) > 0) {
-                    volume.push(`${formatNumber(detalhe.bags || 0, 0)} BAG`);
+                let linhaVolume = '';
+                if (expedicaoGraficoUnidade === 'bag') {
+                    linhaVolume = `${formatNumber(detalhe.bags || 0, 0)} BAG`;
+                } else if (expedicaoGraficoUnidade === 'sc') {
+                    linhaVolume = `${formatNumber(detalhe.scs || 0, 0)} SC físico`;
+                } else {
+                    linhaVolume = formatarComposicaoExpedicao(detalhe);
                 }
-                if (Number(detalhe.scs || 0) > 0) {
-                    volume.push(`${formatNumber(detalhe.scs || 0, 0)} SC`);
-                }
-                return volume.length
-                    ? [String(label), `(${volume.join(' + ')})`]
+                return linhaVolume
+                    ? [String(label), linhaVolume]
                     : String(label);
             })
             : labels;
@@ -4544,9 +4712,10 @@
         charts.expedicoes.data.datasets[0].categoryPercentage = labels.length <= 6 ? .64 : .74;
         charts.expedicoes.data.datasets[0].barPercentage = .78;
         charts.expedicoes.data.datasets[0].label = modo === 'cargas'
-            ? 'Equivalente da carga'
-            : 'Volume diário equivalente';
+            ? metaUnidade.datasetCarga
+            : metaUnidade.datasetDia;
 
+        charts.expedicoes.options.scales.y.title.text = metaUnidade.eixo;
         charts.expedicoes.options.scales.x.ticks.maxTicksLimit = Math.max(10, labels.length);
         charts.expedicoes.options.scales.x.ticks.autoSkip = false;
         charts.expedicoes.options.plugins.datalabels.display = context =>
@@ -4712,7 +4881,7 @@
                     <td>
                         <span class="expedition-equivalent">
                             <i class="fas fa-equals"></i>
-                            ${formatNumber(carga.equivalente_sc || 0, 0)} SC
+                            ${formatNumber(carga.equivalente_sc || 0, 0)} SC eq.
                         </span>
                     </td>
                 </tr>
@@ -5645,13 +5814,13 @@
                                 text: 'Equivalente em sacos (SC)',
                                 color: '#6f7b73',
                                 font: {
-                                    size: 9,
+                                    size: 10,
                                     weight: 800,
                                 },
                             },
                             ticks: {
                                 color: '#6f7b73',
-                                font: { size: 9 },
+                                font: { size: 10 },
                                 callback(value) {
                                     return formatNumber(value, 0);
                                 },
@@ -5662,7 +5831,7 @@
                             ticks: {
                                 color: '#526057',
                                 font: {
-                                    size: 9,
+                                    size: 10,
                                     weight: 750,
                                 },
                                 maxRotation: 0,
@@ -5688,19 +5857,21 @@
                                     return String(detalhe.data || items[0].label || '');
                                 },
                                 label(context) {
-                                    return `Equivalente: ${formatNumber(context.raw || 0, 0)} SC`;
+                                    const meta = metaUnidadeGraficoExpedicao();
+                                    return `${meta.tituloResumo}: ${formatNumber(context.raw || 0, 0)} ${meta.sigla}`;
                                 },
                                 afterBody(items) {
                                     if (!items?.length) return [];
                                     const index = items[0].dataIndex;
                                     const detalhe = expedicaoGraficoDetalhes[index] || {};
                                     const linhas = [];
+                                    const composicao = formatarComposicaoExpedicao(detalhe);
                                     if (expedicaoGraficoModo === 'cargas') {
-                                        if (Number(detalhe.bags || 0) > 0) {
-                                            linhas.push(`BAG: ${formatNumber(detalhe.bags || 0, 0)}`);
+                                        if (composicao !== '0') {
+                                            linhas.push(`Volume físico: ${composicao}`);
                                         }
-                                        if (Number(detalhe.scs || 0) > 0) {
-                                            linhas.push(`SC físicos: ${formatNumber(detalhe.scs || 0, 0)}`);
+                                        if (Number(detalhe.equivalente_sc || 0) > 0) {
+                                            linhas.push(`Conversão: ${composicao} = ${formatNumber(detalhe.equivalente_sc || 0, 0)} SC eq.`);
                                         }
                                         if (detalhe.placa && detalhe.placa !== '--') {
                                             linhas.push(`Placa: ${detalhe.placa}`);
@@ -5710,11 +5881,11 @@
                                         }
                                     } else {
                                         linhas.push(`Cargas: ${formatNumber(detalhe.cargas || 0, 0)}`);
-                                        if (Number(detalhe.bags || 0) > 0) {
-                                            linhas.push(`BAG: ${formatNumber(detalhe.bags || 0, 0)}`);
+                                        if (composicao !== '0') {
+                                            linhas.push(`Volume físico: ${composicao}`);
                                         }
-                                        if (Number(detalhe.scs || 0) > 0) {
-                                            linhas.push(`SC físicos: ${formatNumber(detalhe.scs || 0, 0)}`);
+                                        if (Number(detalhe.equivalente_sc || 0) > 0) {
+                                            linhas.push(`Equivalente: ${formatNumber(detalhe.equivalente_sc || 0, 0)} SC eq.`);
                                         }
                                     }
                                     return linhas;
@@ -5734,12 +5905,13 @@
                                     : '#405047';
                             },
                             font: {
-                                size: 9,
+                                size: 10,
                                 weight: 900,
                             },
                             formatter(value) {
+                                const meta = metaUnidadeGraficoExpedicao();
                                 return Number(value) > 0
-                                    ? `${formatNumber(value, 0)} SC`
+                                    ? `${formatNumber(value, 0)} ${meta.sigla}`
                                     : '';
                             },
                         },
@@ -5755,6 +5927,7 @@
             initCharts();
             const expTypeLabel = document.getElementById('expedicaoChartTypeLabel');
             if (expTypeLabel) expTypeLabel.textContent = modeloGraficoExpedicaoAtual() === 'line' ? 'Linha' : 'Barras';
+            atualizarBotoesUnidadeGraficoExpedicao();
 
             [
                 'filterDataInicio',

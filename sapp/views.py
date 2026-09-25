@@ -7231,8 +7231,10 @@ def _normalizar_numero_carga_avulsa(valor):
         return ''
     texto = texto.replace('-', ' ').replace(':', ' ')
     texto = ' '.join(texto.split())
-    if texto.startswith('CARGA'):
+    while texto.startswith('CARGA'):
         texto = texto[5:].strip()
+        texto = texto.replace('-', ' ').replace(':', ' ')
+        texto = ' '.join(texto.split())
     if not texto.isdigit():
         return ''
     numero = texto.lstrip('0') or '0'
@@ -7260,10 +7262,18 @@ def _dashboard_normalizar_carga(valor):
         numero = texto.lstrip('0') or '0'
         texto = f'CARGA {numero}'
     elif texto.startswith('CARGA'):
-        restante = texto[5:].strip()
+        restante = texto
+        while restante.startswith('CARGA'):
+            restante = restante[5:].strip()
+            restante = restante.replace('-', ' ').replace(':', ' ')
+            restante = ' '.join(restante.split())
         if restante.isdigit():
             numero = restante.lstrip('0') or '0'
             texto = f'CARGA {numero}'
+        elif restante:
+            texto = f'CARGA {restante}'
+        else:
+            texto = 'CARGA'
 
     return texto, texto
 
@@ -15898,6 +15908,9 @@ def api_kanban_dados(request):
                 'motorista': set(),
                 'lotes': set(),
                 'qtd': Decimal('0'),
+                'qtd_bag': Decimal('0'),
+                'qtd_sc': Decimal('0'),
+                'qtd_outros': Decimal('0'),
                 'embalagens': set(),
                 'usuario': mov.usuario,
             })
@@ -15909,8 +15922,24 @@ def api_kanban_dados(request):
             if lote: grupo['lotes'].add(lote)
             emb = str(mov.estoque.embalagem if mov.estoque else '').strip().upper()
             if emb: grupo['embalagens'].add(emb)
+            qtd_mov = Decimal(str(mov.quantidade or 0))
+            if emb == 'BAG':
+                grupo['qtd_bag'] += qtd_mov
+            elif emb == 'SC':
+                grupo['qtd_sc'] += qtd_mov
+            else:
+                grupo['qtd_outros'] += qtd_mov
 
         for chave, grupo in grupos_avulsos.items():
+            partes_volume = []
+            if grupo['qtd_bag'] > 0:
+                partes_volume.append(f"{int(grupo['qtd_bag']) if grupo['qtd_bag'] == int(grupo['qtd_bag']) else grupo['qtd_bag']} BAG")
+            if grupo['qtd_sc'] > 0:
+                partes_volume.append(f"{int(grupo['qtd_sc']) if grupo['qtd_sc'] == int(grupo['qtd_sc']) else grupo['qtd_sc']} SC")
+            if grupo['qtd_outros'] > 0:
+                partes_volume.append(f"{int(grupo['qtd_outros']) if grupo['qtd_outros'] == int(grupo['qtd_outros']) else grupo['qtd_outros']} UN")
+            volume_fisico = ' + '.join(partes_volume) or '0'
+            equivalente_sc = (grupo['qtd_bag'] * Decimal('25')) + grupo['qtd_sc']
             card = {
                 'id': chave,
                 'synthetic_avulsa': True,
@@ -15938,6 +15967,10 @@ def api_kanban_dados(request):
                 'quantidade_empenhada': float(grupo['qtd']),
                 'quantidade_empenhada_display': float(grupo['qtd']),
                 'quantidade_movimentada': float(grupo['qtd']),
+                'volume_fisico': volume_fisico,
+                'qtd_bag': float(grupo['qtd_bag']),
+                'qtd_sc': float(grupo['qtd_sc']),
+                'equivalente_sc': float(equivalente_sc),
                 'percentual_empenhado': 100.0,
                 'percentual_movimentado': 100.0,
                 'prioridade': 'MEDIA',
@@ -15997,6 +16030,8 @@ def api_impressao_carga_avulsa(request):
     if not nome and not numero and not placa:
         return JsonResponse({'success': False, 'error': 'Carga avulsa não informada.'}, status=400)
 
+    numero_canonico = ''
+
     qs = (
         _expedicoes_ativas_qs()
         .filter(origem_carga='AVULSA')
@@ -16038,6 +16073,9 @@ def api_impressao_carga_avulsa(request):
     motoristas = set()
     embalagens = set()
     total = Decimal('0')
+    total_bag = Decimal('0')
+    total_sc = Decimal('0')
+    total_outros = Decimal('0')
     peso_total_carga = Decimal('0')
     produto_cache = {}
 
@@ -16059,6 +16097,12 @@ def api_impressao_carga_avulsa(request):
         embalagem = str(estoque.embalagem if estoque else '').strip().upper()
         if embalagem:
             embalagens.add(embalagem)
+        if embalagem == 'BAG':
+            total_bag += qtd
+        elif embalagem == 'SC':
+            total_sc += qtd
+        else:
+            total_outros += qtd
 
         codigo = str(estoque.produto if estoque else '').strip()
         chave_codigo = codigo.upper()
@@ -16100,10 +16144,30 @@ def api_impressao_carga_avulsa(request):
 
     primeiro = movimentos[0]
     ultimo = movimentos[-1]
-    titulo = nome or (f'CARGA {numero}' if numero else (f'CARGA {placa}' if placa else 'CARGA AVULSA'))
-    unidade = 'BAGS/SC'
+    if numero_canonico:
+        titulo = numero_canonico
+    elif placa:
+        titulo = f'CARGA {placa}'
+    elif nome:
+        resto_nome = str(nome or '').strip()
+        while resto_nome.upper().startswith('CARGA'):
+            resto_nome = resto_nome[5:].lstrip(' -:').strip()
+        titulo = f'CARGA {resto_nome}' if resto_nome else 'CARGA'
+    else:
+        titulo = 'CARGA AVULSA'
+    unidade = 'BAG + SC'
     if len(embalagens) == 1:
         unidade = next(iter(embalagens))
+
+    partes_volume = []
+    if total_bag > 0:
+        partes_volume.append(f'{int(total_bag) if total_bag == int(total_bag) else total_bag} BAG')
+    if total_sc > 0:
+        partes_volume.append(f'{int(total_sc) if total_sc == int(total_sc) else total_sc} SC')
+    if total_outros > 0:
+        partes_volume.append(f'{int(total_outros) if total_outros == int(total_outros) else total_outros} UN')
+    volume_fisico = ' + '.join(partes_volume) or '0'
+    equivalente_sc = (total_bag * Decimal('25')) + total_sc
 
     return JsonResponse({
         'success': True,
@@ -16140,6 +16204,11 @@ def api_impressao_carga_avulsa(request):
         'resumo_avulsa': {
             'lotes': len(itens),
             'quantidade': float(total),
+            'bags': float(total_bag),
+            'scs': float(total_sc),
+            'outros': float(total_outros),
+            'volume_fisico': volume_fisico,
+            'equivalente_sc': float(equivalente_sc),
             'peso_total': str(peso_total_carga),
             'unidade': unidade,
         },
@@ -16598,6 +16667,54 @@ def api_atualizacoes_recentes(request):
 # ============================================================================
 # GESTÃO DE CARGAS - consulta e correções auditáveis
 # ============================================================================
+def _descricao_expedicao_sincronizada(hist, estoque=None):
+    """Reconstrói a descrição exibida na linha do tempo usando o estado atual.
+
+    HistoricoMovimentacao.quantidade sempre foi a fonte numérica da correção,
+    porém a descrição era um snapshot textual e podia continuar mostrando a
+    quantidade antiga depois de editar uma carga. Mantemos apenas a observação
+    livre do texto anterior e regeneramos os dados operacionais atuais.
+    """
+    estoque = estoque or getattr(hist, 'estoque', None)
+    descricao_antiga = str(getattr(hist, 'descricao', '') or '').strip()
+
+    observacao = ''
+    descricao_lower = descricao_antiga.lower()
+    for marcador in (' observação:', ' observacao:'):
+        pos = descricao_lower.find(marcador)
+        if pos >= 0:
+            observacao = descricao_antiga[pos + len(marcador):].strip()
+            break
+
+    quantidade = int(getattr(hist, 'quantidade', 0) or 0)
+    unidade = str(getattr(estoque, 'embalagem', '') or 'un').strip().upper()
+    lote = str(getattr(hist, 'lote_ref', '') or getattr(estoque, 'lote', '') or '--').strip()
+    endereco = str(getattr(estoque, 'endereco', '') or '-').strip()
+    az = str(getattr(estoque, 'az', '') or '-').strip()
+
+    partes = [
+        f'Expedido {quantidade} {unidade} do lote {lote}, '
+        f'endereço {endereco}, AZ {az}.'
+    ]
+
+    numero_carga = str(getattr(hist, 'numero_carga', '') or '').strip()
+    cliente = str(getattr(hist, 'cliente', '') or '').strip()
+    motorista = str(getattr(hist, 'motorista', '') or '').strip()
+    placa = str(getattr(hist, 'placa', '') or '').strip().upper()
+
+    if numero_carga:
+        partes.append(f'Carga: {numero_carga}.')
+    if cliente:
+        partes.append(f'Cliente: {cliente}.')
+    if motorista:
+        partes.append(f'Motorista: {motorista}.')
+    if placa:
+        partes.append(f'Placa: {placa}.')
+    if observacao:
+        partes.append(f'Observação: {observacao}')
+
+    return ' '.join(partes).strip()
+
 @login_required
 def gestao_cargas(request):
     from collections import OrderedDict
@@ -16836,8 +16953,9 @@ def editar_grupo_carga(request):
                     hist.motorista = motorista
                 if cliente:
                     hist.cliente = cliente
+                hist.descricao = _descricao_expedicao_sincronizada(hist)
                 hist.save(update_fields=[
-                    'numero_carga', 'nome_carga_avulsa', 'placa', 'motorista', 'cliente'
+                    'numero_carga', 'nome_carga_avulsa', 'placa', 'motorista', 'cliente', 'descricao'
                 ])
 
                 if nova_data and hist.data_hora:
@@ -16973,6 +17091,8 @@ def editar_movimento_carga(request, historico_id):
                 'estoque_id': hist.estoque_id,
                 'lote': hist.lote_ref,
                 'quantidade': qtd_antiga,
+                'saldo_fisico': int(estoque_antigo.saldo or 0) if estoque_antigo else None,
+                'saida_acumulada': int(estoque_antigo.saida or 0) if estoque_antigo else None,
                 'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
                 'numero_carga': hist.numero_carga or '',
                 'nome_carga_avulsa': hist.nome_carga_avulsa or '',
@@ -17027,9 +17147,11 @@ def editar_movimento_carga(request, historico_id):
             hist.motorista = (request.POST.get('motorista') or '').strip() or None
             if origem_post in {'GERADA', 'AVULSA'}:
                 hist.origem_carga = origem_post
+            hist.descricao = _descricao_expedicao_sincronizada(hist, estoque_novo)
             hist.save(update_fields=[
                 'estoque', 'lote_ref', 'quantidade', 'numero_carga',
-                'nome_carga_avulsa', 'cliente', 'placa', 'motorista', 'origem_carga'
+                'nome_carga_avulsa', 'cliente', 'placa', 'motorista', 'origem_carga',
+                'descricao'
             ])
 
             data_txt = (request.POST.get('data_carga') or '').strip()
@@ -17047,18 +17169,36 @@ def editar_movimento_carga(request, historico_id):
                 titulo = numero_limpo if numero_limpo.upper().startswith('CARGA ') else f'CARGA {numero_limpo}'
                 sol = Solicitacao.objects.filter(tipo_solicitacao='CARGA', titulo__iexact=titulo).first()
                 if sol:
-                    hie = (
+                    numeros_carga_match = {numero_limpo}
+                    if numero_limpo.upper().startswith('CARGA '):
+                        numeros_carga_match.add(numero_limpo[6:].strip())
+                    else:
+                        numeros_carga_match.add(f'CARGA {numero_limpo}')
+
+                    candidatos_hie = list(
                         HistoricoItemEmpenho.objects
                         .filter(
                             empenho__solicitacao=sol,
                             tipo='expedicao',
                             lote__iexact=antes['lote'],
                             quantidade=qtd_antiga,
-                            numero_carga__iexact=numero_limpo,
+                        )
+                        .filter(
+                            Q(numero_carga__iexact=numero_limpo)
+                            | Q(numero_carga__iexact=(numero_limpo[6:].strip() if numero_limpo.upper().startswith('CARGA ') else f'CARGA {numero_limpo}'))
                         )
                         .order_by('id')
-                        .first()
                     )
+                    hie = None
+                    if candidatos_hie:
+                        if hist.data_hora:
+                            def _distancia_hie(item_hie):
+                                if not item_hie.processado_em:
+                                    return float('inf')
+                                return abs((item_hie.processado_em - hist.data_hora).total_seconds())
+                            hie = min(candidatos_hie, key=_distancia_hie)
+                        else:
+                            hie = candidatos_hie[0]
                     if hie:
                         hie.lote = estoque_novo.lote
                         hie.quantidade = qtd_nova
@@ -17086,6 +17226,8 @@ def editar_movimento_carga(request, historico_id):
                 'estoque_id': estoque_novo.id,
                 'lote': estoque_novo.lote,
                 'quantidade': qtd_nova,
+                'saldo_fisico': int(estoque_novo.saldo or 0),
+                'saida_acumulada': int(estoque_novo.saida or 0),
                 'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
                 'numero_carga': hist.numero_carga or '',
                 'nome_carga_avulsa': hist.nome_carga_avulsa or '',
@@ -17120,7 +17262,12 @@ def editar_movimento_carga(request, historico_id):
                 )
 
             transaction.on_commit(_invalidar_dados_cargas)
-            messages.success(request, '✅ Movimento da carga corrigido e auditado com sucesso.')
+            unidade_final = str(estoque_novo.embalagem or 'un').upper()
+            messages.success(
+                request,
+                f'✅ Carga corrigida: {qtd_antiga} → {qtd_nova} {unidade_final}. '
+                f'Saldo físico atual do lote/endereço: {estoque_novo.saldo} {unidade_final}.'
+            )
     except Exception as exc:
         messages.error(request, f'❌ Não foi possível corrigir a carga: {exc}')
 
