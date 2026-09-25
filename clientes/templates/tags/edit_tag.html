@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Tag - {{ tag.nome }}{% endblock %}
+
+{% block content %}
+
+<style>
+.edit-container {
+    max-width: 500px;
+    margin: 30px auto;
+    padding: 0 16px;
+}
+
+.edit-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+}
+
+.edit-card-header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.edit-card-header h2 {
+    color: white;
+    font-size: 1.1rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.edit-card-body {
+    padding: 24px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text);
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 0.95rem;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.btn-back {
+    background: var(--bg-hover);
+    color: var(--text);
+    border: 1px solid var(--border);
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+}
+
+.btn-back:hover {
+    background: var(--border);
+}
+
+.tag-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: var(--bg-hover);
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border: 1px solid var(--border);
+}
+
+.tag-preview-color {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: {{ tag.cor|default:'#6c757d' }};
+    flex-shrink: 0;
+}
+
+.tag-preview-name {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 0.95rem;
+}
+</style>
+
+<div class="edit-container">
+    
+    <div class="edit-card">
+        <div class="edit-card-header">
+            <h2><i class="fas fa-pen"></i> Editar Tag</h2>
+        </div>
+        <div class="edit-card-body">
+            
+            <!-- Preview da tag atual -->
+            <div class="tag-preview">
+                <div class="tag-preview-color"></div>
+                <span class="tag-preview-name">{{ tag.nome }}</span>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label>Nome da Tag *</label>
+                    <input type="text" name="nome" value="{{ tag.nome }}" class="form-control" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <textarea name="descricao" class="form-control" rows="3">{{ tag.descricao|default:'' }}</textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Salvar Alterações
+                </button>
+                
+                <a href="{% url 'tags_page' %}" class="btn btn-back">
+                    <i class="fas fa-arrow-left"></i> Voltar para Tags
+                </a>
+            </form>
+            
+        </div>
+    </div>
+</div>
+
+{% endblock %}

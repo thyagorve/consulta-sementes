@@ -1,0 +1,133 @@
+/* ==============================================================
+   PAGE TRANSITIONS - Gestor TLS V8
+   Indicador central compacto, rápido e sem efeitos pesados.
+   ============================================================== */
+
+.app-route-transition{
+  --rt-primary:var(--primary,var(--primary-color,#2563eb));
+  --rt-card:var(--bg-card,var(--card-bg,#ffffff));
+  --rt-bg:var(--bg,var(--bg-body,#f8fafc));
+  --rt-text:var(--text,var(--text-color,#0f172a));
+  position:fixed;
+  inset:0;
+  z-index:2147481000;
+  display:grid;
+  place-items:center;
+  pointer-events:none;
+  visibility:hidden;
+  opacity:0;
+  background:color-mix(in srgb,var(--rt-bg) 12%,transparent);
+  transition:opacity .09s ease,visibility 0s linear .09s;
+}
+
+/* V8: sem barra, brilho ou varredura de tela. Somente o indicador central. */
+.app-route-transition::before,
+.app-route-transition::after{
+  content:none!important;
+  display:none!important;
+}
+
+body.app-route-loading .app-route-transition{
+  visibility:visible;
+  opacity:1;
+  pointer-events:all;
+  transition:opacity .07s ease,visibility 0s;
+}
+
+.app-route-loader{
+  position:relative;
+  top:auto;
+  right:auto;
+  left:auto;
+  bottom:auto;
+  width:auto;
+  min-width:138px;
+  max-width:calc(100vw - 32px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  padding:10px 14px;
+  border:1px solid color-mix(in srgb,var(--rt-primary) 18%,var(--rt-card));
+  border-radius:14px;
+  background:color-mix(in srgb,var(--rt-card) 96%,transparent);
+  color:var(--rt-text);
+  box-shadow:0 14px 38px rgba(15,23,42,.16),inset 0 1px 0 rgba(255,255,255,.45);
+  opacity:0;
+  transform:translateY(4px) scale(.965);
+  transition:opacity .09s ease,transform .13s cubic-bezier(.2,.8,.2,1);
+}
+
+body.app-route-loading .app-route-loader{
+  opacity:1;
+  transform:none;
+}
+
+.app-route-orbit{
+  position:relative;
+  flex:0 0 auto;
+  width:22px;
+  height:22px;
+  border:2px solid color-mix(in srgb,var(--rt-primary) 18%,transparent);
+  border-top-color:var(--rt-primary);
+  border-right-color:color-mix(in srgb,var(--rt-primary) 65%,transparent);
+  border-radius:50%;
+  animation:appRouteSpin .48s linear infinite;
+}
+.app-route-orbit::before,
+.app-route-orbit::after{
+  display:none!important;
+  content:none!important;
+}
+
+.app-route-copy{min-width:0}
+.app-route-copy strong{
+  display:block;
+  margin:0;
+  color:var(--rt-text);
+  font-size:.76rem;
+  line-height:1.1;
+  font-weight:800;
+  letter-spacing:-.01em;
+  white-space:nowrap;
+}
+.app-route-copy span,
+.app-route-mini-progress{
+  display:none!important;
+}
+
+/* Entrada da página continua rápida como na V7. */
+.content-inner{
+  animation:none!important;
+  will-change:auto!important;
+}
+body.app-route-ready .content-inner{
+  animation:appRouteContentIn .20s cubic-bezier(.2,.8,.2,1) both!important;
+}
+
+@keyframes appRouteContentIn{
+  from{opacity:.72;transform:translateY(4px)}
+  to{opacity:1;transform:none}
+}
+@keyframes appRouteSpin{to{transform:rotate(360deg)}}
+
+@media (max-width:640px){
+  .app-route-loader{
+    min-width:126px;
+    padding:9px 12px;
+    border-radius:13px;
+    gap:8px;
+  }
+  .app-route-orbit{width:20px;height:20px}
+  .app-route-copy strong{font-size:.72rem}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .app-route-transition,
+  .app-route-loader,
+  .app-route-orbit,
+  body.app-route-ready .content-inner{
+    animation:none!important;
+    transition:none!important;
+  }
+}

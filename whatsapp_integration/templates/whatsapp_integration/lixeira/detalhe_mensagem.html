@@ -1,0 +1,488 @@
+<!-- templates/integra/detalhe_mensagem.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-eye me-2"></i> Detalhes da Mensagem
+                        </h4>
+                        <div>
+                            <a href="{% url 'integra:lista_mensagens' %}" class="btn btn-light btn-sm">
+                                <i class="fas fa-arrow-left me-1"></i> Voltar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Cabeçalho da mensagem -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <h3 class="mb-2">{{ mensagem.titulo|default:"Sem título" }}</h3>
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <span class="badge bg-{% if mensagem.status == 'agendada' %}warning{% elif mensagem.status == 'enviada' %}success{% elif mensagem.status == 'rascunho' %}secondary{% elif mensagem.status == 'processando' %}info{% elif mensagem.status == 'falha' %}danger{% elif mensagem.status == 'cancelada' %}dark{% endif %} fs-6">
+                                    {{ mensagem.get_status_display }}
+                                </span>
+                                
+                                {% if mensagem.arquivo_midia %}
+                                <span class="badge bg-info fs-6">
+                                    <i class="fas fa-paperclip me-1"></i> Com Anexo
+                                </span>
+                                {% endif %}
+                                
+                                <span class="badge bg-primary fs-6">
+                                    <i class="fas fa-users me-1"></i> {{ mensagem.total_clientes }} Clientes
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <div class="btn-group">
+                                {% if mensagem.pode_editar %}
+                                <a href="{% url 'integra:editar_mensagem' mensagem.id %}" 
+                                   class="btn btn-warning">
+                                    <i class="fas fa-edit me-1"></i> Editar
+                                </a>
+                                {% endif %}
+                                
+                                {% if mensagem.pode_cancelar %}
+                                <button type="button" 
+                                        class="btn btn-danger cancelar-btn"
+                                        data-id="{{ mensagem.id }}">
+                                    <i class="fas fa-times me-1"></i> Cancelar
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Informações principais -->
+                    <div class="row">
+                        <!-- Coluna da esquerda: Informações -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-info-circle me-2"></i> Informações
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td width="40%"><strong>Criada em:</strong></td>
+                                            <td>{{ mensagem.data_criacao|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% if mensagem.data_agendamento %}
+                                        <tr>
+                                            <td><strong>Agendada para:</strong></td>
+                                            <td>{{ mensagem.data_agendamento|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        {% if mensagem.data_envio %}
+                                        <tr>
+                                            <td><strong>Enviada em:</strong></td>
+                                            <td>{{ mensagem.data_envio|date:"d/m/Y H:i" }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        <tr>
+                                            <td><strong>Status:</strong></td>
+                                            <td>
+                                                <span class="badge bg-{% if mensagem.status == 'agendada' %}warning{% elif mensagem.status == 'enviada' %}success{% elif mensagem.status == 'rascunho' %}secondary{% elif mensagem.status == 'processando' %}info{% elif mensagem.status == 'falha' %}danger{% elif mensagem.status == 'cancelada' %}dark{% endif %}">
+                                                    {{ mensagem.get_status_display }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Progresso:</strong></td>
+                                            <td>
+                                                {% if mensagem.total_clientes > 0 %}
+                                                <div class="d-flex align-items-center">
+                                                    <div class="progress flex-grow-1 me-2" style="height: 10px;">
+                                                        <div class="progress-bar bg-success" 
+                                                             role="progressbar" 
+                                                             style="width: {{ mensagem.progresso }}%"
+                                                             aria-valuenow="{{ mensagem.progresso }}" 
+                                                             aria-valuemin="0" 
+                                                             aria-valuemax="100">
+                                                        </div>
+                                                    </div>
+                                                    <span class="fw-bold">{{ mensagem.progresso }}%</span>
+                                                </div>
+                                                <small class="text-muted">
+                                                    ✓ {{ mensagem.enviados_sucesso }} enviados com sucesso
+                                                    {% if mensagem.enviados_falha > 0 %}
+                                                    <br>✗ {{ mensagem.enviados_falha }} com falha
+                                                    {% endif %}
+                                                </small>
+                                                {% else %}
+                                                <span class="text-muted">Nenhum cliente</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <!-- Filtros aplicados -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-filter me-2"></i> Filtros Aplicados
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    {% if mensagem.filtros %}
+                                    <div class="row">
+                                        {% if mensagem.filtros.plano %}
+                                        <div class="col-12 mb-2">
+                                            <strong>Plano:</strong>
+                                            <span class="badge bg-primary ms-2">{{ mensagem.filtros.plano }}</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if mensagem.filtros.status %}
+                                        <div class="col-12 mb-2">
+                                            <strong>Status:</strong>
+                                            <span class="badge bg-{% if mensagem.filtros.status == 'ativos' %}success{% elif mensagem.filtros.status == 'vencidos' %}warning{% else %}secondary{% endif %} ms-2">
+                                                {{ mensagem.filtros.status|title }}
+                                            </span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if mensagem.filtros.dias_vencido %}
+                                        <div class="col-12 mb-2">
+                                            <strong>Dias Vencido:</strong>
+                                            <span class="badge bg-info ms-2">{{ mensagem.filtros.dias_vencido }} dias</span>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if mensagem.filtros.tags and mensagem.filtros.tags.length > 0 %}
+                                        <div class="col-12">
+                                            <strong>Tags:</strong>
+                                            <div class="mt-1">
+                                                {% for tag in mensagem.filtros.tags %}
+                                                <span class="badge bg-secondary me-1 mb-1">{{ tag.nome }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                    <p class="text-muted mb-0">Nenhum filtro aplicado</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Coluna da direita: Mensagem -->
+                        <div class="col-md-6">
+                            <div class="card mb-4">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-comment-dots me-2"></i> Mensagem
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">Conteúdo:</label>
+                                        <div class="border rounded p-3 bg-light">
+                                            {{ mensagem.mensagem|linebreaksbr }}
+                                        </div>
+                                    </div>
+                                    
+                                    {% if mensagem.arquivo_midia %}
+                                    <div>
+                                        <label class="form-label fw-bold">Anexo:</label>
+                                        <div class="border rounded p-3 bg-light">
+                                            <div class="d-flex align-items-center">
+                                                {% if mensagem.arquivo_midia.url|lower|slice:'-4:' == '.pdf' %}
+                                                <i class="fas fa-file-pdf text-danger fa-2x me-3"></i>
+                                                {% elif mensagem.arquivo_midia.url|lower|slice:'-4:' in '.jpg,.jpeg,.png,.gif' %}
+                                                <i class="fas fa-file-image text-success fa-2x me-3"></i>
+                                                {% elif mensagem.arquivo_midia.url|lower|slice:'-4:' in '.mp4,.avi,.mov' %}
+                                                <i class="fas fa-file-video text-primary fa-2x me-3"></i>
+                                                {% elif mensagem.arquivo_midia.url|lower|slice:'-4:' in '.mp3,.wav' %}
+                                                <i class="fas fa-file-audio text-warning fa-2x me-3"></i>
+                                                {% else %}
+                                                <i class="fas fa-file text-secondary fa-2x me-3"></i>
+                                                {% endif %}
+                                                
+                                                <div class="flex-grow-1">
+                                                    <div class="fw-bold">{{ mensagem.arquivo_midia.name|slice:"19:" }}</div>
+                                                    <small class="text-muted">
+                                                        {% widthratio mensagem.arquivo_midia.size 1024 1 as file_size_kb %}
+                                                        {{ file_size_kb|floatformat:0 }} KB
+                                                    </small>
+                                                </div>
+                                                
+                                                <a href="{{ mensagem.arquivo_midia.url }}" 
+                                                   class="btn btn-sm btn-outline-primary"
+                                                   target="_blank"
+                                                   download>
+                                                    <i class="fas fa-download me-1"></i> Baixar
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Ações -->
+                            <div class="card">
+                                <div class="card-header bg-light">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-cogs me-2"></i> Ações
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="d-grid gap-2">
+                                        {% if mensagem.pode_editar %}
+                                        <a href="{% url 'integra:editar_mensagem' mensagem.id %}" 
+                                           class="btn btn-warning">
+                                            <i class="fas fa-edit me-2"></i> Editar Mensagem
+                                        </a>
+                                        {% endif %}
+                                        
+                                        {% if mensagem.pode_cancelar %}
+                                        <button type="button" 
+                                                class="btn btn-danger cancelar-btn"
+                                                data-id="{{ mensagem.id }}">
+                                            <i class="fas fa-times me-2"></i> Cancelar Agendamento
+                                        </button>
+                                        {% endif %}
+                                        
+                                        {% if mensagem.status != 'enviada' %}
+                                        <button type="button" 
+                                                class="btn btn-outline-danger excluir-btn"
+                                                data-id="{{ mensagem.id }}"
+                                                data-title="{{ mensagem.titulo }}">
+                                            <i class="fas fa-trash me-2"></i> Excluir Mensagem
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de clientes -->
+                    <div class="card mt-4">
+                        <div class="card-header bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-users me-2"></i> Clientes Destinatários
+                                    <span class="badge bg-primary ms-2">{{ clientes|length }}</span>
+                                </h5>
+                                <small class="text-muted">Mostrando até 50 clientes</small>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            {% if clientes %}
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>WhatsApp</th>
+                                            <th>Email</th>
+                                            <th>Plano</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cliente in clientes %}
+                                        <tr>
+                                            <td>{{ cliente.nome|default:cliente.username }}</td>
+                                            <td>
+                                                {% if cliente.whatsapp %}
+                                                <span class="badge bg-success">
+                                                    <i class="fab fa-whatsapp me-1"></i> {{ cliente.whatsapp }}
+                                                </span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Sem WhatsApp</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ cliente.email|default:"-" }}</td>
+                                            <td>
+                                                {% if cliente.plano %}
+                                                <span class="badge bg-primary">{{ cliente.plano.nome }}</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Sem plano</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if cliente.is_active %}
+                                                <span class="badge bg-success">Ativo</span>
+                                                {% else %}
+                                                <span class="badge bg-danger">Inativo</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="fas fa-users-slash fa-2x text-muted mb-3"></i>
+                                <p class="text-muted">Nenhum cliente associado a esta mensagem</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="modalMessage"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn" id="confirmAction"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    
+    // Configurar exclusão
+    document.querySelectorAll('.excluir-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const mensagemId = this.dataset.id;
+            const mensagemTitulo = this.dataset.title || 'esta mensagem';
+            
+            document.getElementById('modalTitle').innerHTML = 
+                '<i class="fas fa-exclamation-triangle text-danger me-2"></i> Confirmar Exclusão';
+            document.getElementById('modalMessage').textContent = 
+                `Tem certeza que deseja excluir "${mensagemTitulo}"? Esta ação não pode ser desfeita.`;
+            
+            const confirmBtn = document.getElementById('confirmAction');
+            confirmBtn.className = 'btn btn-danger';
+            confirmBtn.innerHTML = '<i class="fas fa-trash me-1"></i> Excluir';
+            
+            confirmBtn.onclick = function() {
+                fetch(`/integra/mensagens/${mensagemId}/excluir/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = data.redirect_url || '/integra/mensagens/';
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao excluir mensagem');
+                });
+                modal.hide();
+            };
+            
+            modal.show();
+        });
+    });
+    
+    // Configurar cancelamento
+    document.querySelectorAll('.cancelar-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const mensagemId = this.dataset.id;
+            
+            document.getElementById('modalTitle').innerHTML = 
+                '<i class="fas fa-exclamation-triangle text-warning me-2"></i> Confirmar Cancelamento';
+            document.getElementById('modalMessage').textContent = 
+                'Tem certeza que deseja cancelar esta mensagem agendada?';
+            
+            const confirmBtn = document.getElementById('confirmAction');
+            confirmBtn.className = 'btn btn-warning';
+            confirmBtn.innerHTML = '<i class="fas fa-ban me-1"></i> Cancelar Mensagem';
+            
+            confirmBtn.onclick = function() {
+                fetch(`/integra/mensagens/${mensagemId}/cancelar/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('Erro ao cancelar mensagem');
+                });
+                modal.hide();
+            };
+            
+            modal.show();
+        });
+    });
+});
+</script>
+
+<style>
+.card {
+    border-radius: 10px;
+    border: 1px solid #e0e0e0;
+}
+
+.card-header {
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #f8f9fa;
+}
+
+.badge {
+    font-size: 0.9em;
+    padding: 0.5em 0.9em;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.progress {
+    height: 10px;
+}
+
+.btn {
+    border-radius: 6px;
+}
+</style>
+{% endblock %}

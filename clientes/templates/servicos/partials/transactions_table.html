@@ -1,0 +1,148 @@
+<!-- servicos/partials/transactions_table.html -->
+<div class="table-responsive">
+    <table class="transactions-table">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Cliente/Servidor</th>
+                <th>Descrição</th>
+                <th>Tipo</th>
+                <th>Valor Pago</th>
+                <th>Valor Serviço</th>
+                <th>Lucro</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in page_obj %}
+            <tr data-id="{{ item.id }}" data-tipo="{{ item.tipo }}">
+                <td>
+                    <strong>{{ item.data|date:"d/m/Y" }}</strong>
+                    <br>
+                    <small style="color: var(--text-muted);">{{ item.data|time:"H:i" }}</small>
+                </td>
+                
+                <td>
+                    <strong>{{ item.cliente_nome|truncatechars:20 }}</strong>
+                </td>
+                
+                <td>
+                    {{ item.descricao|truncatechars:25 }}
+                </td>
+                
+                <td>
+                    {% if item.origem == 'servico' %}
+                        <span class="badge badge-receita">
+                            <i class="fas fa-server"></i> Serviço
+                        </span>
+                    {% else %}
+                        {% if item.tipo_transacao == 'entrada' %}
+                            <span class="badge badge-receita">
+                                <i class="fas fa-arrow-down"></i> Entrada
+                            </span>
+                        {% else %}
+                            <span class="badge badge-despesa">
+                                <i class="fas fa-arrow-up"></i> Saída
+                            </span>
+                        {% endif %}
+                    {% endif %}
+                </td>
+                
+                <td class="money {% if item.valor_pago > 0 %}money-positive{% endif %}">
+                    {% if item.valor_pago > 0 %}
+                        R$ {{ item.valor_pago|floatformat:2 }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                
+                <td class="money money-negative">
+                    {% if item.valor_servico > 0 %}
+                        R$ {{ item.valor_servico|floatformat:2 }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                
+                <td class="money {% if item.valor_liquido >= 0 %}money-positive{% else %}money-negative{% endif %}">
+                    R$ {{ item.valor_liquido|floatformat:2 }}
+                </td>
+                
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-action btn-edit" onclick="editarItem('{{ item.tipo }}', '{{ item.id }}')" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn-action btn-delete" onclick="excluirItem('{{ item.tipo }}', '{{ item.id }}')" title="Excluir">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">
+                    <div class="empty-state">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <h3>Nenhuma transação encontrada</h3>
+                        <p>Adicione sua primeira transação usando os botões acima.</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr style="background: var(--bg-secondary); font-weight: 600;">
+                <td colspan="4" style="text-align: right;">TOTAIS:</td>
+                <td class="money money-positive">R$ {{ total_valor_pago|floatformat:2 }}</td>
+                <td class="money money-negative">R$ {{ total_custo_servico|floatformat:2 }}</td>
+                <td class="money money-positive">R$ {{ total_lucro_liquido|floatformat:2 }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="pagination">
+    {% if page_obj.has_previous %}
+        <a class="pagination-link" href="#" onclick="changePage(1)" title="Primeira">
+            <i class="fas fa-angle-double-left"></i>
+        </a>
+        <a class="pagination-link" href="#" onclick="changePage({{ page_obj.previous_page_number }})" title="Anterior">
+            <i class="fas fa-angle-left"></i>
+        </a>
+    {% else %}
+        <span class="pagination-link disabled">
+            <i class="fas fa-angle-double-left"></i>
+        </span>
+        <span class="pagination-link disabled">
+            <i class="fas fa-angle-left"></i>
+        </span>
+    {% endif %}
+
+    {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+            <span class="pagination-link active">{{ num }}</span>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <a class="pagination-link" href="#" onclick="changePage({{ num }})">{{ num }}</a>
+        {% endif %}
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+        <a class="pagination-link" href="#" onclick="changePage({{ page_obj.next_page_number }})" title="Próxima">
+            <i class="fas fa-angle-right"></i>
+        </a>
+        <a class="pagination-link" href="#" onclick="changePage({{ page_obj.paginator.num_pages }})" title="Última">
+            <i class="fas fa-angle-double-right"></i>
+        </a>
+    {% else %}
+        <span class="pagination-link disabled">
+            <i class="fas fa-angle-right"></i>
+        </span>
+        <span class="pagination-link disabled">
+            <i class="fas fa-angle-double-right"></i>
+        </span>
+    {% endif %}
+</div>
+{% endif %}

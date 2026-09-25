@@ -1,0 +1,497 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerenciar Tags{% endblock %}
+
+{% block content %}
+{% load static %}
+
+<style>
+.tags-page-container {
+    padding: 24px;
+    width: 100%;
+}
+
+.tags-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 18px;
+    border-bottom: 2px solid var(--border);
+}
+
+.tags-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.tags-header-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.tags-header-text h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+}
+
+.tags-header-text p {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin: 2px 0 0;
+}
+
+.tags-count-badge {
+    background: var(--primary);
+    color: white;
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* ===== GRID FULL WIDTH ===== */
+.tags-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 24px;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .tags-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== CARDS ===== */
+.tags-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+}
+
+.tags-card-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-hover);
+}
+
+.tags-card-header h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tags-card-body { padding: 24px; }
+
+/* ===== FORM ===== */
+.form-group { margin-bottom: 14px; }
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.form-group label i { color: var(--primary); width: 14px; }
+
+.form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 0.95rem;
+    transition: border-color 0.3s;
+}
+.form-control:focus { outline: none; border-color: var(--primary); }
+
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    width: 100%;
+    justify-content: center;
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent); }
+
+/* ===== LISTA DE TAGS ===== */
+.tags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 650px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.tag-item-card {
+    padding: 20px 24px;
+    border-radius: 14px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    transition: all 0.25s;
+}
+.tag-item-card:hover {
+    background: var(--bg-card);
+    border-color: var(--primary-light);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.tag-item-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.tag-item-color {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.tag-item-nome {
+    font-weight: 700;
+    color: var(--text);
+    font-size: 1rem;
+    flex: 1;
+}
+
+.tag-item-descricao {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+.tag-item-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+.btn-edit { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
+.btn-edit:hover { background: var(--primary); color: white; }
+.btn-delete { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.btn-delete:hover { background: var(--danger); color: white; }
+
+/* CLIENTES QUE USAM A TAG */
+.tag-clients {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.client-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 6px;
+    background: var(--bg-card);
+    border-radius: 25px;
+    border: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text);
+    transition: all 0.2s;
+    text-decoration: none;
+}
+.client-chip:hover {
+    border-color: var(--primary);
+    background: var(--bg-hover);
+    transform: translateY(-1px);
+}
+
+.client-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+.client-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.no-clients {
+    font-size: 0.8rem;
+    color: var(--text-lighter);
+    padding-top: 10px;
+    font-style: italic;
+}
+
+/* ===== COR PICKER ===== */
+.color-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.color-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+.color-box input[type="color"] {
+    position: absolute;
+    top: -10px; left: -10px;
+    width: 68px; height: 68px;
+    cursor: pointer; border: none; opacity: 0;
+}
+.color-hex {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: var(--text-light);
+    background: var(--bg-hover);
+    padding: 6px 12px;
+    border-radius: 6px;
+}
+
+/* ===== SCROLLBAR ===== */
+.tags-list::-webkit-scrollbar { width: 6px; }
+.tags-list::-webkit-scrollbar-track { background: transparent; }
+.tags-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+/* ===== ALERTAS ===== */
+.alert {
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+.alert-success { background: color-mix(in srgb, var(--success) 12%, transparent); border: 1px solid var(--success); color: var(--success); }
+.alert-error { background: color-mix(in srgb, var(--danger) 12%, transparent); border: 1px solid var(--danger); color: var(--danger); }
+.alert-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); border: 1px solid var(--warning); color: var(--warning); }
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-light);
+}
+.empty-state i { font-size: 4rem; opacity: 0.15; display: block; margin-bottom: 14px; }
+
+@media (max-width: 600px) {
+    .tags-page-container { padding: 12px; }
+    .tags-card-body { padding: 16px; }
+    .tag-item-card { padding: 16px; }
+    .tag-item-header { flex-wrap: wrap; }
+}
+</style>
+
+<div class="tags-page-container">
+    
+    <!-- HEADER -->
+    <div class="tags-header">
+        <div class="tags-header-left">
+            <div class="tags-header-icon">
+                <i class="fas fa-tags"></i>
+            </div>
+            <div class="tags-header-text">
+                <h1>Gerenciar Tags</h1>
+                <p>Gerencie as tags e veja quais clientes as utilizam</p>
+            </div>
+        </div>
+        <span class="tags-count-badge">
+            <i class="fas fa-tag"></i> {{ tags|length }} tag{{ tags|length|pluralize }}
+        </span>
+    </div>
+    
+    <!-- MENSAGENS -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-error{% endif %}">
+                <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'warning' %}fa-exclamation-triangle{% else %}fa-exclamation-circle{% endif %}"></i>
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <div class="tags-grid">
+        
+        <!-- CRIAR TAG -->
+        <div class="tags-card">
+            <div class="tags-card-header">
+                <h2><i class="fas fa-plus-circle"></i> Criar Nova Tag</h2>
+            </div>
+            <div class="tags-card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Nome da Tag *</label>
+                        <input type="text" name="nome" class="form-control" placeholder="Ex: VIP, Premium..." required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-align-left"></i> Descrição</label>
+                        <input type="text" name="descricao" class="form-control" placeholder="Descrição opcional...">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-palette"></i> Cor</label>
+                        <div class="color-picker-row">
+                            <div class="color-box" id="colorPreview" style="background: #667eea;">
+                                <input type="color" name="cor" value="#667eea" oninput="updateColor(this.value)">
+                            </div>
+                            <span class="color-hex" id="colorHex">#667eea</span>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Salvar Tag
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- LISTA DE TAGS COM CLIENTES -->
+        <div class="tags-card">
+            <div class="tags-card-header">
+                <h2><i class="fas fa-list"></i> Tags Cadastradas</h2>
+            </div>
+            <div class="tags-card-body">
+                {% if tags %}
+                <div class="tags-list">
+                    {% for tag in tags %}
+                    <div class="tag-item-card">
+                        <div class="tag-item-header">
+                            <div class="tag-item-color" style="background: {{ tag.cor|default:'#6c757d' }};"></div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="tag-item-nome">{{ tag.nome }}</div>
+                                {% if tag.descricao %}
+                                <div class="tag-item-descricao">{{ tag.descricao }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="tag-item-actions">
+                                <a href="{% url 'edit_tag' tag.id %}" class="btn-icon btn-edit" title="Editar">
+                                    <i class="fas fa-pen"></i>
+                                </a>
+                                <form method="post" action="{% url 'delete_tag' tag.id %}" style="display:inline;" 
+                                      data-appui-confirm="Excluir a tag '{{ tag.nome|escape }}'?" data-appui-danger="1">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-icon btn-delete" title="Excluir">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <!-- CLIENTES -->
+                        {% with clientes_da_tag=tag.users.all %}
+                        {% if clientes_da_tag %}
+                        <div class="tag-clients">
+                            {% for cliente in clientes_da_tag|slice:":15" %}
+                            <a href="{% url 'editar_cliente' cliente.id %}" class="client-chip" title="{{ cliente.nome }}">
+                                <div class="client-avatar">
+                                    {% if cliente.whatsapp_avatar_url %}
+                                        <img src="{{ cliente.whatsapp_avatar_url }}" alt="{{ cliente.nome }}">
+                                    {% else %}
+                                        {{ cliente.nome|first|upper }}
+                                    {% endif %}
+                                </div>
+                                <span>{{ cliente.nome|truncatechars:18 }}</span>
+                            </a>
+                            {% endfor %}
+                            {% if clientes_da_tag.count > 15 %}
+                            <span class="client-chip" style="background: var(--primary); color: white; border-color: var(--primary);">
+                                +{{ clientes_da_tag.count|add:"-15" }} mais
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="no-clients">
+                            <i class="fas fa-info-circle"></i> Nenhum cliente usando esta tag
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-tags"></i>
+                    <p>Nenhuma tag cadastrada</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<script>
+function updateColor(value) {
+    document.getElementById('colorPreview').style.background = value;
+    document.getElementById('colorHex').textContent = value;
+}
+</script>
+{% endblock %}

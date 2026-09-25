@@ -76,6 +76,14 @@ def _token_payload_for_user(user):
 
 
 def _token_login_valido(request):
+    # Enquanto a conta estiver marcada para troca obrigatória de senha,
+    # nenhum JWT offline antigo pode continuar autorizando operações.
+    try:
+        if request.user.is_authenticated and request.user.perfil.primeiro_acesso:
+            return False
+    except Exception:
+        pass
+
     token = getattr(request, 'auth', None)
     if token is None:
         return False

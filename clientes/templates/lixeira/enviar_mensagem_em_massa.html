@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}Envio de Mensagens em Massa2{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Envio de Mensagens em Massa2</h2>
+
+    <form id="messageForm" method="post" action="{% url 'enviar_mensagem_massiva' %}">
+        {% csrf_token %}
+
+        <!-- Caixa de texto para a mensagem com variáveis -->
+        <label for="message_template">Mensagem:</label>
+        <textarea id="message_template" name="message_template" rows="4" placeholder="Escreva sua mensagem usando as variáveis..."></textarea>
+        
+        <p>Variáveis disponíveis:</p>
+        <ul>
+            <li><strong>{nome}</strong> - Nome do cliente</li>
+            <li><strong>{data_vencimento}</strong> - Data de vencimento</li>
+            <li><strong>{plano}</strong> - Nome do plano</li>
+            <li><strong>{whatsapp}</strong> - Número do WhatsApp</li>
+            <li><strong>{observacao}</strong> - Observações do cliente</li>
+            <li><strong>{saldo}</strong> - Saldo do cliente</li>
+            <li><strong>{debitos}</strong> - Débitos pendentes (valor absoluto)</li>
+            <li><strong>{saudacao}</strong> - Saudação automática (Bom dia/Boa tarde/Boa noite)</li>
+            <li><strong>{usuario}</strong> - Nome de usuário do cliente</li>
+            <li><strong>{senha}</strong> - Senha de leitura do cliente</li>
+            <li><strong>{valor_total_a_pagar}</strong> - Valor total a pagar (formatado)</li>
+        </ul>
+
+        <!-- Filtros Dinâmicos -->
+        <div class="filters">
+            <label for="plano">Plano:</label>
+            <select id="plano" name="plano">
+                <option value="">Todos os Planos</option>
+                {% for plano in planos %}
+                <option value="{{ plano.id }}">{{ plano.nome }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="form-group">
+                <label for="id_tags">Tags:</label>
+                <select name="tags" id="id_tags" multiple="multiple" style="width: 100%;"></select>
+            </div>
+
+            <label for="vencimento">Vencimento:</label>
+            <select id="vencimento" name="vencimento">
+                <option value="">Qualquer Data</option>
+                <option value="hoje">Vence Hoje</option>
+                <option value="semana">Vence Esta Semana</option>
+                <option value="mes">Vence Este Mês</option>
+            </select>
+        </div>
+
+        <!-- Lista de clientes atualizada com base nos filtros -->
+        <div id="clientesSelecionados">
+            <h4>Clientes que receberão a mensagem:</h4>
+            <ul id="clienteList"></ul>
+            <p id="clienteCount">Total de clientes selecionados: 0</p>
+        </div>
+
+        <button type="submit">Enviar Mensagem</button>
+    </form>
+</div>
+
+<script>
+    // Inicializar Select2 para as tags
+    $(document).ready(function() {
+        $('#id_tags').select2({
+            placeholder: 'Selecione as tags...',
+            allowClear: true,
+            ajax: {
+                url: "{% url 'buscar_tags' %}",
+                dataType: 'json',
+                delay: 250,
+                data: function(params) {
+                    return {
+                        q: params.term, // termo de busca
+                        page: params.page
+                    };
+                },
+                processResults: function(data, params) {
+                    params.page = params.page || 1;
+                    
+                    return {
+                        results: data.map(function(tag) {
+                            return {
+                                id: tag.id,
+                                text: tag.nome
+                            };
+                        }),
+                        pagination: {
+                            more: false // Pode ajustar se tiver paginação
+                        }
+                    };
+                },
+                cache: true
+            },
+            minimumInputLength: 0
+        });
+
+        // Carregar tags automaticamente ao abrir o dropdown
+        $('#id_tags').on('select2:opening', function() {
+            if ($(this).find('option').length <= 1) {
+                var select2 = $(this).data('select2');
+                select2.dropdown._positionDropdown();
+                select2.dropdown._showDropdown();
+                
+                // Dispara uma busca vazia para carregar todas as tags
+                $(this).select2('open');
+                $(this).select2('data', null); // Limpa seleção atual
+                $(this).select2('search', '');
+            }
+        });
+    });
+
+    // Função para atualizar clientes com base nos filtros
+    function atualizarClientes() {
+        const plano = document.getElementById('plano')?.value || '';
+        const vencimento = document.getElementById('vencimento')?.value || '';
+
+        // Select2 → array de IDs das tags selecionadas
+        const tags = $('#id_tags').val() || [];
+
+        console.log("Filtros selecionados para envio:", {
+            plano,
+            tags,
+            vencimento
+        });
+
+        fetch("{% url 'filtrar_clientes' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({
+                plano,
+                tags,          // agora é array
+                vencimento
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Dados recebidos do servidor:", data);
+
+            clienteList.innerHTML = '';
+
+            data.clientes.forEach(cliente => {
+                const li = document.createElement('li');
+                li.textContent = cliente.nome;
+                clienteList.appendChild(li);
+            });
+
+            clienteCount.textContent =
+                `Total de clientes selecionados: ${data.clientes.length}`;
+        })
+        .catch(error => console.error('Erro ao buscar clientes:', error));
+    }
+
+    // Adicionar eventos de mudança nos filtros
+    document.getElementById('plano')?.addEventListener('change', atualizarClientes);
+    document.getElementById('vencimento')?.addEventListener('change', atualizarClientes);
+    
+    // Evento para Select2 quando tags são alteradas
+    $('#id_tags').on('change', function() {
+        atualizarClientes();
+    });
+
+    // CSRF Token para requisições AJAX
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+</script>
+{% endblock %}

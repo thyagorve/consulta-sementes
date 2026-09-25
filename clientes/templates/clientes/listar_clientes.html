@@ -1,0 +1,1804 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Lista de Clientes{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/listar_clientes.css' %}?v=20260908-fouc1">
+<style id="clientes-page-critical">
+    :root {
+        --bg-body: var(--bg);
+        --text-primary: var(--text);
+        --text-secondary: var(--text-light);
+        --text-muted: var(--text-lighter);
+        --border-color: var(--border);
+        --border-light: color-mix(in srgb, var(--border) 72%, transparent);
+        --info: var(--primary);
+    }
+    body { background: var(--bg-body); color: var(--text-primary); }
+
+    .search-input-wrapper { position: relative; flex: 1; min-width: 200px; }
+    .search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem; z-index: 1; pointer-events: none; }
+    .search-input { width: 100%; padding: 0.65rem 3rem 0.65rem 2.5rem !important; border: 2px solid var(--border-color) !important; border-radius: 50px !important; background: var(--bg-card) !important; color: var(--text-primary) !important; font-size: 0.9rem !important; box-sizing: border-box !important; transition: all 0.3s ease !important; }
+    .search-input:focus { outline: none !important; border-color: var(--primary) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent) !important; }
+    .search-input::placeholder { color: var(--text-muted); }
+    .clear-search { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; width: 30px; height: 30px; display: none; align-items: center; justify-content: center; border-radius: 50%; background: var(--bg-hover); transition: all 0.3s ease; z-index: 2; border: none; padding: 0; }
+    .clear-search:hover { background: var(--danger); color: white; }
+    .filters-container { margin-bottom: 1.5rem; background: var(--bg-card); padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.07); border: 1px solid var(--border-color); }
+    .filter-label { font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); display: none; align-items: center; justify-content: center; z-index: 100; border-radius: 16px; backdrop-filter: blur(2px); }
+    .loading-overlay.active { display: flex; }
+    .loading-spinner { width: 44px; height: 44px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .table-container { background: var(--bg-card); border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid var(--border-color); overflow-x: auto; }
+    .table-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--bg-hover); border-bottom: 2px solid var(--border-color); flex-wrap: wrap; gap: 0.5rem; }
+    .table-info { color: var(--text-secondary); font-size: 0.9rem; }
+    .table-info strong { color: var(--text-primary); }
+    .clientes-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    .clientes-table th { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 0.75rem 0.5rem; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+    .clientes-table td { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--border-light); vertical-align: middle; color: var(--text-primary); font-size: 0.85rem; }
+    .table-row { transition: background 0.2s ease; }
+    .table-row:hover { background: var(--bg-hover); }
+    .table-row.fade-in { animation: fadeInRow 0.35s ease both; }
+    @keyframes fadeInRow { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .row-vencido { border-left: 4px solid #ef4444 !important; }
+    .row-hoje { border-left: 4px solid #f59e0b !important; }
+    .row-breve { border-left: 4px solid #3b82f6 !important; }
+    .row-dia { border-left: 4px solid #10b981 !important; }
+    .row-inativo { opacity: 0.55; }
+
+    .status-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 50px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+    .status-vencido { background: rgba(239,68,68,0.1); color: #dc2626; }
+    .status-vence-hoje { background: rgba(245,158,11,0.1); color: #d97706; }
+    .status-vence-em-breve { background: rgba(59,130,246,0.1); color: #2563eb; }
+    .status-em-dia { background: rgba(16,185,129,0.1); color: #059669; }
+    .status-inativo { background: var(--bg-hover); color: var(--text-muted); }
+
+    .avatar-wrapper { position: relative; display: inline-block; }
+    .avatar-circle { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; overflow: hidden; }
+    .avatar-img { width: 100%; height: 100%; object-fit: cover; }
+    .avatar-duplicate-badge { position: absolute; top: -6px; right: -6px; background: var(--danger); color: white; width: 20px; height: 20px; border-radius: 50%; font-size: 0.65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-card); box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+    .vencimento-wrapper { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 100px; }
+    .vencimento-data { font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+    .vencimento-barra-container { width: 100%; height: 6px; background: var(--border-light); border-radius: 10px; overflow: hidden; }
+    .vencimento-barra { height: 100%; border-radius: 10px; transition: width 0.5s ease; min-width: 3px; }
+    .barra-vencido { background: linear-gradient(90deg, #fca5a5, #ef4444); animation: pulse-bar 1.5s infinite; }
+    .barra-hoje { background: linear-gradient(90deg, #fcd34d, #f59e0b); animation: pulse-bar 2s infinite; }
+    .barra-breve { background: linear-gradient(90deg, #93c5fd, #3b82f6); }
+    .barra-dia { background: linear-gradient(90deg, #6ee7b7, #10b981); }
+    @keyframes pulse-bar { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+    .cliente-nome { color: var(--text-primary); font-weight: 600; font-size: 0.88rem; }
+    .cliente-whatsapp { color: var(--text-muted); font-size: 0.73rem; }
+    .saldo { font-weight: 600; font-size: 0.82rem; }
+    .saldo.negativo { color: #dc2626; }
+    .saldo.positivo { color: #059669; }
+
+    .pagination { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: var(--bg-card); border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.85rem; flex-wrap: wrap; gap: 0.5rem; }
+    .pagination-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); text-decoration: none; cursor: pointer; transition: all 0.2s; font-weight: 500; font-size: 0.85rem; }
+    .pagination-btn:hover:not(.disabled):not(.active) { background: var(--primary); color: white; border-color: var(--primary); }
+    .pagination-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+    .pagination-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* MODAL */
+    #modalRenovarOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); z-index: 99999; align-items: center; justify-content: center; }
+    #modalRenovarOverlay.active { display: flex; }
+    .modal-renovar-dialog { background: var(--bg-card); border-radius: 20px; width: 90%; max-width: 480px; max-height: 85vh; overflow-y: auto; box-shadow: 0 25px 60px rgba(0,0,0,0.3); animation: modalIn 0.35s cubic-bezier(0.34,1.56,0.64,1); border: 1px solid var(--border-color); }
+    @keyframes modalIn { from { opacity: 0; transform: translateY(40px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .modal-renovar-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 1.75rem; border-bottom: 1px solid var(--border-light); }
+    .modal-renovar-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.6rem; }
+    .modal-renovar-header h3 i { color: var(--primary); }
+    .modal-renovar-close { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--bg-hover); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; font-size: 1rem; }
+    .modal-renovar-close:hover { background: var(--danger); color: white; transform: rotate(90deg); }
+    .modal-renovar-body { padding: 1.75rem; }
+    .cliente-destaque { display: flex; align-items: center; gap: 0.6rem; padding: 0.85rem 1rem; border-radius: 12px; margin-bottom: 1.25rem; font-weight: 600; color: var(--text-primary); font-size: 0.95rem; background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), color-mix(in srgb, var(--primary-dark) 8%, transparent)); }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+    .form-group input[type="date"] { width: 100%; padding: 0.85rem 1rem; border: 2px solid var(--border-color); border-radius: 12px; font-size: 0.95rem; color: var(--text-primary); background: var(--bg-body); transition: all 0.3s; box-sizing: border-box; }
+    .form-group input[type="date"]:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent); background: var(--bg-card); }
+    .compartilhamento-box { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; display: none; }
+    .compartilhamento-box .titulo { font-weight: 700; color: #d97706; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; }
+    .compartilhamento-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.85rem; background: var(--bg-card); border-radius: 8px; margin-bottom: 0.4rem; font-size: 0.85rem; border: 1px solid var(--border-light); color: var(--text-primary); }
+    .pergunta-pagamento { text-align: center; font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-top: 1rem; padding: 0.6rem; background: color-mix(in srgb, var(--primary) 5%, transparent); border-radius: 8px; }
+    .modal-renovar-footer { display: flex; gap: 0.75rem; padding: 1.25rem 1.75rem; border-top: 1px solid var(--border-light); }
+    /* O tema global força .modal-renovar-footer com display:flex !important.
+       Estas classes têm maior especificidade e garantem que exista apenas
+       UM rodapé visível por etapa da renovação. */
+    #modalRenovarFooterNormal.renovacao-hidden,
+    #modalRenovarFooterCompartilhamento.renovacao-hidden { display: none !important; }
+    #modalRenovarFooterNormal.renovacao-visible,
+    #modalRenovarFooterCompartilhamento.renovacao-visible { display: flex !important; }
+    .modal-renovar-footer button { flex: 1; }
+    .btn-cancelar { padding: 0.85rem; border-radius: 12px; border: 2px solid var(--border-color); background: var(--bg-card); color: var(--text-secondary); font-weight: 600; cursor: pointer; transition: all 0.3s; font-size: 0.9rem; }
+    .btn-cancelar:hover { background: var(--bg-hover); }
+    .btn-confirmar { padding: 0.85rem; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+    .btn-confirmar:hover { transform: translateY(-2px); box-shadow: 0 8px 25px color-mix(in srgb, var(--primary) 40%, transparent); }
+    .btn-confirmar:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-outro-pagou { padding: 0.85rem; border-radius: 12px; border: 2px solid var(--success); background: var(--bg-card); color: var(--success); font-weight: 600; cursor: pointer; transition: all 0.3s; font-size: 0.9rem; }
+    .btn-este-paga { padding: 0.85rem; border-radius: 12px; border: none; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; font-weight: 600; cursor: pointer; transition: all 0.3s; font-size: 0.9rem; }
+    .btn-este-paga:hover { transform: translateY(-2px); box-shadow: 0 8px 25px color-mix(in srgb, var(--primary) 40%, transparent); }
+    .renovacao-modo-wrap { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; padding:.35rem; margin:0 0 1rem; background:var(--bg-hover); border:1px solid var(--border-color); border-radius:13px; }
+    .renovacao-modo-btn { border:0; background:transparent; color:var(--text-secondary); padding:.7rem .8rem; border-radius:10px; cursor:pointer; font-weight:750; transition:.18s ease; }
+    .renovacao-modo-btn.active { background:var(--bg-card); color:var(--primary); box-shadow:0 3px 12px rgba(0,0,0,.08); }
+    .renovacao-integracao-pill { margin-left:auto; padding:.25rem .5rem; font-size:.66rem; border-radius:999px; color:var(--primary); background:color-mix(in srgb, var(--primary) 10%, transparent); border:1px solid color-mix(in srgb, var(--primary) 22%, transparent); }
+    .renovacao-select { width:100%; padding:.85rem 1rem; border:2px solid var(--border-color); border-radius:12px; font-size:.92rem; color:var(--text-primary); background:var(--bg-body); }
+    .renovacao-select:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 10%,transparent); }
+    .renovacao-help { display:block; margin-top:.45rem; color:var(--text-muted); font-size:.74rem; }
+    .renovacao-preview { margin:0 0 1rem; padding:1rem; border-radius:13px; border:1px solid color-mix(in srgb,var(--primary) 25%,var(--border-color)); background:color-mix(in srgb,var(--primary) 5%,var(--bg-card)); }
+    .renovacao-preview-title { display:flex; align-items:center; gap:.45rem; font-weight:800; color:var(--text-primary); margin-bottom:.75rem; }
+    .renovacao-preview-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem .8rem; }
+    .renovacao-preview-item { min-width:0; }
+    .renovacao-preview-item small { display:block; color:var(--text-muted); font-size:.66rem; text-transform:uppercase; letter-spacing:.035em; margin-bottom:.15rem; }
+    .renovacao-preview-item strong { display:block; color:var(--text-primary); font-size:.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .renovacao-preview-alert { margin-top:.75rem; padding:.65rem .75rem; border-radius:9px; background:rgba(245,158,11,.09); color:#b45309; font-size:.75rem; font-weight:650; }
+    .renovacao-credit-choice { padding:.8rem .9rem; border:1px solid var(--border-color); border-radius:12px; margin-bottom:1rem; background:var(--bg-hover); }
+    .renovacao-credit-choice label { display:flex; align-items:flex-start; gap:.65rem; cursor:pointer; color:var(--text-primary); }
+    .renovacao-credit-choice input { width:18px; height:18px; margin-top:.12rem; accent-color:var(--primary); }
+    .renovacao-credit-choice span { display:flex; flex-direction:column; gap:.15rem; font-size:.79rem; }
+    .renovacao-credit-choice small { color:var(--text-muted); font-size:.7rem; font-weight:500; }
+    .renovacao-msg-row { display:flex; align-items:center; gap:.6rem; padding:.75rem .85rem; border-radius:11px; background:var(--bg-hover); border:1px solid var(--border-light); }
+    .renovacao-msg-row input { width:18px; height:18px; accent-color:#25D366; }
+    .renovacao-msg-row label { cursor:pointer; color:var(--text-primary); font-size:.8rem; font-weight:650; }
+    .renovacao-msg-row i { color:#25D366; margin-right:.2rem; }
+    @media (max-width:520px) { .renovacao-preview-grid { grid-template-columns:1fr; } }
+
+/* Responsivo: empilhar colunas em telas menores */
+@media (max-width: 768px) {
+    .detalhes-row td > div > div {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
+<style id="clientes-ui-polish">
+/* ===== Acabamento visual unificado da lista de clientes ===== */
+.status-buttons {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    width:100%;
+    gap:0;
+    padding:0;
+    overflow:hidden;
+    border:1px solid var(--border);
+    background:var(--bg-card);
+    border-radius:14px;
+}
+.status-buttons .filter-btn {
+    width:100%; min-width:0; min-height:46px; margin:0;
+    padding:.6rem .75rem; border:0; border-radius:0;
+    justify-content:center; gap:.5rem; box-shadow:none; font-weight:800;
+}
+.status-buttons .filter-btn:first-child { color:#059669; background:color-mix(in srgb,#10b981 9%,var(--bg-card)); border-right:1px solid var(--border); }
+.status-buttons .filter-btn:last-child { color:#dc2626; background:color-mix(in srgb,#ef4444 8%,var(--bg-card)); }
+.status-buttons .filter-btn:first-child:hover,.status-buttons .filter-btn:first-child.active { background:linear-gradient(135deg,#10b981,#059669);color:#fff; }
+.status-buttons .filter-btn:last-child:hover,.status-buttons .filter-btn:last-child.active { background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff; }
+.filter-buttons.plano-buttons {
+    display:flex;
+    flex-wrap:wrap;
+    gap:.55rem;
+    padding:.15rem 0 .4rem;
+    align-items:center;
+}
+.filter-buttons.plano-buttons .plano-btn {
+    --plano-cor:#64748b;
+    flex:0 0 auto;
+    min-height:38px;
+    padding:.48rem .72rem;
+    gap:.45rem;
+    border:1px solid color-mix(in srgb,var(--plano-cor) 42%,var(--border));
+    border-left:4px solid var(--plano-cor);
+    border-radius:11px;
+    background:color-mix(in srgb,var(--plano-cor) 9%,var(--bg-card));
+    color:var(--text);
+    box-shadow:0 2px 7px color-mix(in srgb,var(--plano-cor) 12%,transparent);
+    font-weight:700;
+}
+.filter-buttons.plano-buttons .plano-btn:hover {
+    transform:translateY(-1px);
+    color:var(--text);
+    background:color-mix(in srgb,var(--plano-cor) 15%,var(--bg-card));
+    border-color:color-mix(in srgb,var(--plano-cor) 68%,var(--border));
+    box-shadow:0 6px 15px color-mix(in srgb,var(--plano-cor) 20%,transparent);
+}
+.filter-buttons.plano-buttons .plano-btn.active {
+    color:#fff;
+    border-color:var(--plano-cor);
+    background:linear-gradient(135deg,color-mix(in srgb,var(--plano-cor) 88%,#fff),var(--plano-cor));
+    box-shadow:0 7px 18px color-mix(in srgb,var(--plano-cor) 32%,transparent);
+}
+.plano-color-dot {
+    width:9px;height:9px;flex:0 0 9px;border-radius:50%;
+    background:var(--plano-cor);
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--plano-cor) 18%,transparent);
+}
+.plano-btn.active .plano-color-dot { background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.20); }
+.plano-btn-nome { max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700; }
+.plano-btn-count {
+    min-width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0 .38rem;
+    border-radius:999px;background:color-mix(in srgb,var(--plano-cor) 13%,var(--bg-card));
+    border:1px solid color-mix(in srgb,var(--plano-cor) 25%,transparent);
+    color:color-mix(in srgb,var(--plano-cor) 82%,var(--text));font-size:.7rem;font-weight:750;
+}
+.plano-btn.active .plano-btn-count { background:rgba(255,255,255,.17);border-color:rgba(255,255,255,.24);color:#fff; }
+.filter-buttons.plano-buttons .plano-btn-todos { --plano-cor:var(--primary);border-left-width:1px;background:var(--bg-hover); }
+.filter-buttons.plano-buttons .plano-btn-todos.active { background:linear-gradient(135deg,var(--primary-light),var(--primary-dark));border-color:var(--primary); }
+.plano-btn-todos i { color:var(--primary); }
+.plano-btn-todos.active i { color:#fff; }
+
+
+/* Badges de plano na tabela: discretos e legíveis em qualquer tema */
+.cliente-plano-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .42rem;
+    max-width: 125px;
+    padding: .28rem .55rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-hover);
+    color: var(--text);
+    font-size: .74rem;
+    font-weight: 650;
+    line-height: 1;
+}
+.cliente-plano-badge .cliente-plano-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cliente-sem-plano { display:inline-flex;align-items:center;gap:.35rem;color:var(--text-lighter);font-size:.74rem; }
+
+/* Botões das ações expandidas seguem o tema em vez de cores aleatórias. */
+.cliente-actions { display:flex; flex-wrap:wrap; gap:5px; margin-top:.55rem; }
+.cliente-action-btn {
+    min-height: 30px;
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--bg-card);
+    color: var(--text);
+    text-decoration: none;
+    font-size: .68rem;
+    font-weight: 650;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: .16s ease;
+}
+.cliente-action-btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb,var(--primary) 42%,var(--border)); color:var(--primary); background:color-mix(in srgb,var(--primary) 6%,var(--bg-card)); }
+.cliente-action-primary { background:linear-gradient(135deg,var(--primary),var(--primary-light));border-color:var(--primary);color:#fff; }
+.cliente-action-primary:hover { color:#fff; box-shadow:0 6px 14px color-mix(in srgb,var(--primary) 22%,transparent); }
+.cliente-action-success { color:var(--success); border-color:color-mix(in srgb,var(--success) 30%,var(--border)); }
+.cliente-action-warning { color:var(--warning); border-color:color-mix(in srgb,var(--warning) 30%,var(--border)); }
+.cliente-action-danger { color:var(--danger); border-color:color-mix(in srgb,var(--danger) 28%,var(--border)); }
+.cliente-action-whatsapp { color:#16a34a; border-color:color-mix(in srgb,#16a34a 28%,var(--border)); }
+.cliente-action-playlist-active { color:var(--primary); border-color:color-mix(in srgb,var(--primary) 42%,var(--border)); background:color-mix(in srgb,var(--primary) 9%,var(--bg-card)); font-weight:750; }
+.cliente-action-playlist-active:hover { background:color-mix(in srgb,var(--primary) 15%,var(--bg-card)); color:var(--primary); }
+.cliente-nome-row { display:flex; align-items:center; gap:6px; min-width:0; }
+.cliente-playlist-indicator { width:23px; height:23px; flex:0 0 23px; display:inline-grid; place-items:center; border:1px solid color-mix(in srgb,var(--primary) 35%,var(--border)); border-radius:7px; background:color-mix(in srgb,var(--primary) 10%,var(--bg-card)); color:var(--primary); text-decoration:none; transition:.16s ease; }
+.cliente-playlist-indicator:hover { transform:translateY(-1px); background:color-mix(in srgb,var(--primary) 18%,var(--bg-card)); box-shadow:0 4px 10px color-mix(in srgb,var(--primary) 14%,transparent); }
+.cliente-playlist-indicator i { font-size:.68rem; }
+
+/* Todos os modais desta página compartilham a mesma pele do tema. */
+#saldoModal .modal-content,
+#modalExcluir .modal-content,
+#indicacaoModal .modal-content,
+#tagsModal .modal-content {
+    border: 1px solid var(--border) !important;
+    border-top: 4px solid var(--primary) !important;
+    border-radius: 16px !important;
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+    box-shadow: 0 24px 70px rgba(15,23,42,.24) !important;
+}
+#saldoModal .modal-header,
+#modalExcluir .modal-header,
+#indicacaoModal .modal-header,
+#tagsModal .modal-header {
+    padding: 1rem 1.2rem !important;
+    background: color-mix(in srgb,var(--primary) 7%,var(--bg-card)) !important;
+    color: var(--text) !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 12px 12px 0 0 !important;
+}
+#saldoModal .modal-header h2,
+#saldoModal .modal-header h3,
+#modalExcluir .modal-header h2,
+#modalExcluir .modal-header h3,
+#indicacaoModal .modal-header h2,
+#indicacaoModal .modal-header h3,
+#tagsModal .modal-header h2,
+#tagsModal .modal-header h3 { color:var(--text) !important; font-size:1.02rem !important; }
+#saldoModal .modal-header h2 i,
+#saldoModal .modal-header h3 i,
+#modalExcluir .modal-header h2 i,
+#modalExcluir .modal-header h3 i,
+#indicacaoModal .modal-header h2 i,
+#indicacaoModal .modal-header h3 i,
+#tagsModal .modal-header h2 i,
+#tagsModal .modal-header h3 i { color:var(--primary) !important; }
+#saldoModal .modal-footer,
+#modalExcluir .modal-footer,
+#indicacaoModal .modal-footer,
+#tagsModal .modal-footer {
+    background: color-mix(in srgb,var(--bg-hover) 55%,transparent) !important;
+    border-top: 1px solid var(--border) !important;
+}
+#modalExcluir .delete-warning-card {
+    display:flex;
+    gap:.85rem;
+    align-items:flex-start;
+    padding:1rem;
+    border:1px solid color-mix(in srgb,var(--danger) 20%,var(--border));
+    border-radius:12px;
+    background:color-mix(in srgb,var(--danger) 5%,var(--bg-card));
+    margin-bottom:1rem;
+}
+#modalExcluir .delete-warning-icon {
+    width:40px;height:40px;flex:0 0 40px;border-radius:11px;display:grid;place-items:center;
+    background:color-mix(in srgb,var(--danger) 10%,transparent);color:var(--danger);font-size:1rem;
+}
+#modalExcluir .delete-warning-title { margin:0 0 .3rem;color:var(--text);font-size:.92rem;font-weight:750; }
+#modalExcluir .delete-warning-text { margin:0;color:var(--text-light);font-size:.8rem;line-height:1.45; }
+#modalExcluir .delete-confirm-row {
+    display:flex;align-items:flex-start;gap:.7rem;padding:.8rem .9rem;border:1px solid var(--border);border-radius:10px;background:var(--bg-hover);
+}
+#modalExcluir .delete-confirm-row input { width:19px;height:19px;flex:0 0 19px;margin-top:1px;accent-color:var(--primary);cursor:pointer; }
+#modalExcluir .delete-confirm-row label { cursor:pointer;margin:0;color:var(--text);font-size:.82rem;line-height:1.45; }
+#modalExcluir #btnExcluir { background:linear-gradient(135deg,var(--primary),var(--primary-light));border-color:var(--primary);color:#fff; }
+#modalExcluir #btnExcluir:disabled { opacity:.45;cursor:not-allowed;box-shadow:none;transform:none; }
+
+@media (max-width: 640px) {
+    .filters-container { padding: 1rem; border-radius: 14px; }
+    .filter-buttons.plano-buttons .plano-btn { min-height: 36px; padding: .46rem .65rem; }
+    .plano-btn-nome { max-width: 120px; }
+    #saldoModal .modal-content,#modalExcluir .modal-content,#indicacaoModal .modal-content,#tagsModal .modal-content { max-width:calc(100% - 16px) !important; margin:8px !important; }
+    #modalExcluir .modal-footer { flex-direction:column-reverse; }
+    #modalExcluir .modal-footer .btn { width:100%;justify-content:center; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- ============================================================ -->
+<!-- CONTEÚDO PRINCIPAL -->
+<!-- ============================================================ -->
+<div class="clientes-container">
+    <!-- FILTROS -->
+    <div class="filters-container">
+        <div class="filter-group">
+            <label class="filter-label">Status:</label>
+            <div class="filter-buttons status-buttons">
+                <button class="filter-btn {% if filtro_status == 'active' or filtro_status == '' %}active{% endif %}" onclick="filtrarPorStatus('active', this)">
+                    <i class="fas fa-user-check"></i> Ativos ({{ total_clientes_ativos }})
+                </button>
+                <button class="filter-btn {% if filtro_status == 'inactive' %}active{% endif %}" onclick="filtrarPorStatus('inactive', this)">
+                    <i class="fas fa-user-slash"></i> Desativados ({{ total_clientes_desativados }})
+                </button>
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label">Planos:</label>
+            <div class="filter-buttons plano-buttons" aria-label="Filtrar clientes por plano">
+                <button class="filter-btn plano-btn plano-btn-todos {% if not filtro_plano %}active{% endif %}" onclick="filtrarPorPlano('', this)" type="button">
+                    <i class="fas fa-layer-group"></i>
+                    <span>Todos</span>
+                </button>
+                {% for plano in planos %}
+                <button class="filter-btn plano-btn {% if filtro_plano == plano.nome %}active{% endif %}" style="--plano-cor: {{ plano.cor|default:'#64748b' }};" onclick="filtrarPorPlano('{{ plano.nome|escapejs }}', this)" type="button" title="Filtrar por {{ plano.nome }}">
+                    <span class="plano-color-dot"></span>
+                    <span class="plano-btn-nome">{{ plano.nome }}</span>
+                    <span class="plano-btn-count">{{ plano.clientes_count }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="filter-group">
+            <label class="filter-label">Pesquisar:</label>
+            <div class="search-container">
+                <div class="search-input-wrapper">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="search-input-live" placeholder="Digite para pesquisar clientes..." value="{{ termo_pesquisa }}" class="search-input" autocomplete="off">
+                    <button type="button" class="clear-search" id="clear-search" title="Limpar pesquisa"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABELA -->
+    <div class="table-container" style="position: relative;">
+        <div class="loading-overlay" id="loading-overlay"><div class="loading-spinner"></div></div>
+
+        <div class="table-header">
+            <div class="table-info" id="table-info">
+                <span>Mostrando <strong>{{ clientes.start_index }} - {{ clientes.end_index }}</strong> de <strong>{{ total_clientes }}</strong> clientes</span>
+            </div>
+            <div class="page-size-selector">
+                <label for="page-size" style="color: var(--text-secondary);">Itens por página:</label>
+                <select id="page-size" onchange="mudarTamanhoPagina(this.value)" style="padding: 0.4rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary);">
+                    <option value="100" {% if page_size == '100' or not page_size %}selected{% endif %}>100</option>
+                    <option value="200" {% if page_size == '200' %}selected{% endif %}>200</option>
+                    <option value="300" {% if page_size == '300' %}selected{% endif %}>300</option>
+                    <option value="500" {% if page_size == '500' %}selected{% endif %}>500</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="clientes-table">
+                <thead>
+                    <tr>
+                        <th width="50" class="text-center">Det.</th>
+                        <th width="55" class="text-center">Avatar</th>
+                        <th>Nome Completo</th>
+                        <th width="95" class="text-center">Saldo</th>
+                        <th width="130" class="text-center">Plano</th>
+                        <th width="120" class="text-center">Status</th>
+                        <th width="160" class="text-center">Vencimento</th>
+                    </tr>
+                </thead>
+                <tbody id="clientes-tbody">
+                    {% include 'clientes/includes/tabela_clientes.html' %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- PAGINAÇÃO -->
+        <div class="pagination" id="pagination-container">
+            {% if clientes.paginator.num_pages > 1 %}
+            <div class="pagination-info">Página <span id="current-page" style="color: var(--text-primary); font-weight: 600;">{{ clientes.number }}</span> de <span id="total-pages" style="color: var(--text-primary); font-weight: 600;">{{ clientes.paginator.num_pages }}</span></div>
+            <div class="pagination-controls"><div class="pagination-links">
+                <div class="pagination-nav pagination-prev">
+                    {% if clientes.has_previous %}
+                        <button class="pagination-btn" onclick="mudarPagina(1)"><i class="fas fa-angle-double-left"></i></button>
+                        <button class="pagination-btn" onclick="mudarPagina({{ clientes.previous_page_number }})"><i class="fas fa-angle-left"></i></button>
+                    {% else %}
+                        <span class="pagination-btn disabled"><i class="fas fa-angle-double-left"></i></span>
+                        <span class="pagination-btn disabled"><i class="fas fa-angle-left"></i></span>
+                    {% endif %}
+                </div>
+                <div class="pagination-numbers" id="pagination-numbers">
+                    {% for num in clientes.paginator.page_range %}
+                        {% if clientes.number == num %}<span class="pagination-btn active">{{ num }}</span>
+                        {% elif num >= clientes.number|add:'-2' and num <= clientes.number|add:'2' %}<button class="pagination-btn" onclick="mudarPagina({{ num }})">{{ num }}</button>
+                        {% elif num == 1 or num == clientes.paginator.num_pages %}<button class="pagination-btn" onclick="mudarPagina({{ num }})">{{ num }}</button>
+                        {% elif num == clientes.number|add:'-3' or num == clientes.number|add:'3' %}<span class="pagination-btn disabled">...</span>{% endif %}
+                    {% endfor %}
+                </div>
+                <div class="pagination-nav pagination-next">
+                    {% if clientes.has_next %}
+                        <button class="pagination-btn" onclick="mudarPagina({{ clientes.next_page_number }})"><i class="fas fa-angle-right"></i></button>
+                        <button class="pagination-btn" onclick="mudarPagina({{ clientes.paginator.num_pages }})"><i class="fas fa-angle-double-right"></i></button>
+                    {% else %}
+                        <span class="pagination-btn disabled"><i class="fas fa-angle-right"></i></span>
+                        <span class="pagination-btn disabled"><i class="fas fa-angle-double-right"></i></span>
+                    {% endif %}
+                </div>
+            </div></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MODAL DE RENOVAÇÃO -->
+<!-- ============================================================ -->
+<div id="modalRenovarOverlay">
+    <div class="modal-renovar-dialog" role="dialog" aria-modal="true" aria-labelledby="modalRenovarTitulo">
+        <div class="modal-renovar-header">
+            <h3 id="modalRenovarTitulo"><i class="fas fa-sync-alt"></i> Renovar Cliente</h3>
+            <button type="button" class="modal-renovar-close" onclick="fecharModalRenovar()" aria-label="Fechar"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-renovar-body" id="modalRenovarCorpo">
+            <div class="cliente-destaque">
+                <i class="fas fa-user-circle"></i>
+                <span id="modalRenovarNomeCliente">---</span>
+                <span id="modalRenovarIntegracaoInfo" class="renovacao-integracao-pill" style="display:none"></span>
+            </div>
+
+            <div id="modalRenovarModoWrap" class="renovacao-modo-wrap" style="display:none">
+                <button type="button" id="modalModoManual" class="renovacao-modo-btn" onclick="selecionarModoRenovacao('manual')">
+                    <i class="fas fa-calendar-alt"></i> Manual
+                </button>
+                <button type="button" id="modalModoAutomatico" class="renovacao-modo-btn" onclick="selecionarModoRenovacao('automatico')">
+                    <i class="fas fa-bolt"></i> Automático
+                </button>
+            </div>
+
+            <div id="modalRenovarManualCampos">
+                <div class="form-group">
+                    <label><i class="far fa-calendar-alt"></i> Nova data de vencimento</label>
+                    <input type="date" id="modalRenovarData">
+                </div>
+                <div id="modalRenovarManualCreditoWrap" class="renovacao-credit-choice" style="display:none">
+                    <label for="modalRenovarConsumirCredito">
+                        <input type="checkbox" id="modalRenovarConsumirCredito" checked>
+                        <span><strong>Consumir crédito nesta renovação</strong><small>Desmarque somente quando este pagamento não deve baixar crédito do servidor.</small></span>
+                    </label>
+                </div>
+            </div>
+
+            <div id="modalRenovarAutomaticoCampos" style="display:none">
+                <div class="form-group">
+                    <label><i class="fas fa-clock"></i> Período da renovação</label>
+                    <select id="modalRenovarMeses" class="renovacao-select"></select>
+                    <small class="renovacao-help">O painel será consultado antes de qualquer crédito ser consumido.</small>
+                </div>
+                <div id="modalRenovarPreview" class="renovacao-preview" style="display:none"></div>
+            </div>
+
+            <div class="compartilhamento-box" id="modalRenovarBoxCompartilhamento">
+                <div class="titulo"><i class="fas fa-users"></i> Este acesso é compartilhado atualmente com:</div>
+                <div id="modalRenovarListaCompartilhamento"></div>
+                <div class="pergunta-pagamento"><i class="fas fa-hand-holding-usd"></i> Quem será responsável por esta renovação?</div>
+            </div>
+
+            <div class="renovacao-msg-row">
+                <input type="checkbox" id="modalRenovarEnviarMsg" checked>
+                <label for="modalRenovarEnviarMsg">
+                    <i class="fab fa-whatsapp"></i> Enviar confirmação de pagamento
+                </label>
+            </div>
+        </div>
+
+        <div class="modal-renovar-footer renovacao-visible" id="modalRenovarFooterNormal">
+            <button type="button" class="btn-cancelar" onclick="fecharModalRenovar()"><i class="fas fa-times"></i> Cancelar</button>
+            <button type="button" class="btn-confirmar" id="modalRenovarBtnConfirmar"><i class="fas fa-check"></i> Confirmar Renovação</button>
+        </div>
+        <div class="modal-renovar-footer renovacao-hidden" id="modalRenovarFooterCompartilhamento">
+            <button type="button" class="btn-outro-pagou" onclick="decidirRenovacao('outro')"><i class="fas fa-user-check"></i> Outro já pagou</button>
+            <button type="button" class="btn-este-paga" onclick="decidirRenovacao('este')"><i class="fas fa-check-circle"></i> Este cliente paga</button>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OUTROS MODAIS -->
+<!-- ============================================================ -->
+{% include 'modals/saldo_modal.html' %}
+{% include 'modals/excluir_modal.html' %}
+{% include 'modals/indicacao_modal.html' %}
+{% include 'modals/tags_modal.html' %}
+
+
+<!-- ============================================================ -->
+<!-- SCRIPTS -->
+
+<script>
+// Proteger a tabela contra modificações do listar_clientes.js
+(function() {
+    // Esperar o DOM carregar
+    var tbody = document.getElementById('clientes-tbody');
+    if (!tbody) return;
+    
+    // Guardar o innerHTML original
+    var originalHTML = tbody.innerHTML;
+    
+    // Verificar a cada 300ms se algo removeu os badges
+    var checkInterval = setInterval(function() {
+        var badges = tbody.querySelectorAll('[style*="position: absolute"][style*="top: -6px"], [style*="position: absolute"][style*="top: -5px"]');
+        var wrappers = tbody.querySelectorAll('.avatar-wrapper');
+        
+        // Se tem wrappers mas não tem badges, restaurar
+        if (wrappers.length > 0 && badges.length === 0) {
+            // Força o navegador a re-renderizar os badges
+            wrappers.forEach(function(w) {
+                w.style.opacity = '0.99';
+                setTimeout(function() { w.style.opacity = '1'; }, 10);
+            });
+        }
+    }, 500);
+    
+    // Parar depois de 10 segundos
+    setTimeout(function() { clearInterval(checkInterval); }, 10000);
+})();
+
+const APP = {
+    page: 1, status: '{{ filtro_status }}' || 'active', plano: '{{ filtro_plano }}' || '',
+    search: '{{ termo_pesquisa }}' || '', pageSize: '{{ page_size }}' || '100',
+    searchTimeout: null, loading: false,
+    renovacao: { id: null, nome: null, url: null, data: null, modo: 'manual', meses: 1, requestId: null, previewConfirmado: false }
+};
+
+function buscarClientes() {
+    if (APP.loading) return;
+    APP.loading = true;
+    mostrarLoading(true);
+    
+    const params = new URLSearchParams({
+        termo: APP.search, 
+        status: APP.status, 
+        plano: APP.plano, 
+        page: APP.page, 
+        page_size: APP.pageSize
+    });
+    
+    
+    fetch('/buscar-clientes-ajax/?' + params.toString())
+    .then(r => r.ok ? r.json() : Promise.reject('Erro'))
+    .then(d => {
+        
+        // Verificar se o HTML contém os badges
+        if (d.html.includes('position: absolute')) {
+        } else {
+        }
+        
+        // Verificar se contém duplicados_count
+        if (d.html.includes('duplicados_count')) {
+        } else {
+        }
+        
+        // Atualizar tabela
+        document.getElementById('clientes-tbody').innerHTML = d.html;
+        document.getElementById('table-info').innerHTML = '<span>Mostrando <strong>' + d.start_index + ' - ' + d.end_index + '</strong> de <strong>' + d.total + '</strong> clientes</span>';
+        atualizarPaginacao(d);
+        setTimeout(() => initEventosTabela(), 100);
+        
+        // Verificar após inserir no DOM
+        setTimeout(() => {
+            const badges = document.querySelectorAll('#clientes-tbody [style*="position: absolute"][style*="top: -6px"], #clientes-tbody [style*="position: absolute"][style*="top: -5px"]');
+            badges.forEach((b, i) => {
+            });
+        }, 200);
+        
+        atualizarURL();
+    })
+    .catch(e => { 
+        console.error('❌ Erro:', e); 
+        mostrarNotificacao('Erro ao buscar clientes', 'erro'); 
+    })
+    .finally(() => { 
+        APP.loading = false; 
+        mostrarLoading(false); 
+    });
+}
+
+function atualizarPaginacao(d) {
+    const c = document.getElementById('pagination-container');
+    if (d.num_pages <= 1) { c.innerHTML = ''; return; }
+    let h = '<div class="pagination-info">Página <span style="color:var(--text-primary);font-weight:600;">' + d.page + '</span> de <span style="color:var(--text-primary);font-weight:600;">' + d.num_pages + '</span></div>';
+    h += '<div class="pagination-controls"><div class="pagination-links"><div class="pagination-nav pagination-prev">';
+    h += d.has_previous ? '<button class="pagination-btn" onclick="mudarPagina(1)"><i class="fas fa-angle-double-left"></i></button><button class="pagination-btn" onclick="mudarPagina(' + (d.page-1) + ')"><i class="fas fa-angle-left"></i></button>' : '<span class="pagination-btn disabled"><i class="fas fa-angle-double-left"></i></span><span class="pagination-btn disabled"><i class="fas fa-angle-left"></i></span>';
+    h += '</div><div class="pagination-numbers">';
+    for (let i = 1; i <= d.num_pages; i++) {
+        if (i === d.page) h += '<span class="pagination-btn active">' + i + '</span>';
+        else if (i >= d.page-2 && i <= d.page+2) h += '<button class="pagination-btn" onclick="mudarPagina(' + i + ')">' + i + '</button>';
+        else if (i === 1 || i === d.num_pages) h += '<button class="pagination-btn" onclick="mudarPagina(' + i + ')">' + i + '</button>';
+        else if (i === d.page-3 || i === d.page+3) h += '<span class="pagination-btn disabled">...</span>';
+    }
+    h += '</div><div class="pagination-nav pagination-next">';
+    h += d.has_next ? '<button class="pagination-btn" onclick="mudarPagina(' + (d.page+1) + ')"><i class="fas fa-angle-right"></i></button><button class="pagination-btn" onclick="mudarPagina(' + d.num_pages + ')"><i class="fas fa-angle-double-right"></i></button>' : '<span class="pagination-btn disabled"><i class="fas fa-angle-right"></i></span><span class="pagination-btn disabled"><i class="fas fa-angle-double-right"></i></span>';
+    h += '</div></div></div>';
+    c.innerHTML = h;
+}
+
+function mudarPagina(p) { APP.page = p; buscarClientes(); document.querySelector('.table-container').scrollIntoView({ behavior: 'smooth' }); }
+function mudarTamanhoPagina(s) { APP.pageSize = s; APP.page = 1; buscarClientes(); }
+function mostrarLoading(m) { const o = document.getElementById('loading-overlay'); if (o) o.classList.toggle('active', m); }
+
+function initEventosTabela() {
+    const tbody = document.getElementById('clientes-tbody');
+    if (!tbody) return;
+    tbody.removeEventListener('click', handlerTabela);
+    tbody.addEventListener('click', handlerTabela);
+}
+async function handlerTabela(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    
+    const id = btn.getAttribute('data-cliente-id') || btn.getAttribute('data-id');
+    const nome = btn.getAttribute('data-cliente-nome');
+    const url = btn.getAttribute('data-url-renovacao');
+    const act = btn.getAttribute('data-action');
+    const cp = btn.getAttribute('data-copy');
+    const wp = btn.getAttribute('data-whatsapp');
+    const cid = btn.getAttribute('data-client-id');
+    
+    // 1. Expandir detalhes: uma única função controla linha, estado e seta.
+    if (btn.classList.contains('toggle-btn')) {
+        toggleDetails(btn);
+        return;
+    }
+    
+    // 2. Copiar texto
+    if (btn.classList.contains('btn-copy')) {
+        const txt = cp || btn.closest('div')?.querySelector('code, span')?.textContent?.trim();
+        if (txt) {
+            navigator.clipboard.writeText(txt).then(() => { 
+                const o = btn.innerHTML; 
+                btn.innerHTML = '<i class="fas fa-check" style="color:#10b981;"></i>'; 
+                setTimeout(() => btn.innerHTML = o, 1200); 
+            });
+        }
+        return;
+    }
+    
+    // 3. Ver/copiar senha: carrega apenas sob demanda, sem segredo no HTML.
+    async function carregarSenhaCliente(botao) {
+        if (botao.dataset.loadedPassword) return botao.dataset.loadedPassword;
+        const endpoint = botao.getAttribute('data-password-url');
+        if (!endpoint) throw new Error('Rota de credencial não encontrada.');
+        const response = await fetch(endpoint, {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Não foi possível carregar a senha.');
+        const password = data.cliente?.senha_iptv || '';
+        botao.dataset.loadedPassword = password;
+        return password;
+    }
+
+    if (btn.classList.contains('btn-toggle-password')) {
+        const clientId = cid || btn.getAttribute('data-client-id');
+        const field = document.getElementById('senha-' + clientId);
+        const icon = btn.querySelector('i');
+        if (!field) return;
+        const hidden = field.textContent.trim() === '••••••••';
+        if (hidden) {
+            try {
+                const password = await carregarSenhaCliente(btn);
+                field.textContent = password || '(vazia)';
+                if (icon) { icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash'); }
+            } catch (err) { window.AppUI?.alert(err.message, {title:'Credencial'}); }
+        } else {
+            field.textContent = '••••••••';
+            if (icon) { icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye'); }
+        }
+        return;
+    }
+
+    if (btn.classList.contains('btn-copy-password')) {
+        try {
+            const password = await carregarSenhaCliente(btn);
+            await navigator.clipboard.writeText(password);
+            const o = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check" style="color:#10b981;"></i>';
+            setTimeout(() => btn.innerHTML = o, 1200);
+        } catch (err) { window.AppUI?.alert(err.message, {title:'Credencial'}); }
+        return;
+    }
+    
+    // 4. Excluir
+    if (btn.classList.contains('btn-delete')) {
+        if (id && nome && typeof abrirModalExcluir === 'function') {
+            abrirModalExcluir(id, nome);
+        }
+        return;
+    }
+    
+    // 5. Renovar
+    if (btn.classList.contains('btn-renew')) {
+        if (id && nome && url) {
+            abrirModalRenovar(id, nome, url, {
+                integracaoAtiva: btn.dataset.integracaoAtiva === '1',
+                politica: btn.dataset.integracaoPolitica || 'manual',
+                tipoIntegracao: btn.dataset.integracaoTipo || 'nenhuma',
+                manualCredito: btn.dataset.manualCredito || 'sempre'
+            });
+        }
+        return;
+    }
+    
+    // 6. Saldo
+    if (btn.classList.contains('btn-balance')) {
+        if (typeof openSaldoModal === 'function') {
+            openSaldoModal(btn);
+        }
+        return;
+    }
+    
+    // 7. WhatsApp
+    if (btn.classList.contains('btn-whatsapp')) {
+        if (wp) {
+            const n = wp.replace(/\D/g, '');
+            if (act === 'abrir-zap') {
+                window.open('https://web.whatsapp.com/send?phone=55' + n, '_blank');
+            } else {
+                window.open('https://wa.me/55' + n, '_blank');
+            }
+        } else {
+            mostrarNotificacao('WhatsApp não cadastrado', 'aviso');
+        }
+        return;
+    }
+    
+    // 8. Ativar/Desativar
+    if (btn.classList.contains('btn-toggle')) {
+        if (typeof toggleClienteStatus === 'function') {
+            toggleClienteStatus(btn);
+        }
+        return;
+    }
+    
+    // 9. Indicar
+    if (btn.classList.contains('btn-indicate')) {
+        if (id && typeof abrirModalIndicacao === 'function') {
+            abrirModalIndicacao(id);
+        }
+        return;
+    }
+    
+    // 10. Tags
+    if (btn.classList.contains('btn-tags')) {
+        if (id && typeof abrirModalTags === 'function') {
+            abrirModalTags(id);
+        }
+        return;
+    }
+}
+
+function gerarRequestIdRenovacao() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+
+function escaparHtml(valor) {
+    return String(valor ?? '').replace(/[&<>'"]/g, function(ch) {
+        return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch];
+    });
+}
+
+function abrirModalRenovar(id, nome, url, opcoes) {
+    opcoes = opcoes || {};
+    var overlay = document.getElementById('modalRenovarOverlay');
+    if (!overlay) {
+        recriarModalRenovar();
+        overlay = document.getElementById('modalRenovarOverlay');
+        if (!overlay) return;
+    }
+
+    APP.renovacao = {
+        id: id,
+        nome: nome,
+        url: url,
+        data: null,
+        modo: 'manual',
+        meses: 1,
+        requestId: gerarRequestIdRenovacao(),
+        previewConfirmado: false,
+        politica: opcoes.politica || 'manual',
+        integracaoAtiva: !!opcoes.integracaoAtiva,
+        tipoIntegracao: opcoes.tipoIntegracao || 'nenhuma',
+        manualCredito: opcoes.manualCredito || 'sempre'
+    };
+
+    document.getElementById('modalRenovarTitulo').innerHTML = '<i class="fas fa-sync-alt"></i> Renovar ' + escaparHtml(nome);
+    document.getElementById('modalRenovarNomeCliente').textContent = nome;
+
+    var dataInput = document.getElementById('modalRenovarData');
+    var futura = new Date();
+    futura.setDate(futura.getDate() + 30);
+    dataInput.value = futura.toISOString().split('T')[0];
+
+    var info = document.getElementById('modalRenovarIntegracaoInfo');
+    var modoWrap = document.getElementById('modalRenovarModoWrap');
+    var manualBtn = document.getElementById('modalModoManual');
+    var autoBtn = document.getElementById('modalModoAutomatico');
+
+    var automaticaDisponivel = APP.renovacao.integracaoAtiva && APP.renovacao.tipoIntegracao !== 'nenhuma';
+    if (automaticaDisponivel) {
+        info.style.display = 'inline-flex';
+        info.textContent = APP.renovacao.tipoIntegracao === 'unitv' ? 'UniTV' : 'SIGMAN';
+    } else {
+        info.style.display = 'none';
+    }
+
+    // Política define o que o navegador oferece. O backend valida novamente.
+    if (APP.renovacao.politica === 'facultativa' && automaticaDisponivel) {
+        modoWrap.style.display = 'grid';
+        manualBtn.style.display = '';
+        autoBtn.style.display = '';
+        APP.renovacao.modo = 'manual';
+    } else if (APP.renovacao.politica === 'obrigatoria' && automaticaDisponivel) {
+        modoWrap.style.display = 'none';
+        APP.renovacao.modo = 'automatico';
+    } else {
+        modoWrap.style.display = 'none';
+        APP.renovacao.modo = 'manual';
+    }
+
+    var enviarMsg = document.getElementById('modalRenovarEnviarMsg');
+    if (enviarMsg) enviarMsg.checked = true;
+    var consumir = document.getElementById('modalRenovarConsumirCredito');
+    if (consumir) consumir.checked = true;
+
+    configurarMesesRenovacao();
+    selecionarModoRenovacao(APP.renovacao.modo, true);
+
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    setTimeout(function(){
+        var alvo = APP.renovacao.modo === 'automatico' ? document.getElementById('modalRenovarMeses') : dataInput;
+        if (alvo) alvo.focus({preventScroll:true});
+    }, 80);
+}
+
+function recriarModalRenovar() {
+    var oldModal = document.getElementById('modalRenovarOverlay');
+    if (oldModal) oldModal.remove();
+    var modalHTML = `
+    <div id="modalRenovarOverlay">
+      <div class="modal-renovar-dialog" role="dialog" aria-modal="true">
+        <div class="modal-renovar-header">
+          <h3 id="modalRenovarTitulo"><i class="fas fa-sync-alt"></i> Renovar Cliente</h3>
+          <button type="button" class="modal-renovar-close" onclick="fecharModalRenovar()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-renovar-body">
+          <div class="cliente-destaque"><i class="fas fa-user-circle"></i><span id="modalRenovarNomeCliente">---</span><span id="modalRenovarIntegracaoInfo" class="renovacao-integracao-pill" style="display:none"></span></div>
+          <div id="modalRenovarModoWrap" class="renovacao-modo-wrap" style="display:none">
+            <button type="button" id="modalModoManual" class="renovacao-modo-btn" onclick="selecionarModoRenovacao('manual')"><i class="fas fa-calendar-alt"></i> Manual</button>
+            <button type="button" id="modalModoAutomatico" class="renovacao-modo-btn" onclick="selecionarModoRenovacao('automatico')"><i class="fas fa-bolt"></i> Automático</button>
+          </div>
+          <div id="modalRenovarManualCampos">
+            <div class="form-group"><label><i class="far fa-calendar-alt"></i> Nova data de vencimento</label><input type="date" id="modalRenovarData"></div>
+            <div id="modalRenovarManualCreditoWrap" class="renovacao-credit-choice" style="display:none"><label for="modalRenovarConsumirCredito"><input type="checkbox" id="modalRenovarConsumirCredito" checked><span><strong>Consumir crédito nesta renovação</strong><small>Desmarque somente quando este pagamento não deve baixar crédito.</small></span></label></div>
+          </div>
+          <div id="modalRenovarAutomaticoCampos" style="display:none">
+            <div class="form-group"><label><i class="fas fa-clock"></i> Período da renovação</label><select id="modalRenovarMeses" class="renovacao-select"></select><small class="renovacao-help">O painel será consultado antes de qualquer crédito ser consumido.</small></div>
+            <div id="modalRenovarPreview" class="renovacao-preview" style="display:none"></div>
+          </div>
+          <div class="compartilhamento-box" id="modalRenovarBoxCompartilhamento"><div class="titulo"><i class="fas fa-users"></i> Este acesso é compartilhado atualmente com:</div><div id="modalRenovarListaCompartilhamento"></div><div class="pergunta-pagamento"><i class="fas fa-hand-holding-usd"></i> Quem será responsável por esta renovação?</div></div>
+          <div class="renovacao-msg-row"><input type="checkbox" id="modalRenovarEnviarMsg" checked><label for="modalRenovarEnviarMsg"><i class="fab fa-whatsapp"></i> Enviar confirmação de pagamento</label></div>
+        </div>
+        <div class="modal-renovar-footer renovacao-visible" id="modalRenovarFooterNormal"><button type="button" class="btn-cancelar" onclick="fecharModalRenovar()"><i class="fas fa-times"></i> Cancelar</button><button type="button" class="btn-confirmar" id="modalRenovarBtnConfirmar"><i class="fas fa-check"></i> Confirmar Renovação</button></div>
+        <div class="modal-renovar-footer renovacao-hidden" id="modalRenovarFooterCompartilhamento"><button type="button" class="btn-outro-pagou" onclick="decidirRenovacao('outro')"><i class="fas fa-user-check"></i> Outro já pagou</button><button type="button" class="btn-este-paga" onclick="decidirRenovacao('este')"><i class="fas fa-check-circle"></i> Este cliente paga</button></div>
+      </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    document.getElementById('modalRenovarOverlay').addEventListener('click', function(e){ if (e.target === this) fecharModalRenovar(); });
+}
+
+function configurarMesesRenovacao() {
+    var select = document.getElementById('modalRenovarMeses');
+    if (!select) return;
+    var valores = APP.renovacao.tipoIntegracao === 'unitv' ? [1] : [1, 2, 3, 6, 12];
+    select.innerHTML = valores.map(function(m){ return '<option value="'+m+'">'+m+' '+(m === 1 ? 'mês' : 'meses')+'</option>'; }).join('');
+    select.value = String(APP.renovacao.meses || 1);
+    select.onchange = function(){
+        APP.renovacao.meses = parseInt(this.value || '1', 10);
+        resetarPreviewRenovacao();
+    };
+}
+
+function resetarRodapesRenovacao() {
+    var normal = document.getElementById('modalRenovarFooterNormal');
+    var comp = document.getElementById('modalRenovarFooterCompartilhamento');
+    normal.classList.remove('renovacao-hidden'); normal.classList.add('renovacao-visible');
+    comp.classList.remove('renovacao-visible'); comp.classList.add('renovacao-hidden');
+    comp.querySelectorAll('button').forEach(function(btn){ btn.disabled = false; });
+}
+
+function resetarPreviewRenovacao() {
+    APP.renovacao.previewConfirmado = false;
+    var preview = document.getElementById('modalRenovarPreview');
+    if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
+    var box = document.getElementById('modalRenovarBoxCompartilhamento');
+    if (box) box.style.display = 'none';
+    var lista = document.getElementById('modalRenovarListaCompartilhamento');
+    if (lista) lista.innerHTML = '';
+    resetarRodapesRenovacao();
+    var btn = document.getElementById('modalRenovarBtnConfirmar');
+    if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = APP.renovacao.modo === 'automatico'
+            ? '<i class="fas fa-search"></i> Conferir no painel'
+            : '<i class="fas fa-check"></i> Confirmar Renovação';
+        btn.onclick = executarRenovacao;
+    }
+}
+
+function selecionarModoRenovacao(modo, inicial) {
+    if (!APP.renovacao || !APP.renovacao.url) return;
+    var podeAuto = APP.renovacao.integracaoAtiva && APP.renovacao.tipoIntegracao !== 'nenhuma';
+    if (modo === 'automatico' && !podeAuto) modo = 'manual';
+    if (APP.renovacao.politica === 'obrigatoria' && podeAuto) modo = 'automatico';
+    if (APP.renovacao.politica === 'manual') modo = 'manual';
+
+    APP.renovacao.modo = modo;
+    var manual = document.getElementById('modalRenovarManualCampos');
+    var automatico = document.getElementById('modalRenovarAutomaticoCampos');
+    var manualBtn = document.getElementById('modalModoManual');
+    var autoBtn = document.getElementById('modalModoAutomatico');
+    manual.style.display = modo === 'manual' ? 'block' : 'none';
+    automatico.style.display = modo === 'automatico' ? 'block' : 'none';
+    manualBtn.classList.toggle('active', modo === 'manual');
+    autoBtn.classList.toggle('active', modo === 'automatico');
+
+    var manualCredito = document.getElementById('modalRenovarManualCreditoWrap');
+    manualCredito.style.display = modo === 'manual' && APP.renovacao.manualCredito === 'perguntar' ? 'block' : 'none';
+    if (!inicial) APP.renovacao.requestId = gerarRequestIdRenovacao();
+    resetarPreviewRenovacao();
+}
+
+function fecharModalRenovar() {
+    var overlay = document.getElementById('modalRenovarOverlay');
+    if (overlay) overlay.classList.remove('active');
+    document.body.style.overflow = '';
+    APP.renovacao = { id:null, nome:null, url:null, data:null, modo:'manual', meses:1, requestId:null, previewConfirmado:false };
+}
+
+function getCsrf() {
+    const i = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (i?.value) return i.value;
+    const c = document.cookie.split(';');
+    for (let x of c) { x = x.trim(); if (x.startsWith('csrftoken=')) return x.substring(10); }
+    return '';
+}
+
+function renderizarPreviewRenovacao(d) {
+    var p = d.preview || {};
+    var box = document.getElementById('modalRenovarPreview');
+    var alerta = APP.renovacao.tipoIntegracao === 'unitv'
+        ? '<div class="renovacao-preview-alert"><i class="fas fa-clock"></i> A UniTV pode levar alguns minutos para refletir o novo vencimento. O gestor não reenviará a renovação automaticamente.</div>'
+        : '';
+    box.innerHTML = `
+        <div class="renovacao-preview-title"><i class="fas fa-shield-alt"></i> Confira antes de renovar</div>
+        <div class="renovacao-preview-grid">
+          <div class="renovacao-preview-item"><small>Usuário encontrado</small><strong title="${escaparHtml(p.usuario)}">${escaparHtml(p.usuario || '-')}</strong></div>
+          <div class="renovacao-preview-item"><small>Painel</small><strong>${escaparHtml(p.tipo_integracao || '-')}</strong></div>
+          <div class="renovacao-preview-item"><small>Validação da conta</small><strong title="${escaparHtml(p.identificacao || '')}">${escaparHtml(p.identificacao || '-')}</strong></div>
+          <div class="renovacao-preview-item"><small>Plano atual</small><strong title="${escaparHtml(p.plano_externo)}">${escaparHtml(p.plano_externo || '-')}</strong></div>
+          <div class="renovacao-preview-item"><small>Novo pacote</small><strong title="${escaparHtml(p.pacote_novo)}">${escaparHtml(p.pacote_novo || '-')}</strong></div>
+          <div class="renovacao-preview-item"><small>Vencimento atual</small><strong>${escaparHtml(p.vencimento_atual || '-')}</strong></div>
+          <div class="renovacao-preview-item"><small>Créditos necessários</small><strong>${escaparHtml(p.creditos ?? '0')}</strong></div>
+          <div class="renovacao-preview-item"><small>Período</small><strong>${escaparHtml(p.meses || 1)} mês(es)</strong></div>
+          <div class="renovacao-preview-item"><small>Conexões</small><strong>${escaparHtml(p.conexoes || 1)}</strong></div>
+        </div>${alerta}`;
+    box.style.display = 'block';
+    APP.renovacao.previewConfirmado = true;
+}
+
+function mostrarCompartilhamento(d) {
+    var outros = d.outros || [];
+    let h = '';
+    outros.forEach(function(c){
+        h += '<div class="compartilhamento-item"><span>👤 ' + escaparHtml(c.nome) + '</span><span class="data">📅 ' + escaparHtml(c.vencimento || 'Sem data') + '</span></div>';
+    });
+    document.getElementById('modalRenovarListaCompartilhamento').innerHTML = h;
+    document.getElementById('modalRenovarBoxCompartilhamento').style.display = 'block';
+    var normal = document.getElementById('modalRenovarFooterNormal');
+    var comp = document.getElementById('modalRenovarFooterCompartilhamento');
+    normal.classList.remove('renovacao-visible'); normal.classList.add('renovacao-hidden');
+    comp.classList.remove('renovacao-hidden'); comp.classList.add('renovacao-visible');
+    comp.querySelectorAll('button').forEach(function(btn){ btn.disabled = false; });
+}
+
+async function requisitarRenovacao(payload) {
+    var r = await fetch(APP.renovacao.url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'X-CSRFToken':getCsrf()},
+        body: JSON.stringify(payload)
+    });
+    var d;
+    try { d = await r.json(); } catch(e) { d = {message:'Resposta inválida do servidor.'}; }
+    if (!r.ok) {
+        var erro = new Error(d.message || 'Erro no servidor');
+        erro.payload = d;
+        throw erro;
+    }
+    return d;
+}
+
+function payloadBaseRenovacao(quem) {
+    var enviar = document.getElementById('modalRenovarEnviarMsg');
+    var consumir = document.getElementById('modalRenovarConsumirCredito');
+    var meses = document.getElementById('modalRenovarMeses');
+    return {
+        modo: APP.renovacao.modo,
+        data_vencimento: APP.renovacao.modo === 'manual' ? (document.getElementById('modalRenovarData').value || null) : null,
+        meses: APP.renovacao.modo === 'automatico' ? parseInt((meses && meses.value) || APP.renovacao.meses || 1, 10) : 1,
+        quem_paga: quem || 'auto',
+        enviar_mensagem: !!(enviar && enviar.checked),
+        consumir_credito_manual: !!(consumir && consumir.checked),
+        request_id: APP.renovacao.requestId
+    };
+}
+
+function finalizarRenovacaoSucesso(d, quem) {
+    var mensagem = d.message || (APP.renovacao.modo === 'automatico' ? 'Renovação automática concluída.' : 'Renovado com sucesso.');
+    if (quem === 'outro') mensagem = d.message || 'Cadastro sincronizado sem nova cobrança externa.';
+    mostrarNotificacao('✅ ' + mensagem, 'sucesso');
+    fecharModalRenovar();
+    setTimeout(function(){ window.location.reload(); }, 450);
+}
+
+async function executarRenovacao() {
+    if (!APP.renovacao.url) return;
+    var btn = document.getElementById('modalRenovarBtnConfirmar');
+    var original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    try {
+        var payload = payloadBaseRenovacao('auto');
+        if (APP.renovacao.modo === 'automatico' && !APP.renovacao.previewConfirmado) {
+            payload.acao = 'preview';
+            var previa = await requisitarRenovacao(payload);
+            if (previa.status !== 'preview') throw new Error(previa.message || 'O painel não retornou a conferência esperada.');
+            renderizarPreviewRenovacao(previa);
+            if (previa.tem_compartilhamento) {
+                mostrarCompartilhamento(previa);
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-bolt"></i> Confirmar no painel';
+            }
+            return;
+        }
+
+        payload.acao = 'executar';
+        var d = await requisitarRenovacao(payload);
+        if (d.status === 'success') return finalizarRenovacaoSucesso(d, 'auto');
+        if (d.status === 'pergunta') {
+            if (d.preview && APP.renovacao.modo === 'automatico') renderizarPreviewRenovacao(d);
+            mostrarCompartilhamento(d);
+            return;
+        }
+        throw new Error(d.message || 'Erro ao renovar.');
+    } catch(e) {
+        var critica = e.payload && e.payload.status === 'error_critico';
+        mostrarNotificacao((critica ? '⚠️ ' : '❌ ') + (e.message || 'Erro ao processar renovação'), critica ? 'aviso' : 'erro');
+        if (critica) fecharModalRenovar();
+    } finally {
+        var overlay = document.getElementById('modalRenovarOverlay');
+        if (document.body.contains(btn) && overlay && overlay.classList.contains('active')) {
+            btn.disabled = false;
+            if (APP.renovacao.modo === 'automatico') {
+                btn.innerHTML = APP.renovacao.previewConfirmado
+                    ? '<i class="fas fa-bolt"></i> Confirmar no painel'
+                    : '<i class="fas fa-search"></i> Conferir no painel';
+            } else {
+                btn.innerHTML = '<i class="fas fa-check"></i> Confirmar Renovação';
+            }
+        }
+    }
+}
+
+async function decidirRenovacao(quem) {
+    if (!APP.renovacao.url) return;
+    var footer = document.getElementById('modalRenovarFooterCompartilhamento');
+    var botoes = Array.from(footer.querySelectorAll('button'));
+    var clicado = botoes.find(function(btn){
+        return (quem === 'este' && btn.classList.contains('btn-este-paga')) || (quem === 'outro' && btn.classList.contains('btn-outro-pagou'));
+    });
+    var original = clicado ? clicado.innerHTML : '';
+    botoes.forEach(function(btn){ btn.disabled = true; });
+    if (clicado) clicado.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+    try {
+        var payload = payloadBaseRenovacao(quem);
+        payload.acao = 'executar';
+        var d = await requisitarRenovacao(payload);
+        if (d.status === 'success') return finalizarRenovacaoSucesso(d, quem);
+        throw new Error(d.message || 'Erro ao processar renovação.');
+    } catch(e) {
+        var critica = e.payload && e.payload.status === 'error_critico';
+        mostrarNotificacao((critica ? '⚠️ ' : '❌ ') + (e.message || 'Erro de comunicação'), critica ? 'aviso' : 'erro');
+        if (critica) {
+            fecharModalRenovar();
+        } else {
+            botoes.forEach(function(btn){ btn.disabled = false; });
+            if (clicado) clicado.innerHTML = original;
+        }
+    }
+}
+
+document.getElementById('modalRenovarOverlay').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalRenovar();
+});
+
+function mostrarNotificacao(msg, tipo) {
+    const existente = document.querySelector('.notificacao-toast');
+    if (existente) existente.remove();
+    const cores = { sucesso: 'var(--success)', erro: 'var(--danger)', aviso: 'var(--warning)', info: 'var(--primary)' };
+    const icones = { sucesso: '✅', erro: '❌', aviso: '⚠️', info: 'ℹ️' };
+    const toast = document.createElement('div');
+    toast.className = 'notificacao-toast';
+    toast.style.cssText = 'position:fixed;bottom:2rem;right:2rem;background:' + (cores[tipo] || cores.info) + ';color:white;padding:1rem 1.5rem;border-radius:12px;z-index:999999;font-weight:600;box-shadow:0 10px 40px rgba(0,0,0,0.3);animation:slideInRight 0.3s ease;max-width:400px;';
+    toast.innerHTML = (icones[tipo] || '') + ' ' + msg;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.animation = 'slideOutRight 0.3s ease forwards'; setTimeout(() => toast.remove(), 300); }, 3000);
+}
+
+const st = document.createElement('style');
+st.textContent = '@keyframes slideInRight{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}@keyframes slideOutRight{from{transform:translateX(0);opacity:1}to{transform:translateX(100%);opacity:0}}';
+document.head.appendChild(st);
+
+document.addEventListener('DOMContentLoaded', () => { initBusca(); initEventosTabela(); });
+
+
+// OBSERVER para garantir que badges não sejam removidos
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.type === 'childList') {
+            // Verificar se badges foram removidos
+            const badges = document.querySelectorAll('#clientes-tbody [style*="position: absolute"][style*="top: -6px"], #clientes-tbody [style*="position: absolute"][style*="top: -5px"]');
+            const expectedBadges = document.querySelectorAll('#clientes-tbody .avatar-wrapper');
+            
+            expectedBadges.forEach(function(wrapper) {
+                const existingBadge = wrapper.querySelector('[style*="position: absolute"]');
+                // Se o badge sumiu mas o HTML original tinha, isso é um problema do listar_clientes.js
+            });
+        }
+    });
+});
+
+// Observar o tbody
+const tbody = document.getElementById('clientes-tbody');
+if (tbody) {
+    observer.observe(tbody, { childList: true, subtree: true });
+}
+
+// FORÇAR a permanência dos badges
+setInterval(function() {
+    var tbody = document.getElementById('clientes-tbody');
+    if (!tbody) return;
+    
+    var wrappers = tbody.querySelectorAll('.avatar-wrapper');
+    wrappers.forEach(function(wrapper) {
+        var badge = wrapper.querySelector('[style*="position: absolute"]');
+        // Se o wrapper tem o badge no HTML mas não no DOM visível
+        if (!badge || badge.offsetParent === null) {
+            // Recriar o badge se necessário
+        }
+    });
+}, 500);
+
+
+
+function getCsrfToken() {
+    var input = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (input && input.value) return input.value;
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var parts = cookies[i].trim().split('=');
+        if (parts[0] === 'csrftoken') return decodeURIComponent(parts[1]);
+    }
+    return '';
+}
+
+function mostrarToast(msg, tipo) {
+    var cores = { success: 'var(--success)', warning: 'var(--warning)', error: 'var(--danger)', info: 'var(--primary)' };
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:99999;background:' + (cores[tipo] || 'var(--primary)') + ';color:#fff;padding:0.7rem 1.2rem;border-radius:10px;font-size:0.9rem;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.18);transition:opacity 0.4s;';
+    document.body.appendChild(t);
+    setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 400); }, 2800);
+}
+
+// ====================================================================
+// API
+// ====================================================================
+
+function createAbortController(timeoutMs) {
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function() { controller.abort(); }, timeoutMs || 15000);
+    return { controller: controller, signal: controller.signal, clear: function() { clearTimeout(timeoutId); } };
+}
+
+function validateResponse(response) {
+    if (!response.ok) {
+        var msg = 'Erro ' + response.status;
+        if (response.status === 400) msg = 'Requisição inválida';
+        else if (response.status === 403) msg = 'Acesso negado';
+        else if (response.status === 404) msg = 'Não encontrado';
+        else if (response.status >= 500) msg = 'Erro no servidor';
+        var err = new Error(msg);
+        err.status = response.status;
+        err.isHttpError = true;
+        throw err;
+    }
+    return response;
+}
+
+function handleError(error, fallbackMsg) {
+    if (error.name === 'AbortError') mostrarToast('Tempo limite atingido.', 'warning');
+    else if (error.isHttpError) mostrarToast(error.message, 'error');
+    else mostrarToast(fallbackMsg || 'Erro de conexão.', 'error');
+}
+
+function apiFetch(url, options, config) {
+    config = config || {};
+    var timeoutMs = config.timeout || 15000;
+    var retries = config.retries || 0;
+    var retryOn = config.retryOn || [0, 502, 503, 504];
+    var attempt = 0;
+    function doFetch() {
+        var abortCtrl = createAbortController(timeoutMs);
+        var fetchOptions = Object.assign({}, options, { signal: abortCtrl.signal });
+        return fetch(url, fetchOptions)
+            .then(function(response) { abortCtrl.clear(); return validateResponse(response).json(); })
+            .catch(function(error) {
+                abortCtrl.clear();
+                if (error.name === 'AbortError') throw error;
+                attempt++;
+                if (attempt <= retries && (error.status === 0 || retryOn.indexOf(error.status) !== -1)) return doFetch();
+                throw error;
+            });
+    }
+    return doFetch();
+}
+
+// ====================================================================
+// UI HELPERS
+// ====================================================================
+
+function setButtonLoading(btn, loading, text) {
+    if (!btn) return null;
+    var originalHTML = btn.innerHTML;
+    if (loading) {
+        btn.dataset.originalHTML = originalHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (text || 'Processando...');
+        btn.disabled = true;
+        btn.dataset.loading = '1';
+    } else {
+        btn.innerHTML = btn.dataset.originalHTML || originalHTML;
+        btn.disabled = false;
+        btn.dataset.loading = '0';
+        delete btn.dataset.originalHTML;
+    }
+    return originalHTML;
+}
+
+function criarIcone(classe) { var i = document.createElement('i'); i.className = classe; return i; }
+
+// ====================================================================
+// MODAIS GENÉRICOS
+// ====================================================================
+
+function openModal(modalId) {
+    var modal = document.getElementById(modalId);
+    if (modal) { document.body.style.overflow = 'hidden'; modal.style.display = 'flex'; }
+}
+
+function closeModal(modalId) {
+    var modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+}
+
+
+// ====================================================================
+// NAVEGAÇÃO
+// ====================================================================
+
+function changePageSize(select) {
+    var url = new URL(window.location.href);
+    url.searchParams.set('page_size', select.value);
+    url.searchParams.delete('page');
+    window.location.href = url.toString();
+}
+// ========== FILTROS (CORRIGIDOS) ==========
+
+// Quando clicar em um PLANO: mantém o status, limpa pesquisa
+function filtrarPorPlano(p, trigger) {
+    APP.plano = !p ? '' : (APP.plano === p ? '' : p);
+    APP.search = '';
+    APP.page = 1;
+
+    var searchInput = document.getElementById('search-input-live');
+    if (searchInput) searchInput.value = '';
+    var clearBtn = document.getElementById('clear-search');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    document.querySelectorAll('.plano-btn').forEach(function(btn) { btn.classList.remove('active'); });
+    if (APP.plano && trigger) {
+        trigger.classList.add('active');
+    } else {
+        var todos = document.querySelector('.plano-btn-todos');
+        if (todos) todos.classList.add('active');
+    }
+
+    buscarClientes();
+}
+
+// Pesquisa: mantém status e plano, apenas adiciona o termo
+function initBusca() {
+    const inp = document.getElementById('search-input-live'), clr = document.getElementById('clear-search');
+    if (!inp) return;
+    
+    function tgl() { 
+        if (clr) clr.style.display = inp.value.length > 0 ? 'flex' : 'none'; 
+    }
+    
+    inp.addEventListener('input', () => { 
+        clearTimeout(APP.searchTimeout); 
+        tgl(); 
+        APP.searchTimeout = setTimeout(() => { 
+            APP.search = inp.value; 
+            APP.page = 1; 
+            // MANTÉM APP.status e APP.plano
+            buscarClientes(); 
+        }, 500); 
+    });
+    
+    if (clr) {
+        clr.addEventListener('click', () => { 
+            inp.value = ''; 
+            APP.search = ''; 
+            APP.page = 1; 
+            tgl(); 
+            // MANTÉM APP.status e APP.plano
+            buscarClientes(); 
+            inp.focus(); 
+        });
+    }
+
+    // Verificar se já tem texto ao carregar a página
+    if (inp.value.length > 0 && clr) {
+        clr.style.display = 'flex';
+    }
+    
+    tgl();
+}
+
+// Função para atualizar a URL
+function atualizarURL() { 
+    const p = new URLSearchParams(); 
+    if (APP.search) p.set('termo', APP.search); 
+    if (APP.status && APP.status !== 'active') p.set('status', APP.status); 
+    if (APP.plano) p.set('plano', APP.plano); 
+    if (APP.page > 1) p.set('page', APP.page); 
+    if (APP.pageSize !== '100') p.set('page_size', APP.pageSize); 
+    window.history.pushState({}, '', window.location.pathname + (p.toString() ? '?' + p : '')); 
+}
+
+// Restaurar visual dos filtros após busca AJAX
+function restaurarFiltrosVisuais() {
+    // Botões de status
+    document.querySelectorAll('.status-buttons .filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+        var onclick = btn.getAttribute('onclick') || '';
+        if (onclick.includes("'" + APP.status + "'")) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // Botões de plano
+    document.querySelectorAll('.plano-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (APP.plano) {
+            var onclick = btn.getAttribute('onclick') || '';
+            if (onclick.includes("'" + APP.plano + "'")) btn.classList.add('active');
+        }
+    });
+    if (!APP.plano) {
+        var todos = document.querySelector('.plano-btn-todos');
+        if (todos) todos.classList.add('active');
+    }
+}
+// ====================================================================
+// SENHA / CLIPBOARD
+// ====================================================================
+
+function togglePassword(event, clienteId, senhaReal) {
+    var el = document.getElementById('senha-' + clienteId);
+    if (!el) return;
+    if (el.textContent === '••••••••') { el.textContent = senhaReal; }
+    else { el.textContent = '••••••••'; }
+}
+
+function copyToClipboard(text, button) {
+    if (!navigator.clipboard) { mostrarToast('Clipboard não suportado.', 'warning'); return; }
+    navigator.clipboard.writeText(text).then(function() {
+        var orig = button.innerHTML;
+        button.classList.add('copied');
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        mostrarToast('Copiado!', 'success');
+        setTimeout(function() { button.classList.remove('copied'); button.innerHTML = orig; }, 2000);
+    }).catch(function() { mostrarToast('Erro ao copiar.', 'error'); });
+}
+
+// ====================================================================
+// DETALHES
+// ====================================================================
+
+function toggleDetails(btn) {
+    var id = btn.getAttribute('data-id') || btn.dataset.id;
+    var detalhesRow = document.querySelector('.detalhes-row[data-id="' + id + '"]');
+    if (!detalhesRow) return;
+    var jaAberto = btn.dataset.aberto === '1';
+    var scrollY = window.scrollY;
+    if (jaAberto) {
+        detalhesRow.style.display = 'none';
+        var icon = btn.querySelector('i');
+        if (icon) icon.className = 'fas fa-chevron-down';
+        btn.classList.remove('active');
+        btn.dataset.aberto = '0';
+        btn.setAttribute('aria-expanded', 'false');
+    } else {
+        var allDetalhes = document.querySelectorAll('.detalhes-row');
+        for (var i = 0; i < allDetalhes.length; i++) allDetalhes[i].style.display = 'none';
+        var allBtns = document.querySelectorAll('.toggle-btn');
+        for (var j = 0; j < allBtns.length; j++) {
+            var bIcon = allBtns[j].querySelector('i');
+            if (bIcon) bIcon.className = 'fas fa-chevron-down';
+            allBtns[j].classList.remove('active');
+            allBtns[j].dataset.aberto = '0';
+            allBtns[j].setAttribute('aria-expanded', 'false');
+        }
+        detalhesRow.style.display = 'table-row';
+        var btnIcon = btn.querySelector('i');
+        if (btnIcon) btnIcon.className = 'fas fa-chevron-down';
+        btn.classList.add('active');
+        btn.dataset.aberto = '1';
+        btn.setAttribute('aria-expanded', 'true');
+    }
+    window.scrollTo({ top: scrollY, behavior: 'auto' });
+}
+
+// ====================================================================
+// SALDO
+// ====================================================================
+
+function calcularValorTotal(valorAPagar, saldo) { return Math.max(0, (parseFloat(valorAPagar) || 0) - (parseFloat(saldo) || 0)); }
+
+function atualizarExibicaoSaldo(clienteId, novoSaldo, valorAPagar) {
+    var saldoEl = document.getElementById('saldo-badge-' + clienteId);
+    if (saldoEl) {
+        var s = parseFloat(novoSaldo) || 0;
+        saldoEl.className = 'saldo ' + (s >= 0 ? 'positivo' : 'negativo');
+        saldoEl.innerHTML = '';
+        saldoEl.appendChild(criarIcone('fas ' + (s >= 0 ? 'fa-arrow-up' : 'fa-arrow-down')));
+        saldoEl.appendChild(document.createTextNode(' R$ ' + Math.abs(s).toFixed(2).replace('.', ',')));
+    }
+    var totalEl = document.getElementById('total-pagar-' + clienteId);
+    if (totalEl && valorAPagar !== undefined) {
+        totalEl.textContent = 'R$ ' + calcularValorTotal(valorAPagar, novoSaldo).toFixed(2).replace('.', ',');
+    }
+}
+
+// ====================================================================
+// MODAIS DE CLIENTE
+// ====================================================================
+
+function openSaldoModal(button) {
+    var clienteId = button.getAttribute('data-id');
+    var clienteNome = 'Cliente';
+    var currentRow = button.closest('tr');
+    var nomeElement = (currentRow && currentRow.querySelector('.cliente-nome'));
+    if (nomeElement) clienteNome = nomeElement.textContent.trim();
+    document.getElementById('clienteId').value = clienteId;
+    document.getElementById('clienteNomeSaldo').textContent = clienteNome;
+    document.getElementById('valor').value = '';
+    document.querySelector('input[name="tipo"][value="adicionar"]').checked = true;
+    document.getElementById('observacao').value = '';
+    openModal('saldoModal');
+}
+
+function abrirModalExcluir(clienteId, clienteNome) {
+    document.getElementById('excluirClienteId').value = clienteId;
+    document.getElementById('clienteNomeExcluir').textContent = clienteNome;
+    document.getElementById('confirmacao').checked = false;
+    document.getElementById('btnExcluir').disabled = true;
+    document.getElementById('formExcluir').action = '';
+    openModal('modalExcluir');
+}
+
+// ====================================================================
+// RENOVAÇÃO - GERENCIADA PELO TEMPLATE PRINCIPAL
+// ====================================================================
+
+window._sessaoRenovacao = null;
+
+// ====================================================================
+// AÇÕES DE CLIENTE
+// ====================================================================
+
+async function toggleClienteStatus(button) {
+    if (button.dataset.loading === '1') return;
+    setButtonLoading(button, true);
+    var clienteId = button.getAttribute('data-id');
+    var isActive = button.getAttribute('data-is-active');
+    var actionLabel = isActive === 'True' ? 'desativar' : 'ativar';
+    if (!(await window.AppUI.confirm('Tem certeza que deseja ' + actionLabel + ' este cliente?', {title:'Alterar status'}))) { setButtonLoading(button, false); return; }
+    apiFetch('/ativar_desativar_cliente/' + clienteId + '/', { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken() } }, { retries: 1 })
+    .then(function(data) {
+        if (data.status === 'success') { mostrarToast(data.message || 'Sucesso!', 'success'); setTimeout(function() { location.reload(); }, 1000); }
+        else { mostrarToast(data.message || 'Erro.', 'error'); setButtonLoading(button, false); }
+    })
+    .catch(function(error) { handleError(error, 'Erro ao ' + actionLabel + ' cliente.'); setButtonLoading(button, false); });
+}
+
+function enviarMensagemWhatsApp(event, clienteId) {
+    var btn = event ? event.currentTarget : null;
+    if (!btn || btn.dataset.loading === '1') return;
+    setButtonLoading(btn, true, 'Buscando...');
+    apiFetch('/get_mensagem_cliente/' + clienteId + '/', {}, { retries: 1 })
+    .then(function(data) {
+        if (!data.whatsapp) { mostrarToast('Cliente sem WhatsApp.', 'warning'); return; }
+        var msg = data.mensagem_texto ? encodeURIComponent(data.mensagem_texto) : '';
+        window.open('https://wa.me/' + data.whatsapp.replace(/\D/g, '') + (msg ? '?text=' + msg : ''), '_blank');
+        mostrarToast('WhatsApp aberto!', 'success');
+    })
+    .catch(function(error) { handleError(error, 'Erro ao buscar mensagem.'); })
+    .finally(function() { setButtonLoading(btn, false); });
+}
+
+function abrirWhatsApp(event, clienteId) {
+    var btn = event ? event.currentTarget : null;
+    if (!btn || btn.dataset.loading === '1') return;
+    setButtonLoading(btn, true, 'Buscando...');
+    apiFetch('/get_mensagem_cliente/' + clienteId + '/', {}, { retries: 1 })
+    .then(function(data) {
+        if (data.whatsapp) { window.open('https://wa.me/' + data.whatsapp.replace(/\D/g, ''), '_blank'); mostrarToast('WhatsApp aberto!', 'success'); }
+        else { mostrarToast('Cliente sem WhatsApp.', 'warning'); }
+    })
+    .catch(function(error) { handleError(error, 'Erro ao buscar WhatsApp.'); })
+    .finally(function() { setButtonLoading(btn, false); });
+}
+
+async function gerarLink(event, clienteId) {
+    if (!(await window.AppUI.confirm('Deseja gerar um novo link de acesso?', {title:'Gerar novo link'}))) return;
+    var btn = event ? event.currentTarget : null;
+    if (!btn || btn.dataset.loading === '1') return;
+    setButtonLoading(btn, true, 'Gerando...');
+    apiFetch('/gerar_novo_link/' + clienteId + '/', { method: 'POST', headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/json' } }, { retries: 1 })
+    .then(function(data) {
+        if (data.status === 'success') { mostrarToast('Link gerado!', 'success'); setTimeout(function() { location.reload(); }, 1000); }
+        else { mostrarToast(data.message || 'Erro.', 'error'); setButtonLoading(btn, false); }
+    })
+    .catch(function(error) { handleError(error, 'Erro ao gerar link.'); setButtonLoading(btn, false); });
+}
+
+// ====================================================================
+// PESQUISA AJAX - DESATIVADA (template principal gerencia)
+// ====================================================================
+
+function reativarPosPesquisa() { return; }
+function initPesquisaAjax() { return; }
+
+// ====================================================================
+// INICIALIZAÇÃO GERAL
+// ====================================================================
+
+function initGeral() {
+    // Sidebar
+    var menuToggle = document.getElementById('menuToggle');
+    var sidebar = document.getElementById('sidebar');
+    var content = document.getElementById('content');
+    var sidebarOverlay = document.getElementById('sidebarOverlay');
+    if (menuToggle && sidebar) {
+        menuToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+            if (content) content.classList.toggle('expanded');
+            if (sidebarOverlay) sidebarOverlay.classList.toggle('show');
+        });
+    }
+    
+    // Fechar modais com ESC
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            // Fechar modal de renovação do template principal
+            var modalRenovarOverlay = document.getElementById('modalRenovarOverlay');
+            if (modalRenovarOverlay) {
+                modalRenovarOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            var mc = document.getElementById('modalCompartilhamento');
+            if (mc) { mc.style.display = 'none'; document.body.style.overflow = ''; }
+        }
+    });
+}
+
+// ====================================================================
+// MODAL DE SALDO
+// ====================================================================
+
+function initModalSaldo() {
+    var saldoForm = document.getElementById('saldoForm');
+    if (!saldoForm) return;
+    saldoForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (this.dataset.loading === '1') return;
+        this.dataset.loading = '1';
+        var clienteId = document.getElementById('clienteId').value;
+        var valor = document.getElementById('valor').value;
+        var tipoEl = document.querySelector('input[name="tipo"]:checked');
+        var tipo = tipoEl ? tipoEl.value : null;
+        var btnConfirmar = document.querySelector('[form="saldoForm"]');
+        if (!clienteId || !valor || !tipo) { mostrarToast('Preencha todos os campos.', 'warning'); this.dataset.loading = '0'; return; }
+        setButtonLoading(btnConfirmar, true, 'Salvando...');
+        var bodyData = 'cliente_id=' + encodeURIComponent(clienteId) + '&valor=' + encodeURIComponent(valor) + '&tipo=' + encodeURIComponent(tipo);
+        apiFetch('/alterar_saldo/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRFToken': getCsrfToken() }, body: bodyData }, { retries: 1 })
+        .then(function(data) {
+            if (data.status === 'success') {
+                closeModal('saldoModal');
+                mostrarToast('Saldo atualizado!', 'success');
+                // Atualização completa evita saldo/total visualmente antigo e mantém
+                // o mesmo comportamento confiável usado após a renovação.
+                setTimeout(function() { window.location.reload(); }, 450);
+            }
+            else { mostrarToast(data.message || 'Erro.', 'error'); }
+        })
+        .catch(function(error) { handleError(error, 'Erro ao alterar saldo.'); })
+        .finally(function() { setButtonLoading(btnConfirmar, false); this.dataset.loading = '0'; }.bind(this));
+    });
+}
+
+
+document.addEventListener('DOMContentLoaded', function() {
+    initGeral();
+    initModalSaldo();
+});
+
+
+function filtrarPorClienteCompartilhado(nome) {
+    var searchInput = document.getElementById('search-input-live');
+    var clearBtn = document.getElementById('clear-search');
+    
+    if (searchInput) {
+        searchInput.value = nome;
+        APP.search = nome;
+        APP.page = 1;
+        
+        // 🔥 Mostrar o botão X
+        if (clearBtn) {
+            clearBtn.style.display = 'flex';
+        }
+        
+        buscarClientes();
+    }
+}
+
+
+// Atualizar chips de plano após filtrar por status
+function atualizarBotoesPlanos() {
+    fetch('/buscar-planos-ajax/?status=' + encodeURIComponent(APP.status), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then(function(r) { if (!r.ok) throw new Error('Falha ao buscar planos'); return r.json(); })
+        .then(function(data) {
+            const container = document.querySelector('.plano-buttons');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const todos = document.createElement('button');
+            todos.type = 'button';
+            todos.className = 'filter-btn plano-btn plano-btn-todos active';
+            todos.innerHTML = '<i class="fas fa-layer-group"></i><span>Todos</span>';
+            todos.addEventListener('click', function() { filtrarPorPlano('', todos); });
+            container.appendChild(todos);
+
+            (data.planos || []).forEach(function(plano) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'filter-btn plano-btn';
+                btn.title = 'Filtrar por ' + (plano.nome || 'plano');
+
+                const dot = document.createElement('span');
+                dot.className = 'plano-color-dot';
+                btn.style.setProperty('--plano-cor', plano.cor || '#64748b');
+                const nome = document.createElement('span');
+                nome.className = 'plano-btn-nome';
+                nome.textContent = plano.nome || 'Sem nome';
+                const count = document.createElement('span');
+                count.className = 'plano-btn-count';
+                count.textContent = plano.clientes_count || 0;
+
+                btn.append(dot, nome, count);
+                btn.addEventListener('click', function() { filtrarPorPlano(plano.nome || '', btn); });
+                container.appendChild(btn);
+            });
+        })
+        .catch(function() {});
+}
+
+function filtrarPorStatus(s, trigger) {
+    APP.status = s;
+    APP.plano = '';
+    APP.search = '';
+    APP.page = 1;
+
+    var searchInput = document.getElementById('search-input-live');
+    if (searchInput) searchInput.value = '';
+    var clearBtn = document.getElementById('clear-search');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    document.querySelectorAll('.status-buttons .filter-btn').forEach(function(btn) { btn.classList.remove('active'); });
+    if (trigger) trigger.classList.add('active');
+
+    atualizarBotoesPlanos();
+    buscarClientes();
+}
+</script>
+
+{% endblock %}

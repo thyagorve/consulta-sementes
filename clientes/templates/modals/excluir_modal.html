@@ -1,0 +1,57 @@
+<!-- Modal Excluir -->
+<div id="modalExcluir" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalExcluirTitulo">
+    <div class="modal-overlay" onclick="closeModal('modalExcluir')"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalExcluirTitulo"><i class="fas fa-trash-alt"></i> Excluir cliente</h2>
+            <button type="button" class="close-modal" onclick="closeModal('modalExcluir')" aria-label="Fechar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="modal-body">
+            <div class="delete-warning-card">
+                <div class="delete-warning-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <div>
+                    <p class="delete-warning-title">Você está prestes a excluir <strong id="clienteNomeExcluir"></strong>.</p>
+                    <p class="delete-warning-text">Os dados vinculados a este cliente serão removidos permanentemente. Use esta ação apenas quando realmente quiser apagar o cadastro.</p>
+                </div>
+            </div>
+
+            <form id="formExcluir" method="post" action="">
+                {% csrf_token %}
+                <input type="hidden" id="excluirClienteId" name="cliente_id">
+
+                <div class="delete-confirm-row">
+                    <input type="checkbox"
+                           id="confirmacao"
+                           onchange="document.getElementById('btnExcluir').disabled = !this.checked">
+                    <label for="confirmacao">Confirmo que desejo excluir este cliente permanentemente.</label>
+                </div>
+            </form>
+        </div>
+
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeModal('modalExcluir')">
+                Cancelar
+            </button>
+            <button type="button" class="btn btn-primary" id="btnExcluir" disabled onclick="executarExclusao()">
+                <i class="fas fa-trash-alt"></i> Excluir cliente
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function executarExclusao() {
+    var clienteId = document.getElementById('excluirClienteId').value;
+    if (!clienteId) {
+        window.AppUI.alert('Cliente não identificado.', {title: 'Não foi possível excluir'});
+        return;
+    }
+
+    var form = document.getElementById('formExcluir');
+    form.action = '/excluir_cliente/' + clienteId + '/';
+    form.submit();
+}
+</script>

@@ -1,0 +1,616 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configurações do Sistema{% endblock %}
+
+{% block content %}
+<style>
+    .config-page {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    .config-card {
+        background: var(--bg-card, #fff);
+        border-radius: 20px;
+        border: 1px solid var(--border, #e5e7eb);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        overflow: hidden;
+    }
+    
+    .config-card-header {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .config-card-header h2 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.5rem;
+    }
+    
+    .config-card-header p {
+        margin: 0.5rem 0 0;
+        opacity: 0.9;
+        font-size: 0.9rem;
+    }
+    
+    .config-card-body {
+        padding: 2rem;
+    }
+    
+    .config-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid var(--border, #e5e7eb);
+    }
+    
+    .config-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+    
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text, #1f2937);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .section-title i {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    
+    .section-title .icon-whatsapp {
+        background: rgba(37, 211, 102, 0.15);
+        color: #25D366;
+    }
+    
+    .section-title .icon-telegram {
+        background: rgba(0, 136, 204, 0.15);
+        color: #0088cc;
+    }
+    
+    .section-title .icon-security {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+    }
+    
+    .section-title .icon-email {
+        background: rgba(59, 130, 246, 0.15);
+        color: #3b82f6;
+    }
+    
+    .section-title .icon-lock {
+        background: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+    }
+    
+    .form-group-modern {
+        margin-bottom: 1.25rem;
+    }
+    
+    .form-group-modern label {
+        display: block;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text, #1f2937);
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-group-modern .input-wrapper {
+        position: relative;
+    }
+    
+    .form-group-modern .input-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-light, #9ca3af);
+        font-size: 1rem;
+        z-index: 1;
+    }
+    
+    .form-group-modern input {
+        width: 100%;
+        padding: 12px 16px 12px 42px;
+        border: 2px solid var(--border, #e5e7eb);
+        border-radius: 12px;
+        font-size: 0.95rem;
+        background: var(--bg-card, #fff);
+        color: var(--text, #1f2937);
+        transition: all 0.3s ease;
+    }
+    
+    .form-group-modern input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .form-group-modern input::placeholder {
+        color: var(--text-light, #9ca3af);
+        opacity: 0.6;
+    }
+    
+    .form-group-modern input:disabled {
+        background: var(--bg-hover, #f3f4f6);
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+    
+    .form-group-modern .help-text {
+        font-size: 0.75rem;
+        color: var(--text-light, #6b7280);
+        margin-top: 0.35rem;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .form-group-modern .help-text a {
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    
+    .form-group-modern .help-text a:hover {
+        text-decoration: underline;
+    }
+    
+    .telegram-info-box {
+        background: rgba(0, 136, 204, 0.05);
+        border: 1px solid rgba(0, 136, 204, 0.2);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-top: 1rem;
+    }
+    
+    .telegram-info-box h6 {
+        font-weight: 600;
+        color: #0088cc;
+        margin-bottom: 0.75rem;
+        font-size: 0.85rem;
+    }
+    
+    .telegram-info-box ol {
+        margin: 0;
+        padding-left: 1.25rem;
+        font-size: 0.8rem;
+        color: var(--text-light, #6b7280);
+    }
+    
+    .telegram-info-box ol li {
+        margin-bottom: 0.35rem;
+    }
+    
+    .telegram-info-box code {
+        background: rgba(0,0,0,0.05);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+    }
+    
+    /* Admin badge */
+    .admin-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+        font-size: 0.65rem;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-weight: 600;
+        margin-left: 8px;
+        vertical-align: middle;
+    }
+    
+    /* Locked section */
+    .locked-section {
+        position: relative;
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    .locked-section::after {
+        content: '🔒 Apenas administrador';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        z-index: 10;
+        white-space: nowrap;
+    }
+    
+    .btn-save {
+        width: 100%;
+        padding: 14px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+    
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px color-mix(in srgb, var(--primary) 40%, transparent);
+    }
+    
+    .btn-save:active {
+        transform: translateY(0);
+    }
+    
+    .btn-save:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+    
+    .btn-cancel {
+        width: 100%;
+        padding: 14px;
+        background: transparent;
+        color: var(--text, #1f2937);
+        border: 2px solid var(--border, #e5e7eb);
+        border-radius: 12px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-top: 0.75rem;
+    }
+    
+    .btn-cancel:hover {
+        background: var(--bg-hover, #f3f4f6);
+        border-color: var(--text-light, #9ca3af);
+    }
+    
+    .alert-float {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        padding: 16px 24px;
+        border-radius: 12px;
+        color: white;
+        font-weight: 500;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        animation: slideDown 0.3s ease;
+        max-width: 400px;
+    }
+    
+    .alert-float.success {
+        background: linear-gradient(135deg, #11998e, #38ef7d);
+    }
+    
+    .alert-float.error {
+        background: linear-gradient(135deg, #eb3349, #f45c43);
+    }
+    
+    .alert-float.info {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    }
+    
+    @keyframes slideDown {
+        from { transform: translateY(-100px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    
+    @media (max-width: 768px) {
+        .config-card-body {
+            padding: 1.25rem;
+        }
+        
+        .config-card-header {
+            padding: 1.5rem;
+        }
+        
+        .config-card-header h2 {
+            font-size: 1.25rem;
+        }
+    }
+</style>
+
+<div class="config-page">
+    <div class="config-card">
+        <!-- Cabeçalho -->
+        <div class="config-card-header">
+            <h2><i class="fas fa-cogs"></i> Configurações do Sistema</h2>
+            <p>Gerencie suas preferências e integrações</p>
+        </div>
+        
+        <!-- Corpo -->
+        <div class="config-card-body">
+            <form method="post" id="configForm">
+                {% csrf_token %}
+                
+                <!-- Seção WhatsApp -->
+                <div class="config-section">
+                    <div class="section-title">
+                        <i class="fab fa-whatsapp icon-whatsapp"></i>
+                        WhatsApp
+                    </div>
+                    
+                    <div class="form-group-modern">
+                        <label for="id_numero_celular">
+                            <i class="fas fa-mobile-alt"></i> Número de Celular
+                        </label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-phone input-icon"></i>
+                            <input type="text" 
+                                   name="numero_celular" 
+                                   id="id_numero_celular" 
+                                   value="{{ form.numero_celular.value|default:'' }}" 
+                                   placeholder="64981688931"
+                                   oninput="formatarTelefone(this)">
+                        </div>
+                        <span class="help-text">
+                            <i class="fas fa-info-circle"></i>
+                            Digite apenas números com DDD (ex: 11999999999)
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Seção Telegram (APENAS ADMIN) -->
+                {% if request.user.is_staff or request.user.is_superuser %}
+                <div class="config-section">
+                    <div class="section-title">
+                        <i class="fab fa-telegram icon-telegram"></i>
+                        Telegram (Backup)
+                        <span class="admin-badge">ADMIN</span>
+                    </div>
+                    
+                    <div class="form-group-modern">
+                        <label for="id_token_telegram">
+                            <i class="fas fa-key"></i> Token do Bot
+                        </label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-robot input-icon"></i>
+                            <input type="text" 
+                                   name="token_telegram" 
+                                   id="id_token_telegram" 
+                                   value="{{ form.token_telegram.value|default:'' }}" 
+                                   placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+                        </div>
+                        <span class="help-text">
+                            <i class="fas fa-info-circle"></i>
+                            Crie um bot no <a href="https://t.me/BotFather" target="_blank">@BotFather</a>
+                        </span>
+                    </div>
+                    
+                    <div class="form-group-modern">
+                        <label for="id_chave_telegram">
+                            <i class="fas fa-id-card"></i> Chat ID
+                        </label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-hashtag input-icon"></i>
+                            <input type="text" 
+                                   name="chave_telegram" 
+                                   id="id_chave_telegram" 
+                                   value="{{ form.chave_telegram.value|default:'' }}" 
+                                   placeholder="123456789">
+                        </div>
+                        <span class="help-text">
+                            <i class="fas fa-info-circle"></i>
+                            Envie /start para <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>
+                        </span>
+                    </div>
+                    
+                    <!-- Guia rápido -->
+                    <div class="telegram-info-box">
+                        <h6><i class="fas fa-lightbulb"></i> Como configurar o Telegram:</h6>
+                        <ol>
+                            <li>Vá até <code>@BotFather</code> no Telegram</li>
+                            <li>Envie <code>/newbot</code> e siga as instruções</li>
+                            <li>Copie o <strong>token</strong> gerado e cole acima</li>
+                            <li>Vá até <code>@userinfobot</code> e envie <code>/start</code></li>
+                            <li>Copie o <strong>Chat ID</strong> e cole acima</li>
+                            <li>Envie qualquer mensagem para seu bot</li>
+                            <li>Vá na página de Backup e clique em "Testar Conexão"</li>
+                        </ol>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Usuário não-admin vê a seção bloqueada -->
+                <div class="config-section locked-section">
+                    <div class="section-title">
+                        <i class="fab fa-telegram icon-telegram"></i>
+                        Telegram (Backup)
+                        <i class="fas fa-lock" style="color:#f59e0b;font-size:0.8rem;"></i>
+                    </div>
+                    
+                    <div class="form-group-modern">
+                        <label><i class="fas fa-key"></i> Token do Bot</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-robot input-icon"></i>
+                            <input type="text" disabled placeholder="Apenas administrador">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-modern">
+                        <label><i class="fas fa-id-card"></i> Chat ID</label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-hashtag input-icon"></i>
+                            <input type="text" disabled placeholder="Apenas administrador">
+                        </div>
+                    </div>
+                    
+                    <span class="help-text" style="color:#f59e0b;">
+                        <i class="fas fa-lock"></i>
+                        Configuração disponível apenas para administradores
+                    </span>
+                </div>
+                {% endif %}
+                
+                <!-- Seção E-mail -->
+                <div class="config-section">
+                    <div class="section-title">
+                        <i class="fas fa-envelope icon-email"></i>
+                        E-mail
+                    </div>
+                    
+                    <div class="form-group-modern">
+                        <label for="id_email">
+                            <i class="fas fa-at"></i> Endereço de E-mail
+                        </label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-envelope input-icon"></i>
+                            <input type="email" 
+                                   name="email" 
+                                   id="id_email" 
+                                   value="{{ form.email.value|default:'' }}" 
+                                   placeholder="seu@email.com">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Seção Segurança -->
+                <div class="config-section">
+                    <div class="section-title">
+                        <i class="fas fa-shield-alt icon-security"></i>
+                        Segurança
+                    </div>
+                    
+                    <div class="form-group-modern">
+                        <label for="id_senha">
+                            <i class="fas fa-lock"></i> Senha de Acesso
+                        </label>
+                        <div class="input-wrapper">
+                            <i class="fas fa-key input-icon"></i>
+                            <input type="password" 
+                                   name="senha" 
+                                   id="id_senha" 
+                                   value="{{ form.senha.value|default:'' }}" 
+                                   placeholder="••••••••">
+                        </div>
+                        <span class="help-text">
+                            <i class="fas fa-shield-alt"></i>
+                            Mantenha sua senha segura
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Botões -->
+                <button type="submit" class="btn-save" id="btnSave">
+                    <i class="fas fa-save"></i> Salvar Configurações
+                </button>
+                
+                <button type="button" class="btn-cancel" onclick="cancelarAlteracoes()">
+                    <i class="fas fa-undo"></i> Cancelar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+<div id="alertFloat" class="alert-float {% if messages.first.tags == 'success' %}success{% else %}error{% endif %}">
+    {% for message in messages %}
+        {{ message }}
+    {% endfor %}
+</div>
+{% endif %}
+
+<script>
+// Formatar telefone automaticamente
+function formatarTelefone(input) {
+    let value = input.value.replace(/\D/g, '');
+    
+    if (value.length > 0) {
+        if (value.length <= 2) {
+            value = '(' + value;
+        } else if (value.length <= 7) {
+            value = '(' + value.substring(0, 2) + ') ' + value.substring(2);
+        } else if (value.length <= 11) {
+            value = '(' + value.substring(0, 2) + ') ' + value.substring(2, 7) + '-' + value.substring(7);
+        } else {
+            value = '(' + value.substring(0, 2) + ') ' + value.substring(2, 7) + '-' + value.substring(7, 11);
+        }
+    }
+    
+    input.value = value;
+}
+
+// Alert flutuante
+document.addEventListener('DOMContentLoaded', function() {
+    const alertFloat = document.getElementById('alertFloat');
+    if (alertFloat) {
+        setTimeout(() => {
+            alertFloat.style.opacity = '0';
+            alertFloat.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => alertFloat.remove(), 500);
+        }, 3000);
+    }
+});
+
+// Controle de alterações
+let isFormModified = false;
+const form = document.getElementById('configForm');
+const inputs = form.querySelectorAll('input:not(:disabled)');
+
+inputs.forEach(input => {
+    input.addEventListener('input', () => {
+        isFormModified = true;
+    });
+});
+
+async function cancelarAlteracoes() {
+    if (isFormModified) {
+        if (await window.AppUI.confirm("Tem certeza que deseja cancelar as alterações?", {title:'Cancelar alterações'})) {
+            form.reset();
+            isFormModified = false;
+            showToast('Alterações canceladas', 'info');
+        }
+    } else {
+        showToast('Nenhuma alteração foi feita', 'info');
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `alert-float ${type}`;
+    toast.innerHTML = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
+}
+
+// Efeito de loading no botão salvar
+form.addEventListener('submit', function() {
+    const btn = document.getElementById('btnSave');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+    btn.disabled = true;
+});
+</script>
+{% endblock %}

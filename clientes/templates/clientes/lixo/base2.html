@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Clientes{% endblock %}</title>
+    <link rel="icon" href="{% static 'favicon.ico' %}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'css/dashboard.css' %}?v=2">
+    <script>
+      // Função para aplicar o tema baseado no Local Storage
+      function applyTheme() {
+          const theme = localStorage.getItem("theme") || "light"; // Verifica tema salvo ou usa 'light' como padrão
+          document.body.classList.toggle("dark-mode", theme === "dark");
+      }
+
+      // Chamar a função ao carregar o documento
+      document.addEventListener("DOMContentLoaded", applyTheme);
+
+      // Função para alternar e salvar o tema no Local Storage
+      function toggleTheme() {
+          const isDarkMode = document.body.classList.toggle("dark-mode");
+          localStorage.setItem("theme", isDarkMode ? "dark" : "light"); // Salva a preferência no Local Storage
+      }
+  </script>
+</head>
+<body>
+    <!-- Barra superior fixa -->
+    <div class="topbar">
+        <div class="left">
+            <button class="toggle-btn" onclick="toggleMenu()">⮜</button>
+        </div>
+        <div class="center">
+            <span>Usuário logado: {{ user.username }}</span>
+            <span>Data e Hora: <span id="datetime"></span></span>
+            <span>Vencimento: {{ user.data_vencimento|date:"d/m/Y" }}</span>
+        </div>
+        <div class="right">
+            <button onclick="toggleTheme()" id="theme-toggle" title="Trocar Tema">
+                <i class="fas fa-adjust"></i>
+            </button>
+            <i class="fas fa-headset chat-icon" onclick="toggleChatModal()" title="Suporte"></i>
+            <a href="{% url 'logout' %}">Sair</a>
+        </div>
+    </div>
+
+    <!-- Sidebar, Modal de Chat e Conteúdo seguem aqui... -->
+
+</body>
+</html>

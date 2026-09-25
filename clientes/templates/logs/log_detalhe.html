@@ -1,0 +1,638 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho Modernizado -->
+    <div class="content-header mb-4">
+        <div class="breadcrumbs">
+            <a href="{% url 'dashboard' %}" class="breadcrumb-home" title="Dashboard">
+                <i class="fas fa-home"></i>
+            </a>
+            <i class="fas fa-chevron-right breadcrumb-separator mx-2"></i>
+            <a href="{% url 'logs_atividade' %}" class="breadcrumb-link text-decoration-none">
+                Logs de Atividade
+            </a>
+            <i class="fas fa-chevron-right breadcrumb-separator mx-2"></i>
+            <span class="breadcrumb-current text-primary fw-bold">
+                <i class="fas fa-info-circle me-1"></i>Detalhes do Log #{{ log.id }}
+            </span>
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div>
+                <h1 class="display-6 fw-bold text-gradient-primary mb-0">Detalhamento do Log</h1>
+                <p class="text-muted mb-0">
+                    <i class="fas fa-calendar me-1"></i>
+                    {{ log.data_hora|date:"d/m/Y H:i:s" }}
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                {% if log.status == 'sucesso' %}
+                <span class="badge bg-success p-2 fs-6">
+                    <i class="fas fa-check-circle me-1"></i> OPERAÇÃO BEM-SUCEDIDA
+                </span>
+                {% elif log.status == 'falha' %}
+                <span class="badge bg-warning p-2 fs-6">
+                    <i class="fas fa-exclamation-triangle me-1"></i> OPERAÇÃO COM FALHA
+                </span>
+                {% else %}
+                <span class="badge bg-danger p-2 fs-6">
+                    <i class="fas fa-times-circle me-1"></i> ERRO NA OPERAÇÃO
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Coluna Principal -->
+        <div class="col-lg-8">
+            <!-- Card de Informações Gerais -->
+            <div class="card border-0 shadow-lg mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2 text-primary"></i>Informações da Operação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        <!-- Data e Hora -->
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-calendar-alt text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="info-label">Data e Hora</h6>
+                                    <p class="info-value mb-0">{{ log.data_hora|date:"d/m/Y H:i:s" }}</p>
+                                    <small class="text-muted">Horário do servidor</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Usuário Responsável -->
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-user text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="info-label">Usuário Responsável</h6>
+                                    {% if log.usuario %}
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="user-avatar bg-primary text-white rounded-circle">
+                                            {{ log.usuario.username|first|upper }}
+                                        </div>
+                                        <div>
+                                            <p class="info-value mb-0">{{ log.usuario.username }}</p>
+                                            <small class="text-muted">{{ log.usuario.get_full_name|default:"Sem nome" }}</small>
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <p class="info-value mb-0">
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-robot me-1"></i> Sistema Automático
+                                        </span>
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tipo de Ação -->
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-bolt text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="info-label">Tipo de Ação</h6>
+                                    <p class="info-value mb-0">
+                                        <span class="badge bg-info p-2">
+                                            <i class="fas fa-{{ log.get_tipo_acao_display|lower }} me-1"></i>
+                                            {{ log.get_tipo_acao_display }}
+                                        </span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Status da Operação -->
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    {% if log.status == 'sucesso' %}
+                                    <i class="fas fa-check-circle text-success"></i>
+                                    {% elif log.status == 'falha' %}
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    {% else %}
+                                    <i class="fas fa-times-circle text-danger"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <h6 class="info-label">Status da Operação</h6>
+                                    {% if log.status == 'sucesso' %}
+                                    <p class="info-value mb-0 text-success">
+                                        <i class="fas fa-check me-1"></i> Sucesso - Operação concluída
+                                    </p>
+                                    {% elif log.status == 'falha' %}
+                                    <p class="info-value mb-0 text-warning">
+                                        <i class="fas fa-exclamation-triangle me-1"></i> Falha - Operação não concluída
+                                    </p>
+                                    {% else %}
+                                    <p class="info-value mb-0 text-danger">
+                                        <i class="fas fa-times me-1"></i> Erro - Operação com falha crítica
+                                    </p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Modelo Afetado -->
+                        {% if log.modelo_afetado %}
+                        <div class="col-md-6">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-database text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="info-label">Modelo Afetado</h6>
+                                    <p class="info-value mb-0">{{ log.modelo_afetado }}</p>
+                                    {% if log.objeto_id %}
+                                    <small class="text-muted">ID do objeto: {{ log.objeto_id }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Descrição Detalhada -->
+                        <div class="col-12">
+                            <div class="info-card">
+                                <div class="info-icon">
+                                    <i class="fas fa-align-left text-primary"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="info-label">Descrição Detalhada</h6>
+                                    <div class="description-box p-3 bg-light rounded">
+                                        {{ log.descricao|linebreaks }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dados Antes/Depois (se existirem) -->
+            {% if log.dados_antes or log.dados_depois %}
+            <div class="card border-0 shadow-lg mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-exchange-alt me-2 text-primary"></i>Análise das Alterações
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-4">
+                        {% if log.dados_antes %}
+                        <div class="col-lg-6">
+                            <div class="data-card h-100">
+                                <div class="data-card-header bg-danger text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-arrow-left me-2"></i>Dados Antes da Alteração
+                                    </h6>
+                                </div>
+                                <div class="data-card-body">
+                                    <pre class="json-view bg-dark text-light p-3 rounded">{{ log.dados_antes|pprint }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if log.dados_depois %}
+                        <div class="col-lg-6">
+                            <div class="data-card h-100">
+                                <div class="data-card-header bg-success text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-arrow-right me-2"></i>Dados Após a Alteração
+                                    </h6>
+                                </div>
+                                <div class="data-card-body">
+                                    <pre class="json-view bg-dark text-light p-3 rounded">{{ log.dados_depois|pprint }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Coluna Lateral -->
+        <div class="col-lg-4">
+            <!-- Card de Informações Técnicas -->
+            <div class="card border-0 shadow-lg mb-4">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-server me-2 text-primary"></i>Informações Técnicas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="tech-info-list">
+                        <!-- Endereço IP -->
+                        <div class="tech-info-item">
+                            <div class="tech-icon">
+                                <i class="fas fa-network-wired"></i>
+                            </div>
+                            <div>
+                                <h6>Endereço IP</h6>
+                                <p class="mb-0">
+                                    <code class="bg-light p-1 rounded">{{ log.ip_address|default:"Não registrado" }}</code>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- User Agent -->
+                        {% if log.user_agent %}
+                        <div class="tech-info-item">
+                            <div class="tech-icon">
+                                <i class="fas fa-desktop"></i>
+                            </div>
+                            <div>
+                                <h6>Dispositivo & Navegador</h6>
+                                <p class="mb-0 small">{{ log.user_agent|truncatechars:100 }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Método HTTP -->
+                        {% if log.metodo_http %}
+                        <div class="tech-info-item">
+                            <div class="tech-icon">
+                                <i class="fas fa-code"></i>
+                            </div>
+                            <div>
+                                <h6>Método HTTP</h6>
+                                <p class="mb-0">
+                                    <span class="badge bg-info">{{ log.metodo_http }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- URL Acessada -->
+                        {% if log.url_acessada %}
+                        <div class="tech-info-item">
+                            <div class="tech-icon">
+                                <i class="fas fa-link"></i>
+                            </div>
+                            <div>
+                                <h6>URL Acessada</h6>
+                                <p class="mb-0 small">
+                                    <a href="{{ log.url_acessada }}" target="_blank" class="text-truncate d-block">
+                                        {{ log.url_acessada|truncatechars:50 }}
+                                    </a>
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Duração -->
+                        {% if log.duracao %}
+                        <div class="tech-info-item">
+                            <div class="tech-icon">
+                                <i class="fas fa-stopwatch"></i>
+                            </div>
+                            <div>
+                                <h6>Tempo de Execução</h6>
+                                <p class="mb-0">
+                                    <span class="badge bg-primary">{{ log.duracao|floatformat:3 }} segundos</span>
+                                </p>
+                                {% if log.duracao > 1 %}
+                                <small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    Tempo acima da média
+                                </small>
+                                {% else %}
+                                <small class="text-success">
+                                    <i class="fas fa-check me-1"></i>
+                                    Tempo dentro do esperado
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- ID do Log -->
+                        <div class="tech-info-item">
+                            <div class="tech-icon">
+                                <i class="fas fa-fingerprint"></i>
+                            </div>
+                            <div>
+                                <h6>Identificador Único</h6>
+                                <p class="mb-0">
+                                    <code class="bg-light p-1 rounded">#{{ log.id }}</code>
+                                </p>
+                                <small class="text-muted">Referência para auditoria</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card de Ações Rápidas -->
+            <div class="card border-0 shadow-lg">
+                <div class="card-header bg-transparent border-0 py-3">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-cog me-2 text-primary"></i>Ações Rápidas
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'logs_atividade' %}" class="btn btn-outline-primary btn-lg">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar para Logs
+                        </a>
+                        
+                        <button class="btn btn-outline-secondary btn-lg" onclick="copyLogInfo()">
+                            <i class="fas fa-copy me-2"></i>Copiar Informações
+                        </button>
+                        
+                        {% if request.user.is_superuser %}
+                        <button class="btn btn-outline-danger btn-lg" onclick="deleteLog()">
+                            <i class="fas fa-trash me-2"></i>Excluir Este Log
+                        </button>
+                        {% endif %}
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Este log foi gerado automaticamente pelo sistema
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos Específicos para a Página de Detalhes */
+.info-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+
+
+.info-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.info-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.info-label {
+    font-size: 0.875rem;
+    color: var(--text-light);
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: var(--text);
+    font-weight: 500;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.description-box {
+    border-left: 4px solid var(--primary);
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+.data-card {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.data-card-header {
+    padding: 1rem;
+    font-weight: 600;
+}
+
+.data-card-body {
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.json-view {
+    font-size: 0.85rem;
+    font-family: 'Courier New', monospace;
+    line-height: 1.4;
+}
+
+.tech-info-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.tech-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+}
+
+.tech-info-item:hover {
+    background: var(--bg-hover);
+}
+
+.tech-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--primary) 10%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.tech-info-item h6 {
+    font-size: 0.875rem;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+}
+
+.text-gradient-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+}
+</style>
+
+<script>
+// Funções para a página de detalhes
+function copyLogInfo() {
+    const logInfo = `
+Log ID: #{{ log.id }}
+Data/Hora: {{ log.data_hora|date:"d/m/Y H:i:s" }}
+Usuário: {% if log.usuario %}{{ log.usuario.username }}{% else %}Sistema{% endif %}
+Ação: {{ log.get_tipo_acao_display }}
+Status: {{ log.status }}
+Descrição: {{ log.descricao }}
+IP: {{ log.ip_address|default:"Não registrado" }}
+    `.trim();
+    
+    navigator.clipboard.writeText(logInfo).then(() => {
+        showToast('success', 'Informações copiadas para a área de transferência!');
+    }).catch(err => {
+        console.error('Erro ao copiar:', err);
+        showToast('error', 'Erro ao copiar informações');
+    });
+}
+
+async function deleteLog() {
+    if (await window.AppUI.confirm('⚠️ Tem certeza que deseja excluir permanentemente este log?\n\nEsta ação não pode ser desfeita.', {title:'Excluir log', danger:true, confirmText:'Excluir'})) {
+        fetch('{% url "log_delete" log.id %}', {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('success', 'Log excluído com sucesso!');
+                setTimeout(() => {
+                    window.location.href = '{% url "logs_atividade" %}';
+                }, 1500);
+            } else {
+                showToast('error', 'Erro ao excluir log');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showToast('error', 'Erro de conexão');
+        });
+    }
+}
+
+function showToast(type, message) {
+    // Criar elemento de toast
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <div class="toast-content">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+            ${message}
+        </div>
+    `;
+    
+    // Adicionar ao body
+    document.body.appendChild(toast);
+    
+    // Mostrar toast
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Remover após 3 segundos
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Estilos para o toast
+const toastStyles = document.createElement('style');
+toastStyles.textContent = `
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    border-left: 4px solid var(--primary);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast.success {
+    border-left-color: var(--success);
+}
+
+.toast.error {
+    border-left-color: var(--danger);
+}
+
+.toast-content {
+    display: flex;
+    align-items: center;
+}
+`;
+document.head.appendChild(toastStyles);
+
+// Inicializar tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    // Tooltips do Bootstrap (se estiver usando)
+    if (typeof bootstrap !== 'undefined') {
+        var tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltips.forEach(function(tooltip) {
+            new bootstrap.Tooltip(tooltip);
+        });
+    }
+});
+</script>
+{% endblock %}

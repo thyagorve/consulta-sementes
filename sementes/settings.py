@@ -46,16 +46,23 @@ INSTALLED_APPS = [
 
 # Definição de permissões disponíveis no sistema
 PERMISSIONS_CONFIG = {
+    'pode_ver_dashboard': 'Pode acessar o dashboard',
     'pode_ver_estoque': 'Pode visualizar estoque',
     'pode_movimentar_estoque': 'Pode movimentar estoque',
     'pode_ver_almoxarifado': 'Pode visualizar almoxarifado',
     'pode_gerenciar_almoxarifado': 'Pode gerenciar almoxarifado',
-    'pode_ver_empenhos': 'Pode visualizar empenhos',
+    'pode_ver_empenhos': 'Pode visualizar solicitações/empenhos',
     'pode_criar_empenhos': 'Pode criar empenhos',
+    'pode_criar_solicitacao': 'Pode criar solicitação',
+    'pode_empenhar_solicitacao': 'Pode empenhar itens em solicitação',
+    'pode_movimentar_solicitacao': 'Pode transferir/expedir solicitação',
+    'pode_cancelar_solicitacao': 'Pode cancelar solicitação',
     'pode_ver_mapa': 'Pode acessar mapa canvas',
     'pode_gerenciar_usuarios': 'Pode gerenciar usuários',
     'pode_configuracoes': 'Pode alterar configurações',
 }
+
+DEFAULT_NEW_USER_PASSWORD = env('DEFAULT_NEW_USER_PASSWORD', default='conceito123')
 
 
 # ========== API OFFLINE / JWT ==========

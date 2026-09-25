@@ -1,0 +1,72 @@
+INFINITY STOCK V12 — VISUAL PREMIUM + DASHBOARD MULTIUNIDADE
+=============================================================
+Base: V11.14 (código/tratamento)
+
+OBJETIVO
+--------
+Unificar a identidade visual do sistema sem alterar as regras operacionais já
+estabilizadas, melhorar a responsividade e tornar os gráficos mais úteis para
+o operador.
+
+PRINCIPAIS MUDANÇAS
+-------------------
+1. Design system global em /sapp/static/css/infinity-v12.css
+   - paleta unificada;
+   - tipografia e hierarquia consistentes;
+   - cards, botões, formulários, tabelas, modais e badges padronizados;
+   - navbar premium;
+   - responsividade refinada para desktop, notebook, tablet e celular;
+   - redução de enfeites sem função e sombras excessivas;
+   - modo de movimento reduzido respeitado pelo navegador.
+
+2. Dashboard
+   - estoque principal agora destaca BAG + SC físicos;
+   - equivalente em SC permanece como informação secundária;
+   - entradas e expedições mostram BAG + SC físicos nos KPIs;
+   - gráficos de cultivar, peneira, armazém, transferências e fluxo ganham
+     alternância de unidade: Eq. SC -> BAG -> SC;
+   - o modelo do gráfico continua alternável por botão;
+   - tooltips mostram unidade selecionada e composição física;
+   - insights informam o destaque e a composição BAG/SC;
+   - gráfico de carregamentos também alterna Eq. SC -> BAG -> SC;
+   - assinatura/marca visual invasiva removida dos gráficos.
+
+3. Páginas operacionais
+   - Kanban, Gestão de Cargas, Estoque, Solicitações, Histórico, Configurações,
+     Inventário e Almoxarifado recebem a mesma camada visual global;
+   - Lista de Armazéns deixa o visual antigo escuro e passa a conversar com a
+     identidade principal, sem alterar o canvas/mapa operacional;
+   - Login refinado.
+
+4. Offline/cache
+   - Service Worker atualizado para infinity-stock-v12-shell-1;
+   - novo CSS global incluído no cache estático;
+   - offline-sync versionado como v12.0-visual.
+
+BANCO DE DADOS
+--------------
+Nenhuma migration nova.
+
+VALIDAÇÕES REALIZADAS
+---------------------
+- python -m py_compile sapp/views.py
+- python -m compileall sapp almoxarifado sementes
+- node --check do JavaScript consolidado do dashboard
+- node --check sapp/static/js/service-worker.js
+- parsing do CSS com tinycss2 sem erros
+
+DEPLOY
+------
+1. Faça backup do projeto e banco como de costume.
+2. Suba a V12.
+3. Rode: python manage.py migrate
+   (não há migration nova da V12, mas mantém segurança no deploy)
+4. Rode collectstatic.
+5. Reinicie/rebuild o serviço.
+6. Faça Ctrl + F5 uma vez nos navegadores principais para trocar o cache V11
+   pelo shell V12.
+
+OBSERVAÇÃO
+----------
+A V12 é uma camada visual e analítica. As regras de estoque, empenho, filas,
+cargas e auditoria da base V11.14 foram preservadas.

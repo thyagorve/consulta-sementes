@@ -1,0 +1,426 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+:root{
+  --pl-primary:var(--primary-color,#2f8f4e);
+  --pl-primary-dark:var(--primary-dark,#246f3c);
+  --pl-primary-soft:color-mix(in srgb,var(--pl-primary) 12%,transparent);
+  --pl-card:var(--card-bg,#fff);
+  --pl-bg:var(--body-bg,#f4f7f5);
+  --pl-text:var(--text-color,#17201a);
+  --pl-muted:var(--text-muted,#667085);
+  --pl-border:var(--border-color,#e1e8e3);
+  --pl-danger:#dc3545;
+  --pl-info:#2563eb;
+  --pl-success:#198754;
+  --pl-warning:#d97706;
+}
+*{box-sizing:border-box}
+.pl-page{max-width:1500px;margin:auto;padding:18px;color:var(--pl-text)}
+.pl-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:24px;margin-bottom:16px;border:1px solid var(--pl-border);border-radius:22px;background:radial-gradient(circle at 95% 10%,var(--pl-primary-soft),transparent 34%),var(--pl-card);box-shadow:0 12px 32px rgba(21,39,27,.08)}
+.pl-kicker{margin-bottom:7px;color:var(--pl-primary);font-size:.77rem;font-weight:850;text-transform:uppercase;letter-spacing:.08em}
+.pl-title{margin:0;font-size:clamp(1.5rem,3vw,2.2rem);font-weight:850}
+.pl-sub{margin:8px 0 0;color:var(--pl-muted);line-height:1.5}
+.pl-hero-actions,.pl-actions,.pl-expanded-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pl-hero-actions{justify-content:flex-end;min-width:min(100%,490px)}
+.pl-search{display:flex;flex:1 1 290px;min-width:260px;border:1px solid var(--pl-border);border-radius:12px;overflow:hidden;background:var(--pl-card)}
+.pl-search:focus-within{border-color:var(--pl-primary);box-shadow:0 0 0 4px var(--pl-primary-soft)}
+.pl-search input{width:100%;min-width:0;padding:11px 13px;border:0;outline:0;background:transparent;color:var(--pl-text)}
+.pl-search button{padding:0 15px;border:0;border-left:1px solid var(--pl-border);background:var(--pl-bg);cursor:pointer}
+.pl-btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 13px;border:1px solid transparent;border-radius:11px;font-weight:750;cursor:pointer;white-space:nowrap;transition:.16s}
+.pl-btn:hover{transform:translateY(-1px);filter:brightness(.98)}
+.pl-btn:disabled{opacity:.62;cursor:wait;transform:none}
+.pl-primary{background:var(--pl-primary);color:#fff}.pl-secondary{border-color:var(--pl-border);background:var(--pl-card);color:var(--pl-text)}
+.pl-success{background:var(--pl-success);color:#fff}.pl-info{background:color-mix(in srgb,var(--pl-info) 12%,transparent);color:var(--pl-info)}
+.pl-danger{background:color-mix(in srgb,var(--pl-danger) 11%,transparent);color:var(--pl-danger)}.pl-dark{background:#1f2937;color:#fff}
+.pl-device-list{display:grid;gap:10px}.pl-device{overflow:hidden;border:1px solid var(--pl-border);border-radius:17px;background:var(--pl-card);box-shadow:0 4px 15px rgba(21,39,27,.05)}
+.pl-device-head{display:grid;grid-template-columns:auto minmax(220px,1.35fr) minmax(160px,.65fr) minmax(220px,1fr);gap:14px;align-items:center;padding:13px 15px;cursor:pointer}.pl-device-head:hover{background:color-mix(in srgb,var(--pl-primary) 3%,transparent)}
+.pl-toggle{width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-bg);color:var(--pl-primary);cursor:pointer}
+.pl-toggle span{transition:.2s}.pl-device.open .pl-toggle span{transform:rotate(90deg)}
+.pl-device-name{display:flex;align-items:center;gap:11px;min-width:0}.pl-avatar{width:46px;height:46px;display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--pl-border);border-radius:14px;background:var(--pl-primary-soft);color:var(--pl-primary);font-weight:900;overflow:hidden}
+.pl-avatar img{width:100%;height:100%;object-fit:cover;background:#fff}.pl-avatar img[hidden]{display:none}.pl-provider-name{margin-top:3px;color:var(--pl-muted);font-size:.8rem}
+.pl-ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pl-label{margin-bottom:4px;color:var(--pl-muted);font-size:.7rem;font-weight:850;text-transform:uppercase;letter-spacing:.055em}.pl-muted{color:var(--pl-muted);font-size:.82rem;line-height:1.35}
+.pl-device-body{display:none;padding:12px;border-top:1px solid var(--pl-border);background:var(--pl-bg)}.pl-device.open .pl-device-body{display:block}.pl-device-details{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;margin-bottom:10px;padding:12px;border:1px solid var(--pl-border);border-radius:13px;background:var(--pl-card)}.pl-device-facts{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:10px}.pl-device-fact{min-width:0;padding:8px 10px;border-radius:10px;background:var(--pl-bg)}.pl-device-tools{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.pl-device-tools .pl-btn{min-height:38px;padding:7px 10px;font-size:.78rem}
+.pl-expanded-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px;padding:10px 11px;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-card)}
+.pl-expanded-info{min-width:0}.pl-expanded-info strong{display:block;font-size:.86rem}.pl-expanded-info span{display:block;margin-top:2px;color:var(--pl-muted);font-size:.73rem}.pl-expanded-actions{justify-content:flex-end}
+.pl-playlists{display:grid;gap:9px}.pl-playlist{display:grid;grid-template-columns:minmax(220px,1.35fr) minmax(130px,.5fr) minmax(150px,.65fr) auto;gap:14px;align-items:center;padding:11px 12px;border:1px solid var(--pl-border);border-radius:13px;background:var(--pl-card)}
+.pl-tags{display:flex;gap:6px;flex-wrap:wrap}.pl-badge{display:inline-flex;padding:5px 8px;border-radius:999px;background:var(--pl-bg);color:var(--pl-muted);font-size:.71rem;font-weight:850}.status-ativo{background:#dcfce7;color:#166534}.status-erro{background:#fee2e2;color:#991b1b}.status-rascunho,.status-confirmacao_pendente{background:#fef3c7;color:#92400e}.status-nao_encontrada,.status-excluida{background:#e5e7eb;color:#374151}
+.pl-id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem}.pl-empty{padding:28px 16px;border:1px dashed var(--pl-border);border-radius:14px;text-align:center;color:var(--pl-muted);background:var(--pl-card)}.pl-empty strong{display:block;margin-bottom:5px;color:var(--pl-text)}
+.pl-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(13,24,17,.62);backdrop-filter:blur(5px);overflow:hidden}.pl-modal.show{display:flex}.pl-dialog{width:min(820px,100%);max-height:min(92vh,900px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--pl-border);border-radius:21px;background:var(--pl-card);box-shadow:0 28px 85px rgba(0,0,0,.24)}.pl-dialog.small,.pl-dialog-small{width:min(520px,100%)}.pl-dialog>form{display:flex;flex-direction:column;min-height:0;max-height:min(92vh,900px)}
+.pl-modal-head{display:flex;justify-content:space-between;gap:15px;flex:0 0 auto;padding:18px 20px 14px;border-bottom:1px solid var(--pl-border)}.pl-modal-head h2{margin:0;font-size:1.15rem}.pl-modal-head p{margin:5px 0 0;color:var(--pl-muted);font-size:.82rem}.pl-close{width:38px;height:38px;flex:0 0 auto;border:1px solid var(--pl-border);border-radius:10px;background:var(--pl-bg);cursor:pointer}.pl-modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:18px 20px;overscroll-behavior:contain}.pl-modal-foot{display:flex;justify-content:flex-end;gap:8px;flex:0 0 auto;padding:13px 20px;border-top:1px solid var(--pl-border);background:var(--pl-card);box-shadow:0 -8px 18px rgba(21,39,27,.05)}
+.pl-section{margin-bottom:18px}.pl-section:last-child{margin-bottom:0}.pl-section-title{margin:0 0 11px;color:var(--pl-primary-dark);font-size:.86rem;font-weight:850}.pl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pl-field.full{grid-column:1/-1}.pl-field label{display:block;margin-bottom:6px;font-size:.79rem;font-weight:800}.pl-hint{color:var(--pl-muted);font-size:.71rem;font-weight:500}.pl-control{width:100%;min-height:43px;padding:10px 11px;border:1px solid var(--pl-border);border-radius:10px;outline:0;background:var(--pl-card);color:var(--pl-text)}textarea.pl-control{min-height:82px;resize:vertical}.pl-control:focus{border-color:var(--pl-primary);box-shadow:0 0 0 4px var(--pl-primary-soft)}.pl-field-help,.pl-help{display:block;margin-top:6px;color:var(--pl-muted);font-size:.72rem;line-height:1.4}.pl-input-password{position:relative}.pl-input-password .pl-control{padding-right:46px}.pl-password-toggle{position:absolute;top:50%;right:7px;width:34px;height:34px;border:0;border-radius:8px;background:transparent;cursor:pointer;transform:translateY(-50%)}.pl-password-toggle:hover{background:rgba(15,23,42,.08)}
+.pl-switch{display:flex!important;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--pl-border);border-radius:11px;background:var(--pl-bg)}.pl-switch input{width:18px;height:18px;accent-color:var(--pl-primary)}.pl-switch strong{display:block;font-size:.81rem}.pl-switch small{display:block;color:var(--pl-muted);font-weight:500}.pl-warning{padding:12px;border:1px solid #fed7aa;border-radius:11px;background:#fff7ed;color:#9a3412;font-size:.8rem;line-height:1.45}.pl-delete-warning{display:flex;align-items:flex-start;gap:14px;padding:16px;border:1px solid #fecaca;border-radius:12px;background:#fff7f7}.pl-delete-icon{font-size:25px}.pl-delete-warning p{margin:5px 0 0;color:var(--pl-muted)}.pl-confirm-check{display:flex;align-items:flex-start;gap:10px;margin-top:18px;cursor:pointer}.pl-confirm-check input{margin-top:3px}.hidden{display:none!important}
+.pl-history{display:grid;gap:8px}.pl-history-item{padding:11px;border:1px solid var(--pl-border);border-radius:11px;background:var(--pl-bg)}.pl-history-head{display:flex;justify-content:space-between;gap:9px;margin-bottom:5px}.pl-history-item p{margin:0;color:var(--pl-muted);font-size:.8rem}.pl-time{color:var(--pl-muted);font-size:.71rem;white-space:nowrap}.pl-toasts{position:fixed;right:18px;top:18px;z-index:12000;width:min(390px,calc(100vw - 36px));display:grid;gap:8px}.pl-toast{display:grid;grid-template-columns:auto 1fr auto;gap:9px;padding:12px;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-card);box-shadow:0 18px 45px rgba(0,0,0,.16)}.pl-toast.success{border-left:4px solid var(--pl-success)}.pl-toast.error{border-left:4px solid var(--pl-danger)}.pl-toast button{border:0;background:transparent;cursor:pointer}.pl-spinner{width:15px;height:15px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:1100px){.pl-device-head{grid-template-columns:auto minmax(180px,1fr) minmax(130px,.6fr)}.pl-device-message{grid-column:2/-1}.pl-device-details{grid-template-columns:1fr}.pl-device-tools{justify-content:flex-start}.pl-playlist{grid-template-columns:minmax(190px,1fr) minmax(130px,.55fr) auto}.pl-id-block{grid-column:1/3}}
+@media(max-width:760px){.pl-page{padding:8px}.pl-hero{align-items:stretch;flex-direction:column;padding:16px;border-radius:16px}.pl-title{font-size:1.45rem}.pl-sub{font-size:.86rem}.pl-hero-actions{min-width:0;justify-content:stretch}.pl-search{min-width:0;flex-basis:100%}.pl-hero-actions>.pl-btn{flex:1;min-height:40px}.pl-device-list{gap:8px}.pl-device{border-radius:14px}.pl-device-head{grid-template-columns:38px minmax(0,1fr);gap:9px;padding:10px}.pl-toggle{width:38px;height:38px;border-radius:10px}.pl-avatar{width:40px;height:40px;border-radius:11px}.pl-device-name{gap:9px}.pl-device-name strong{font-size:.9rem}.pl-provider-name{font-size:.72rem}.pl-device-meta,.pl-device-message{grid-column:2/-1}.pl-device-meta{display:none}.pl-device-message .pl-label{display:none}.pl-device-message .pl-muted{display:-webkit-box;overflow:hidden;-webkit-line-clamp:1;-webkit-box-orient:vertical;font-size:.73rem}.pl-device-body{padding:7px}.pl-device-details{grid-template-columns:1fr;gap:9px;margin-bottom:8px;padding:9px}.pl-device-facts{grid-template-columns:1fr 1fr;gap:7px}.pl-device-fact{padding:7px 8px}.pl-device-fact:last-child{grid-column:1/-1}.pl-device-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}.pl-device-tools .pl-btn{min-width:0;min-height:36px;padding:6px 7px;font-size:.72rem;border-radius:9px}.pl-expanded-toolbar{align-items:stretch;flex-direction:column;gap:8px;margin-bottom:8px;padding:9px}.pl-expanded-info span{display:none}.pl-expanded-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.pl-expanded-actions .pl-btn{min-height:38px;padding:7px 8px;font-size:.75rem}.pl-playlist{grid-template-columns:1fr;gap:7px;padding:9px;border-radius:11px}.pl-playlist>.pl-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}.pl-playlist>.pl-actions .pl-btn{min-width:0;min-height:35px;padding:6px 5px;font-size:.7rem;border-radius:8px}.pl-id-block{grid-column:auto}.pl-tags{gap:4px}.pl-badge{padding:4px 6px;font-size:.65rem}.pl-modal{align-items:flex-end;padding:0;height:100dvh}.pl-dialog,.pl-dialog.small,.pl-dialog-small,.pl-dialog>form{width:100%;max-height:96dvh;border-radius:21px 21px 0 0}.pl-modal-head,.pl-modal-body{padding-left:15px;padding-right:15px}.pl-modal-foot{flex-wrap:wrap;padding:11px 15px max(11px,env(safe-area-inset-bottom))}.pl-modal-foot .pl-btn{flex:1 1 145px}.pl-grid{grid-template-columns:1fr}.pl-field.full{grid-column:auto}}
+@media(max-width:430px){.pl-avatar{display:none}.pl-device-head{grid-template-columns:36px minmax(0,1fr)}.pl-device-facts{grid-template-columns:1fr}.pl-device-fact:last-child{grid-column:auto}.pl-device-tools{grid-template-columns:1fr 1fr}.pl-device-tools .pl-btn:last-child{grid-column:1/-1}.pl-playlist>.pl-actions{grid-template-columns:1fr 1fr}.pl-playlist>.pl-actions .pl-btn:last-child:nth-child(odd){grid-column:1/-1}.pl-modal-foot .pl-btn{flex-basis:100%}}
+
+/* Substituição remota manual */
+.pl-warning-pending{border-color:#fde68a;background:#fffbeb;color:#92400e}
+.pl-btn-pending{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+.pl-btn-pending:hover{background:#fef3c7}
+.pl-replace-summary{display:grid;gap:10px;padding:14px;border:1px solid var(--pl-border);border-radius:13px;background:var(--pl-bg)}
+.pl-replace-summary strong{font-size:.9rem}.pl-replace-summary p{margin:0;color:var(--pl-muted);font-size:.8rem;line-height:1.45}
+@media(max-width:760px){.pl-btn-pending{flex:1 1 100%}.pl-playlist .pl-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.pl-playlist .pl-actions .pl-btn{min-height:38px;padding:7px 9px;font-size:.76rem}.pl-playlist .pl-actions .pl-btn-pending{grid-column:1/-1}}
+
+
+/* Tabela expansível de dispositivos */
+.pl-device-table{display:block;border:1px solid var(--pl-border);border-radius:16px;background:var(--pl-card);overflow-y:auto;overflow-x:hidden}
+.pl-table-head,.pl-device-head{display:grid;grid-template-columns:52px minmax(190px,1.25fr) minmax(130px,.75fr) minmax(170px,.85fr) 90px minmax(220px,1.2fr);align-items:center;gap:12px}
+.pl-table-head{position:sticky;top:0;z-index:8;padding:11px 14px;border-bottom:1px solid var(--pl-border);background:var(--pl-bg);color:var(--pl-muted);font-size:.7rem;font-weight:850;text-transform:uppercase;letter-spacing:.055em}
+.pl-device{border:0;border-bottom:1px solid var(--pl-border);border-radius:0;box-shadow:none;overflow:visible}
+.pl-device:last-child{border-bottom:0}
+.pl-device-head{padding:11px 14px;cursor:pointer;background:var(--pl-card)}
+.pl-device-head:hover{background:color-mix(in srgb,var(--pl-primary) 4%,var(--pl-card))}
+.pl-device.open>.pl-device-head{background:color-mix(in srgb,var(--pl-primary) 7%,var(--pl-card))}
+.pl-device-body{border-top:1px solid var(--pl-border);padding:12px 14px 14px;background:var(--pl-bg)}
+.pl-table-cell{min-width:0;font-size:.82rem}
+.pl-count-badge{display:inline-flex;min-width:30px;height:27px;align-items:center;justify-content:center;padding:0 8px;border-radius:999px;background:var(--pl-soft);color:var(--pl-primary-dark);font-weight:850}
+.pl-device-name .pl-avatar{width:36px;height:36px;border-radius:10px}
+.pl-device-name strong{font-size:.86rem}
+.pl-device-message .pl-muted{display:-webkit-box;overflow:hidden;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.pl-device-head:focus-visible{outline:3px solid var(--pl-soft);outline-offset:-3px}
+
+@media(max-width:1050px){
+ .pl-table-head,.pl-device-head{grid-template-columns:48px minmax(180px,1.2fr) minmax(120px,.7fr) minmax(150px,.8fr) 76px}
+ .pl-table-head>div:last-child,.pl-device-head>.pl-device-message{display:none}
+}
+@media(max-width:760px){
+ .pl-device-table{border-radius:13px}
+ .pl-table-head{display:none}
+ .pl-device{border-bottom:1px solid var(--pl-border)}
+ .pl-device-head{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:9px;padding:10px}
+ .pl-device-head>.pl-device-name{grid-column:2}
+ .pl-device-head>.pl-table-cell{display:none}
+ .pl-device-head>.pl-table-cell[data-label="Playlists"]{display:flex;grid-column:3;align-items:center;justify-content:flex-end}
+ .pl-device-name .pl-avatar{width:36px;height:36px}
+ .pl-count-badge{min-width:27px;height:25px;font-size:.72rem}
+ .pl-device-body{padding:8px}
+}
+</style>
+
+<div class="pl-page">
+  <header class="pl-hero">
+    <div>
+      <div class="pl-kicker">◉ Integrações de aplicativos</div>
+      <h1 class="pl-title">Gerenciador de playlists</h1>
+      <p class="pl-sub">Cadastre dispositivos, importe listas existentes e gerencie cada playlist individualmente.</p>
+    </div>
+    <div class="pl-hero-actions">
+      <form class="pl-search" method="get">
+        <input type="search" name="termo" value="{{ termo }}" placeholder="Nome, MAC, playlist ou ID remoto">
+        <button type="submit" title="Pesquisar" aria-label="Pesquisar">⌕</button>
+      </form>
+      <button type="button" class="pl-btn pl-primary" data-new-device>＋ Novo dispositivo</button>
+    </div>
+  </header>
+
+  <main class="pl-device-list pl-device-table">
+    <div class="pl-table-head" aria-hidden="true">
+      <div></div>
+      <div>Dispositivo</div>
+      <div>Aplicativo</div>
+      <div>MAC Address</div>
+      <div>Playlists</div>
+      <div>Situação</div>
+    </div>
+
+    {% for integracao in integracoes %}
+    <section class="pl-device" id="device-{{ integracao.id }}">
+      <div class="pl-device-head" role="button" tabindex="0" aria-controls="device-body-{{ integracao.id }}">
+        <button type="button" class="pl-toggle" data-toggle aria-expanded="false" aria-controls="device-body-{{ integracao.id }}"><span>▶</span></button>
+
+        <div class="pl-device-name" data-label="Dispositivo">
+          <div class="pl-avatar" data-provider-avatar="{{ integracao.provedor|escape }}">
+            <img alt="" hidden>
+            <span>{{ integracao.nome_exibicao|default:'D'|slice:':1'|upper }}</span>
+          </div>
+          <div class="pl-ellipsis"><strong class="pl-ellipsis">{{ integracao.nome_exibicao }}</strong></div>
+        </div>
+
+        <div class="pl-table-cell" data-label="Aplicativo">
+          <span class="pl-provider-name">{{ integracao.provedor_nome_view|default:integracao.get_provedor_display }}</span>
+        </div>
+
+        <div class="pl-table-cell" data-label="MAC Address">
+          <span class="pl-ellipsis" title="{{ integracao.mac_address|default:'' }}">{{ integracao.mac_address|default:'Não informado' }}</span>
+        </div>
+
+        <div class="pl-table-cell" data-label="Playlists">
+          <span class="pl-count-badge">{{ integracao.playlists.count }}</span>
+        </div>
+
+        <div class="pl-device-message pl-table-cell" data-label="Situação">
+          <div class="pl-muted">{{ integracao.ultima_mensagem|default:'Ainda não sincronizado.' }}</div>
+        </div>
+      </div>
+
+      <div class="pl-device-body" id="device-body-{{ integracao.id }}">
+        <div class="pl-device-details">
+          <div class="pl-device-facts">
+            <div class="pl-device-fact"><div class="pl-label">MAC Address</div><div class="pl-ellipsis" title="{{ integracao.mac_address|default:'' }}">{{ integracao.mac_address|default:'Não informado' }}</div></div>
+            <div class="pl-device-fact"><div class="pl-label">Aplicativo</div><div class="pl-ellipsis">{{ integracao.provedor_nome_view|default:integracao.get_provedor_display }}</div></div>
+            <div class="pl-device-fact"><div class="pl-label">Situação</div><div class="pl-muted">{{ integracao.ultima_mensagem|default:'Ainda não sincronizado.' }}</div></div>
+          </div>
+          <div class="pl-device-tools">
+            <button type="button" class="pl-btn pl-secondary" data-edit-device data-id="{{ integracao.id }}" data-name="{{ integracao.nome_avulso|default:''|escape }}" data-client="{{ integracao.cliente_id|default:'' }}" data-provider="{{ integracao.provedor|escape }}" data-mac="{{ integracao.mac_address|default:''|escape }}" data-key="{{ integracao.device_key|default:''|escape }}">✎ Editar</button>
+            <button type="button" class="pl-btn pl-dark" data-history="{% url 'historico_integracao_playlist' integracao.id %}">◷ Histórico</button>
+            <button type="button" class="pl-btn pl-danger" data-delete-device data-name="{{ integracao.nome_exibicao|default:integracao.nome_avulso|escape }}" data-playlists="{{ integracao.playlists.count }}" data-url="{% url 'excluir_dispositivo_playlist' integracao.id %}">🗑 Excluir</button>
+          </div>
+        </div>
+
+        <div class="pl-expanded-toolbar">
+          <div class="pl-expanded-info"><strong>Playlists deste dispositivo</strong><span>Cadastre uma nova lista ou importe as existentes do aplicativo.</span></div>
+          <div class="pl-expanded-actions">
+            <button type="button" class="pl-btn pl-secondary" data-pull-lists data-url="{% url 'puxar_listas_integracao' integracao.id %}" data-device-name="{{ integracao.nome_exibicao|default:'Dispositivo'|escape }}" data-provider="{{ integracao.provedor|escape }}">↻ Puxar listas</button>
+            <button type="button" class="pl-btn pl-primary" data-new-playlist="{{ integracao.id }}" data-create-url="{% url 'criar_playlist_local' integracao.id %}">＋ Nova lista</button>
+          </div>
+        </div>
+
+        <div class="pl-playlists">
+          {% for playlist in integracao.playlists.all %}
+          <article class="pl-playlist">
+            <div class="pl-ellipsis"><strong class="pl-ellipsis">{{ playlist.nome }}</strong>{% if playlist.nome_remoto and playlist.nome_remoto != playlist.nome %}<div class="pl-muted">Remoto: {{ playlist.nome_remoto }}</div>{% endif %}<div class="pl-muted">{{ playlist.ultima_mensagem|default:'Sem movimentação.' }}</div></div>
+            <div class="pl-tags"><span class="pl-badge status-{{ playlist.status }}">{{ playlist.get_status_display }}</span>{% if playlist.protegida %}<span class="pl-badge">🔒 PIN {% if playlist.pin_conhecido %}salvo{% else %}desconhecido{% endif %}</span>{% endif %}</div>
+            <div class="pl-id-block"><div class="pl-label">ID remoto</div><div class="pl-id pl-ellipsis" title="{{ playlist.remote_id }}">{{ playlist.remote_id|default:'Ainda não enviada' }}</div></div>
+            <div class="pl-actions">
+              {% if not playlist.remote_id %}<button type="button" class="pl-btn pl-success" data-post="{% url 'subir_playlist' playlist.id %}" data-reload="1" data-loading="Subindo...">↑ Subir</button>{% endif %}
+              {% if playlist.remote_id and playlist.status == 'confirmacao_pendente' %}<button type="button" class="pl-btn pl-btn-pending" data-replace-playlist data-name="{{ playlist.nome|escape }}" data-protected="{{ playlist.protegida|yesno:'true,false' }}" data-url="{% url 'substituir_playlist_remota' playlist.id %}">↻ Substituir no aplicativo</button>{% endif %}
+              <button type="button" class="pl-btn pl-secondary" data-edit-playlist data-id="{{ playlist.id }}" data-client="{{ playlist.cliente_id|default:'' }}" data-name="{{ playlist.nome|default:''|escape }}" data-user="{{ playlist.usuario_iptv|default:''|escape }}" data-password="{{ playlist.senha_iptv|default:''|escape }}" data-dns="{{ playlist.dns|default:''|escape }}" data-code="{{ playlist.codigo|default:''|escape }}" data-url="{{ playlist.url_playlist|default:''|escape }}" data-mode="{{ playlist.modo_envio|default:'url' }}" data-protected="{{ playlist.protegida|yesno:'true,false' }}" data-pin="{{ playlist.pin_protecao|default:''|escape }}" data-remote-id="{{ playlist.remote_id|default:''|escape }}" data-edit-url="{% url 'editar_playlist' playlist.id %}">✎ Editar</button>
+              <button type="button" class="pl-btn pl-danger" data-delete data-name="{{ playlist.nome|escape }}" data-protected="{{ playlist.protegida|yesno:'true,false' }}" data-url="{% url 'excluir_playlist' playlist.id %}">🗑 Excluir</button>
+            </div>
+          </article>
+          {% empty %}<div class="pl-empty"><strong>Nenhuma playlist cadastrada</strong>Use “Nova lista” para cadastrar ou “Puxar listas” para importar do aplicativo.</div>{% endfor %}
+        </div>
+      </div>
+    </section>
+    {% empty %}<div class="pl-empty"><strong>Nenhum dispositivo cadastrado</strong>Cadastre o primeiro dispositivo para começar.</div>{% endfor %}
+  </main>
+</div>
+
+{{ provedores_json|json_script:'playlist-providers-data' }}
+<div class="pl-toasts" id="plToasts"></div>
+
+<div class="pl-modal" id="pullListsModal"><div class="pl-dialog small"><form id="pullListsForm">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2>Puxar playlists</h2><p id="pullListsDevice">Informe o PIN para acessar dados protegidos.</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body"><input type="hidden" id="pullListsUrl"><div class="pl-field"><label>PIN de proteção <span class="pl-hint">opcional</span></label><input class="pl-control" type="password" name="pin" id="pullListsPin" inputmode="numeric" autocomplete="off" placeholder="Vazio ou 0 para consulta comum"><small class="pl-help">Com PIN, o sistema tenta liberar cada playlist protegida. PIN incorreto ignora somente aquela playlist.</small></div></div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button class="pl-btn pl-primary" type="submit">Puxar agora</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="deviceModal"><div class="pl-dialog"><form id="deviceForm" action="{% url 'salvar_integracao_playlist' %}">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2 id="deviceTitle">Novo dispositivo</h2><p>Cadastre o aparelho. Os campos mudam automaticamente conforme o aplicativo.</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body"><input type="hidden" name="integracao_id" id="deviceId">
+    <section class="pl-section"><h3 class="pl-section-title">1. Identificação</h3><div class="pl-grid">
+      <div class="pl-field full"><label>Nome do cadastro</label><input class="pl-control" name="nome_avulso" id="deviceName" required placeholder="Ex.: TV da sala"></div>
+      <div class="pl-field"><label>Cliente <span class="pl-hint">opcional</span></label><select class="pl-control" name="cliente_id" id="deviceClient"><option value="">Cadastro avulso</option>{% for c in clientes_disponiveis %}<option value="{{ c.id }}">{% firstof c.nome c.username %}</option>{% endfor %}</select></div>
+      <div class="pl-field"><label>Aplicativo</label><select class="pl-control" name="provedor" id="deviceProvider" required>{% for p in provedores %}<option value="{{ p.slug }}">{{ p.nome }}</option>{% endfor %}</select></div>
+    </div></section>
+    <section class="pl-section"><h3 class="pl-section-title">2. Acesso ao dispositivo</h3><div class="pl-grid">
+      <div class="pl-field" data-device-field="mac_address"><label data-label for="deviceMac">MAC Address</label><input type="text" class="pl-control" name="mac_address" id="deviceMac" maxlength="40" autocomplete="off" placeholder="Ex.: 00:1A:79:00:00:00"><div class="pl-field-help">Informe exatamente como aparece no aplicativo.</div></div>
+      <div class="pl-field" data-device-field="device_key"><label data-label for="deviceKey">Device Key</label><div class="pl-input-password"><input type="password" class="pl-control" name="device_key" id="deviceKey" maxlength="180" autocomplete="new-password" placeholder="Digite a Key exibida no aplicativo"><button type="button" class="pl-password-toggle" data-toggle-password="#deviceKey" aria-label="Mostrar ou ocultar Key">👁</button></div><div class="pl-field-help" id="deviceKeyHelp">A Key é usada para autenticar e puxar playlists.</div></div>
+    </div></section>
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-primary">Salvar dispositivo</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="playlistModal"><div class="pl-dialog"><form id="playlistForm">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2 id="playlistTitle">Nova playlist</h2><p id="playlistSubtitle">Salve como rascunho ou envie ao aplicativo.</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body"><input type="hidden" id="playlistIntegration"><input type="hidden" id="playlistCreateUrl"><input type="hidden" id="playlistId"><input type="hidden" id="playlistEditUrl">
+    <section class="pl-section"><h3 class="pl-section-title">1. Dados da playlist</h3><div class="pl-grid"><div class="pl-field full"><label>Nome</label><input class="pl-control" name="nome" id="playlistName" required></div><div class="pl-field"><label>Cliente <span class="pl-hint">opcional</span></label><select class="pl-control" name="cliente_id" id="playlistClient"><option value="">Credencial manual ou padrão</option>{% for c in clientes_disponiveis %}<option value="{{ c.id }}" data-user="{{ c.login_externo|default:''|escape }}" data-password="{{ c.senha_leitura|default:''|escape }}">{% firstof c.nome c.username %}</option>{% endfor %}</select></div><div class="pl-field"><label>Modo de envio</label><select class="pl-control" name="modo_envio" id="playlistMode"><option value="url">URL ou DNS</option><option value="codigo">Código do servidor</option></select></div></div></section>
+    <section class="pl-section"><h3 class="pl-section-title">2. Credenciais IPTV</h3><div class="pl-grid"><div class="pl-field"><label>Usuário</label><input class="pl-control" name="usuario_iptv" id="playlistUser"></div><div class="pl-field"><label>Senha</label><input class="pl-control" type="password" name="senha_iptv" id="playlistPassword"></div><div class="pl-field" id="playlistDnsField"><label>DNS</label><input class="pl-control" name="dns" id="playlistDns"></div><div class="pl-field hidden" id="playlistCodeField"><label>Código</label><input class="pl-control" name="codigo" id="playlistCode"></div><div class="pl-field full" id="playlistUrlField"><label>URL completa <span class="pl-hint">opcional com DNS</span></label><textarea class="pl-control" name="url_playlist" id="playlistUrl"></textarea></div></div></section>
+    <section class="pl-section"><h3 class="pl-section-title">3. Proteção</h3><div class="pl-grid"><div class="pl-field full"><label class="pl-switch"><input type="checkbox" name="protegida" id="playlistProtected"><span><strong>Proteger com PIN</strong><small>Ative somente quando necessário.</small></span></label></div><div class="pl-field hidden" id="playlistPinField"><label>PIN</label><input class="pl-control" name="pin_protecao" id="playlistPin" inputmode="numeric"><small class="pl-help">Ao editar, deixe vazio para manter o PIN salvo.</small></div></div></section>
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-primary" name="action" value="save">Salvar</button><button type="submit" class="pl-btn pl-success" name="action" value="upload" id="saveUpload">↑ Salvar e subir agora</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="replaceModal"><div class="pl-dialog small"><form id="replaceForm">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2>Substituir no aplicativo</h2><p id="replaceName"></p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body">
+    <input type="hidden" id="replaceUrl">
+    <div class="pl-replace-summary pl-warning-pending"><strong>A API não permite edição direta.</strong><p>Ao confirmar, o sistema excluirá a playlist atual do aplicativo e cadastrará outra usando os dados salvos no gestor. Nada acontece automaticamente.</p></div>
+    <div class="pl-field hidden" id="replacePinField" style="margin-top:14px"><label>PIN atual da playlist remota</label><input class="pl-control" type="password" name="pin_atual" id="replacePin" inputmode="numeric" autocomplete="off"><small class="pl-help">Necessário apenas quando a playlist atual está protegida.</small></div>
+    <label class="pl-confirm-check"><input type="checkbox" name="confirmar" id="confirmReplace" value="1" required><span>Confirmo que desejo excluir a versão remota e cadastrar novamente.</span></label>
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-btn-pending">Confirmar substituição</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="deleteModal"><div class="pl-dialog small"><form id="deleteForm">{% csrf_token %}<div class="pl-modal-head"><div><h2>Excluir playlist</h2><p id="deleteName"></p></div><button type="button" class="pl-close" data-close>✕</button></div><div class="pl-modal-body"><input type="hidden" id="deleteUrl"><div class="pl-grid"><div class="pl-field full"><label>Onde excluir?</label><select class="pl-control" name="modo"><option value="ambas">Painel e gestor</option><option value="remota">Somente painel</option><option value="local">Somente gestor</option></select></div><div class="pl-field full hidden" id="deletePinField"><label>PIN atual</label><input class="pl-control" name="pin" id="deletePin"></div></div></div><div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button class="pl-btn pl-danger">Excluir</button></div></form></div></div>
+
+<div class="pl-modal" id="historyModal"><div class="pl-dialog small"><div class="pl-modal-head"><div><h2>Histórico</h2><p>Últimas operações registradas.</p></div><button type="button" class="pl-close" data-close>✕</button></div><div class="pl-modal-body"><div class="pl-history" id="historyContent"></div></div><div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Fechar</button></div></div></div>
+
+<div class="pl-modal" id="deleteDeviceModal"><div class="pl-dialog small"><form id="deleteDeviceForm">{% csrf_token %}<input type="hidden" id="deleteDeviceUrl"><div class="pl-modal-head"><div><h2>Excluir dispositivo</h2><p>Remove o cadastro e as playlists locais vinculadas.</p></div><button type="button" class="pl-close" data-close>✕</button></div><div class="pl-modal-body"><div class="pl-delete-warning"><div class="pl-delete-icon">🗑</div><div><strong id="deleteDeviceName"></strong><p id="deleteDeviceMessage">Confirme para excluir este dispositivo.</p></div></div><label class="pl-confirm-check"><input type="checkbox" id="confirmDeleteDevice" required><span>Entendo que as playlists locais vinculadas também serão removidas.</span></label></div><div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-danger">Excluir dispositivo</button></div></form></div></div>
+
+<script>
+(()=>{'use strict';
+const $=(s,c=document)=>c.querySelector(s), $$=(s,c=document)=>[...c.querySelectorAll(s)];
+let providers=[];try{providers=JSON.parse($('#playlist-providers-data')?.textContent||'[]')}catch(e){console.warn('JSON de providers inválido',e)}
+const csrf=()=>$('[name="csrfmiddlewaretoken"]')?.value||'';
+const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
+function toast(msg,type='info'){const box=$('#plToasts');if(!box)return;const el=document.createElement('div');el.className=`pl-toast ${type}`;el.innerHTML=`<b>${type==='success'?'✓':type==='error'?'!':'i'}</b><div>${esc(msg||'Operação concluída.')}</div><button type="button">✕</button>`;el.querySelector('button').onclick=()=>el.remove();box.appendChild(el);setTimeout(()=>el.remove(),5000)}
+function loading(btn,on,text='Processando...'){if(!btn)return;if(on){btn.dataset.html=btn.innerHTML;btn.disabled=true;btn.innerHTML=`<span class="pl-spinner"></span>${esc(text)}`}else{btn.disabled=false;btn.innerHTML=btn.dataset.html||btn.innerHTML}}
+async function request(url,opt={}){const response=await fetch(url,{credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest',...(opt.headers||{})},...opt});let data;try{data=await response.json()}catch{data={success:false,message:`Resposta inválida do servidor (${response.status}).`}}if(!response.ok&&data.success!==true)throw new Error(data.message||`Erro HTTP ${response.status}`);return data}
+function openModal(modal){if(!modal)return;modal.classList.add('show');document.body.style.overflow='hidden';setTimeout(()=>modal.querySelector('input:not([type=hidden]),select,textarea,button')?.focus(),40)}
+function closeModal(modal){if(!modal)return;modal.classList.remove('show');if(!$('.pl-modal.show'))document.body.style.overflow=''}
+$$('[data-close]').forEach(btn=>btn.addEventListener('click',()=>closeModal(btn.closest('.pl-modal'))));
+$$('.pl-modal').forEach(modal=>modal.addEventListener('mousedown',e=>{if(e.target===modal)closeModal(modal)}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal($('.pl-modal.show'))});
+
+function providerBySlug(slug){return providers.find(item=>String(item.slug||item.valor||'')===String(slug||''))||{}}
+function providerLogo(provider){return provider.logo_url||provider.imagem_url||provider.icone_url||provider.logo||''}
+$$('[data-provider-avatar]').forEach(avatar=>{const provider=providerBySlug(avatar.dataset.providerAvatar);const url=providerLogo(provider);const img=avatar.querySelector('img'),fallback=avatar.querySelector('span');if(url&&img){img.src=url;img.alt=provider.nome||'Aplicativo';img.onload=()=>{img.hidden=false;if(fallback)fallback.hidden=true};img.onerror=()=>{img.hidden=true;if(fallback)fallback.hidden=false}}});
+
+function toggleDevice(card){if(!card)return;const btn=card.querySelector('[data-toggle]');const open=card.classList.toggle('open');btn?.setAttribute('aria-expanded',String(open))}$$('[data-toggle]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();toggleDevice(btn.closest('.pl-device'))}));$$('.pl-device-head').forEach(head=>{head.addEventListener('click',()=>toggleDevice(head.closest('.pl-device')));head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleDevice(head.closest('.pl-device'))}})});
+$$('[data-post]').forEach(btn=>btn.addEventListener('click',async()=>{loading(btn,true,btn.dataset.loading||'Processando...');try{const body=new URLSearchParams({csrfmiddlewaretoken:csrf()});const data=await request(btn.dataset.post,{method:'POST',body});toast(data.message,data.success?'success':'error');if(data.success&&btn.dataset.reload)setTimeout(()=>location.reload(),450)}catch(e){toast(e.message,'error')}finally{loading(btn,false)}}));
+
+const pullModal=$('#pullListsModal'),pullForm=$('#pullListsForm');
+$$('[data-pull-lists]').forEach(btn=>btn.addEventListener('click',()=>{pullForm.reset();const usaPin=(btn.dataset.provider||'')==='fun_plays';const pinField=$('#pullListsPin')?.closest('.pl-field');$('#pullListsUrl').value=btn.dataset.url||'';pinField?.classList.toggle('hidden',!usaPin);if($('#pullListsPin'))$('#pullListsPin').disabled=!usaPin;$('#pullListsDevice').textContent=usaPin?`Dispositivo: ${btn.dataset.deviceName||'Dispositivo'}. Informe o PIN apenas para liberar playlists protegidas.`:`Dispositivo: ${btn.dataset.deviceName||'Dispositivo'}. Este aplicativo não exige PIN para puxar as playlists.`;openModal(pullModal)}));
+pullForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#pullListsUrl').value;if(!url)return toast('Rota para puxar listas não encontrada.','error');loading(btn,true,'Puxando...');try{const data=await request(url,{method:'POST',body:new FormData(pullForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(pullModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const dModal=$('#deviceModal'),dForm=$('#deviceForm'),dProvider=$('#deviceProvider');
+function providerFields(){if(!dProvider)return;const slug=dProvider.value,provider=providerBySlug(slug),config=provider.campos||{};$$('[data-device-field]').forEach(wrapper=>{const name=wrapper.dataset.deviceField,field=config[name]||{},input=wrapper.querySelector(`[name="${name}"]`),label=wrapper.querySelector('[data-label]');if(!input)return;let show=field.mostrar!==false,required=Boolean(field.obrigatorio);if(slug==='fun_plays'&&['mac_address','device_key'].includes(name)){show=true;required=true}wrapper.classList.toggle('hidden',!show);input.disabled=!show;input.required=show&&required;if(field.label&&label)label.textContent=field.label;if(field.placeholder)input.placeholder=field.placeholder});const help=$('#deviceKeyHelp');if(help)help.textContent=slug==='fun_plays'?'Obrigatória para autenticar, puxar e administrar playlists do Fun Plays.':'Informe a Key somente quando o aplicativo solicitar.'}
+function resetDevice(){dForm.reset();$('#deviceId').value='';$('#deviceTitle').textContent='Novo dispositivo';providerFields()}
+dProvider?.addEventListener('change',providerFields);
+$('[data-new-device]')?.addEventListener('click',()=>{resetDevice();openModal(dModal)});
+$$('[data-edit-device]').forEach(btn=>btn.addEventListener('click',()=>{resetDevice();$('#deviceId').value=btn.dataset.id||'';$('#deviceName').value=btn.dataset.name||'';$('#deviceClient').value=btn.dataset.client||'';dProvider.value=btn.dataset.provider||'';$('#deviceMac').value=btn.dataset.mac||'';$('#deviceKey').value=btn.dataset.key||'';$('#deviceTitle').textContent='Editar dispositivo';providerFields();openModal(dModal)}));
+$('#deviceClient')?.addEventListener('change',e=>{const option=e.target.selectedOptions[0];if(option?.value&&!$('#deviceName').value.trim())$('#deviceName').value=option.textContent.trim()});
+dForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter;loading(btn,true,'Salvando...');try{const data=await request(dForm.action,{method:'POST',body:new FormData(dForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(dModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+$$('[data-toggle-password]').forEach(btn=>btn.addEventListener('click',()=>{const input=$(btn.dataset.togglePassword);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';btn.textContent=show?'🙈':'👁'}));
+
+const pModal=$('#playlistModal'),pForm=$('#playlistForm');
+function mode(){const code=$('#playlistMode')?.value==='codigo';$('#playlistCodeField')?.classList.toggle('hidden',!code);$('#playlistDnsField')?.classList.toggle('hidden',code);$('#playlistUrlField')?.classList.toggle('hidden',code)}
+function protect(){$('#playlistPinField')?.classList.toggle('hidden',!$('#playlistProtected')?.checked)}
+$('#playlistMode')?.addEventListener('change',mode);$('#playlistProtected')?.addEventListener('change',protect);
+function resetPlaylist(){pForm.reset();$('#playlistIntegration').value='';$('#playlistCreateUrl').value='';$('#playlistId').value='';$('#playlistEditUrl').value='';$('#playlistTitle').textContent='Nova playlist';$('#playlistSubtitle').textContent='Salve como rascunho ou envie ao aplicativo.';$('#saveUpload').classList.remove('hidden');mode();protect()}
+$$('[data-new-playlist]').forEach(btn=>btn.addEventListener('click',()=>{resetPlaylist();$('#playlistIntegration').value=btn.dataset.newPlaylist||'';$('#playlistCreateUrl').value=btn.dataset.createUrl||'';openModal(pModal)}));
+$$('[data-edit-playlist]').forEach(btn=>btn.addEventListener('click',()=>{resetPlaylist();$('#playlistId').value=btn.dataset.id||'';$('#playlistEditUrl').value=btn.dataset.editUrl||'';$('#playlistName').value=btn.dataset.name||'';$('#playlistClient').value=btn.dataset.client||'';$('#playlistUser').value=btn.dataset.user||'';$('#playlistPassword').value=btn.dataset.password||'';$('#playlistDns').value=btn.dataset.dns||'';$('#playlistCode').value=btn.dataset.code||'';$('#playlistUrl').value=btn.dataset.url||'';$('#playlistMode').value=btn.dataset.mode||'url';$('#playlistProtected').checked=btn.dataset.protected==='true';$('#playlistPin').value=btn.dataset.pin||'';$('#playlistTitle').textContent='Editar playlist';const remoteId=btn.dataset.remoteId||'';$('#playlistSubtitle').textContent=remoteId?`ID remoto: ${remoteId}`:'Playlist ainda não enviada ao painel.';$('#saveUpload').classList.add('hidden');mode();protect();openModal(pModal)}));
+$('#playlistClient')?.addEventListener('change',e=>{const option=e.target.selectedOptions[0];if(option?.value){$('#playlistUser').value=option.dataset.user||'';$('#playlistPassword').value=option.dataset.password||''}});
+pForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,id=$('#playlistId').value,url=id?$('#playlistEditUrl').value:$('#playlistCreateUrl').value;if(!url)return toast('Rota do formulário não encontrada.','error');const fd=new FormData(pForm);fd.set('protegida',$('#playlistProtected').checked?'1':'');if(!id&&btn.value==='upload')fd.set('subir_agora','1');loading(btn,true,btn.value==='upload'?'Enviando...':'Salvando...');try{const data=await request(url,{method:'POST',body:fd});toast(data.message,data.success?'success':'error');if(data.success){closeModal(pModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const replaceModal=$('#replaceModal'),replaceForm=$('#replaceForm');
+$$('[data-replace-playlist]').forEach(btn=>btn.addEventListener('click',()=>{replaceForm.reset();$('#replaceUrl').value=btn.dataset.url||'';$('#replaceName').textContent=btn.dataset.name||'Playlist';const protectedNow=btn.dataset.protected==='true';$('#replacePinField').classList.toggle('hidden',!protectedNow);$('#replacePin').disabled=!protectedNow;openModal(replaceModal)}));
+replaceForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#replaceUrl').value;if(!url)return toast('Rota de substituição não encontrada.','error');if(!$('#confirmReplace').checked)return toast('Confirme a substituição.','error');loading(btn,true,'Substituindo...');try{const data=await request(url,{method:'POST',body:new FormData(replaceForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(replaceModal);setTimeout(()=>location.reload(),550)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const delModal=$('#deleteModal'),delForm=$('#deleteForm');
+$$('[data-delete]').forEach(btn=>btn.addEventListener('click',()=>{delForm.reset();$('#deleteUrl').value=btn.dataset.url||'';$('#deleteName').textContent=btn.dataset.name||'';$('#deletePinField').classList.toggle('hidden',btn.dataset.protected!=='true');openModal(delModal)}));
+delForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#deleteUrl').value;loading(btn,true,'Excluindo...');try{const data=await request(url,{method:'POST',body:new FormData(delForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(delModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const deleteDeviceModal=$('#deleteDeviceModal'),deleteDeviceForm=$('#deleteDeviceForm');
+$$('[data-delete-device]').forEach(btn=>btn.addEventListener('click',()=>{deleteDeviceForm.reset();$('#deleteDeviceUrl').value=btn.dataset.url||'';$('#deleteDeviceName').textContent=btn.dataset.name||'Dispositivo';const count=Number(btn.dataset.playlists||0);$('#deleteDeviceMessage').textContent=count?`Este dispositivo possui ${count} playlist(s) local(is), que também serão removidas.`:'Este dispositivo não possui playlists locais cadastradas.';openModal(deleteDeviceModal)}));
+deleteDeviceForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#deleteDeviceUrl').value;if(!$('#confirmDeleteDevice').checked)return toast('Confirme a exclusão do dispositivo.','error');loading(btn,true,'Excluindo...');try{const data=await request(url,{method:'POST',body:new FormData(deleteDeviceForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(deleteDeviceModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const hModal=$('#historyModal');
+$$('[data-history]').forEach(btn=>btn.addEventListener('click',async()=>{const content=$('#historyContent');content.innerHTML='<div class="pl-empty">Carregando...</div>';openModal(hModal);try{const data=await request(btn.dataset.history);const items=data.historico||[];content.innerHTML=items.length?items.map(item=>`<article class="pl-history-item"><div class="pl-history-head"><strong>${esc(item.acao)}${item.playlist?' · '+esc(item.playlist):''}</strong><span class="pl-time">${esc(item.criado_em)}</span></div><p>${esc(item.mensagem||'Sem mensagem.')}</p></article>`).join(''):'<div class="pl-empty"><strong>Sem histórico</strong>As próximas operações aparecerão aqui.</div>'}catch(err){content.innerHTML=`<div class="pl-empty">${esc(err.message)}</div>`}}));
+
+providerFields();mode();protect();
+})();
+</script>
+
+
+<style>
+/* ==========================================================
+   ÁREA FIXA: título/pesquisa fora do scroll.
+   Somente a lista de dispositivos possui rolagem.
+   ========================================================== */
+.pl-page{
+    display:flex !important;
+    flex-direction:column !important;
+    min-height:0 !important;
+    max-height:none !important;
+    overflow:hidden !important;
+    padding-bottom:0 !important;
+}
+
+.pl-hero{
+    position:relative !important;
+    inset:auto !important;
+    z-index:20;
+    flex:0 0 auto !important;
+    margin-bottom:10px !important;
+}
+
+.pl-device-list{
+    flex:1 1 0 !important;
+    min-height:0 !important;
+    height:0;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    align-content:start;
+    padding:2px 8px 18px 2px;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+    scrollbar-width:thin;
+    scrollbar-color:color-mix(in srgb,var(--pl-primary) 42%,transparent) transparent;
+}
+
+.pl-device-list::-webkit-scrollbar{width:8px}
+.pl-device-list::-webkit-scrollbar-track{background:transparent}
+.pl-device-list::-webkit-scrollbar-thumb{
+    border:2px solid transparent;
+    border-radius:999px;
+    background:color-mix(in srgb,var(--pl-primary) 42%,transparent);
+    background-clip:padding-box;
+}
+
+@media(max-width:760px){
+    .pl-page{
+        padding:6px 6px 0 !important;
+    }
+
+    .pl-hero{
+        margin-bottom:7px !important;
+        padding:12px !important;
+        border-radius:14px !important;
+    }
+
+    .pl-kicker{display:none}
+    .pl-title{font-size:1.18rem}
+    .pl-sub{margin-top:4px;font-size:.76rem;line-height:1.35}
+    .pl-hero-actions{gap:6px}
+    .pl-search{min-height:38px;border-radius:10px}
+    .pl-search input{padding:8px 10px;font-size:.82rem}
+    .pl-search button{padding:0 12px}
+    .pl-hero-actions>.pl-btn{min-height:38px;padding:7px 10px;font-size:.76rem}
+
+    .pl-device-list{
+        padding:1px 3px max(14px,env(safe-area-inset-bottom)) 1px;
+        scrollbar-width:none;
+    }
+    .pl-device-list::-webkit-scrollbar{display:none}
+}
+</style>
+
+<script>
+/* Calcula o espaço real disponível abaixo do cabeçalho do sistema.
+   Isso evita que o título entre na área de rolagem, independentemente
+   da altura do menu/base.html. */
+(function(){
+    const page = document.querySelector('.pl-page');
+    if (!page) return;
+
+    function ajustarAreaPlaylist(){
+        const viewportHeight = window.visualViewport
+            ? window.visualViewport.height
+            : window.innerHeight;
+
+        const top = page.getBoundingClientRect().top;
+        const margemInferior = window.innerWidth <= 760 ? 6 : 14;
+        const alturaDisponivel = Math.max(320, viewportHeight - top - margemInferior);
+
+        page.style.height = `${alturaDisponivel}px`;
+    }
+
+    ajustarAreaPlaylist();
+    window.addEventListener('resize', ajustarAreaPlaylist, {passive:true});
+    window.addEventListener('orientationchange', ajustarAreaPlaylist, {passive:true});
+
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', ajustarAreaPlaylist, {passive:true});
+    }
+
+    requestAnimationFrame(ajustarAreaPlaylist);
+    setTimeout(ajustarAreaPlaylist, 150);
+})();
+</script>
+{% endblock %}

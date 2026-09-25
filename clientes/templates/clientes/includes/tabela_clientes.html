@@ -1,0 +1,352 @@
+{% load custom_filters %}
+
+{% for cliente in clientes %}
+<tr class="table-row 
+    {% if not cliente.is_active %}row-inativo
+    {% elif cliente.status_vencimento == 'Vencido' %}row-vencido
+    {% elif cliente.status_vencimento == 'Vence Hoje' %}row-hoje
+    {% elif cliente.status_vencimento == 'Vence em Breve' %}row-breve
+    {% else %}row-dia{% endif %}">
+    
+    <!-- Botão expandir -->
+    <td class="text-center" data-label="Det.">
+        <button class="toggle-btn" type="button" data-id="{{ cliente.pk }}" aria-label="Mostrar detalhes de {{ cliente.nome }}" aria-expanded="false">
+            <i class="fas fa-chevron-down"></i>
+        </button>
+    </td>
+    
+    <!-- Avatar com badge de duplicados (SEMPRE VISÍVEL) -->
+    <td class="text-center" data-label="Avatar">
+        <div class="avatar-wrapper" style="position: relative; display: inline-block;">
+            <div class="avatar-circle">
+                {% if cliente.has_avatar %}
+                    <img src="{{ cliente.whatsapp_avatar_url }}" alt="{{ cliente.nome }}" class="avatar-img" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">
+                {% else %}
+                    <div class="avatar-initial">{{ cliente.nome|first|upper }}</div>
+                {% endif %}
+            </div>
+            {% if cliente.duplicados_count > 1 %}
+            <span class="avatar-duplicate-badge">{{ cliente.duplicados_count }}</span>
+            {% endif %}
+        </div>
+    </td>
+
+    <!-- Nome e WhatsApp -->
+    <td data-label="Nome">
+        <div class="cliente-info">
+            <div class="cliente-nome-row">
+                <strong class="cliente-nome">{{ cliente.nome }}</strong>
+                {% if cliente.tem_playlist_cadastrada %}
+                <a href="{% url 'pagina_integracoes_playlist' %}?termo={{ cliente.nome|urlencode }}" class="cliente-playlist-indicator" title="Abrir no Gerenciador de playlists filtrado por {{ cliente.nome }}" aria-label="Abrir cadastro de playlist de {{ cliente.nome }}"><i class="fas fa-play-circle"></i></a>
+                {% endif %}
+            </div>
+            {% if cliente.whatsapp %}
+            <small class="cliente-whatsapp"><i class="fab fa-whatsapp"></i> {{ cliente.whatsapp }}</small>
+            {% endif %}
+        </div>
+    </td>
+    
+    <!-- Saldo -->
+    <td class="text-center" data-label="Saldo">
+        <span class="saldo {% if cliente.saldo < 0 %}negativo{% else %}positivo{% endif %}">
+            R$ {{ cliente.saldo|floatformat:2|replace_comma_with_dot }}
+        </span>
+    </td>
+    
+    <!-- Plano -->
+    <td class="text-center" data-label="Plano">
+        {% if cliente.plano %}
+            <span class="cliente-plano-badge" title="{{ cliente.plano.nome }}">
+                <span class="plano-color-dot" style="--plano-cor: {{ cliente.plano.cor|default:'#64748b' }};"></span>
+                <span class="cliente-plano-nome">{{ cliente.plano.nome }}</span>
+            </span>
+            {% if cliente.plano.integracao_ativa and cliente.plano.integracao_tipo != 'nenhuma' %}
+            <span title="Integração {{ cliente.plano.get_integracao_tipo_display }} • {{ cliente.plano.get_integracao_politica_display }}" style="display:inline-flex;margin-left:4px;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:color-mix(in srgb,var(--primary) 10%,transparent);color:var(--primary);font-size:.62rem;vertical-align:middle;">
+                <i class="fas fa-bolt"></i>
+            </span>
+            {% endif %}
+        {% else %}
+            <span class="cliente-sem-plano"><i class="fas fa-minus-circle"></i> Sem plano</span>
+        {% endif %}
+    </td>
+    
+    <!-- Status -->
+    <td class="text-center" data-label="Status">
+        <span class="status-badge 
+            {% if cliente.status_vencimento == 'Vencido' %}status-vencido
+            {% elif cliente.status_vencimento == 'Vence Hoje' %}status-vence-hoje
+            {% elif cliente.status_vencimento == 'Vence em Breve' %}status-vence-em-breve
+            {% elif cliente.status_vencimento == 'Inativo' %}status-inativo
+            {% else %}status-em-dia{% endif %}" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 50px; font-size: 0.72rem; font-weight: 600; white-space: nowrap;">
+            <i class="fas 
+                {% if cliente.status_vencimento == 'Vencido' %}fa-exclamation-circle
+                {% elif cliente.status_vencimento == 'Vence Hoje' %}fa-clock
+                {% elif cliente.status_vencimento == 'Vence em Breve' %}fa-calendar-week
+                {% elif cliente.status_vencimento == 'Inativo' %}fa-user-slash
+                {% else %}fa-check-circle{% endif %}"></i>
+            {{ cliente.status_vencimento|default:"Em Dia" }}
+        </span>
+    </td>
+    
+    <!-- Vencimento com barra -->
+    <td class="text-center vencimento-cell" data-label="Vencimento">
+        <div class="vencimento-wrapper" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 90px;">
+            <span class="vencimento-data" style="font-size: 0.78rem; font-weight: 500; color: var(--text-secondary);">
+                <i class="far fa-calendar-alt" style="font-size: 0.7rem;"></i> 
+                {% if cliente.data_vencimento %}{{ cliente.data_vencimento|date:"d/m/Y" }}{% else %}-{% endif %}
+            </span>
+            <div style="width: 100%; height: 6px; background: var(--border-light); border-radius: 10px; overflow: hidden;">
+                <div class="vencimento-barra 
+                    {% if cliente.status_vencimento == 'Vencido' %}barra-vencido
+                    {% elif cliente.status_vencimento == 'Vence Hoje' %}barra-hoje
+                    {% elif cliente.status_vencimento == 'Vence em Breve' %}barra-breve
+                    {% else %}barra-dia{% endif %}" 
+                    style="width: {{ cliente.porcentagem_vencimento|default:'75' }}%; height: 100%; border-radius: 10px; transition: width 0.5s ease;
+                    {% if cliente.status_vencimento == 'Vencido' %}background: linear-gradient(90deg, #fca5a5, #ef4444);
+                    {% elif cliente.status_vencimento == 'Vence Hoje' %}background: linear-gradient(90deg, #fcd34d, #f59e0b);
+                    {% elif cliente.status_vencimento == 'Vence em Breve' %}background: linear-gradient(90deg, #93c5fd, #3b82f6);
+                    {% else %}background: linear-gradient(90deg, #6ee7b7, #10b981);{% endif %}">
+                </div>
+            </div>
+        </div>
+    </td>
+</tr>
+
+
+<!-- ============================================ -->
+<tr class="detalhes-row" data-id="{{ cliente.pk }}" style="display: none;">
+    <td colspan="7" style="padding: 0;">
+        <div style="padding: 1rem; background: var(--bg-hover); border-radius: 0 0 12px 12px; margin: 0;">
+            
+            <!-- 3 COLUNAS COM FLEXBOX -->
+            <div style="display: flex; flex-wrap: nowrap; gap: 1rem;">
+                
+                <!-- ========== COLUNA 1: DADOS DO CLIENTE ========== -->
+                <div style="flex: 2 1 0; min-width: 0;">
+                    <h4 style="margin: 0 0 0.75rem 0; color: var(--text-primary); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-user" style="color: var(--primary);"></i> Dados do Cliente
+                    </h4>
+                    
+                    <div style="background: var(--bg-card); border-radius: 10px; padding: 0.6rem;">
+                        
+
+                        
+                        <!-- Usuário (Login IPTV) -->
+                        {% if cliente.login_externo %}
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid var(--border-light);">
+                            <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem;">Usuário:</span>
+                            <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                <code style="color: var(--text-primary); background: var(--bg-hover); padding: 1px 5px; border-radius: 4px; font-size: 0.72rem;">{{ cliente.login_externo }}</code>
+                                <button class="btn-copy" data-copy="{{ cliente.login_externo }}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:1px 3px;" title="Copiar"><i class="fas fa-copy" style="font-size:0.6rem;"></i></button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Senha -->
+                        {% if cliente.senha_leitura %}
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.3rem 0;border-bottom:1px solid var(--border-light);">
+                            <span style="font-weight:600;color:var(--text-secondary);font-size:0.72rem;">Senha:</span>
+                            <div style="display:flex;align-items:center;gap:0.15rem;">
+                                <code id="senha-{{ cliente.id }}" style="font-size:0.65rem;">••••••••</code>
+                                <button class="btn-toggle-password" data-client-id="{{ cliente.id }}" data-password-url="{% url 'detalhes_cliente_playlist' cliente.id %}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:1px 2px;" title="Mostrar senha"><i class="fas fa-eye" style="font-size:0.5rem;"></i></button>
+                                <button class="btn-copy-password" data-client-id="{{ cliente.id }}" data-password-url="{% url 'detalhes_cliente_playlist' cliente.id %}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:1px 2px;" title="Copiar senha"><i class="fas fa-copy" style="font-size:0.5rem;"></i></button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- WhatsApp -->
+                        {% if cliente.whatsapp %}
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid var(--border-light);">
+                            <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem;">WhatsApp:</span>
+                            <div style="display: flex; align-items: center; gap: 0.3rem;">
+                                <span style="color: var(--text-primary); font-size: 0.78rem;">{{ cliente.whatsapp }}</span>
+                                <button class="btn-copy" data-copy="{{ cliente.whatsapp }}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:1px 3px;" title="Copiar"><i class="fas fa-copy" style="font-size:0.6rem;"></i></button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Valor do Serviço -->
+                        {% if cliente.valor_servico_exibicao %}
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid var(--border-light);">
+                            <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem;">Valor Serviço:</span>
+                            <span style="color: var(--text-primary); font-size: 0.78rem; font-weight: 500;">R$ {{ cliente.valor_servico_exibicao|floatformat:2|replace_comma_with_dot }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Valor a Pagar -->
+                        {% if cliente.valor_a_pagar %}
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid var(--border-light);">
+                            <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem;">A Pagar:</span>
+                            <span style="color: #dc2626; font-size: 0.78rem; font-weight: 600;">R$ {{ cliente.valor_total_a_pagar|floatformat:2|replace_comma_with_dot }}</span>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Tags -->
+                        {% if cliente.tags.all %}
+                        <div style="padding: 0.3rem 0; border-bottom: 1px solid var(--border-light);">
+                            <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem; display: block; margin-bottom: 0.2rem;">Tags:</span>
+                            <div style="display: flex; flex-wrap: wrap; gap: 3px;">
+                                {% for tag in cliente.tags.all %}
+                                <span style="background: {{ tag.cor|default:'#6c757d' }}; color: white; padding: 1px 6px; border-radius: 20px; font-size: 0.62rem;">{{ tag.nome }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Observação -->
+                        {% if cliente.observacao %}
+                        <div style="padding: 0.3rem 0; border-bottom: 1px solid var(--border-light);">
+                            <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem; display: block; margin-bottom: 0.2rem;">Obs:</span>
+                            <p style="color: var(--text-primary); font-size: 0.72rem; margin: 0;">{{ cliente.observacao }}</p>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Indicações -->
+                        {% if cliente.indicacoes_list %}
+                        <div style="padding: 0.3rem 0; border-bottom: 1px solid var(--border-light);">
+                            <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem; display: block; margin-bottom: 0.2rem;">Indicações:</span>
+                            <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                {% for indicacao in cliente.indicacoes_list %}
+                                {% if indicacao.cliente_indicado %}
+                                <div title="{{ indicacao.cliente_indicado.nome }} - {{ indicacao.data_indicacao|date:'d/m/Y' }}" style="width: 24px; height: 24px; border-radius: 50%; overflow: hidden; border: 2px solid color-mix(in srgb, var(--primary) 50%, transparent);">
+                                    {% if indicacao.cliente_indicado.whatsapp_avatar_url %}
+                                    <img src="{{ indicacao.cliente_indicado.whatsapp_avatar_url }}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover;" loading="lazy">
+                                    {% else %}
+                                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; font-weight: 700; font-size: 0.6rem;">{{ indicacao.cliente_indicado.nome|first|upper|default:'?' }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Link de Acesso -->
+<!-- Link de Acesso -->
+                    {% if cliente.link_acesso %}
+                    <div style="padding: 0.3rem 0;">
+                        <span style="font-weight: 600; color: var(--text-secondary); font-size: 0.72rem; display: block; margin-bottom: 0.2rem;">Link:</span>
+                        <div style="display: flex; align-items: center; gap: 0.3rem;">
+                            <code style="color: var(--primary); font-size: 0.62rem; background: var(--bg-hover); padding: 2px 4px; border-radius: 4px; flex: 1; 
+                                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;"
+                                title="{{ request.scheme }}://{{ request.get_host }}{% url 'jogos_do_dia' cliente.link_acesso %}">
+                                {{ request.scheme }}://{{ request.get_host }}/jogos/{{ cliente.link_acesso|truncatechars:25 }}
+                            </code>
+                            <button class="btn-copy" data-copy="{{ request.scheme }}://{{ request.get_host }}{% url 'jogos_do_dia' cliente.link_acesso %}" style="background:none;border:none;color:var(--text-muted);cursor:pointer;" title="Copiar link completo"><i class="fas fa-copy" style="font-size:0.6rem;"></i></button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    </div>
+                    
+                    <!-- BOTÕES DE AÇÃO -->
+                    <div class="cliente-actions">
+                        <a href="{% url 'editar_cliente' cliente.pk %}" class="cliente-action-btn cliente-action-primary"><i class="fas fa-edit"></i> Editar</a>
+                        {% if cliente.tem_playlist_cadastrada %}
+                        <a href="{% url 'pagina_integracoes_playlist' %}?termo={{ cliente.nome|urlencode }}" class="cliente-action-btn cliente-action-playlist-active" title="Abrir este cliente no Gerenciador de playlists"><i class="fas fa-play-circle"></i> Playlist</a>
+                        {% else %}
+                        <a href="{% url 'pagina_integracoes_playlist' %}?cliente_id={{ cliente.id }}&novo=1" class="cliente-action-btn" title="Cadastrar dispositivo/lista para este cliente"><i class="fas fa-tv"></i> App</a>
+                        {% endif %}
+                        <button class="btn-delete cliente-action-btn cliente-action-danger" data-cliente-id="{{ cliente.pk }}" data-cliente-nome="{{ cliente.nome|escapejs }}"><i class="fas fa-trash-alt"></i> Excluir</button>
+                        {% if cliente.is_active %}
+                        <button class="btn-renew cliente-action-btn cliente-action-success"
+                            data-cliente-id="{{ cliente.id }}"
+                            data-cliente-nome="{{ cliente.nome|escapejs }}"
+                            data-url-renovacao="{% url 'renovar_cliente' cliente.id %}"
+                            data-integracao-ativa="{% if cliente.plano and cliente.plano.integracao_ativa %}1{% else %}0{% endif %}"
+                            data-integracao-politica="{% if cliente.plano %}{{ cliente.plano.integracao_politica|default:'manual' }}{% else %}manual{% endif %}"
+                            data-integracao-tipo="{% if cliente.plano %}{{ cliente.plano.integracao_tipo|default:'nenhuma' }}{% else %}nenhuma{% endif %}"
+                            data-manual-credito="{% if cliente.plano %}{{ cliente.plano.renovacao_manual_credito|default:'sempre' }}{% else %}sempre{% endif %}"
+                            title="{% if cliente.plano and cliente.plano.integracao_ativa %}Renovação {{ cliente.plano.get_integracao_politica_display }} • {{ cliente.plano.get_integracao_tipo_display }}{% else %}Renovação manual{% endif %}">
+                            <i class="fas fa-redo"></i> Renovar
+                        </button>
+                        <button class="btn-balance cliente-action-btn cliente-action-warning" data-id="{{ cliente.id }}"><i class="fas fa-wallet"></i> Saldo</button>
+                        <button class="btn-whatsapp cliente-action-btn cliente-action-whatsapp" data-cliente-id="{{ cliente.id }}" data-action="abrir" data-whatsapp="{{ cliente.whatsapp }}"><i class="fab fa-whatsapp"></i> Whats</button>
+                        {% endif %}
+                        <button class="btn-toggle cliente-action-btn" data-id="{{ cliente.pk }}" data-is-active="{{ cliente.is_active }}"><i class="fas fa-power-off"></i> {{ cliente.is_active|yesno:"Desativar,Ativar" }}</button>
+                        <button class="btn-indicate cliente-action-btn" data-cliente-id="{{ cliente.pk }}"><i class="fas fa-user-plus"></i> Indicar</button>
+                        <button class="btn-tags cliente-action-btn" data-cliente-id="{{ cliente.id }}"><i class="fas fa-tags"></i> Tags</button>
+                    </div>
+                </div>
+                
+                <!-- ========== COLUNA 2: HISTÓRICO ========== -->
+                <div style="flex: 2 1 0; min-width: 0;">
+                    <h4 style="margin: 0 0 0.75rem 0; color: var(--text-primary); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-history" style="color: var(--primary);"></i> Histórico de Pagamentos
+                    </h4>
+                    <div style="background: var(--bg-card); border-radius: 10px; padding: 0.5rem; max-height: 280px; overflow-y: auto;">
+                        {% if cliente.relatorios_carregados %}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 0.25rem 0.4rem; font-weight: 600; color: var(--text-secondary); font-size: 0.68rem; border-bottom: 2px solid var(--border-color); margin-bottom: 0.2rem;">
+                                <span>Data</span><span>Valor</span><span>Plano</span>
+                            </div>
+                            {% for relatorio in cliente.relatorios_carregados %}
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; padding: 0.3rem 0.4rem; border-bottom: 1px solid var(--border-light); font-size: 0.7rem; color: var(--text-primary);">
+                                <span>{{ relatorio.data_geracao|date:"d/m/Y" }}</span>
+                                <span style="color: #059669; font-weight: 500;">R$ {{ relatorio.valor_pago|floatformat:2 }}</span>
+                                <span style="color: var(--text-muted);">{{ relatorio.servidor|default:"-" }}</span>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                                <i class="fas fa-receipt" style="font-size: 1.5rem; display: block; margin-bottom: 0.5rem;"></i>
+                                <p style="margin: 0; font-size: 0.75rem;">Nenhum pagamento</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+ <!-- ========== COLUNA 3: COMPARTILHADOS ========== -->
+<div style="flex: 1 1 0; min-width: 0;">
+    <h4 style="margin: 0 0 0.75rem 0; color: var(--text-primary); font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="fas fa-users" style="color: #f59e0b;"></i> Compartilhados
+    </h4>
+    <div style="background: var(--bg-card); border-radius: 10px; padding: 0.5rem; max-height: 280px; overflow-y: auto;">
+        {% if cliente.compartilhados %}
+            {% for comp in cliente.compartilhados %}
+                {% if comp.id != cliente.id %}
+                <button onclick="filtrarPorClienteCompartilhado('{{ comp.nome|escapejs }}')" 
+                    style="display:flex;align-items:center;gap:0.5rem;width:100%;text-align:left;padding:0.4rem 0.5rem;margin-bottom:0.25rem;background:var(--bg-hover);border:1px solid var(--border-light);border-radius:8px;cursor:pointer;transition:all 0.2s;"
+                    onmouseover="this.style.background='rgba(245,158,11,0.1)';this.style.borderColor='#f59e0b';"
+                    onmouseout="this.style.background='var(--bg-hover)';this.style.borderColor='var(--border-light)';">
+                    
+                    <!-- Avatar -->
+                    <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,var(--primary),var(--primary-light));display:flex;align-items:center;justify-content:center;">
+                        {% if comp.avatar_url %}
+                            <img src="{{ comp.avatar_url }}" alt="{{ comp.nome }}" style="width:100%;height:100%;object-fit:cover;" loading="lazy">
+                        {% else %}
+                            <span style="color:white;font-weight:700;font-size:0.65rem;">{{ comp.nome|first|upper }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Info -->
+                    <div style="flex:1;min-width:0;">
+                        <strong style="color:var(--text-primary);font-size:0.75rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ comp.nome }}</strong>
+                        <small style="color:var(--text-muted);font-size:0.65rem;">📅 {{ comp.data_vencimento|date:"d/m/Y"|default:"Sem data" }}</small>
+                    </div>
+                </button>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            <div style="text-align: center; padding: 1.5rem; color: var(--text-muted);">
+                <i class="fas fa-user" style="font-size: 1.5rem; display: block; margin-bottom: 0.5rem;"></i>
+                <p style="margin: 0; font-size: 0.75rem;">Não compartilha</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+
+</div>
+
+        </div>
+    </td>
+</tr>
+
+{% empty %}
+<tr>
+    <td colspan="7" style="padding: 3rem; text-align: center;">
+        <div style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem;"><i class="fas fa-users"></i></div>
+        <h3 style="color: var(--text-primary); margin-bottom: 0.5rem;">Nenhum cliente encontrado</h3>
+        <p style="color: var(--text-secondary);">Tente outro termo de pesquisa</p>
+    </td>
+</tr>
+{% endfor %}

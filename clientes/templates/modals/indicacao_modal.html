@@ -1,0 +1,605 @@
+<!-- modals/indicacao_modal.html - VERSÃO FINAL COMPLETA E CORRIGIDA -->
+<div class="modal" id="indicacaoModal">
+    <div class="modal-overlay" onclick="closeModal('indicacaoModal')"></div>
+    <div class="modal-content" style="max-width: 540px; width: calc(100vw - 32px);">
+        
+        <!-- HEADER -->
+        <div class="modal-header" style="background: linear-gradient(135deg, var(--primary), var(--primary-light)); border-radius: 16px 16px 0 0; padding: 20px 24px;">
+            <h2 style="margin: 0; font-size: 1.2rem; color: white;">
+                <i class="fas fa-user-plus"></i> Gerenciar Indicações
+            </h2>
+            <button class="close-modal" onclick="closeModal('indicacaoModal')" 
+                    style="background: rgba(255,255,255,0.2); border: none; color: white; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 1.2rem;">
+                &times;
+            </button>
+        </div>
+        
+        <!-- BODY -->
+        <div class="modal-body" style="padding: 24px;">
+            
+            <!-- INFO DO CLIENTE -->
+            <div id="clienteInfoIndicacaoModal" style="display: none; margin-bottom: 20px; background: var(--bg-hover); padding: 12px 16px; border-radius: 12px; border-left: 4px solid var(--primary);">
+                <i class="fas fa-user" style="color: var(--primary);"></i> 
+                <span style="color: var(--text);">Indicando para: <strong id="nomeClienteIndicacaoModal" style="color: var(--primary-light);"></strong></span>
+            </div>
+            
+            <!-- TABS -->
+            <div style="display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg-hover); padding: 4px; border-radius: 10px;">
+                <button class="tab-btn active" data-tab="indicacoes" id="tabBtnIndicacoes"
+                        style="flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.3s; background: var(--primary); color: white;">
+                    <i class="fas fa-user-friends"></i> Indicações
+                </button>
+                <button class="tab-btn" data-tab="comissao" id="tabBtnComissao"
+                        style="flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: all 0.3s; background: transparent; color: var(--text-light);">
+                    <i class="fas fa-cog"></i> Comissão
+                </button>
+            </div>
+            
+            <!-- TAB: INDICAÇÕES -->
+            <div id="tabIndicacoes" class="tab-content">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="color: var(--text); margin-bottom: 6px; display: block; font-weight: 600; font-size: 0.9rem;">
+                        <i class="fas fa-search" style="color: var(--primary);"></i> Buscar Cliente:
+                    </label>
+                    <input type="text" id="buscaClienteInput" placeholder="Digite o nome do cliente..." 
+                           style="width: 100%; padding: 12px 16px; border: 2px solid var(--border); 
+                                  border-radius: 10px; background: var(--bg-card); color: var(--text); 
+                                  font-size: 0.9rem; transition: border-color 0.3s;"
+                           onfocus="this.style.borderColor='var(--primary)'" 
+                           onblur="this.style.borderColor='var(--border)'">
+                    <div id="resultadosBusca" style="display: none; max-height: 220px; overflow-y: auto; 
+                             border: 2px solid var(--primary); border-radius: 0 0 10px 10px; 
+                             background: var(--bg-card); margin-top: -2px; position: relative; z-index: 10;">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label style="color: var(--text); margin-bottom: 6px; display: block; font-weight: 600; font-size: 0.9rem;">
+                        <i class="fas fa-list" style="color: var(--primary);"></i> 
+                        Clientes Indicados 
+                        <span id="contadorIndicados" style="background: var(--primary); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem;">0</span>
+                    </label>
+                    <div id="listaIndicadosSelecionados" style="max-height: 250px; overflow-y: auto; 
+                             border: 2px solid var(--border); border-radius: 10px; 
+                             padding: 12px; background: var(--bg-card); min-height: 60px;">
+                        <span style="color: var(--text-light); font-size: 0.85rem;">
+                            <i class="fas fa-spinner fa-spin"></i> Carregando indicações...
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- TAB: COMISSÃO -->
+            <div id="tabComissao" class="tab-content" style="display: none;">
+                <div style="background: var(--bg-hover); padding: 12px; border-radius: 10px; margin-bottom: 16px;">
+                    <i class="fas fa-info-circle" style="color: var(--primary);"></i>
+                    <span style="color: var(--text); font-size: 0.85rem;">
+                        Configuração de comissão para: <strong id="nomeClienteComissao" style="color: var(--primary-light);"></strong>
+                    </span>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="color: var(--text); font-weight: 600; margin-bottom: 6px; display: block; font-size: 0.9rem;">
+                        <i class="fas fa-hand-holding-usd" style="color: var(--primary);"></i> Tipo de Comissão:
+                    </label>
+                    <select id="tipoComissao" style="width: 100%; padding: 12px; border-radius: 10px; 
+                            background: var(--bg-card); border: 2px solid var(--border); color: var(--text); font-size: 0.9rem;">
+                        <option value="indicacao">Apenas Indicação</option>
+                        <option value="renovacao">Apenas Renovação</option>
+                        <option value="ambos">Indicação + Renovação</option>
+                    </select>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+                    <div class="form-group">
+                        <label style="color: var(--text); font-weight: 500; margin-bottom: 4px; display: block; font-size: 0.8rem;">💰 Por Indicação:</label>
+                        <div style="position: relative;">
+                            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-light);">R$</span>
+                            <input type="text" id="valorIndicacao" value="0,00" 
+                                   style="width: 100%; padding: 12px 12px 12px 40px; border-radius: 10px; 
+                                          background: var(--bg-card); border: 2px solid var(--border); color: var(--text); font-size: 0.9rem;"
+                                   onkeyup="formatarMoeda(this)" onblur="formatarMoeda(this)">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: var(--text); font-weight: 500; margin-bottom: 4px; display: block; font-size: 0.8rem;">🔄 Por Renovação:</label>
+                        <div style="position: relative;">
+                            <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-light);">R$</span>
+                            <input type="text" id="valorRenovacao" value="0,00"
+                                   style="width: 100%; padding: 12px 12px 12px 40px; border-radius: 10px; 
+                                          background: var(--bg-card); border: 2px solid var(--border); color: var(--text); font-size: 0.9rem;"
+                                   onkeyup="formatarMoeda(this)" onblur="formatarMoeda(this)">
+                        </div>
+                    </div>
+                </div>
+                
+                <hr style="border-color: var(--border); margin: 16px 0;">
+                
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text);">
+                        <input type="checkbox" id="ativarMeta" 
+                               onchange="document.getElementById('metaConfig').style.display = this.checked ? 'block' : 'none'"
+                               style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);">
+                        <span>🎯 Ativar sistema de meta</span>
+                    </label>
+                </div>
+                
+                <div id="metaConfig" style="display: none; background: var(--bg-hover); padding: 16px; border-radius: 10px; border: 2px solid var(--border);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label style="color: var(--text); font-size: 0.8rem;">📊 Qtd. indicações:</label>
+                            <input type="number" id="quantidadeMeta" min="1" value="3"
+                                   style="width: 100%; padding: 10px; border-radius: 8px; 
+                                          background: var(--bg-card); border: 2px solid var(--border); color: var(--text);">
+                        </div>
+                        <div class="form-group">
+                            <label style="color: var(--text); font-size: 0.8rem;">🏆 Bônus:</label>
+                            <div style="position: relative;">
+                                <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-light);">R$</span>
+                                <input type="text" id="bonusMeta" value="0,00"
+                                       style="width: 100%; padding: 10px 10px 10px 35px; border-radius: 8px; 
+                                              background: var(--bg-card); border: 2px solid var(--border); color: var(--text);"
+                                       onkeyup="formatarMoeda(this)" onblur="formatarMoeda(this)">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label style="color: var(--text); font-size: 0.8rem;">⏳ Validade (meses):</label>
+                        <input type="number" id="validadeMeses" min="0" max="12" value="1"
+                               style="width: 100%; padding: 10px; border-radius: 8px; 
+                                      background: var(--bg-card); border: 2px solid var(--border); color: var(--text);">
+                        <small style="color: var(--text-light);">0 = sem validade</small>
+                    </div>
+                </div>
+                
+                <button type="button" onclick="salvarConfigComissao()"
+                        style="width: 100%; margin-top: 16px; background: linear-gradient(135deg, var(--primary), var(--primary-light)); 
+                               color: white; padding: 12px; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; font-size: 0.9rem;">
+                    <i class="fas fa-save"></i> Salvar Configuração de Comissão
+                </button>
+            </div>
+        </div>
+        
+        <!-- FOOTER -->
+        <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-top: 1px solid var(--border);">
+            <button type="button" onclick="closeModal('indicacaoModal')" 
+                    style="background: var(--bg-hover); color: var(--text); padding: 10px 20px; border-radius: 10px; border: 1px solid var(--border); cursor: pointer; font-weight: 500;">
+                <i class="fas fa-times"></i> Cancelar
+            </button>
+            <button type="button" id="btnSalvarIndicacoes"
+                    style="background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; padding: 10px 20px; border-radius: 10px; border: none; cursor: pointer; font-weight: 600;">
+                <i class="fas fa-save"></i> Salvar Indicações
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-btn.active {
+    background: var(--primary) !important;
+    color: white !important;
+}
+.tab-btn:hover:not(.active) {
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+}
+.resultado-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+}
+.resultado-item:hover {
+    background: var(--bg-hover);
+}
+.resultado-item:last-child {
+    border-bottom: none;
+}
+.resultado-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+.resultado-nome {
+    color: var(--text);
+    font-weight: 500;
+    flex: 1;
+}
+.resultado-status {
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+#resultadosBusca::-webkit-scrollbar,
+#listaIndicadosSelecionados::-webkit-scrollbar {
+    width: 5px;
+}
+#resultadosBusca::-webkit-scrollbar-track,
+#listaIndicadosSelecionados::-webkit-scrollbar-track {
+    background: transparent;
+}
+#resultadosBusca::-webkit-scrollbar-thumb,
+#listaIndicadosSelecionados::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+@media (max-width: 600px) {
+    .modal-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 10px;
+        border-radius: 12px;
+    }
+    #resultadosBusca { max-height: 150px; }
+    #listaIndicadosSelecionados { max-height: 180px; }
+}
+</style>
+
+<script>
+// ============================================
+// FORMATAÇÃO DE MOEDA REAL
+// ============================================
+function formatarMoeda(input) {
+    var valor = input.value.replace(/\D/g, '');
+    valor = (parseInt(valor || '0') / 100).toFixed(2);
+    valor = valor.replace('.', ',');
+    valor = valor.replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+    input.value = valor;
+}
+
+function moedaParaFloat(valor) {
+    if (!valor) return 0;
+    return parseFloat(valor.replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+function getCookie(name) {
+    var value = null;
+    if (document.cookie && document.cookie !== '') {
+        document.cookie.split(';').forEach(function(cookie) {
+            cookie = cookie.trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                value = decodeURIComponent(cookie.substring(name.length + 1));
+            }
+        });
+    }
+    return value;
+}
+
+// ============================================
+// MÓDULO UNIFICADO DE INDICAÇÃO
+// ============================================
+(function() {
+    'use strict';
+    
+    
+    var clienteAtualId = null;
+    var indicadosSelecionados = [];
+    var timerBusca = null;
+    
+    function getCsrfToken() {
+        var name = 'csrftoken';
+        var value = null;
+        if (document.cookie && document.cookie !== '') {
+            document.cookie.split(';').forEach(function(cookie) {
+                cookie = cookie.trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    value = decodeURIComponent(cookie.substring(name.length + 1));
+                }
+            });
+        }
+        return value;
+    }
+    
+    // Expõe clienteAtualId para uso externo
+    window._getClienteAtualId = function() { return clienteAtualId; };
+    
+    // TABS
+    var tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            tabBtns.forEach(function(b) {
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = 'var(--text-light)';
+            });
+            document.querySelectorAll('.tab-content').forEach(function(c) { c.style.display = 'none'; });
+            
+            this.classList.add('active');
+            this.style.background = 'var(--primary)';
+            this.style.color = 'white';
+            
+            var tabId = 'tab' + this.dataset.tab.charAt(0).toUpperCase() + this.dataset.tab.slice(1);
+            document.getElementById(tabId).style.display = 'block';
+            
+            if (this.dataset.tab === 'comissao') {
+                carregarConfigComissao();
+            }
+        });
+    });
+    
+    // ATUALIZAR LISTA
+    function atualizarListaIndicados() {
+        var container = document.getElementById('listaIndicadosSelecionados');
+        var contador = document.getElementById('contadorIndicados');
+        if (!container) return;
+        if (contador) contador.textContent = indicadosSelecionados.length;
+        
+        if (indicadosSelecionados.length === 0) {
+            container.innerHTML = '<span style="color: var(--text-light); font-size: 0.85rem;">📭 Nenhum cliente indicado</span>';
+            return;
+        }
+        
+        container.innerHTML = indicadosSelecionados.map(function(ind) {
+            return '<div style="display: flex; align-items: center; gap: 10px; ' +
+                        'background: var(--bg-hover); padding: 10px 14px; ' +
+                        'border-radius: 25px; border: 1px solid var(--border); margin-bottom: 6px;">' +
+                    '<div style="width: 34px; height: 34px; border-radius: 50%; ' +
+                                'background: linear-gradient(135deg, var(--primary), var(--primary-light)); ' +
+                                'display: flex; align-items: center; justify-content: center; ' +
+                                'color: white; font-weight: 600; font-size: 0.8rem; flex-shrink: 0;">' +
+                        (ind.inicial || '?') +
+                    '</div>' +
+                    '<span style="font-size: 0.85rem; font-weight: 500; color: var(--text); flex: 1;">' + ind.text + '</span>' +
+                    '<button onclick="window._removerIndicado(\'' + ind.id + '\', \'' + (ind.indicacao_id || '') + '\')" ' +
+                            'style="background: none; border: none; color: var(--danger); cursor: pointer; ' +
+                                   'font-size: 0.9rem; padding: 4px 8px; border-radius: 50%;" title="Remover">' +
+                        '<i class="fas fa-times-circle"></i>' +
+                    '</button>' +
+                '</div>';
+        }).join('');
+    }
+    
+    // CARREGAR INDICAÇÕES EXISTENTES
+    function carregarIndicacoesExistentes() {
+        fetch('/cliente/' + clienteAtualId + '/indicacoes/')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'success' && data.indicacoes_feitas) {
+                    indicadosSelecionados = data.indicacoes_feitas.map(function(ind) {
+                        return {
+                            id: ind.cliente_indicado_id,
+                            text: ind.cliente_indicado_nome,
+                            inicial: ind.cliente_indicado_nome.charAt(0).toUpperCase(),
+                            indicacao_id: ind.id
+                        };
+                    });
+                } else {
+                    indicadosSelecionados = [];
+                }
+                atualizarListaIndicados();
+            })
+            .catch(function() {
+                indicadosSelecionados = [];
+                atualizarListaIndicados();
+            });
+    }
+    
+    // REMOVER INDICADO
+    window._removerIndicado = function(id, indicacaoId) {
+        if (indicacaoId) {
+            fetch('/indicacao/' + indicacaoId + '/remover/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/json' }
+            });
+        }
+        indicadosSelecionados = indicadosSelecionados.filter(function(i) { return i.id != id; });
+        atualizarListaIndicados();
+    };
+    
+    // BUSCAR CLIENTES
+    function buscarClientes(termo) {
+        var resultadosDiv = document.getElementById('resultadosBusca');
+        if (!termo || termo.length < 1) { resultadosDiv.style.display = 'none'; return; }
+        
+        resultadosDiv.style.display = 'block';
+        resultadosDiv.innerHTML = '<div style="padding: 15px; text-align: center; color: var(--text-light);"><i class="fas fa-spinner fa-spin"></i> Buscando...</div>';
+        
+        fetch('/api/buscar-clientes-indicacao/?q=' + encodeURIComponent(termo) + '&excluir_id=' + clienteAtualId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data.results || data.results.length === 0) {
+                    resultadosDiv.innerHTML = '<div style="padding: 15px; text-align: center; color: var(--text-light);">📭 Nenhum cliente encontrado</div>';
+                    return;
+                }
+                
+                var borderColors = { 'danger': '#ef4444', 'warning': '#f59e0b', 'info': '#3b82f6', 'success': '#10b981', 'secondary': '#6b7280' };
+                
+                resultadosDiv.innerHTML = data.results.map(function(cliente) {
+                    var inicial = cliente.inicial || '?';
+                    var borderColor = borderColors[cliente.status_cor] || '#667eea';
+                    var jaIndicado = cliente.ja_indicado ? '🔒 ' : '';
+                    var nomeLimpo = cliente.text.replace(' 🔒', '').replace(/'/g, "\\'");
+                    
+                    return '<div class="resultado-item" onclick="window._selecionarIndicado(\'' + cliente.id + '\', \'' + nomeLimpo + '\', \'' + inicial + '\')" ' +
+                           'style="' + (cliente.is_active === false ? 'opacity: 0.5;' : '') + '">' +
+                        '<div class="resultado-avatar" style="border: 2px solid ' + borderColor + ';">' + inicial + '</div>' +
+                        '<span class="resultado-nome">' + jaIndicado + cliente.text.replace(' 🔒', '') + '</span>' +
+                        '<span class="resultado-status" style="color: ' + borderColor + ';">' + (cliente.status_vencimento || '') + '</span>' +
+                    '</div>';
+                }).join('');
+            });
+    }
+    
+    // SELECIONAR INDICADO
+    window._selecionarIndicado = function(id, text, inicial) {
+        if (indicadosSelecionados.find(function(i) { return i.id == id; })) {
+            window.AppUI.alert('⚠️ Este cliente já está na lista!');
+            return;
+        }
+        indicadosSelecionados.push({ id: id, text: text, inicial: inicial });
+        atualizarListaIndicados();
+        document.getElementById('buscaClienteInput').value = '';
+        document.getElementById('resultadosBusca').style.display = 'none';
+        document.getElementById('buscaClienteInput').focus();
+    };
+    
+    // CARREGAR CONFIG COMISSÃO
+    function carregarConfigComissao() {
+        document.getElementById('nomeClienteComissao').textContent = 'Cliente #' + clienteAtualId;
+        
+        fetch('/api/configuracao-comissao/?cliente_id=' + clienteAtualId)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.status === 'success' && data.config) {
+                    var c = data.config;
+                    document.getElementById('tipoComissao').value = c.tipo_comissao || 'indicacao';
+                    document.getElementById('valorIndicacao').value = (parseFloat(c.valor_por_indicacao) || 0).toFixed(2).replace('.', ',');
+                    document.getElementById('valorRenovacao').value = (parseFloat(c.valor_por_renovacao) || 0).toFixed(2).replace('.', ',');
+                    document.getElementById('ativarMeta').checked = c.ativar_meta || false;
+                    document.getElementById('quantidadeMeta').value = c.quantidade_meta || 3;
+                    document.getElementById('bonusMeta').value = (parseFloat(c.bonus_meta) || 0).toFixed(2).replace('.', ',');
+                    document.getElementById('validadeMeses').value = c.validade_meses || 1;
+                    document.getElementById('metaConfig').style.display = c.ativar_meta ? 'block' : 'none';
+                }
+            });
+    }
+    
+    // ABRIR MODAL
+    window.abrirModalIndicacao = function(clienteId) {
+        if (!clienteId) return;
+        
+        clienteAtualId = clienteId;
+        indicadosSelecionados = [];
+        
+        document.getElementById('clienteInfoIndicacaoModal').style.display = 'block';
+        document.getElementById('nomeClienteIndicacaoModal').textContent = 'Cliente #' + clienteId;
+        document.getElementById('nomeClienteComissao').textContent = 'Cliente #' + clienteId;
+        document.getElementById('buscaClienteInput').value = '';
+        document.getElementById('resultadosBusca').style.display = 'none';
+        document.getElementById('listaIndicadosSelecionados').innerHTML = '<span style="color: var(--text-light);"><i class="fas fa-spinner fa-spin"></i> Carregando...</span>';
+        
+        // Reseta tabs
+        tabBtns.forEach(function(b) {
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.color = 'var(--text-light)';
+        });
+        document.querySelectorAll('.tab-content').forEach(function(c) { c.style.display = 'none'; });
+        
+        var tabInd = document.getElementById('tabBtnIndicacoes');
+        if (tabInd) { tabInd.classList.add('active'); tabInd.style.background = 'var(--primary)'; tabInd.style.color = 'white'; }
+        document.getElementById('tabIndicacoes').style.display = 'block';
+        
+        openModal('indicacaoModal');
+        carregarIndicacoesExistentes();
+        
+        setTimeout(function() { document.getElementById('buscaClienteInput').focus(); }, 300);
+    };
+    
+    // EVENT LISTENERS
+    document.getElementById('buscaClienteInput').addEventListener('input', function() {
+        var termo = this.value.trim();
+        if (timerBusca) clearTimeout(timerBusca);
+        timerBusca = setTimeout(function() { buscarClientes(termo); }, 300);
+    });
+    
+    document.addEventListener('click', function(e) {
+        var resultadosDiv = document.getElementById('resultadosBusca');
+        var inputBusca = document.getElementById('buscaClienteInput');
+        if (resultadosDiv && inputBusca && e.target !== inputBusca && !resultadosDiv.contains(e.target)) {
+            resultadosDiv.style.display = 'none';
+        }
+    });
+    
+    // BOTÃO SALVAR INDICAÇÕES
+    document.getElementById('btnSalvarIndicacoes').addEventListener('click', async function() {
+        if (!clienteAtualId) return;
+        
+        var btn = document.getElementById('btnSalvarIndicacoes');
+        var originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        
+        // FILTRA APENAS NOVAS INDICAÇÕES (sem indicacao_id)
+        var novasIndicacoes = indicadosSelecionados.filter(function(ind) {
+            return !ind.indicacao_id;
+        });
+        
+        
+        if (novasIndicacoes.length === 0) {
+            await window.AppUI.alert('✅ Nenhuma nova indicação para salvar.', {title:'Indicações'});
+            closeModal('indicacaoModal');
+            location.reload();
+            return;
+        }
+        
+        var promises = novasIndicacoes.map(function(ind) {
+            return fetch('/cliente/' + clienteAtualId + '/adicionar-indicacao/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({ indicado_id: ind.id })
+            }).then(function(r) { return r.json(); });
+        });
+        
+        Promise.all(promises)
+            .then(async function(results) {
+                var erros = results.filter(function(r) { return r.status === 'error'; });
+                if (erros.length > 0) {
+                    window.AppUI.alert('⚠️ Algumas falharam:\n' + erros.map(function(e) { return e.message; }).join('\n'));
+                } else {
+                    var comissaoTotal = results.reduce(function(total, r) {
+                        return total + (parseFloat(r.comissao) || 0);
+                    }, 0);
+                    
+                    var msg = '✅ ' + novasIndicacoes.length + ' indicação(s) salva(s)!';
+                    if (comissaoTotal > 0) {
+                        msg += '\n💰 Comissão total: R$ ' + comissaoTotal.toFixed(2).replace('.', ',');
+                    }
+                    await window.AppUI.alert(msg, {title:'Indicações salvas'});
+                    closeModal('indicacaoModal');
+                    location.reload();
+                }
+            })
+            .catch(function() { window.AppUI.alert('❌ Erro ao salvar'); })
+            .finally(function() { btn.disabled = false; btn.innerHTML = originalHtml; });
+    });
+    
+    
+})();
+
+// ============================================
+// SALVAR CONFIG DE COMISSÃO (GLOBAL)
+// ============================================
+function salvarConfigComissao() {
+    var clienteId = window._getClienteAtualId ? window._getClienteAtualId() : null;
+    
+    if (!clienteId) {
+        window.AppUI.alert('❌ Cliente não identificado');
+        return;
+    }
+    
+    var data = {
+        cliente_id: clienteId,
+        tipo_comissao: document.getElementById('tipoComissao').value,
+        valor_por_indicacao: moedaParaFloat(document.getElementById('valorIndicacao').value),
+        valor_por_renovacao: moedaParaFloat(document.getElementById('valorRenovacao').value),
+        ativar_meta: document.getElementById('ativarMeta').checked,
+        quantidade_meta: document.getElementById('quantidadeMeta').value,
+        bonus_meta: moedaParaFloat(document.getElementById('bonusMeta').value),
+        validade_meses: document.getElementById('validadeMeses').value,
+    };
+    
+    
+    fetch('/api/configuracao-comissao/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify(data)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        window.AppUI.alert(data.status === 'success' ? '✅ Configuração salva!' : '❌ ' + (data.message || 'Erro'));
+    })
+    .catch(function() { window.AppUI.alert('❌ Erro de rede'); });
+}
+</script>

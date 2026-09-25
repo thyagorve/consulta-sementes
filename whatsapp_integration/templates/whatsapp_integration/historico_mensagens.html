@@ -1,0 +1,560 @@
+{% extends 'base.html' %}
+
+{% block title %}Histórico de Mensagens Automáticas{% endblock %}
+
+{% block content %}
+
+<!-- ESTILOS VISUAIS "TOP" -->
+<style>
+    :root {
+        --primary-color-local: #0056b3;
+        --secondary-color-local: #f8f9fa;
+        --text-color-local: #333;
+        --card-bg-local: #ffffff;
+        --border-color-local: #e0e0e0;
+    }
+
+    /* Container Card Flutuante */
+    .history-card {
+        background: var(--card-bg, var(--card-bg-local));
+        border-radius: 10px;
+        border: 1px solid var(--border-color, var(--border-color-local));
+        padding: 2rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        margin: 2rem auto;
+        max-width: 1400px;
+        width: 98%;
+    }
+
+    /* Header */
+    .history-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #eee;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .history-title {
+        color: var(--primary-color-local);
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    /* Tabela Moderna Customizada */
+    .table-responsive {
+        overflow-x: auto;
+        border-radius: 8px;
+        border: 1px solid #eee;
+    }
+
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        font-size: 0.9rem;
+    }
+
+    .custom-table th {
+        background-color: var(--primary-color-local);
+        color: white;
+        font-weight: 600;
+        padding: 12px 15px;
+        text-align: left;
+        white-space: nowrap;
+        text-transform: uppercase;
+        font-size: 0.8rem;
+        letter-spacing: 0.5px;
+    }
+
+    .custom-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #eee;
+        color: #444;
+        vertical-align: middle;
+    }
+
+    .custom-table tr:hover {
+        background-color: #f1f3f5;
+    }
+
+    /* Badges e Status */
+    .status-badge {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .bg-success-custom { background: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; }
+    .bg-warning-custom { background: #fff3cd; color: #664d03; border: 1px solid #ffecb5; }
+    .bg-danger-custom  { background: #f8d7da; color: #842029; border: 1px solid #f5c2c7; }
+    .bg-info-custom    { background: #cff4fc; color: #055160; border: 1px solid #b6effb; }
+    .bg-secondary-custom { background: #e2e3e5; color: #41464b; border: 1px solid #d3d6d8; }
+
+    /* Botões de Ação */
+    .btn-action {
+        border: none;
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+        text-decoration: none;
+        margin: 0 2px;
+    }
+
+    .btn-view { background: #e7f1ff; color: #0d6efd; }
+    .btn-view:hover { background: #0d6efd; color: white; }
+
+    .btn-details-icon { background: #e0cffc; color: #6f42c1; }
+    .btn-details-icon:hover { background: #6f42c1; color: white; }
+
+    .btn-delete-icon { background: #f8d7da; color: #dc3545; }
+    .btn-delete-icon:hover { background: #dc3545; color: white; }
+
+    .btn-warning-custom {
+        background: #ffc107; color: #000; font-weight: 600; padding: 8px 16px; border: none; border-radius: 5px;
+        display: flex; align-items: center; gap: 5px; cursor: pointer;
+    }
+    .btn-warning-custom:hover { background: #e0a800; }
+
+    /* Modais */
+    .custom-modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);
+        z-index: 10000; display: none; align-items: center; justify-content: center;
+    }
+    
+    .custom-modal-box {
+        background: white; width: 90%; max-width: 500px;
+        border-radius: 12px; box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        overflow: hidden; transform: translateY(-20px); transition: 0.3s;
+        display: flex; flex-direction: column;
+    }
+
+    .custom-modal-header {
+        padding: 15px 20px; background: #f8f9fa; border-bottom: 1px solid #eee;
+        display: flex; justify-content: space-between; align-items: center; font-weight: bold;
+    }
+
+    .custom-modal-body { padding: 25px; font-size: 1rem; color: #555; overflow-y: auto; max-height: 70vh; }
+    
+    .custom-modal-footer {
+        padding: 15px 20px; background: #f8f9fa; border-top: 1px solid #eee;
+        display: flex; justify-content: flex-end; gap: 10px;
+    }
+
+    .text-truncate-custom {
+        max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+    }
+    
+    pre { background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #eee; white-space: pre-wrap; font-family: monospace; }
+</style>
+
+
+
+<div class="container-fluid">
+    
+    <div class="history-card">
+        <!-- Header -->
+        <div class="history-header">
+            <h2 class="history-title">
+                <i class="fas fa-history"></i> Histórico de Mensagens Automáticas
+            </h2>
+            
+            {% if is_owner_or_staff %}
+            <button id="btn-excluir-todos" class="btn-warning-custom">
+                <i class="fas fa-trash-alt"></i> Apagar Todo o Histórico
+            </button>
+            {% endif %}
+        </div>
+
+        <div id="statusMessages"></div>
+        
+        {% if error_message %}
+            <div class="alert alert-danger" style="margin-bottom: 20px; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; color: #842029;">
+                {{ error_message }}
+            </div>
+        {% endif %}
+
+        <!-- Tabela -->
+        <div class="table-responsive">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>WhatsApp</th>
+                        <th>Configuração</th>
+                        <th>Mensagem</th>
+                        <th>Data/Hora</th>
+                        <th>Status</th>
+                        <th>Detalhes</th>
+                        {% if is_owner_or_staff %}
+                        <th style="text-align: center;">Ações</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody id="historico-table-body">
+                    {% for msg in mensagens %}
+                    <tr id="historico-item-{{ msg.id }}">
+                        <td>
+                            <strong>
+                            {% if msg.cliente %}
+                                {{ msg.cliente.get_full_name|default:msg.cliente.username }}
+                            {% else %}
+                                <span class="text-muted">Cliente Removido</span>
+                            {% endif %}
+                            </strong>
+                        </td>
+                        <td>
+                            {% if msg.cliente %}
+                                <i class="fab fa-whatsapp" style="color: #28a745;"></i> {{ msg.cliente.whatsapp|default:"--" }}
+                            {% else %}
+                                --
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if msg.mensagem_configurada %}
+                                <div style="line-height: 1.2;">
+                                    <strong>{{ msg.mensagem_configurada.criterio_dias }} dias</strong><br>
+                                    <small style="color: #666;">{{ msg.mensagem_configurada.horario_envio|time:"H:i" }}</small>
+                                </div>
+                            {% else %}
+                                <span class="status-badge bg-secondary-custom">Manual</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="text-truncate-custom" title="{{ msg.mensagem_final_enviada }}">
+                                {{ msg.mensagem_final_enviada|default:"Sem mensagem"|truncatechars:50 }}
+                            </div>
+                            {% if msg.mensagem_final_enviada and msg.mensagem_final_enviada|length > 50 %}
+                            <button class="btn-action btn-view btn-view-message" 
+                                    data-message="{{ msg.mensagem_final_enviada }}" style="margin-top: 5px; font-size: 0.7rem;">
+                                Ver Completa
+                            </button>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="line-height: 1.2;">
+                                <span>{{ msg.data_tentativa|date:"d/m/Y" }}</span><br>
+                                <small style="color: #666;">{{ msg.data_tentativa|time:"H:i" }}</small>
+                            </div>
+                        </td>
+                        
+                        <!-- LÓGICA DE STATUS: Prioriza sucesso se houver 201/PENDING nos detalhes -->
+                        <td>
+                            {% if msg.detalhes and "HTTP 201" in msg.detalhes and "PENDING" in msg.detalhes %}
+                                <span class="status-badge bg-success-custom" title="API aceitou a mensagem (Status 201)">
+                                    <i class="fas fa-check-double"></i> Enviado
+                                </span>
+                            {% elif msg.status == 'ENVIADO' or msg.status == 'success' or msg.status == 'SENT' or msg.status == 'enviado' %}
+                                <span class="status-badge bg-success-custom">
+                                    <i class="fas fa-check"></i> Enviado
+                                </span>
+                            {% elif msg.status == 'PENDING' or msg.status == 'pendente' %}
+                                <span class="status-badge bg-warning-custom">
+                                    <i class="fas fa-clock"></i> Pendente
+                                </span>
+                            {% elif 'ERRO' in msg.status or msg.status == 'error' or msg.status == 'falha' or 'Falha' in msg.status %}
+                                <span class="status-badge bg-danger-custom">
+                                    <i class="fas fa-times"></i> Erro
+                                </span>
+                            {% else %}
+                                <span class="status-badge bg-secondary-custom">{{ msg.status|default:"N/A" }}</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if msg.detalhes and msg.detalhes != "Sem detalhes" %}
+                            <button class="btn-action btn-details-icon btn-details" data-details="{{ msg.detalhes }}" title="Ver Retorno da API">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        {% if is_owner_or_staff %}
+                        <td style="text-align: center;">
+                            <button class="btn-action btn-delete-icon btn-excluir" data-id="{{ msg.id }}" title="Excluir Registro">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{% if is_owner_or_staff %}8{% else %}7{% endif %}" style="text-align: center; padding: 3rem; color: #888;">
+                            <i class="fas fa-inbox" style="font-size: 2.5rem; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
+                            Nenhum histórico encontrado.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ================= MODAIS ================= -->
+
+<div class="custom-modal-overlay" id="modalExcluir">
+  <div class="custom-modal-box">
+      <div class="custom-modal-header" style="color: #dc3545;">
+        <span><i class="fas fa-exclamation-triangle"></i> Confirmar Exclusão</span>
+        <button type="button" class="btn-action" onclick="hideModal('modalExcluir')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="custom-modal-body">
+        <p>Tem certeza que deseja excluir este registro?</p>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn-action" style="background: #ddd;" onclick="hideModal('modalExcluir')">Cancelar</button>
+        <button type="button" class="btn-action btn-delete-icon" id="confirmarExclusaoBtn">Excluir</button>
+      </div>
+  </div>
+</div>
+
+<div class="custom-modal-overlay" id="modalExcluirTodos">
+  <div class="custom-modal-box">
+      <div class="custom-modal-header" style="background: #fff3cd; color: #856404;">
+        <span><i class="fas fa-broom"></i> Limpar Todo Histórico</span>
+        <button type="button" class="btn-action" onclick="hideModal('modalExcluirTodos')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="custom-modal-body">
+        <p>Atenção! Isso apagará <strong>todos</strong> os registros para todos os clientes.</p>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn-action" style="background: #ddd;" onclick="hideModal('modalExcluirTodos')">Cancelar</button>
+        <button type="button" class="btn-action" style="background: #ffc107; color: black;" id="confirmarExclusaoTodosBtn">Limpar Tudo</button>
+      </div>
+  </div>
+</div>
+
+<div class="custom-modal-overlay" id="modalMensagemCompleta">
+    <div class="custom-modal-box" style="max-width: 520px;">
+        <div class="custom-modal-header">
+            <span><i class="fas fa-comment"></i> Mensagem Completa</span>
+            <button type="button" class="btn-action" onclick="hideModal('modalMensagemCompleta')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="custom-modal-body"><pre id="mensagemCompletaTexto"></pre></div>
+        <div class="custom-modal-footer">
+            <button type="button" class="btn-action btn-view" onclick="copiarMensagem()">Copiar</button>
+            <button type="button" class="btn-action" style="background: #ddd;" onclick="hideModal('modalMensagemCompleta')">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div class="custom-modal-overlay" id="modalDetalhes">
+    <div class="custom-modal-box" style="max-width: 520px;">
+        <div class="custom-modal-header">
+            <span><i class="fas fa-info-circle"></i> Detalhes do Envio</span>
+            <button type="button" class="btn-action" onclick="hideModal('modalDetalhes')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="custom-modal-body"><pre id="detalhesTexto"></pre></div>
+        <div class="custom-modal-footer">
+            <button type="button" class="btn-action" style="background: #ddd;" onclick="hideModal('modalDetalhes')">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- SCRIPTS CORRIGIDOS -->
+<script>
+let currentDeleteId = null;
+
+// Exibir Feedback visual
+function showStatusMessage(message, type = 'info') {
+    const statusMessagesDiv = document.getElementById('statusMessages');
+    const colors = { 'success': '#d1e7dd', 'danger': '#f8d7da', 'warning': '#fff3cd', 'info': '#cff4fc' };
+    const textColors = { 'success': '#0f5132', 'danger': '#842029', 'warning': '#664d03', 'info': '#055160' };
+    
+    statusMessagesDiv.innerHTML = `
+        <div style="background: ${colors[type]}; color: ${textColors[type]}; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid currentColor;">
+            <span style="font-weight: 500;">${message}</span>
+            <button onclick="this.parentElement.remove()" style="border:none; background:none; cursor:pointer; font-size: 1.2rem;">&times;</button>
+        </div>
+    `;
+    
+    // Auto remover após 5 segundos
+    setTimeout(() => {
+        const alert = statusMessagesDiv.querySelector('div');
+        if(alert) alert.remove();
+    }, 5000);
+}
+
+// Obter Token CSRF Corretamente
+function getCSRFToken() {
+    const fromInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (fromInput) return fromInput.value;
+    
+    const cookieValue = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrftoken='))
+        ?.split('=')[1];
+    return cookieValue || '';
+}
+
+// Controle de Modais
+function showModal(modalId) {
+    document.getElementById(modalId).style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function hideModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('click', function(e) { 
+    if(e.target.classList.contains('custom-modal-overlay')) hideModal(e.target.id); 
+});
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', function() {
+
+    document.addEventListener('click', function(e) {
+        // Botão Excluir (Delegação de evento)
+        if (e.target.closest('.btn-excluir')) {
+            const btn = e.target.closest('.btn-excluir');
+            currentDeleteId = btn.getAttribute('data-id');
+            showModal('modalExcluir');
+        }
+        
+        // Botão Ver Mensagem
+        if (e.target.closest('.btn-view-message')) {
+            const btn = e.target.closest('.btn-view-message');
+            document.getElementById('mensagemCompletaTexto').textContent = btn.getAttribute('data-message');
+            showModal('modalMensagemCompleta');
+        }
+        
+        // Botão Ver Detalhes
+        if (e.target.closest('.btn-details')) {
+            const btn = e.target.closest('.btn-details');
+            let details = btn.getAttribute('data-details');
+            try {
+                // Tenta formatar JSON se possível
+                if (details.includes('{')) {
+                   const jsonStart = details.indexOf('{');
+                   const jsonEnd = details.lastIndexOf('}') + 1;
+                   if (jsonStart > -1 && jsonEnd > jsonStart) {
+                       const jsonPart = JSON.parse(details.substring(jsonStart, jsonEnd));
+                       details = JSON.stringify(jsonPart, null, 2);
+                   }
+                }
+            } catch(e) {}
+            document.getElementById('detalhesTexto').textContent = details;
+            showModal('modalDetalhes');
+        }
+    });
+    
+    // Binds de botões estáticos
+    const btnExcluirTodos = document.getElementById('btn-excluir-todos');
+    if(btnExcluirTodos) btnExcluirTodos.onclick = () => showModal('modalExcluirTodos');
+    
+    const btnConfirmarExc = document.getElementById('confirmarExclusaoBtn');
+    if(btnConfirmarExc) btnConfirmarExc.onclick = () => { deleteRecord(currentDeleteId); hideModal('modalExcluir'); };
+    
+    const btnConfirmarExcTodos = document.getElementById('confirmarExclusaoTodosBtn');
+    if(btnConfirmarExcTodos) btnConfirmarExcTodos.onclick = () => { clearAllRecords(); hideModal('modalExcluirTodos'); };
+});
+
+function copiarMensagem() {
+    navigator.clipboard.writeText(document.getElementById('mensagemCompletaTexto').textContent);
+    showStatusMessage('Mensagem copiada para a área de transferência!', 'success');
+}
+
+// --- FUNÇÕES DE COMUNICAÇÃO COM O SERVIDOR (CORRIGIDAS) ---
+
+function deleteRecord(id) {
+    // URL correta baseada no seu erro
+    const url = "{% url 'integra:api_delete_historico' 0 %}".replace('0', id);
+    
+    showStatusMessage('Processando exclusão...', 'info');
+    
+    fetch(url, { 
+        method: 'POST', 
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        } 
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP Error ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => { 
+        if(data.success) { 
+            const row = document.getElementById(`historico-item-${id}`);
+            if (row) {
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 300);
+            }
+            showStatusMessage('Registro excluído com sucesso!', 'success'); 
+        } else { 
+            showStatusMessage(data.error || data.message || 'Erro desconhecido ao excluir', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showStatusMessage('Erro de conexão ao excluir. Verifique o console.', 'danger');
+    });
+}
+
+function clearAllRecords() {
+    const url = "{% url 'integra:api_clear_all_historico' %}";
+    
+    showStatusMessage('Limpando histórico...', 'info');
+    
+    fetch(url, {
+        method: 'POST', 
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        } 
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP Error ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if(data.success) { 
+            document.getElementById('historico-table-body').innerHTML = `
+                <tr><td colspan="8" style="text-align: center; padding: 3rem; color: #888;">
+                    <i class="fas fa-inbox" style="font-size: 2.5rem; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
+                    Histórico limpo com sucesso.
+                </td></tr>
+            `; 
+            showStatusMessage('Histórico limpo com sucesso!', 'success'); 
+            setTimeout(() => location.reload(), 1500);
+        } else { 
+            showStatusMessage(data.error || data.message || 'Erro ao limpar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showStatusMessage('Erro de conexão ao limpar.', 'danger');
+    });
+}
+</script>
+
+
+{% endblock %}

@@ -5,6 +5,7 @@ import logging
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
+from sapp.access_control import has_any_direct_permission
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
@@ -40,8 +41,14 @@ def parse_decimal(value, default=None):
 # ============================
 
 @login_required
-@permission_required('almoxarifado.pode_ver_almoxarifado', raise_exception=True)
 def lista_itens(request):
+    if not has_any_direct_permission(
+        request.user,
+        'almoxarifado.pode_ver_almoxarifado',
+        'almoxarifado.pode_gerenciar_almoxarifado',
+    ):
+        messages.error(request, '❌ Você não tem permissão para acessar o almoxarifado.')
+        return redirect('sapp:redirecionar')
     mostrar_todos = request.GET.get('todos', '0') == '1'
     filtro_status = request.GET.get('status', '')
     ordenar = request.GET.get('ordenar', 'vencimento')  # padrão vencimento

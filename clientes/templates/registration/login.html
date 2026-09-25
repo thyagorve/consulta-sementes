@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+    <script id="standaloneThemeInit">(function(){try{document.documentElement.setAttribute('data-theme',localStorage.getItem('theme')||'light')}catch(e){}})();</script>
+
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="theme-color" id="standaloneThemeColor" content="#2563eb">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso ao Sistema - Painel de Gestão</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+
+        :root{--st-bg:#f8fafc;--st-card:#ffffff;--st-text:#0f172a;--st-muted:#64748b;--st-border:#e2e8f0;--st-primary:#2563eb;--st-primary-light:#3b82f6;--st-primary-dark:#1d4ed8}
+        :root[data-theme="dark"]{--st-bg:#0f172a;--st-card:#111827;--st-text:#f8fafc;--st-muted:#94a3b8;--st-border:#334155;--st-primary:#60a5fa;--st-primary-light:#93c5fd;--st-primary-dark:#3b82f6}
+        :root[data-theme="green"]{--st-bg:#f0fdf4;--st-card:#fff;--st-text:#14532d;--st-muted:#4b5563;--st-border:#bbf7d0;--st-primary:#16a34a;--st-primary-light:#22c55e;--st-primary-dark:#047857}
+        :root[data-theme="purple"]{--st-bg:#faf5ff;--st-card:#fff;--st-text:#3b0764;--st-muted:#6b7280;--st-border:#e9d5ff;--st-primary:#7c3aed;--st-primary-light:#8b5cf6;--st-primary-dark:#6d28d9}
+        :root[data-theme="orange"]{--st-bg:#fff7ed;--st-card:#fff;--st-text:#431407;--st-muted:#6b7280;--st-border:#fed7aa;--st-primary:#ea580c;--st-primary-light:#f97316;--st-primary-dark:#c2410c}
+        :root[data-theme="turquoise"]{--st-bg:#f0fdfa;--st-card:#fff;--st-text:#134e4a;--st-muted:#64748b;--st-border:#99f6e4;--st-primary:#0d9488;--st-primary-light:#14b8a6;--st-primary-dark:#0f766e}
+        :root[data-theme="blue"]{--st-bg:#eff6ff;--st-card:#fff;--st-text:#172554;--st-muted:#64748b;--st-border:#bfdbfe;--st-primary:#1d4ed8;--st-primary-light:#3b82f6;--st-primary-dark:#1e40af}
+        :root[data-theme="contrast"]{--st-bg:#000;--st-card:#050505;--st-text:#fff;--st-muted:#e5e7eb;--st-border:#fff;--st-primary:#60a5fa;--st-primary-light:#93c5fd;--st-primary-dark:#000}
+
+        :root{
+            --primary:var(--st-primary);--primary-light:var(--st-primary-light);--primary-dark:var(--st-primary-dark);
+            --bg:var(--st-bg);--bg-card:var(--st-card);--bg-hover:color-mix(in srgb,var(--st-primary) 7%,var(--st-card));
+            --text:var(--st-text);--text-light:var(--st-muted);--text-lighter:var(--st-muted);--border:var(--st-border);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--st-primary-dark) 0%, var(--st-primary) 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            display: flex;
+            width: 90%;
+            max-width: 1100px;
+            background: color-mix(in srgb, var(--st-card) 96%, transparent);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.8s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .image-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--st-primary), var(--st-primary-light));
+            padding: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .image-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            animation: float 20s infinite linear;
+        }
+        
+        @keyframes float {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            100% { transform: translate(-20px, -20px) rotate(360deg); }
+        }
+        
+        .image-container img {
+            max-width: 80%;
+            height: auto;
+            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));
+            z-index: 1;
+            transition: transform 0.5s ease;
+        }
+        
+        .image-container img:hover { transform: scale(1.05); }
+        
+        .form-container {
+            flex: 1;
+            padding: 35px 30px;
+            position: relative;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+        
+        .form-header { text-align: center; margin-bottom: 20px; }
+        .form-header h2 { color: var(--st-text); font-size: 26px; font-weight: 700; margin-bottom: 5px; }
+        .form-header p { color: var(--st-muted); font-size: 13px; }
+        
+        .form-group { margin-bottom: 14px; position: relative; }
+        .form-group label { display: block; margin-bottom: 6px; color: var(--st-text); font-weight: 600; font-size: 13px; }
+        
+        .input-with-icon { position: relative; }
+        .input-with-icon i {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--st-muted); z-index: 1; font-size: 0.9rem;
+        }
+        .input-with-icon input {
+            width: 100%; padding: 12px 12px 12px 38px;
+            border: 2px solid var(--st-border); border-radius: 10px;
+            font-size: 14px; outline: none; transition: all 0.3s ease;
+            background: var(--st-card);
+        }
+        .input-with-icon input:focus {
+            border-color: var(--st-primary); background: var(--st-card);
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--st-primary) 14%, transparent);
+        }
+        
+        .verification-code-display {
+            background: linear-gradient(135deg, var(--st-primary-dark) 0%, var(--st-primary) 100%);
+            color: white; padding: 12px 16px; border-radius: 12px;
+            text-align: center; margin: 14px 0;
+            box-shadow: 0 4px 12px color-mix(in srgb, var(--st-primary) 25%, transparent);
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            transition: background 0.5s ease;
+        }
+        .verification-code-display .code-label {
+            font-size: 11px; opacity: 0.85; letter-spacing: 0.5px;
+            text-transform: uppercase; display: flex; align-items: center; gap: 6px;
+        }
+        .verification-code-display .code-number {
+            font-size: 26px; font-weight: 800; letter-spacing: 6px;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+            background: rgba(255,255,255,0.15); padding: 4px 12px;
+            border-radius: 8px; line-height: 1;
+        }
+        .verification-code-display .code-timer {
+            font-size: 10px; opacity: 0.7; display: flex; align-items: center; gap: 4px;
+        }
+        
+        /* Estilo para display de recuperação (vertical) */
+        .verification-code-display.recovery-display {
+            flex-direction: column; gap: 8px;
+        }
+        .verification-code-display.recovery-display .code-label {
+            font-size: 13px; text-transform: none;
+        }
+        .verification-code-display.recovery-display .code-timer {
+            font-size: 12px; opacity: 0.8;
+        }
+        
+        .verification-input {
+            text-align: center; font-size: 18px !important;
+            letter-spacing: 5px; font-weight: 700;
+        }
+        .verification-input::placeholder { font-size: 12px; letter-spacing: 2px; font-weight: 400; }
+        
+        .whatsapp-send-section {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: white; padding: 14px 16px; border-radius: 12px;
+            text-align: center; margin: 14px 0;
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+        }
+        .whatsapp-send-section .info-text { font-size: 13px; margin-bottom: 10px; opacity: 0.95; }
+        .btn-whatsapp-send {
+            background: white; color: #25D366; border: none;
+            padding: 10px 24px; border-radius: 20px; font-size: 14px;
+            font-weight: 700; cursor: pointer; display: inline-flex;
+            align-items: center; gap: 8px; transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .btn-whatsapp-send:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .btn-whatsapp-send:disabled { background: #ccc; color: #999; cursor: not-allowed; transform: none; }
+        
+        .button {
+            width: 100%; padding: 12px;
+            background: linear-gradient(135deg, var(--st-primary), var(--st-primary-light));
+            border: none; border-radius: 10px; color: white;
+            font-size: 15px; font-weight: 600; cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px color-mix(in srgb, var(--st-primary) 30%, transparent);
+        }
+        .button:hover { transform: translateY(-2px); box-shadow: 0 6px 18px color-mix(in srgb, var(--st-primary) 40%, transparent); }
+        .button:active { transform: translateY(0); }
+        .button:disabled { background: #bdc3c7; cursor: not-allowed; box-shadow: none; }
+        
+        .toggle-link {
+            display: block; text-align: center; margin-top: 16px;
+            color: var(--st-primary); text-decoration: none; font-weight: 600;
+            cursor: pointer; transition: color 0.3s ease; font-size: 13px;
+        }
+        .toggle-link:hover { color: #3498db; text-decoration: underline; }
+        
+        .forgot-password-link {
+            display: inline-flex; align-items: center; gap: 5px;
+            color: var(--st-muted); text-decoration: none; font-size: 13px;
+            cursor: pointer; transition: color 0.3s ease;
+        }
+        .forgot-password-link:hover { color: var(--st-primary); }
+        
+        .message-container { margin-bottom: 16px; }
+        .success-message, .error-message, .info-message {
+            padding: 10px 12px; border-radius: 8px; text-align: center;
+            font-size: 12px; font-weight: 500; margin-bottom: 10px;
+            animation: slideDown 0.5s ease-out;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .success-message { color: #27ae60; background: #d5f4e6; border: 1px solid #2ecc71; }
+        .error-message { color: #e74c3c; background: #fadbd8; border: 1px solid #e74c3c; }
+        .info-message { color: #2980b9; background: #d6eaf8; border: 1px solid #3498db; }
+        
+        .form-divider {
+            display: flex; align-items: center; margin: 16px 0;
+            color: var(--st-muted); font-size: 13px;
+        }
+        .form-divider::before, .form-divider::after {
+            content: ''; flex: 1; height: 1px; background: #e8f0fe;
+        }
+        .form-divider span { padding: 0 12px; }
+        
+        .security-notice {
+            text-align: center; margin-top: 16px; padding: 10px;
+            background: #f8f9fa; border-radius: 8px; font-size: 11px; color: var(--st-muted);
+        }
+        .security-notice i { color: #27ae60; margin-right: 4px; }
+        
+        .password-toggle {
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--st-muted); cursor: pointer; z-index: 2;
+        }
+        
+        .countdown {
+            display: inline-block; background: rgba(255,255,255,0.2);
+            padding: 4px 10px; border-radius: 12px; margin-top: 8px; font-size: 11px;
+        }
+        
+        .help-text {
+            font-size: 12px; color: var(--st-muted); margin-top: 6px;
+            display: flex; align-items: center; gap: 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .container { flex-direction: column; width: 95%; }
+            .image-container { padding: 25px; min-height: 160px; }
+            .image-container img { max-width: 100px; }
+            .form-container { padding: 25px 18px; }
+            .verification-code-display { flex-direction: column; gap: 8px; padding: 10px 14px; }
+            .verification-code-display .code-number { font-size: 24px; letter-spacing: 4px; }
+        }
+        
+        @media (max-width: 480px) {
+            .form-container { padding: 20px 14px; }
+            .form-header h2 { font-size: 22px; }
+            .verification-code-display .code-number { font-size: 22px; letter-spacing: 3px; }
+        }
+    </style>
+
+    <script>(function(){try{var t=localStorage.getItem('theme')||'light';var c={light:'#2563eb',dark:'#60a5fa',blue:'#2563eb',green:'#16a34a',purple:'#7c3aed',orange:'#ea580c',turquoise:'#0d9488',contrast:'#ffd400'};var m=document.getElementById('standaloneThemeColor');if(m)m.content=c[t]||c.light;}catch(e){}})();</script>
+
+
+
+<link rel="stylesheet" href="{% static 'css/page-transitions.css' %}?v=20260913-v8">
+<link rel="stylesheet" href="{% static 'css/modal-manager.css' %}?v=20260913-v8">
+</head>
+<body class="app-route-loading">
+{% include 'includes/page_transition_overlay.html' %}
+
+    <div class="container" id="container">
+        <div class="image-container">
+            <img src="{% static 'logo2.png' %}" alt="Logo do Sistema" />
+        </div>
+        
+        <div class="form-container" id="form-container">
+            <div class="form-header">
+                <h2 id="form-title">Acessar Sistema</h2>
+                <p id="form-subtitle">Área exclusiva para revendedores e administradores</p>
+            </div>
+
+            <div id="message-container" class="message-container">
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="{% if message.tags == 'error' %}error-message{% elif message.tags == 'success' %}success-message{% else %}info-message{% endif %}">
+                            <i class="fas {% if message.tags == 'error' %}fa-exclamation-circle{% elif message.tags == 'success' %}fa-check-circle{% else %}fa-info-circle{% endif %}"></i>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- ========================================== -->
+            <!-- FORMULÁRIO DE LOGIN -->
+            <!-- ========================================== -->
+            <form id="login-form" method="POST" action="{% url 'login' %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.GET.next }}">
+                
+                <div class="form-group">
+                    <label for="username">Usuário</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="username" name="username" required placeholder="Digite seu usuário">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Senha</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="password" name="password" required placeholder="Digite sua senha">
+                        <button type="button" class="password-toggle" onclick="togglePassword('password')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="verification-code-display" id="login-code-display">
+                    <div class="code-label">
+                        <i class="fas fa-shield-alt"></i> CÓDIGO
+                    </div>
+                    <div class="code-number" id="login-verification-code">{{ login_verification_code }}</div>
+                    <div class="code-timer"><i class="far fa-clock"></i> 5 min</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-code-input">Digite o código acima</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-key"></i>
+                        <input type="text" id="login-code-input" name="verification_code" 
+                               class="verification-input" maxlength="4" required 
+                               placeholder="_ _ _ _" autocomplete="off">
+                    </div>
+                </div>
+                
+                <button type="submit" class="button">
+                    <i class="fas fa-sign-in-alt"></i> Entrar no Sistema
+                </button>
+                
+                <div style="text-align: center; margin-top: 14px;">
+                    <a id="forgot-password-link" class="forgot-password-link" href="javascript:void(0)">
+                        <i class="fas fa-question-circle"></i> Esqueci a senha?
+                    </a>
+                </div>
+            </form>
+
+            <!-- ========================================== -->
+            <!-- FORMULÁRIO DE RECUPERAÇÃO DE SENHA -->
+            <!-- ========================================== -->
+            <form id="forgot-password-form" method="POST" style="display: none;">
+                {% csrf_token %}
+                
+                <div id="recover-step-1">
+                    <div class="form-group">
+                        <label for="recover-username">
+                            <i class="fas fa-user"></i> Nome de Usuário
+                        </label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-user"></i>
+                            <input type="text" id="recover-username" name="recover_username" 
+                                   required placeholder="Digite seu nome de usuário"
+                                   oninput="checkUserWhatsApp()">
+                        </div>
+                        <span class="help-text" id="user-whatsapp-hint" style="display: none;">
+                            <i class="fab fa-whatsapp" style="color: #25D366;"></i>
+                            WhatsApp: <strong id="whatsapp-masked"></strong>
+                        </span>
+                    </div>
+                    
+                    <div class="verification-code-display recovery-display" id="recover-code-display">
+                        <div class="code-label">
+                            <i class="fas fa-paper-plane"></i> 
+                            <span id="recover-status-text">Digite o usuário para receber o código</span>
+                        </div>
+                        <div class="code-timer" id="recover-timer-text">
+                            <i class="fab fa-whatsapp"></i> O código será enviado para seu WhatsApp
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="recover-code-input">
+                            <i class="fas fa-key"></i> Digite o código de 6 dígitos recebido
+                        </label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-key"></i>
+                            <input type="text" id="recover-code-input" name="recovery_code" 
+                                   class="verification-input" maxlength="6" 
+                                   placeholder="_ _ _ _ _ _" autocomplete="off" disabled>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="button" id="btn-verify-code" disabled
+                            onclick="verifyRecoveryCode()">
+                        <i class="fas fa-check-circle"></i> Verificar Código
+                    </button>
+                    
+                    <div style="text-align: center; margin-top: 10px;">
+                        <a href="javascript:void(0)" onclick="resendRecoveryCode()" 
+                           id="resend-link" style="display: none; color: var(--st-primary); font-size: 12px; text-decoration: none;">
+                            <i class="fas fa-redo"></i> Reenviar código
+                        </a>
+                        <span id="resend-timer" style="display: none; color: var(--st-muted); font-size: 12px;">
+                            Reenviar em <strong id="resend-countdown">60</strong>s
+                        </span>
+                    </div>
+                </div>
+                
+                <div id="recover-step-2" style="display: none;">
+                    <div class="verification-code-display recovery-display" style="background: linear-gradient(135deg, #11998e, #38ef7d);">
+                        <div class="code-label" style="font-size: 14px; text-transform: none;">
+                            <i class="fas fa-check-circle"></i> CÓDIGO VERIFICADO
+                        </div>
+                        <div class="code-timer" style="font-size: 12px; opacity: 0.9;">
+                            Agora defina sua nova senha
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="new-password">
+                            <i class="fas fa-lock"></i> Nova Senha
+                        </label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" id="new-password" name="new_password" 
+                                   required placeholder="Digite a nova senha (mín. 4 caracteres)">
+                            <button type="button" class="password-toggle" onclick="togglePassword('new-password')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirm-password">
+                            <i class="fas fa-check-double"></i> Confirmar Nova Senha
+                        </label>
+                        <div class="input-with-icon">
+                            <i class="fas fa-lock"></i>
+                            <input type="password" id="confirm-password" name="confirm_password" 
+                                   required placeholder="Confirme a nova senha">
+                            <button type="button" class="password-toggle" onclick="togglePassword('confirm-password')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="button" onclick="resetPassword()">
+                        <i class="fas fa-save"></i> Salvar Nova Senha
+                    </button>
+                </div>
+            </form>
+
+            <!-- ========================================== -->
+            <!-- FORMULÁRIO DE CADASTRO -->
+            <!-- ========================================== -->
+            <form id="register-form" method="POST" action="{% url 'register' %}" style="display: none;">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                    <label for="fullname">Nome Completo</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="fullname" name="fullname" required placeholder="Seu nome completo">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-username">Usuário</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-at"></i>
+                        <input type="text" id="register-username" name="username" required placeholder="Escolha um nome de usuário">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-password">Senha</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="register-password" name="password" required placeholder="Crie uma senha segura">
+                        <button type="button" class="password-toggle" onclick="togglePassword('register-password')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">E-mail</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="email" name="email" required placeholder="seu@email.com">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="whatsapp">WhatsApp</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-phone"></i>
+                        <input type="text" id="whatsapp" name="whatsapp" required 
+                               placeholder="(11) 99999-9999" oninput="formatWhatsApp(this)">
+                    </div>
+                </div>
+                
+                <div class="whatsapp-send-section" id="whatsapp-section">
+                    <div class="info-text">
+                        <i class="fab fa-whatsapp"></i> Enviaremos um código para seu WhatsApp
+                    </div>
+                    <button type="button" class="btn-whatsapp-send" id="send-whatsapp-btn" onclick="sendWhatsAppCode()">
+                        <i class="fab fa-whatsapp"></i> Enviar Código
+                    </button>
+                    <div class="countdown" id="whatsapp-countdown" style="display: none;">
+                        Reenviar em <span id="countdown-timer">60</span>s
+                    </div>
+                </div>
+                
+                <div class="form-group" id="whatsapp-code-group" style="display: none;">
+                    <label for="whatsapp-code">Código recebido</label>
+                    <div class="input-with-icon">
+                        <i class="fas fa-key"></i>
+                        <input type="text" id="whatsapp-code" name="whatsapp_verification_code" 
+                               class="verification-input" maxlength="6" placeholder="_ _ _ _ _ _" autocomplete="off">
+                    </div>
+                </div>
+                
+                <button type="submit" class="button" id="register-submit-btn" disabled>
+                    <i class="fas fa-user-plus"></i> Criar Minha Conta
+                </button>
+            </form>
+
+            <div class="form-divider"><span>OU</span></div>
+
+            <a id="toggle-form" class="toggle-link">
+                <i class="fas fa-exchange-alt"></i> 
+                <span id="toggle-text">Ainda não tem uma conta? Cadastre-se</span>
+            </a>
+
+            <div class="security-notice">
+                <i class="fas fa-shield-alt"></i>
+                Seus dados estão protegidos com criptografia avançada
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // VARIÁVEIS GLOBAIS
+        // ==========================================
+        let whatsappCodeVerified = false;
+        let countdownInterval = null;
+        
+        // Recuperação de senha
+        let recoveryUserId = null; // marcador local; o servidor vincula a conta à sessão
+        let recoveryWhatsapp = null;
+        let recoveryCode = null;
+        let recoveryCodeVerified = false;
+        let recoveryTimerInterval = null;
+        let resendCountdownInterval = null;
+        
+        // ==========================================
+        // FUNÇÕES UTILITÁRIAS
+        // ==========================================
+        function clearMessages() { 
+            document.getElementById("message-container").innerHTML = ""; 
+        }
+        
+        function togglePassword(fieldId) {
+            const field = document.getElementById(fieldId);
+            const toggle = field.nextElementSibling;
+            const icon = toggle.querySelector('i');
+            if (field.type === "password") {
+                field.type = "text"; 
+                icon.classList.replace('fa-eye','fa-eye-slash');
+            } else {
+                field.type = "password"; 
+                icon.classList.replace('fa-eye-slash','fa-eye');
+            }
+        }
+        
+        function formatWhatsApp(input) {
+            let value = input.value.replace(/\D/g, '');
+            if (value.length > 0) {
+                if (value.length <= 2) value = '(' + value;
+                else if (value.length <= 7) value = '(' + value.substring(0,2) + ') ' + value.substring(2);
+                else if (value.length <= 11) value = '(' + value.substring(0,2) + ') ' + value.substring(2,7) + '-' + value.substring(7);
+                else value = '(' + value.substring(0,2) + ') ' + value.substring(2,7) + '-' + value.substring(7,11);
+            }
+            input.value = value;
+        }
+        
+        function showMessage(message, type) {
+            const icons = { 
+                success: 'fa-check-circle', 
+                error: 'fa-exclamation-circle', 
+                info: 'fa-info-circle' 
+            };
+            document.getElementById('message-container').innerHTML = `
+                <div class="${type}-message">
+                    <i class="fas ${icons[type]}"></i> ${message}
+                </div>`;
+            setTimeout(() => {
+                if (document.getElementById('message-container')) {
+                    document.getElementById('message-container').innerHTML = '';
+                }
+            }, 6000);
+        }
+        
+        // ==========================================
+        // LIMPEZA DE CÓDIGO DE LOGIN
+        // ==========================================
+        document.getElementById('login-code-input').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+            if (this.value.length > 4) this.value = this.value.slice(0, 4);
+        });
+        
+        // ==========================================
+        // WHATSAPP CODE (CADASTRO)
+        // ==========================================
+        document.getElementById('whatsapp-code').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+            if (this.value.length > 6) this.value = this.value.slice(0, 6);
+        });
+        
+        function sendWhatsAppCode() {
+            const whatsappNumber = document.getElementById('whatsapp').value.replace(/\D/g, '');
+            if (whatsappNumber.length < 10) { 
+                showMessage('Digite um WhatsApp válido', 'error'); 
+                return; 
+            }
+            
+            const sendBtn = document.getElementById('send-whatsapp-btn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            
+            fetch('{% url "send_whatsapp_code" %}', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/x-www-form-urlencoded', 
+                    'X-CSRFToken': '{{ csrf_token }}' 
+                },
+                body: `whatsapp=${encodeURIComponent(whatsappNumber)}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('✅ Código enviado para seu WhatsApp!', 'success');
+                    document.getElementById('whatsapp-code-group').style.display = 'block';
+                    startCountdown(60);
+                } else {
+                    showMessage(data.message || 'Erro ao enviar código', 'error');
+                    sendBtn.disabled = false;
+                    sendBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Código';
+                }
+            })
+            .catch(() => {
+                showMessage('Erro de conexão', 'error');
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = '<i class="fab fa-whatsapp"></i> Enviar Código';
+            });
+        }
+        
+        function startCountdown(seconds) {
+            const cd = document.getElementById('whatsapp-countdown');
+            const timer = document.getElementById('countdown-timer');
+            const btn = document.getElementById('send-whatsapp-btn');
+            cd.style.display = 'block';
+            let remaining = seconds;
+            if (countdownInterval) clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
+                remaining--;
+                timer.textContent = remaining;
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    cd.style.display = 'none';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fab fa-whatsapp"></i> Reenviar Código';
+                }
+            }, 1000);
+        }
+        
+        // ==========================================
+        // VERIFICAÇÃO CÓDIGO WHATSAPP (CADASTRO)
+        // ==========================================
+        document.getElementById('whatsapp-code').addEventListener('input', function() {
+            const code = this.value;
+            const submitBtn = document.getElementById('register-submit-btn');
+            if (code.length === 6) {
+                fetch('{% url "verify_whatsapp_code" %}', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded', 
+                        'X-CSRFToken': '{{ csrf_token }}' 
+                    },
+                    body: `code=${encodeURIComponent(code)}`
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        whatsappCodeVerified = true; 
+                        submitBtn.disabled = false;
+                        showMessage('✅ Código verificado!', 'success');
+                    } else {
+                        whatsappCodeVerified = false; 
+                        submitBtn.disabled = true;
+                        showMessage('❌ Código inválido', 'error');
+                    }
+                });
+            } else { 
+                whatsappCodeVerified = false; 
+                submitBtn.disabled = true; 
+            }
+        });
+        
+        // ==========================================
+        // TOGGLE LOGIN / CADASTRO / RECUPERAÇÃO
+        // ==========================================
+        document.getElementById("toggle-form").addEventListener("click", function() {
+            clearMessages();
+            const loginForm = document.getElementById("login-form");
+            const registerForm = document.getElementById("register-form");
+            const forgotForm = document.getElementById("forgot-password-form");
+            const forgotLink = document.getElementById("forgot-password-link");
+            const title = document.getElementById("form-title");
+            const subtitle = document.getElementById("form-subtitle");
+            const toggleText = document.getElementById("toggle-text");
+            
+            // Se estiver em qualquer tela que não seja login, volta para login
+            if (loginForm.style.display === "none") {
+                loginForm.style.display = "block"; 
+                registerForm.style.display = "none";
+                forgotForm.style.display = "none";
+                forgotLink.style.display = "inline-flex";
+                title.innerText = "Acessar Sistema";
+                subtitle.innerText = "Área exclusiva para revendedores e administradores";
+                toggleText.innerText = "Ainda não tem uma conta? Cadastre-se";
+            } else {
+                // Vai para cadastro
+                loginForm.style.display = "none"; 
+                registerForm.style.display = "block";
+                forgotForm.style.display = "none";
+                forgotLink.style.display = "none";
+                title.innerText = "Criar Conta";
+                subtitle.innerText = "Cadastre-se e comece a usar nosso sistema";
+                toggleText.innerText = "Já tem uma conta? Faça login";
+                document.getElementById('register-submit-btn').disabled = true;
+            }
+        });
+        
+        // Clique no "Esqueci a senha?"
+        document.getElementById("forgot-password-link").addEventListener("click", function() {
+            clearMessages();
+            const loginForm = document.getElementById("login-form");
+            const registerForm = document.getElementById("register-form");
+            const forgotForm = document.getElementById("forgot-password-form");
+            const forgotLink = document.getElementById("forgot-password-link");
+            const title = document.getElementById("form-title");
+            const subtitle = document.getElementById("form-subtitle");
+            const toggleText = document.getElementById("toggle-text");
+            
+            loginForm.style.display = "none";
+            registerForm.style.display = "none";
+            forgotForm.style.display = "block";
+            forgotLink.style.display = "none";
+            title.innerText = "Recuperar Senha";
+            subtitle.innerText = "Enviaremos um código para seu WhatsApp";
+            toggleText.innerText = "Voltar para o login";
+            
+            resetRecoveryState();
+        });
+        
+        // ==========================================
+        // RECUPERAÇÃO DE SENHA
+        // ==========================================
+        
+        function resetRecoveryState() {
+            recoveryUserId = null;
+            recoveryWhatsapp = null;
+            recoveryCode = null;
+            recoveryCodeVerified = false;
+            
+            document.getElementById('recover-username').value = '';
+            document.getElementById('recover-code-input').value = '';
+            document.getElementById('recover-code-input').disabled = true;
+            document.getElementById('btn-verify-code').disabled = true;
+            document.getElementById('recover-status-text').textContent = 'Digite o usuário para receber o código';
+            document.getElementById('recover-timer-text').innerHTML = '<i class="fab fa-whatsapp"></i> O código será enviado para seu WhatsApp';
+            document.getElementById('user-whatsapp-hint').style.display = 'none';
+            document.getElementById('resend-link').style.display = 'none';
+            document.getElementById('resend-timer').style.display = 'none';
+            document.getElementById('recover-step-1').style.display = 'block';
+            document.getElementById('recover-step-2').style.display = 'none';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+            
+            const codeDisplay = document.getElementById('recover-code-display');
+            codeDisplay.style.background = 'linear-gradient(135deg, var(--st-primary) 0%, var(--st-primary-dark) 100%)';
+            
+            if (recoveryTimerInterval) {
+                clearInterval(recoveryTimerInterval);
+                recoveryTimerInterval = null;
+            }
+            if (resendCountdownInterval) {
+                clearInterval(resendCountdownInterval);
+                resendCountdownInterval = null;
+            }
+        }
+        
+        function checkUserWhatsApp() {
+            const username = document.getElementById('recover-username').value.trim();
+            const hint = document.getElementById('user-whatsapp-hint');
+            const maskedSpan = document.getElementById('whatsapp-masked');
+            const codeInput = document.getElementById('recover-code-input');
+            const verifyBtn = document.getElementById('btn-verify-code');
+            const statusText = document.getElementById('recover-status-text');
+            const timerText = document.getElementById('recover-timer-text');
+            const codeDisplay = document.getElementById('recover-code-display');
+            const resendLink = document.getElementById('resend-link');
+            const resendTimer = document.getElementById('resend-timer');
+            
+            if (username.length < 2) {
+                hint.style.display = 'none';
+                codeInput.disabled = true;
+                verifyBtn.disabled = true;
+                statusText.textContent = 'Digite o usuário para receber o código';
+                timerText.innerHTML = '<i class="fab fa-whatsapp"></i> O código será enviado para seu WhatsApp';
+                codeDisplay.style.background = 'linear-gradient(135deg, var(--st-primary) 0%, var(--st-primary-dark) 100%)';
+                resendLink.style.display = 'none';
+                resendTimer.style.display = 'none';
+                return;
+            }
+            
+            fetch('{% url "check_username" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `username=${encodeURIComponent(username)}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.whatsapp) {
+                    recoveryUserId = true;
+                    recoveryWhatsapp = true;
+                    
+                    hint.style.display = 'flex';
+                    maskedSpan.textContent = data.whatsapp_masked;
+                    
+                    sendRecoveryCodeAuto();
+                } else {
+                    recoveryUserId = null;
+                    recoveryWhatsapp = null;
+                    hint.style.display = 'none';
+                    codeInput.disabled = true;
+                    verifyBtn.disabled = true;
+                    statusText.textContent = 'Usuário não encontrado';
+                    timerText.innerHTML = '<i class="fas fa-times-circle"></i> Verifique o nome de usuário';
+                    codeDisplay.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                    resendLink.style.display = 'none';
+                    resendTimer.style.display = 'none';
+                    
+                    if (username.length >= 3) {
+                        showMessage(data.message || 'Usuário não encontrado', 'error');
+                    }
+                }
+            })
+            .catch(() => {
+                hint.style.display = 'none';
+            });
+        }
+        
+        function sendRecoveryCodeAuto() {
+            if (!recoveryUserId || !recoveryWhatsapp) return;
+            
+            const codeInput = document.getElementById('recover-code-input');
+            const verifyBtn = document.getElementById('btn-verify-code');
+            const statusText = document.getElementById('recover-status-text');
+            const timerText = document.getElementById('recover-timer-text');
+            const codeDisplay = document.getElementById('recover-code-display');
+            const resendLink = document.getElementById('resend-link');
+            const resendTimer = document.getElementById('resend-timer');
+            
+            statusText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando código...';
+            timerText.innerHTML = '<i class="fab fa-whatsapp"></i> Aguarde...';
+            codeDisplay.style.background = 'linear-gradient(135deg, var(--st-primary) 0%, var(--st-primary-dark) 100%)';
+            resendLink.style.display = 'none';
+            resendTimer.style.display = 'none';
+            
+            fetch('{% url "send_recovery_code" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `username=${encodeURIComponent(document.getElementById('recover-username').value)}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    recoveryCode = null;
+                    
+                    statusText.innerHTML = '<i class="fas fa-check-circle"></i> Código enviado com sucesso!';
+                    timerText.innerHTML = '<i class="fab fa-whatsapp"></i> Verifique seu WhatsApp e digite o código abaixo';
+                    codeDisplay.style.background = 'linear-gradient(135deg, #25D366, #128C7E)';
+                    
+                    codeInput.disabled = false;
+                    codeInput.focus();
+                    verifyBtn.disabled = false;
+                    
+                    startResendCountdown(60);
+                    startRecoveryTimer(data.expires_in || 300);
+                    
+                    showMessage('✅ Código enviado para seu WhatsApp!', 'success');
+                } else {
+                    statusText.innerHTML = '<i class="fas fa-times-circle"></i> Erro ao enviar';
+                    timerText.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + (data.message || 'Tente novamente');
+                    codeDisplay.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                    codeInput.disabled = true;
+                    verifyBtn.disabled = true;
+                    resendLink.style.display = 'none';
+                    resendTimer.style.display = 'none';
+                    showMessage(data.message || 'Erro ao enviar código', 'error');
+                }
+            })
+            .catch(() => {
+                statusText.innerHTML = '<i class="fas fa-times-circle"></i> Erro de conexão';
+                timerText.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Verifique sua internet';
+                codeDisplay.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                showMessage('Erro de conexão', 'error');
+            });
+        }
+        
+        function startRecoveryTimer(seconds) {
+            const codeDisplay = document.getElementById('recover-code-display');
+            const statusText = document.getElementById('recover-status-text');
+            let remaining = seconds;
+            
+            if (recoveryTimerInterval) clearInterval(recoveryTimerInterval);
+            
+            recoveryTimerInterval = setInterval(() => {
+                remaining--;
+                
+                if (remaining <= 30 && remaining > 0) {
+                    statusText.innerHTML = `<i class="fas fa-clock"></i> Código expira em ${remaining}s`;
+                    codeDisplay.style.background = 'linear-gradient(135deg, #f39c12, #e67e22)';
+                }
+                
+                if (remaining <= 0) {
+                    clearInterval(recoveryTimerInterval);
+                    statusText.innerHTML = '<i class="fas fa-times-circle"></i> Código expirado';
+                    document.getElementById('recover-timer-text').innerHTML = '<i class="fas fa-exclamation-triangle"></i> Solicite um novo código';
+                    codeDisplay.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+                    document.getElementById('recover-code-input').disabled = true;
+                    document.getElementById('btn-verify-code').disabled = true;
+                    showMessage('⏰ Código expirado. Solicite um novo.', 'error');
+                }
+            }, 1000);
+        }
+        
+        function startResendCountdown(seconds) {
+            const resendLink = document.getElementById('resend-link');
+            const resendTimer = document.getElementById('resend-timer');
+            const resendCountdown = document.getElementById('resend-countdown');
+            
+            resendLink.style.display = 'none';
+            resendTimer.style.display = 'inline';
+            
+            let remaining = seconds;
+            
+            if (resendCountdownInterval) clearInterval(resendCountdownInterval);
+            
+            resendCountdownInterval = setInterval(() => {
+                remaining--;
+                resendCountdown.textContent = remaining;
+                
+                if (remaining <= 0) {
+                    clearInterval(resendCountdownInterval);
+                    resendTimer.style.display = 'none';
+                    resendLink.style.display = 'inline';
+                }
+            }, 1000);
+        }
+        
+        function resendRecoveryCode() {
+            if (!recoveryUserId) return;
+            sendRecoveryCodeAuto();
+            showMessage('📤 Reenviando código...', 'info');
+        }
+        
+        function verifyRecoveryCode() {
+            const codeInput = document.getElementById('recover-code-input');
+            const code = codeInput.value.trim();
+            
+            if (!code || code.length !== 6) {
+                showMessage('Digite o código de 6 dígitos recebido no WhatsApp', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('btn-verify-code');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+            btn.disabled = true;
+            
+            fetch('{% url "verify_recovery_code" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `code=${encodeURIComponent(code)}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> Verificar Código';
+                btn.disabled = false;
+                
+                if (data.success) {
+                    recoveryCodeVerified = true;
+                    document.getElementById('recover-step-1').style.display = 'none';
+                    document.getElementById('recover-step-2').style.display = 'block';
+                    
+                    if (recoveryTimerInterval) clearInterval(recoveryTimerInterval);
+                    if (resendCountdownInterval) clearInterval(resendCountdownInterval);
+                    
+                    showMessage('✅ Código verificado! Defina sua nova senha.', 'success');
+                } else {
+                    showMessage(data.message || '❌ Código inválido ou expirado', 'error');
+                }
+            })
+            .catch(() => {
+                btn.innerHTML = '<i class="fas fa-check-circle"></i> Verificar Código';
+                btn.disabled = false;
+                showMessage('Erro de conexão', 'error');
+            });
+        }
+        
+        // Enter no campo de código
+        document.getElementById('recover-code-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (!this.disabled) verifyRecoveryCode();
+            }
+        });
+        
+        // Limitar a números
+        document.getElementById('recover-code-input').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '');
+            if (this.value.length > 6) this.value = this.value.slice(0, 6);
+        });
+        
+        function resetPassword() {
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            if (!newPassword || newPassword.length < 6) {
+                showMessage('A senha deve ter no mínimo 6 caracteres', 'error');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                showMessage('As senhas não conferem', 'error');
+                return;
+            }
+            
+            if (!recoveryCodeVerified || !recoveryUserId) {
+                showMessage('Sessão expirada. Recomece o processo.', 'error');
+                return;
+            }
+            
+            const btn = document.querySelector('#recover-step-2 .button');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            btn.disabled = true;
+            
+            fetch('{% url "reset_password" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: `password=${encodeURIComponent(newPassword)}`
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.innerHTML = '<i class="fas fa-save"></i> Salvar Nova Senha';
+                btn.disabled = false;
+                
+                if (data.success) {
+                    showMessage('✅ Senha alterada com sucesso! Faça login.', 'success');
+                    setTimeout(() => {
+                        document.getElementById("toggle-form").click();
+                        document.getElementById('username').value = '';
+                        document.getElementById('password').value = '';
+                        document.getElementById('login-code-input').value = '';
+                        document.getElementById('username').focus();
+                    }, 2000);
+                } else {
+                    showMessage(data.message || 'Erro ao alterar senha', 'error');
+                }
+            })
+            .catch(() => {
+                btn.innerHTML = '<i class="fas fa-save"></i> Salvar Nova Senha';
+                btn.disabled = false;
+                showMessage('Erro de conexão', 'error');
+            });
+        }
+        
+        // ==========================================
+        // VALIDAÇÃO DO FORMULÁRIO DE CADASTRO
+        // ==========================================
+        document.getElementById('register-form').addEventListener('submit', function(e) {
+            if (!whatsappCodeVerified) {
+                e.preventDefault();
+                showMessage('Verifique seu WhatsApp antes de cadastrar', 'error');
+            }
+        });
+        
+        // ==========================================
+        // EFEITOS VISUAIS NOS INPUTS
+        // ==========================================
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('focus', function() { 
+                if (this.parentElement) {
+                    this.parentElement.style.transform = 'scale(1.01)'; 
+                }
+            });
+            input.addEventListener('blur', function() { 
+                if (this.parentElement) {
+                    this.parentElement.style.transform = 'scale(1)'; 
+                }
+            });
+        });
+    </script>
+
+
+
+<script src="{% static 'js/page-transitions.js' %}?v=20260913-v8"></script>
+<script src="{% static 'js/modal-manager.js' %}?v=20260913-v8"></script>
+</body>
+</html>

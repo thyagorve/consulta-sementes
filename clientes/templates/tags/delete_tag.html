@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+
+{% block title %}Excluir Tag{% endblock %}
+
+{% block content %}
+{% load static %}
+
+<style>
+.delete-tag-container {
+    max-width: 550px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.delete-tag-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+}
+
+.delete-tag-header {
+    background: linear-gradient(135deg, var(--danger), #c0392b);
+    padding: 20px 24px;
+}
+
+.delete-tag-header h2 {
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.delete-tag-body {
+    padding: 30px;
+    text-align: center;
+}
+
+.delete-icon {
+    font-size: 4rem;
+    color: var(--danger);
+    margin-bottom: 16px;
+    opacity: 0.8;
+}
+
+.delete-tag-body h3 {
+    color: var(--text);
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+}
+
+.delete-tag-body .tag-name-highlight {
+    display: inline-block;
+    background: var(--bg-hover);
+    color: var(--primary);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 1rem;
+    margin: 8px 0;
+    border: 1px solid var(--border);
+}
+
+.delete-tag-body .warning-text {
+    color: var(--text-light);
+    font-size: 0.85rem;
+    margin-top: 12px;
+    line-height: 1.5;
+}
+
+.delete-tag-body .warning-text i {
+    color: var(--warning);
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 24px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--danger), #c0392b);
+    color: white;
+}
+
+.btn-danger:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+}
+
+.btn-secondary {
+    background: var(--bg-hover);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--border);
+}
+
+/* Responsivo */
+@media (max-width: 600px) {
+    .delete-tag-container {
+        margin: 20px auto;
+    }
+    
+    .delete-tag-body {
+        padding: 20px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+</style>
+
+<div class="delete-tag-container">
+    
+    <div class="delete-tag-card">
+        <div class="delete-tag-header">
+            <h2><i class="fas fa-exclamation-triangle"></i> Confirmar Exclusão</h2>
+        </div>
+        <div class="delete-tag-body">
+            
+            <div class="delete-icon">
+                <i class="fas fa-trash-alt"></i>
+            </div>
+            
+            <h3>Tem certeza que deseja excluir esta tag?</h3>
+            
+            <div class="tag-name-highlight">
+                <i class="fas fa-tag"></i> {{ tag.nome }}
+            </div>
+            
+            {% if tag.descricao %}
+            <p style="color: var(--text-light); font-size: 0.85rem; margin-top: 8px;">
+                {{ tag.descricao }}
+            </p>
+            {% endif %}
+            
+            <p class="warning-text">
+                <i class="fas fa-exclamation-circle"></i>
+                Esta ação <strong>não pode ser desfeita</strong>. Todos os clientes que possuem esta tag perderão a associação.
+            </p>
+            
+            <form method="post" style="margin-top: 24px;">
+                {% csrf_token %}
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Sim, Excluir Permanentemente
+                    </button>
+                    <a href="{% url 'tags_page' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancelar
+                    </a>
+                </div>
+            </form>
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

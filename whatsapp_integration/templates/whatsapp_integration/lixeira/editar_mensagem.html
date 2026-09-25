@@ -1,0 +1,346 @@
+<!-- templates/integra/editar_mensagem.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-warning text-dark py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-edit me-2"></i> Editar Mensagem
+                        </h4>
+                        <div>
+                            <a href="{% url 'integra:detalhe_mensagem' mensagem.id %}" class="btn btn-dark btn-sm">
+                                <i class="fas fa-times me-1"></i> Cancelar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="editMessageForm" method="POST" enctype="multipart/form-data" class="mass-message-form">
+                    {% csrf_token %}
+                    
+                    <div class="card-body">
+                        <!-- Título -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-heading me-1"></i> Título da Mensagem
+                            </label>
+                            <input type="text" 
+                                   name="titulo" 
+                                   class="form-control" 
+                                   value="{{ mensagem.titulo|default:'' }}"
+                                   placeholder="Ex: Lembrete de Vencimento - Abril">
+                            <div class="form-text">Dê um título para identificar sua mensagem</div>
+                        </div>
+                        
+                        <!-- Mensagem -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-comment-dots me-1"></i> Conteúdo da Mensagem *
+                            </label>
+                            <textarea id="mensagem" 
+                                      name="mensagem" 
+                                      rows="8" 
+                                      class="form-control" 
+                                      required>{{ mensagem.mensagem }}</textarea>
+                            
+                            <!-- Variáveis -->
+                            <div class="mt-3">
+                                <label class="form-label">Variáveis Disponíveis:</label>
+                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="saudacao">
+                                        {saudacao}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="nome">
+                                        {nome}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="data_vencimento">
+                                        {data_vencimento}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="plano">
+                                        {plano}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="whatsapp">
+                                        {whatsapp}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="valor_servico">
+                                        {valor_servico}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="usuario">
+                                        {usuario}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="senha">
+                                        {senha}
+                                    </button>
+                                </div>
+                                <div class="form-text">Clique para inserir no texto</div>
+                            </div>
+                        </div>
+                        
+                        {% if mensagem.status == 'agendada' %}
+                        <!-- Agendamento -->
+                        <div class="card mb-4 border-warning">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-calendar-alt me-2"></i> Agendamento
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Data do Envio *</label>
+                                        <input type="date" 
+                                               name="data_agendamento" 
+                                               class="form-control" 
+                                               value="{{ mensagem.data_agendamento|date:'Y-m-d' }}"
+                                               required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Hora do Envio *</label>
+                                        <input type="time" 
+                                               name="hora_agendamento" 
+                                               class="form-control" 
+                                               value="{{ mensagem.data_agendamento|date:'H:i' }}"
+                                               required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Anexo -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">
+                                <i class="fas fa-paperclip me-1"></i> Anexo
+                            </label>
+                            
+                            {% if mensagem.arquivo_midia %}
+                            <div class="border rounded p-3 mb-3 bg-light">
+                                <div class="d-flex align-items-center">
+                                    {% if mensagem.arquivo_midia.url|lower|slice:'-4:' == '.pdf' %}
+                                    <i class="fas fa-file-pdf text-danger fa-2x me-3"></i>
+                                    {% elif mensagem.arquivo_midia.url|lower|slice:'-4:' in '.jpg,.jpeg,.png,.gif' %}
+                                    <i class="fas fa-file-image text-success fa-2x me-3"></i>
+                                    {% elif mensagem.arquivo_midia.url|lower|slice:'-4:' in '.mp4,.avi,.mov' %}
+                                    <i class="fas fa-file-video text-primary fa-2x me-3"></i>
+                                    {% elif mensagem.arquivo_midia.url|lower|slice:'-4:' in '.mp3,.wav' %}
+                                    <i class="fas fa-file-audio text-warning fa-2x me-3"></i>
+                                    {% else %}
+                                    <i class="fas fa-file text-secondary fa-2x me-3"></i>
+                                    {% endif %}
+                                    
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold">{{ mensagem.arquivo_midia.name|slice:"19:" }}</div>
+                                        <small class="text-muted">
+                                            {% widthratio mensagem.arquivo_midia.size 1024 1 as file_size_kb %}
+                                            {{ file_size_kb|floatformat:0 }} KB
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="remover_anexo" id="removerAnexo">
+                                        <label class="form-check-label" for="removerAnexo">
+                                            Remover
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-text mb-2">Arquivo atual</div>
+                            {% endif %}
+                            
+                            <input type="file" 
+                                   name="midia" 
+                                   class="form-control" 
+                                   accept="image/*,application/pdf,video/*,audio/*">
+                            <div class="form-text">Deixe em branco para manter o arquivo atual (máx. 10MB)</div>
+                        </div>
+                        
+                        <!-- Status Messages -->
+                        <div id="statusMessages" class="mb-4"></div>
+                        
+                        <!-- Botões -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'integra:detalhe_mensagem' mensagem.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save me-2"></i> Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('editMessageForm');
+    const mensagemTextarea = document.getElementById('mensagem');
+    const statusMessages = document.getElementById('statusMessages');
+    
+    // Inserir variáveis
+    document.querySelectorAll('[data-variable]').forEach(button => {
+        button.addEventListener('click', function() {
+            const variable = `{${this.dataset.variable}}`;
+            const start = mensagemTextarea.selectionStart;
+            const end = mensagemTextarea.selectionEnd;
+            const text = mensagemTextarea.value;
+            
+            mensagemTextarea.value = text.substring(0, start) + variable + text.substring(end);
+            mensagemTextarea.focus();
+            mensagemTextarea.setSelectionRange(start + variable.length, start + variable.length);
+        });
+    });
+    
+    // Validação de arquivo
+    const fileInput = document.querySelector('input[name="midia"]');
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                // Validar tamanho (10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    showMessage('O arquivo é muito grande (máximo 10MB)', 'danger');
+                    this.value = '';
+                    return;
+                }
+                
+                // Validar tipo
+                const allowedTypes = ['image/', 'video/', 'audio/', 'application/pdf'];
+                const isValidType = allowedTypes.some(type => file.type.startsWith(type));
+                
+                if (!isValidType) {
+                    showMessage('Tipo de arquivo não permitido', 'danger');
+                    this.value = '';
+                }
+            }
+        });
+    }
+    
+    // Mostrar mensagem
+    function showMessage(text, type = 'info') {
+        const alertClass = {
+            'success': 'alert-success',
+            'danger': 'alert-danger',
+            'warning': 'alert-warning',
+            'info': 'alert-info'
+        }[type] || 'alert-info';
+        
+        statusMessages.innerHTML = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                ${text}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+    }
+    
+    // Validação do formulário
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Validar mensagem
+        if (!mensagemTextarea.value.trim()) {
+            showMessage('A mensagem não pode estar vazia', 'warning');
+            mensagemTextarea.focus();
+            return;
+        }
+        
+        // Se for agendada, validar data/hora
+        if (document.querySelector('input[name="data_agendamento"]')) {
+            const data = document.querySelector('input[name="data_agendamento"]').value;
+            const hora = document.querySelector('input[name="hora_agendamento"]').value;
+            
+            if (!data || !hora) {
+                showMessage('Data e hora são obrigatórias para agendamento', 'warning');
+                return;
+            }
+            
+            // Verificar se é no futuro
+            const dataHora = new Date(data + 'T' + hora);
+            if (dataHora <= new Date()) {
+                showMessage('A data/hora deve ser no futuro', 'warning');
+                return;
+            }
+        }
+        
+        // Enviar formulário
+        const formData = new FormData(form);
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Salvando...';
+        submitBtn.disabled = true;
+        
+        fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                return response;
+            }
+            throw new Error('Erro na requisição');
+        })
+        .then(() => {
+            showMessage('Mensagem atualizada com sucesso!', 'success');
+            setTimeout(() => {
+                window.location.href = "{% url 'integra:detalhe_mensagem' mensagem.id %}";
+            }, 1500);
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showMessage('Erro ao salvar alterações', 'danger');
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+    });
+    
+    // Configurar data mínima para amanhã
+    const dataInput = document.querySelector('input[name="data_agendamento"]');
+    if (dataInput) {
+        const amanha = new Date();
+        amanha.setDate(amanha.getDate() + 1);
+        const amanhaStr = amanha.toISOString().split('T')[0];
+        dataInput.min = amanhaStr;
+    }
+});
+</script>
+
+<style>
+.card {
+    border-radius: 10px;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.btn {
+    border-radius: 6px;
+    padding: 10px 20px;
+}
+
+.form-control, .form-select {
+    border-radius: 6px;
+    padding: 10px 15px;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.25);
+}
+
+.alert {
+    border-radius: 6px;
+}
+</style>
+{% endblock %}

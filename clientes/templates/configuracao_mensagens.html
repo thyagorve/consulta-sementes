@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+
+{% block title %}Configuração de Mensagens{% endblock %}
+
+{% block content %}
+
+<style>
+    .msg-container { max-width: 1100px; margin: 1.5rem auto; padding: 0 1rem; }
+
+    .msg-card { background: var(--bg-card, #ffffff); border-radius: 16px; border: 1px solid var(--border, #e5e7eb); box-shadow: 0 4px 24px rgba(0,0,0,0.06); overflow: hidden; }
+    .msg-card-header { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border, #e5e7eb); gap: 1rem; flex-wrap: wrap; }
+    .msg-title { font-size: 1.2rem; font-weight: 700; color: var(--text, #1f2937); display: flex; align-items: center; gap: 0.6rem; margin: 0; }
+    .msg-title i { color: var(--primary); font-size: 1.3rem; }
+
+    .btn-msg { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; transition: all 0.25s; text-decoration: none; white-space: nowrap; }
+    .btn-msg-primary { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff; }
+    .btn-msg-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 35%, transparent); }
+    .btn-msg-success { background: #10b981; color: #fff; }
+    .btn-msg-success:hover { background: #059669; }
+    .btn-msg-warning { background: #f59e0b; color: #fff; }
+    .btn-msg-warning:hover { background: #d97706; }
+    .btn-msg-edit { background: rgba(245,158,11,0.15); color: #d97706; }
+    .btn-msg-edit:hover { background: rgba(245,158,11,0.25); }
+    .btn-msg-delete { background: rgba(239,68,68,0.1); color: #dc2626; }
+    .btn-msg-delete:hover { background: rgba(239,68,68,0.2); }
+    .btn-msg-cancel { background: var(--bg-hover, #f3f4f6); color: var(--text, #374151); border: 1px solid var(--border, #d1d5db); }
+
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .msg-table { width: 100%; border-collapse: collapse; min-width: 600px; }
+    .msg-table thead th { background: var(--bg-hover, #f9fafb); color: var(--text-light, #6b7280); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.9rem 1rem; border-bottom: 2px solid var(--border, #e5e7eb); text-align: left; white-space: nowrap; }
+    .msg-table tbody td { padding: 1rem; border-bottom: 1px solid var(--border, #f3f4f6); color: var(--text, #374151); font-size: 0.9rem; vertical-align: middle; }
+    .msg-table tbody tr:hover { background: var(--bg-hover, #f9fafb); }
+    .msg-preview { max-width: 350px; white-space: pre-wrap; word-break: break-word; font-size: 0.85rem; line-height: 1.5; color: var(--text-muted, #6b7280); }
+    .dias-badge { display: inline-block; padding: 0.3rem 0.7rem; border-radius: 20px; font-weight: 600; font-size: 0.8rem; background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); }
+    .acoes-cell { display: flex; gap: 0.4rem; justify-content: center; }
+    .btn-icon { width: 36px; height: 36px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 0.9rem; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted, #9ca3af); }
+    .empty-state i { font-size: 3rem; display: block; margin-bottom: 0.8rem; opacity: 0.5; }
+
+    /* 🔥 CARDS DE MENSAGENS FIXAS */
+    .fixed-msg-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2rem; }
+    .fixed-msg-card { background: var(--bg-card); border: 2px solid var(--border-color); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden; }
+    .fixed-msg-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+    .fixed-msg-card.bemvindo::before { background: linear-gradient(90deg, #10b981, #059669); }
+    .fixed-msg-card.pagamento::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .fixed-msg-card h3 { font-size: 1rem; font-weight: 700; margin: 0 0 1rem 0; display: flex; align-items: center; gap: 0.5rem; }
+    .fixed-msg-card .msg-textarea { width: 100%; min-height: 120px; padding: 0.75rem; border: 2px solid var(--border-color); border-radius: 10px; background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; resize: vertical; font-family: inherit; line-height: 1.5; box-sizing: border-box; transition: all 0.3s; }
+    .fixed-msg-card .msg-textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent); }
+    .fixed-msg-card .var-tags-wrap { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.75rem; }
+    .fixed-msg-card .var-tag { display: inline-block; padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.7rem; font-weight: 600; font-family: monospace; cursor: pointer; border: 2px solid var(--primary); color: var(--primary); background: transparent; transition: all 0.2s; }
+    .fixed-msg-card .var-tag:hover { background: var(--primary); color: #fff; }
+    .char-count { text-align: right; font-size: 0.7rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: var(--bg-card, #ffffff); border-radius: 16px; width: 100%; max-width: 520px; max-height: 82dvh; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.25); animation: slideUp 0.3s ease; overflow: hidden; }
+    @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header { flex-shrink: 0; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border, #e5e7eb); display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--text, #1f2937); display: flex; align-items: center; gap: 0.5rem; }
+    .modal-close { width: 36px; height: 36px; border-radius: 50%; border: none; background: var(--bg-hover, #f3f4f6); color: var(--text-light, #6b7280); cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .modal-close:hover { background: #ef4444; color: #fff; }
+    .tab-nav { flex-shrink: 0; display: flex; border-bottom: 2px solid var(--border, #e5e7eb); padding: 0 1.5rem; gap: 0; }
+    .tab-btn { padding: 0.8rem 1.2rem; border: none; background: transparent; color: var(--text-muted, #9ca3af); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; display: flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-btn:hover { color: var(--text, #374151); }
+    .modal-body-scroll { flex: 1; overflow-y: auto; padding: 0; }
+    .tab-content { display: none; padding: 1.5rem; }
+    .tab-content.active { display: block; }
+    .modal-footer { flex-shrink: 0; padding: 1rem 1.5rem; border-top: 1px solid var(--border, #e5e7eb); display: flex; justify-content: flex-end; gap: 0.75rem; background: var(--bg-hover, #f9fafb); }
+    .form-row { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .form-group-msg { flex: 1; margin-bottom: 1rem; }
+    .form-group-msg label { display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.85rem; color: var(--text, #374151); }
+    .form-group-msg input, .form-group-msg textarea { width: 100%; padding: 0.7rem 0.9rem; border: 2px solid var(--border, #e5e7eb); border-radius: 10px; background: var(--bg-card, #fff); color: var(--text, #1f2937); font-size: 0.9rem; transition: border 0.2s; box-sizing: border-box; }
+    .form-group-msg input:focus, .form-group-msg textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent); }
+    .form-group-msg textarea { min-height: 150px; resize: vertical; line-height: 1.5; font-family: inherit; }
+    .var-tags-wrap { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; }
+    .var-tag { display: inline-block; padding: 0.35rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; font-family: monospace; cursor: pointer; border: 2px solid var(--primary); color: var(--primary); background: transparent; transition: all 0.2s; }
+    .var-tag:hover { background: var(--primary); color: #fff; transform: translateY(-1px); }
+    .wp-preview { background: #e5ddd5; border-radius: 12px; overflow: hidden; max-width: 400px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .wp-preview-header { background: #075e54; color: #fff; padding: 0.7rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
+    .wp-preview-chat { padding: 1rem; min-height: 120px; display: flex; flex-direction: column; gap: 0.5rem; }
+    .wp-bubble { background: #dcf8c6; padding: 0.6rem 0.9rem; border-radius: 8px 8px 2px 8px; max-width: 85%; align-self: flex-end; font-size: 0.85rem; line-height: 1.4; white-space: pre-wrap; word-break: break-word; color: #303030; box-shadow: 0 1px 1px rgba(0,0,0,0.1); }
+    .wp-preview-footer { background: #f0f0f0; padding: 0.5rem 0.8rem; border-top: 1px solid #ddd; }
+    .wp-preview-footer input { width: 100%; padding: 0.5rem 0.8rem; border-radius: 20px; border: none; background: #fff; font-size: 0.8rem; color: #999; }
+
+    @media (max-width: 768px) {
+        .fixed-msg-cards { grid-template-columns: 1fr; }
+        .msg-card-header { flex-direction: column; text-align: center; }
+        .form-row { flex-direction: column; gap: 0.5rem; }
+        .modal-box { width: calc(100vw - 24px); max-width: 520px; max-height: 84dvh; border-radius: 14px; }
+        .tab-btn { padding: 0.7rem 0.8rem; font-size: 0.8rem; }
+        .modal-footer { flex-direction: column; }
+        .acoes-cell { flex-direction: column; gap: 0.3rem; }
+        .btn-icon { width: 100%; }
+    }
+</style>
+
+<div class="msg-container">
+
+    <!-- 🔥 MENSAGENS FIXAS (BOAS-VINDAS + PAGAMENTO) -->
+    <div class="fixed-msg-cards">
+        <!-- Boas-vindas -->
+        <div class="fixed-msg-card bemvindo">
+            <h3><i class="fas fa-hand-sparkles" style="color:#10b981;"></i> Boas-vindas</h3>
+            <form method="post" action="{% url 'configuracao_mensagens' %}">
+                {% csrf_token %}
+                <input type="hidden" name="tipo" value="bemvindo">
+                <textarea name="mensagem_bem_vindo" class="msg-textarea" placeholder="Olá {nome}, seja bem-vindo! 🎉">{{ configuracao.mensagem_bem_vindo|default:'' }}</textarea>
+                <div class="char-count"><span id="char-bv">0</span> caracteres</div>
+                <div class="var-tags-wrap">
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_bem_vindo','{nome}')">{nome}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_bem_vindo','{plano}')">{plano}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_bem_vindo','{usuario}')">{usuario}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_bem_vindo','{senha}')">{senha}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_bem_vindo','{whatsapp}')">{whatsapp}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_bem_vindo','{data_vencimento}')">{vencimento}</button>
+                </div>
+                <button type="submit" class="btn-msg btn-msg-success" style="margin-top:1rem;width:100%;"><i class="fas fa-save"></i> Salvar Boas-vindas</button>
+            </form>
+        </div>
+
+        <!-- Confirmação de Pagamento -->
+        <div class="fixed-msg-card pagamento">
+            <h3><i class="fas fa-check-circle" style="color:#f59e0b;"></i> Confirmação de Pagamento</h3>
+            <form method="post" action="{% url 'configuracao_mensagens' %}">
+                {% csrf_token %}
+                <input type="hidden" name="tipo" value="pagamento">
+                <textarea name="mensagem_confirmacao_pagamento" class="msg-textarea" placeholder="✅ Pagamento confirmado, {nome}! Seu plano {plano} está ativo até {data_vencimento}.">{{ configuracao.mensagem_confirmacao_pagamento|default:'' }}</textarea>
+                <div class="char-count"><span id="char-pg">0</span> caracteres</div>
+                <div class="var-tags-wrap">
+                    
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_confirmacao_pagamento','{nome}')">{nome}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_confirmacao_pagamento','{plano}')">{plano}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_confirmacao_pagamento','{usuario}')">{usuario}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_confirmacao_pagamento','{senha}')">{senha}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_confirmacao_pagamento','{whatsapp}')">{whatsapp}</button>
+                    <button type="button" class="var-tag" onclick="inserirNoCampo('mensagem_confirmacao_pagamento','{data_vencimento}')">{vencimento}</button>
+                </div>
+                <button type="submit" class="btn-msg btn-msg-warning" style="margin-top:1rem;width:100%;"><i class="fas fa-save"></i> Salvar Pagamento</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MENSAGENS DE VENCIMENTO (TABELA + MODAL - MANTIDO IGUAL) -->
+    <div class="msg-card">
+        <div class="msg-card-header">
+            <h2 class="msg-title"><i class="fas fa-envelope-open-text"></i> Mensagens Automáticas de Vencimento</h2>
+            <button onclick="abrirModalNovaMensagem()" class="btn-msg btn-msg-primary"><i class="fas fa-plus"></i> Nova Mensagem</button>
+        </div>
+        <div class="table-wrap">
+            <table class="msg-table">
+                <thead><tr><th>Critério</th><th>Conteúdo</th><th>Horário</th><th style="text-align:center;">Ações</th></tr></thead>
+                <tbody id="messages-body">
+                    {% for mensagem in mensagens %}
+                    <tr id="mensagem-{{ mensagem.id }}">
+                        <td><span class="dias-badge">{% if mensagem.criterio_dias == 0 %}No dia{% elif mensagem.criterio_dias > 0 %}{{ mensagem.criterio_dias }} dias antes{% else %}{{ mensagem.criterio_dias|stringformat:"d"|slice:"1:" }} dias após{% endif %}</span></td>
+                        <td><div class="msg-preview">{{ mensagem.mensagem_texto|truncatechars:120 }}</div></td>
+                        <td><i class="far fa-clock"></i> {{ mensagem.horario_envio|time:"H:i" }}</td>
+                        <td><div class="acoes-cell">
+                            <button class="btn-icon btn-msg-edit" onclick="editarMensagem({{ mensagem.id }})" title="Editar"><i class="fas fa-pencil-alt"></i></button>
+                            <button class="btn-icon btn-msg-delete" onclick="removerMensagem({{ mensagem.id }})" title="Remover"><i class="fas fa-trash"></i></button>
+                        </div></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4"><div class="empty-state"><i class="fas fa-inbox"></i><p>Nenhuma mensagem automática configurada.</p></div></td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL (MANTIDO IGUAL) -->
+<div id="modalMensagem" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header"><h3><i class="fas fa-paper-plane" style="color:var(--primary);"></i> <span id="modal-title">Nova Mensagem</span></h3><button class="modal-close" onclick="fecharModal()">&times;</button></div>
+        <div class="tab-nav">
+            <button class="tab-btn active" onclick="mudarAba('config')"><i class="fas fa-cog"></i> Config</button>
+            <button class="tab-btn" onclick="mudarAba('mensagem')"><i class="fas fa-comment-dots"></i> Mensagem</button>
+            <button class="tab-btn" onclick="mudarAba('preview')"><i class="fab fa-whatsapp"></i> Prévia</button>
+        </div>
+        <form method="post" action="{% url 'configuracao_mensagens' %}" id="message-form">
+            {% csrf_token %}<input type="hidden" name="mensagem_id" id="mensagem_id">
+            <div class="modal-body-scroll">
+                <div class="tab-content active" id="tab-config">
+                    <div class="form-row">
+                        <div class="form-group-msg"><label><i class="fas fa-calendar-day"></i> Dias:</label><input type="number" name="criterio_dias" id="criterio_dias" required placeholder="5 (antes), 0 (hoje), -3 (depois)"></div>
+                        <div class="form-group-msg"><label><i class="far fa-clock"></i> Horário:</label><input type="time" name="horario_envio" id="horario_envio" required></div>
+                    </div>
+                </div>
+                <div class="tab-content" id="tab-mensagem">
+                    <div class="form-group-msg"><label><i class="fas fa-comment-dots"></i> Texto:</label><textarea name="mensagem_texto" id="mensagem_texto" required placeholder="Digite sua mensagem..."></textarea><div class="char-count"><span id="char-count">0</span> caracteres</div></div>
+                    <div class="var-tags-wrap">
+                        <button type="button" class="var-tag" onclick="inserirVariavel('{saudacao}')">{saudacao}</button>
+                        <button type="button" class="var-tag" onclick="inserirVariavel('{nome}')">{nome}</button>
+                        <button type="button" class="var-tag" onclick="inserirVariavel('{data_vencimento}')">{vencimento}</button>
+                        <button type="button" class="var-tag" onclick="inserirVariavel('{plano}')">{plano}</button>
+   
+                        <button type="button" class="var-tag" onclick="inserirVariavel('{valor_total_a_pagar}')">{total}</button>
+                        <button type="button" class="var-tag" onclick="inserirVariavel('{usuario}')">{usuario}</button>
+                        <button type="button" class="var-tag" onclick="inserirVariavel('{senha}')">{senha}</button>
+                    </div>
+                </div>
+                <div class="tab-content" id="tab-preview">
+                    <div class="wp-preview"><div class="wp-preview-header"><i class="fas fa-arrow-left"></i><span>Cliente</span></div><div class="wp-preview-chat"><div class="wp-bubble" id="wp-preview-text">Sua mensagem aparecerá aqui...</div></div><div class="wp-preview-footer"><input type="text" disabled placeholder="Mensagem"></div></div>
+                    <div style="text-align:center;margin-top:1rem;"><button type="button" class="btn-msg btn-msg-primary" onclick="atualizarPreview()"><i class="fas fa-sync-alt"></i> Atualizar Prévia</button></div>
+                </div>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn-msg btn-msg-cancel" onclick="fecharModal()">Cancelar</button><button type="submit" class="btn-msg btn-msg-primary"><i class="fas fa-save"></i> Salvar</button></div>
+        </form>
+    </div>
+</div>
+
+<script>
+function mudarAba(aba) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    event.target.closest('.tab-btn').classList.add('active');
+    document.getElementById('tab-' + aba).classList.add('active');
+    if (aba === 'preview') atualizarPreview();
+}
+function atualizarPreview() { document.getElementById('wp-preview-text').innerText = document.getElementById('mensagem_texto').value || 'Sua mensagem aparecerá aqui...'; }
+function abrirModalNovaMensagem() {
+    document.getElementById("message-form").reset(); document.getElementById("mensagem_id").value = "";
+    document.getElementById("modal-title").innerText = "Nova Mensagem"; document.getElementById("char-count").innerText = "0";
+    mudarAbaSilenciosa('config'); document.getElementById("modalMensagem").classList.add("active");
+}
+function fecharModal() { document.getElementById("modalMensagem").classList.remove("active"); }
+function mudarAbaSilenciosa(aba) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('.tab-btn[onclick*="' + aba + '"]')?.classList.add('active');
+    document.getElementById('tab-' + aba)?.classList.add('active');
+}
+function editarMensagem(id) {
+    const url = "{% url 'detalhe_mensagem' 0 %}".replace('/0/', '/' + id + '/');
+    fetch(url).then(r => r.json()).then(data => {
+        document.getElementById("modal-title").innerText = "Editar Mensagem";
+        document.getElementById("mensagem_id").value = data.id;
+        document.getElementById("criterio_dias").value = data.criterio_dias;
+        document.getElementById("mensagem_texto").value = data.mensagem_texto;
+        document.getElementById("horario_envio").value = data.horario_envio;
+        document.getElementById("char-count").innerText = data.mensagem_texto.length;
+        mudarAbaSilenciosa('config'); document.getElementById("modalMensagem").classList.add("active");
+    });
+}
+async function removerMensagem(id) {
+    if (!(await window.AppUI.confirm("Tem certeza que deseja remover esta mensagem?", {title:'Remover mensagem', danger:true, confirmText:'Remover'}))) return;
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    fetch(`/remover_mensagem/${id}/`, { method: "POST", headers: { "X-CSRFToken": csrf, "Content-Type": "application/x-www-form-urlencoded" }, body: `mensagem_id=${id}` })
+    .then(r => r.json()).then(data => { if (data.success) { const row = document.getElementById(`mensagem-${id}`); if (row) row.remove(); } });
+}
+function inserirVariavel(valor) {
+    const ta = document.getElementById("mensagem_texto");
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.substring(0, start) + " " + valor + " " + ta.value.substring(end);
+    ta.focus(); ta.selectionStart = ta.selectionEnd = start + valor.length + 2;
+    document.getElementById("char-count").innerText = ta.value.length;
+}
+function inserirNoCampo(campoId, valor) {
+    const ta = document.getElementsByName(campoId)[0]; if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.substring(0, start) + " " + valor + " " + ta.value.substring(end);
+    ta.focus();
+    const countId = campoId === 'mensagem_bem_vindo' ? 'char-bv' : 'char-pg';
+    document.getElementById(countId).innerText = ta.value.length;
+}
+document.addEventListener("DOMContentLoaded", function () {
+    const ta = document.getElementById("mensagem_texto");
+    if (ta) ta.addEventListener("input", function () { document.getElementById("char-count").innerText = this.value.length; });
+    ['mensagem_bem_vindo', 'mensagem_confirmacao_pagamento'].forEach(name => {
+        const el = document.getElementsByName(name)[0];
+        if (el) { const countId = name === 'mensagem_bem_vindo' ? 'char-bv' : 'char-pg';
+            el.addEventListener('input', function() { document.getElementById(countId).innerText = this.value.length; });
+            document.getElementById(countId).innerText = el.value.length; }
+    });
+});
+document.getElementById("modalMensagem").addEventListener("click", function(e) { if (e.target === this) fecharModal(); });
+document.addEventListener("keydown", function(e) { if (e.key === "Escape") fecharModal(); });
+</script>
+{% endblock %}

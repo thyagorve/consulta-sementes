@@ -1,0 +1,884 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Envio de Mensagens em Massa{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Estilos específicos para a página */
+.tag-selector-wrapper {
+    position: relative;
+    margin-bottom: 1rem;
+}
+
+.tag-selector-input {
+    min-height: 45px;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.tag-selector-input:hover {
+    background-color: #e9ecef;
+    border-color: #86b7fe;
+}
+
+.tag-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.dropdown-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.selected-tag {
+    display: inline-flex;
+    align-items: center;
+    background: #e9ecef;
+    padding: 4px 8px;
+    margin: 2px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.remove-tag {
+    margin-left: 5px;
+    cursor: pointer;
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.remove-tag:hover {
+    color: #b02a37;
+}
+
+/* Cards com sombras */
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    border-radius: 8px;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px 8px 0 0 !important;
+    padding: 12px 20px;
+}
+
+/* Botões */
+.btn {
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+    border: none;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%);
+    border: none;
+}
+
+/* Formulários */
+.form-control, .form-select {
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+    padding: 10px 12px;
+    transition: all 0.3s;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Variáveis */
+#variable-buttons .btn {
+    margin: 2px;
+    border-radius: 20px;
+}
+
+/* Preview */
+#previewClientes {
+    animation: slideIn 0.5s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 15px;
+    }
+    
+    .btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-lg">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-bullhorn me-2"></i> Envio de Mensagens em Massa
+                        </h4>
+                        <a href="{% url 'integra:lista_mensagens' %}" class="btn btn-light btn-sm">
+                            <i class="fas fa-list me-1"></i> Minhas Mensagens
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Agendamento -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light py-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-calendar-alt text-primary me-2"></i> Agendamento
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Data do Envio *</label>
+                                    <input type="date" 
+                                           name="data_agendamento" 
+                                           id="data_agendamento" 
+                                           class="form-control" 
+                                           required
+                                           min="{{ hoje|date:'Y-m-d' }}">
+                                    <div class="form-text">Selecione a data do envio</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Hora do Envio *</label>
+                                    <input type="time" 
+                                           name="hora_agendamento" 
+                                           id="hora_agendamento" 
+                                           class="form-control" 
+                                           required
+                                           value="09:00">
+                                    <div class="form-text">Horário no formato 24h</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light py-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-filter text-primary me-2"></i> Filtros de Clientes
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Plano</label>
+                                    <select name="plano" class="form-select" id="plano-select">
+                                        <option value="">Todos os Planos</option>
+                                        {% for servico in servicos %}
+                                        <option value="{{ servico.id }}">{{ servico.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Status</label>
+                                    <select name="status" class="form-select" id="status-select">
+                                        <option value="">Todos</option>
+                                        <option value="ativos">✅ Ativos</option>
+                                        <option value="vencidos">⚠️ Vencidos</option>
+                                        <option value="desativados">❌ Desativados</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Dias Vencido</label>
+                                    <input type="number" 
+                                           name="dias_vencido" 
+                                           class="form-control" 
+                                           id="dias-vencido-input"
+                                           placeholder="Ex: 5"
+                                           min="0"
+                                           disabled>
+                                    <div class="form-text">Para status "Vencidos"</div>
+                                </div>
+                            </div>
+
+                            <!-- Tags -->
+                            <div class="mt-4">
+                                <label class="form-label fw-bold">Tags</label>
+                                <div class="tag-selector-wrapper">
+                                    <div id="tag-selector" class="tag-selector-input border rounded p-2">
+                                        <span class="text-muted">Clique para selecionar tags...</span>
+                                    </div>
+                                    <div id="tag-dropdown" class="tag-dropdown border rounded shadow mt-1"></div>
+                                    <input type="hidden" name="tags_json" id="tags_json" value="[]">
+                                </div>
+                                <div class="form-text">Selecione uma ou mais tags</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mensagem -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light py-3">
+                            <h5 class="mb-0">
+                                <i class="fas fa-comment-dots text-primary me-2"></i> Mensagem
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Conteúdo da Mensagem *</label>
+                                <textarea id="mensagem" 
+                                          name="mensagem" 
+                                          rows="6" 
+                                          class="form-control" 
+                                          placeholder="Olá {nome}, sua fatura vence em {data_vencimento}..."
+                                          required></textarea>
+                                <div class="form-text">Use as variáveis abaixo para personalizar</div>
+                            </div>
+
+                            <!-- Variáveis -->
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Variáveis Disponíveis</label>
+                                <div class="d-flex flex-wrap gap-2 mb-2" id="variable-buttons">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="nome">
+                                        <i class="fas fa-user me-1"></i> {nome}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="data_vencimento">
+                                        <i class="fas fa-calendar me-1"></i> {data_vencimento}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="plano">
+                                        <i class="fas fa-box me-1"></i> {plano}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="whatsapp">
+                                        <i class="fab fa-whatsapp me-1"></i> {whatsapp}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="valor_servico">
+                                        <i class="fas fa-dollar-sign me-1"></i> {valor_servico}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-variable="usuario">
+                                        <i class="fas fa-user-circle me-1"></i> {usuario}
+                                    </button>
+                                </div>
+                                <div class="form-text">Clique para inserir no texto da mensagem</div>
+                            </div>
+
+                            <!-- Anexo -->
+                            <div>
+                                <label class="form-label fw-bold">Anexo (Opcional)</label>
+                                <input type="file" 
+                                       name="midia" 
+                                       class="form-control" 
+                                       id="id_midia"
+                                       accept="image/*,application/pdf,video/*,audio/*">
+                                <div class="form-text">Suporta imagens, PDF, vídeos e áudio (máx. 10MB)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Messages -->
+                    <div id="statusMessages" class="mb-4"></div>
+
+                    <!-- Botões -->
+                    <div class="d-flex justify-content-center gap-3 mb-4">
+                        <button type="button" class="btn btn-secondary px-4" id="saveDraftBtn">
+                            <i class="fas fa-save me-2"></i> Salvar Rascunho
+                        </button>
+                        <button type="button" class="btn btn-success px-4" id="scheduleBtn">
+                            <i class="fas fa-calendar-check me-2"></i> Agendar Envio
+                        </button>
+                        <button type="button" class="btn btn-warning px-4" id="testBtn">
+                            <i class="fas fa-vial me-2"></i> Testar Conexão
+                        </button>
+                    </div>
+
+                    <!-- Preview -->
+                    <div id="previewClientes" class="card border-primary" style="display: none;">
+                        <div class="card-header bg-primary text-white py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-users me-2"></i> Destinatários Selecionados
+                                </h6>
+                                <span class="badge bg-light text-dark" id="clientesCount">0</span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="clientes-list" class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                                <!-- Lista será preenchida via JS -->
+                            </div>
+                        </div>
+                        <div class="card-footer text-center py-2">
+                            <small class="text-muted">
+                                <i class="fas fa-sync-alt me-1"></i> A lista é atualizada automaticamente
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Elementos principais
+    const dataAgendamento = document.getElementById('data_agendamento');
+    const horaAgendamento = document.getElementById('hora_agendamento');
+    const planoSelect = document.getElementById('plano-select');
+    const statusSelect = document.getElementById('status-select');
+    const diasVencidoInput = document.getElementById('dias-vencido-input');
+    const mensagemTextarea = document.getElementById('mensagem');
+    const saveDraftBtn = document.getElementById('saveDraftBtn');
+    const scheduleBtn = document.getElementById('scheduleBtn');
+    const testBtn = document.getElementById('testBtn');
+    const previewClientes = document.getElementById('previewClientes');
+    const clientesList = document.getElementById('clientes-list');
+    const clientesCount = document.getElementById('clientesCount');
+    const statusMessages = document.getElementById('statusMessages');
+    const tagsJsonInput = document.getElementById('tags_json');
+    const tagSelector = document.getElementById('tag-selector');
+    const tagDropdown = document.getElementById('tag-dropdown');
+    
+    // CSRF Token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    
+    // Variáveis globais
+    let selectedTags = [];
+    let clientesFiltradosIds = [];
+    let clientesFiltradosData = [];
+    let previewTimeout = null;
+    
+    // Tags disponíveis do Django
+    const allTags = [
+        {% for tag in tags %}
+        {
+            id: {{ tag.id }},
+            nome: "{{ tag.nome|escapejs }}",
+            cor: "{{ tag.cor|default:'#6c757d'|escapejs }}"
+        },
+        {% endfor %}
+    ];
+    
+    // ========== FUNÇÕES DE TAGS ==========
+    function initTags() {
+        renderSelectedTags();
+        
+        // Abrir dropdown ao clicar
+        tagSelector.addEventListener('click', function(e) {
+            if (!e.target.closest('.remove-tag')) {
+                showTagDropdown();
+            }
+        });
+        
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', function(e) {
+            if (!tagSelector.contains(e.target) && !tagDropdown.contains(e.target)) {
+                tagDropdown.style.display = 'none';
+            }
+        });
+        
+        // Remover tag
+        tagSelector.addEventListener('click', function(e) {
+            const removeBtn = e.target.closest('.remove-tag');
+            if (removeBtn) {
+                const tagId = parseInt(removeBtn.dataset.id);
+                removeTag(tagId);
+            }
+        });
+    }
+    
+    function showTagDropdown() {
+        // Filtrar tags não selecionadas
+        const availableTags = allTags.filter(tag => 
+            !selectedTags.find(t => t.id === tag.id)
+        );
+        
+        if (availableTags.length === 0) {
+            tagDropdown.style.display = 'none';
+            showMessage('Todas as tags já foram selecionadas', 'info');
+            return;
+        }
+        
+        // Criar dropdown
+        tagDropdown.innerHTML = '';
+        availableTags.forEach(tag => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.innerHTML = `
+                <i class="fas fa-tag me-2" style="color: ${tag.cor}"></i>
+                ${tag.nome}
+            `;
+            item.dataset.id = tag.id;
+            tagDropdown.appendChild(item);
+        });
+        
+        tagDropdown.style.display = 'block';
+        
+        // Adicionar eventos
+        tagDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const tagId = parseInt(this.dataset.id);
+                const tag = allTags.find(t => t.id === tagId);
+                if (tag) {
+                    selectedTags.push(tag);
+                    renderSelectedTags();
+                    updateClientPreview();
+                }
+                tagDropdown.style.display = 'none';
+            });
+        });
+    }
+    
+    function removeTag(tagId) {
+        selectedTags = selectedTags.filter(tag => tag.id !== tagId);
+        renderSelectedTags();
+        updateClientPreview();
+    }
+    
+    function renderSelectedTags() {
+        if (selectedTags.length === 0) {
+            tagSelector.innerHTML = '<span class="text-muted">Clique para selecionar tags...</span>';
+            tagsJsonInput.value = '[]';
+        } else {
+            tagSelector.innerHTML = '';
+            selectedTags.forEach(tag => {
+                const tagEl = document.createElement('span');
+                tagEl.className = 'selected-tag';
+                tagEl.innerHTML = `
+                    <i class="fas fa-tag" style="color: ${tag.cor}"></i>
+                    ${tag.nome}
+                    <span class="remove-tag" data-id="${tag.id}">&times;</span>
+                `;
+                tagSelector.appendChild(tagEl);
+            });
+            tagsJsonInput.value = JSON.stringify(selectedTags);
+        }
+    }
+    
+    // ========== FUNÇÕES DE FILTRO ==========
+    function updateClientPreview() {
+        // Limpar timeout anterior
+        if (previewTimeout) {
+            clearTimeout(previewTimeout);
+        }
+        
+        // Aguardar 500ms após última alteração
+        previewTimeout = setTimeout(() => {
+            fetchClientes();
+        }, 500);
+    }
+    
+    function fetchClientes() {
+        // Mostrar loading
+        clientesList.innerHTML = `
+            <div class="list-group-item text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <div class="mt-2 text-muted">Buscando clientes...</div>
+            </div>
+        `;
+        previewClientes.style.display = 'block';
+        
+        // Preparar dados
+        const formData = new FormData();
+        formData.append('plano', planoSelect.value);
+        formData.append('status', statusSelect.value);
+        formData.append('dias_vencido', diasVencidoInput.value);
+        formData.append('tags_json', tagsJsonInput.value);
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        
+        // Fazer requisição
+        const url = "{% url 'integra:api_filter_clients' %}";
+        
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                clientesFiltradosData = data.clientes || [];
+                clientesFiltradosIds = clientesFiltradosData.map(c => c.id);
+                clientesCount.textContent = data.count || 0;
+                
+                if (clientesFiltradosData.length > 0) {
+                    renderClientesList(clientesFiltradosData);
+                } else {
+                    clientesList.innerHTML = `
+                        <div class="list-group-item text-center py-4">
+                            <i class="fas fa-users-slash fa-2x text-muted mb-3"></i>
+                            <div class="text-muted">Nenhum cliente encontrado</div>
+                        </div>
+                    `;
+                }
+            } else {
+                showMessage(data.message || 'Erro ao buscar clientes', 'warning');
+                clientesList.innerHTML = `
+                    <div class="list-group-item text-center py-4 text-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message || 'Erro ao buscar clientes'}
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            showMessage('Erro de conexão ao buscar clientes', 'danger');
+            clientesList.innerHTML = `
+                <div class="list-group-item text-center py-4 text-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Erro de conexão: ${error.message}
+                </div>
+            `;
+        });
+    }
+    
+    function renderClientesList(clientes) {
+        clientesList.innerHTML = '';
+        
+        clientes.slice(0, 100).forEach(cliente => {
+            const item = document.createElement('div');
+            item.className = 'list-group-item';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold">${cliente.nome || 'Sem nome'}</div>
+                        <div class="small text-muted">
+                            <i class="fab fa-whatsapp me-1"></i>
+                            ${cliente.whatsapp || 'Sem WhatsApp'}
+                        </div>
+                        <div class="small">
+                            <span class="badge bg-info">${cliente.plano || 'Sem plano'}</span>
+                            <span class="badge ${cliente.status === 'Ativo' ? 'bg-success' : 'bg-secondary'} ms-1">
+                                ${cliente.status || 'Desconhecido'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-muted">${cliente.data_vencimento || ''}</div>
+                    </div>
+                </div>
+            `;
+            clientesList.appendChild(item);
+        });
+        
+        if (clientes.length > 100) {
+            const warning = document.createElement('div');
+            warning.className = 'list-group-item text-center text-warning small';
+            warning.innerHTML = `<i class="fas fa-info-circle me-1"></i> Mostrando 100 de ${clientes.length} clientes`;
+            clientesList.appendChild(warning);
+        }
+    }
+    
+    // ========== FUNÇÕES DE MENSAGEM ==========
+    function insertVariable(variable) {
+        const textarea = mensagemTextarea;
+        const variableText = `{${variable}}`;
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        
+        textarea.value = textarea.value.substring(0, start) + 
+                        variableText + 
+                        textarea.value.substring(end);
+        
+        // Focar e posicionar cursor após a variável
+        textarea.focus();
+        textarea.setSelectionRange(start + variableText.length, start + variableText.length);
+    }
+    
+    // ========== FUNÇÕES DE UI ==========
+    function showMessage(text, type = 'info') {
+        const alertClass = {
+            'success': 'alert-success',
+            'danger': 'alert-danger',
+            'warning': 'alert-warning',
+            'info': 'alert-info'
+        }[type] || 'alert-info';
+        
+        const icon = {
+            'success': 'check-circle',
+            'danger': 'exclamation-circle',
+            'warning': 'exclamation-triangle',
+            'info': 'info-circle'
+        }[type] || 'info-circle';
+        
+        statusMessages.innerHTML = `
+            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+                <i class="fas fa-${icon} me-2"></i>
+                ${text}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        // Auto-remover após 8 segundos
+        setTimeout(() => {
+            const alert = statusMessages.querySelector('.alert');
+            if (alert) {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 300);
+            }
+        }, 8000);
+    }
+    
+    function setLoading(button, isLoading) {
+        const icon = button.querySelector('i');
+        const originalIcon = icon.className;
+        
+        if (isLoading) {
+            button.disabled = true;
+            icon.className = 'fas fa-spinner fa-spin me-2';
+        } else {
+            button.disabled = false;
+            icon.className = originalIcon;
+        }
+    }
+    
+    function validateForm() {
+        // Validar data e hora
+        if (!dataAgendamento.value || !horaAgendamento.value) {
+            showMessage('Preencha a data e hora do agendamento', 'warning');
+            dataAgendamento.focus();
+            return false;
+        }
+        
+        // Validar mensagem
+        if (!mensagemTextarea.value.trim()) {
+            showMessage('Digite a mensagem', 'warning');
+            mensagemTextarea.focus();
+            return false;
+        }
+        
+        // Validar clientes
+        if (clientesFiltradosIds.length === 0) {
+            showMessage('Nenhum cliente encontrado com os filtros atuais', 'warning');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // ========== EVENT LISTENERS ==========
+    
+    // Habilitar/desabilitar dias vencido
+    statusSelect.addEventListener('change', function() {
+        if (this.value === 'vencidos') {
+            diasVencidoInput.disabled = false;
+        } else {
+            diasVencidoInput.disabled = true;
+            diasVencidoInput.value = '';
+        }
+        updateClientPreview();
+    });
+    
+    // Filtros
+    planoSelect.addEventListener('change', updateClientPreview);
+    statusSelect.addEventListener('change', updateClientPreview);
+    diasVencidoInput.addEventListener('input', updateClientPreview);
+    
+    // Variáveis
+    document.querySelectorAll('[data-variable]').forEach(button => {
+        button.addEventListener('click', function() {
+            insertVariable(this.dataset.variable);
+        });
+    });
+    
+    // Teste
+    testBtn.addEventListener('click', function() {
+        showMessage('Testando conexão com servidor...', 'info');
+        fetch("{% url 'integra:api_filter_clients' %}", {
+            method: 'POST',
+            body: new FormData(),
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                showMessage('Conexão com servidor OK!', 'success');
+            } else {
+                showMessage(`Erro ${response.status} na conexão`, 'danger');
+            }
+        })
+        .catch(error => {
+            showMessage('Falha na conexão: ' + error.message, 'danger');
+        });
+    });
+    
+    // Salvar rascunho
+    saveDraftBtn.addEventListener('click', function() {
+        if (!validateForm()) return;
+        
+        if (!confirm(`Salvar rascunho para ${clientesFiltradosIds.length} cliente(s)?`)) return;
+        
+        setLoading(this, true);
+        
+        const formData = new FormData();
+        formData.append('mensagem', mensagemTextarea.value);
+        formData.append('data_agendamento', dataAgendamento.value);
+        formData.append('hora_agendamento', horaAgendamento.value);
+        formData.append('plano', planoSelect.value);
+        formData.append('status', statusSelect.value);
+        formData.append('dias_vencido', diasVencidoInput.value);
+        formData.append('tags_json', tagsJsonInput.value);
+        formData.append('clientes_ids', JSON.stringify(clientesFiltradosIds));
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        
+        // Adicionar arquivo se existir
+        const fileInput = document.getElementById('id_midia');
+        if (fileInput.files[0]) {
+            formData.append('midia', fileInput.files[0]);
+        }
+        
+        const url = "{% url 'integra:api_save_mass_message_draft' %}";
+        
+        fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message, 'success');
+                if (data.redirect_url) {
+                    setTimeout(() => {
+                        window.location.href = data.redirect_url;
+                    }, 1500);
+                }
+            } else {
+                showMessage(data.message || 'Erro desconhecido', 'danger');
+            }
+        })
+        .catch(error => {
+            showMessage('Erro ao salvar rascunho: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            setLoading(saveDraftBtn, false);
+        });
+    });
+    
+    // Agendar envio
+    scheduleBtn.addEventListener('click', function() {
+        if (!validateForm()) return;
+        
+        const confirmMsg = `Confirmar agendamento para ${clientesFiltradosIds.length} cliente(s) em ${dataAgendamento.value} às ${horaAgendamento.value}?`;
+        if (!confirm(confirmMsg)) return;
+        
+        setLoading(this, true);
+        
+        const formData = new FormData();
+        formData.append('mensagem', mensagemTextarea.value);
+        formData.append('data_agendamento', dataAgendamento.value);
+        formData.append('hora_agendamento', horaAgendamento.value);
+        formData.append('plano', planoSelect.value);
+        formData.append('status', statusSelect.value);
+        formData.append('dias_vencido', diasVencidoInput.value);
+        formData.append('tags_json', tagsJsonInput.value);
+        formData.append('clientes_ids', JSON.stringify(clientesFiltradosIds));
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        
+        // Adicionar arquivo se existir
+        const fileInput = document.getElementById('id_midia');
+        if (fileInput.files[0]) {
+            formData.append('midia', fileInput.files[0]);
+        }
+        
+        const url = "{% url 'integra:api_schedule_mass_message' %}";
+        
+        fetch(url, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage(data.message, 'success');
+                if (data.redirect_url) {
+                    setTimeout(() => {
+                        window.location.href = data.redirect_url;
+                    }, 1500);
+                }
+            } else {
+                showMessage(data.message || 'Erro ao agendar', 'danger');
+            }
+        })
+        .catch(error => {
+            showMessage('Erro ao agendar mensagem: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            setLoading(scheduleBtn, false);
+        });
+    });
+    
+    // ========== INICIALIZAÇÃO ==========
+    initTags();
+    fetchClientes();
+    
+    // Configurar data mínima para amanhã
+    const hoje = new Date();
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    
+    if (dataAgendamento) {
+        const amanhaStr = amanha.toISOString().split('T')[0];
+        dataAgendamento.min = amanhaStr;
+        if (!dataAgendamento.value) {
+            dataAgendamento.value = amanhaStr;
+        }
+    }
+});
+</script>
+{% endblock %}

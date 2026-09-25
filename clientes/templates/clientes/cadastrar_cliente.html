@@ -1,0 +1,546 @@
+{% extends 'base.html' %}
+
+{% block title %}Cadastrar Cliente{% endblock %}
+
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+/* ===== CONTAINER PRINCIPAL ===== */
+.cadastro-page { padding: 20px; width: 100%; }
+
+/* ===== HEADER ===== */
+.cadastro-header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 24px; padding-bottom: 18px;
+    border-bottom: 2px solid var(--border);
+}
+.cadastro-header-icon {
+    width: 50px; height: 50px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 1.4rem;
+    box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 30%, transparent); flex-shrink: 0;
+}
+.cadastro-header-text h1 { font-size: 1.4rem; font-weight: 700; color: var(--text); margin: 0; }
+.cadastro-header-text p { font-size: 0.85rem; color: var(--text-light); margin: 2px 0 0; }
+
+/* ===== ALERTAS ===== */
+.alert {
+    padding: 14px 18px; border-radius: 10px; margin-bottom: 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 0.9rem; font-weight: 500; animation: slideDown 0.3s ease;
+}
+@keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
+.alert i { margin-top: 2px; flex-shrink: 0; font-size: 1rem; }
+.alert-success { background: color-mix(in srgb, var(--success) 12%, transparent); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent); color: var(--success); }
+.alert-error { background: color-mix(in srgb, var(--danger) 12%, transparent); border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent); color: var(--danger); }
+.alert-warning { background: color-mix(in srgb, var(--warning) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warning) 30%, transparent); color: var(--warning); }
+.alert ul { margin: 8px 0 0 16px; padding: 0; }
+.alert ul li { margin-bottom: 4px; }
+
+/* ===== CARD DO FORMULÁRIO ===== */
+.cadastro-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-soft);
+}
+.cadastro-card-header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    padding: 16px 24px; display: flex; align-items: center; gap: 10px;
+}
+.cadastro-card-header h2 { color: white; font-size: 1.1rem; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
+.cadastro-card-body { padding: 24px; }
+
+/* ===== GRID ===== */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.form-grid .full-width { grid-column: 1 / -1; }
+
+/* ===== GRUPOS ===== */
+.form-group { margin-bottom: 4px; }
+.form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.82rem; color: var(--text); text-transform: uppercase; letter-spacing: 0.4px; }
+.form-group label i { color: var(--primary); width: 16px; }
+.form-group .required::after { content: ' *'; color: var(--danger); }
+.form-control {
+    width: 100%; padding: 12px 16px; border: 2px solid var(--border);
+    border-radius: 10px; background: var(--bg-card); color: var(--text);
+    font-size: 0.95rem; transition: all 0.3s; font-family: inherit;
+}
+.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent); }
+.form-control::placeholder { color: var(--text-lighter); }
+select.form-control {
+    cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px;
+}
+textarea.form-control { resize: vertical; min-height: 90px; }
+.form-hint { font-size: 0.75rem; color: var(--text-light); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.form-preview { font-size: 0.8rem; margin-top: 4px; font-weight: 600; min-height: 20px; }
+.form-preview.success { color: var(--success); }
+.plano-info-box {
+    padding: 10px 14px; border-radius: 8px; margin-top: 6px;
+    font-size: 0.8rem; font-weight: 500; display: none;
+}
+.plano-info-box.multi { background: rgba(34,197,94,0.1); color: #16a34a; border: 1px solid rgba(34,197,94,0.3); }
+.plano-info-box.unico { background: rgba(245,158,11,0.1); color: #d97706; border: 1px solid rgba(245,158,11,0.3); }
+.plano-info-box.esgotado { background: rgba(220,53,69,0.1); color: #dc2626; border: 1px solid rgba(220,53,69,0.3); }
+
+/* ===== WHATSAPP ===== */
+#id_whatsapp { font-family: 'Courier New', monospace; letter-spacing: 1px; font-size: 1rem; }
+#id_whatsapp::placeholder { font-family: 'Inter', sans-serif; letter-spacing: normal; font-size: 0.85rem; }
+
+/* ===== TOGGLE ===== */
+.toggle-switch { display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.toggle-switch input[type="checkbox"] {
+    appearance: none; width: 50px; height: 28px; background: var(--border);
+    border-radius: 14px; position: relative; outline: none; cursor: pointer;
+    transition: background 0.3s; flex-shrink: 0;
+}
+.toggle-switch input[type="checkbox"]::before {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 22px; height: 22px; background: white; border-radius: 50%;
+    transition: transform 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-switch input[type="checkbox"]:checked { background: var(--success); }
+.toggle-switch input[type="checkbox"]:checked::before { transform: translateX(22px); }
+.toggle-label { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+
+/* ===== BOTÕES ===== */
+.form-actions { display: flex; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.btn {
+    padding: 13px 28px; border: none; border-radius: 10px; font-size: 0.9rem;
+    font-weight: 600; cursor: pointer; transition: all 0.3s;
+    display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+}
+.btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 20%, transparent); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 35%, transparent); }
+.btn-secondary { background: var(--bg-hover); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+
+/* ===== SELECT2 ===== */
+.select2-container--default .select2-selection--multiple { background: var(--bg-card)!important; border: 2px solid var(--border)!important; border-radius: 10px!important; min-height: 46px!important; padding: 4px 8px!important; }
+.select2-container--default.select2-container--focus .select2-selection--multiple { border-color: var(--primary)!important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent)!important; }
+.select2-container--default .select2-selection--multiple .select2-selection__choice { background: var(--primary)!important; color: white!important; border: none!important; padding: 5px 12px!important; border-radius: 20px!important; font-size: 0.82rem!important; }
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove { color: rgba(255,255,255,0.7)!important; }
+.select2-dropdown { background: var(--bg-card)!important; border: 2px solid var(--border)!important; border-radius: 10px!important; }
+.select2-container--default .select2-results__option--highlighted[aria-selected] { background: var(--primary)!important; color: white!important; }
+.select2-container--default .select2-search--dropdown .select2-search__field { background: var(--bg-card)!important; border: 2px solid var(--border)!important; color: var(--text)!important; border-radius: 8px!important; }
+
+@media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } .cadastro-page { padding: 12px; } .cadastro-card-body { padding: 16px; } }
+@media (max-width: 600px) { .cadastro-page { padding: 10px; } .cadastro-card-body { padding: 14px; } .form-actions { flex-direction: column; } .btn { width: 100%; justify-content: center; } }
+
+
+
+.toggle-switch input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 50px;
+    height: 28px;
+    background: var(--border);
+    border-radius: 14px;
+    position: relative;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.3s;
+    flex-shrink: 0;
+    border: none;
+}
+
+.toggle-switch input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input[type="checkbox"]:checked {
+    background: var(--success);
+}
+
+.toggle-switch input[type="checkbox"]:checked::before {
+    transform: translateX(22px);
+}
+
+</style>
+
+<div class="cadastro-page">
+    
+    <div class="cadastro-header">
+        <div class="cadastro-header-icon"><i class="fas fa-user-plus"></i></div>
+        <div class="cadastro-header-text">
+            <h1>Cadastrar Cliente</h1>
+            <p>Preencha os dados abaixo para cadastrar um novo cliente</p>
+        </div>
+    </div>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-error{% else %}alert-warning{% endif %}">
+                <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-exclamation-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
+                <span>{{ message }}</span>
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if form.errors %}
+    <div class="alert alert-error">
+        <i class="fas fa-exclamation-circle"></i>
+        <div><strong>Corrija os erros:</strong><ul>{% for field, errors in form.errors.items %}{% for error in errors %}<li><strong>{{ field }}:</strong> {{ error }}</li>{% endfor %}{% endfor %}</ul></div>
+    </div>
+    {% endif %}
+    
+    <div class="cadastro-card">
+        <div class="cadastro-card-header"><h2><i class="fas fa-clipboard-list"></i> Dados do Cliente</h2></div>
+        <div class="cadastro-card-body">
+            
+            <form method="post" action="{% url 'cadastrar_cliente' %}" id="formCadastro" novalidate>
+                {% csrf_token %}
+                <input type="hidden" name="tipo_usuario" value="cliente">
+                
+                <div class="form-grid">
+                    
+                    <!-- Nome -->
+                    <div class="form-group">
+                        <label class="required"><i class="fas fa-user"></i> Nome Completo</label>
+                        <input type="text" name="nome" maxlength="50" required class="form-control" id="id_nome" placeholder="Digite o nome completo" value="{{ form.nome.value|default:'' }}">
+                    </div>
+                    
+                    <!-- Usuário -->
+                   <div class="form-group">
+                        <label><i class="fas fa-sign-in-alt"></i> Login do Serviço (IPTV)</label>
+                        <input type="text" name="login_externo" maxlength="150" class="form-control" 
+                            id="id_login_externo" placeholder="Login de acesso ao serviço"
+                            value="{{ form.login_externo.value|default:'' }}">
+                        <span class="form-hint">
+                            <i class="fas fa-info-circle"></i> Login usado para acessar o serviço. Pode ser compartilhado entre clientes do mesmo plano.
+                        </span>
+                    </div>
+                    
+                    <!-- Senha -->
+                   <div class="form-group">
+                        <label><i class="fas fa-key"></i> Senha do Serviço (IPTV)</label>
+                        <input
+                            type="text"
+                            name="senha_leitura"
+                            class="form-control"
+                            id="id_senha_leitura"
+                            placeholder="Senha de acesso ao serviço"
+                            value="{{ form.senha_leitura.value|default:'' }}"
+                        >
+                        <span class="form-hint">
+                            <i class="fas fa-shield-alt"></i> Esta senha será visível para todos que compartilham este plano.
+                        </span>
+                    </div>
+                    
+                    <!-- Vencimento -->
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-alt"></i> Data de Vencimento</label>
+                        <input type="date" name="data_vencimento" class="form-control" id="id_data_vencimento" value="{{ form.data_vencimento.value|default:'' }}">
+                    </div>
+                    
+                    <!-- Plano -->
+                    <div class="form-group">
+                        <label><i class="fas fa-box"></i> Plano</label>
+                        <select name="plano" id="id_plano" class="form-control">
+                            <option value="">Selecione um plano...</option>
+                            {% for plano in form.fields.plano.queryset %}
+                                <option value="{{ plano.id }}" {% if form.plano.value|stringformat:"s" == plano.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ plano.nome }} - R$ {{ plano.valor|default:"0,00" }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <div class="plano-info-box" id="plano-info-box"></div>
+                    </div>
+                    
+                    <!-- Valor Serviço -->
+                    <div class="form-group">
+                        <label><i class="fas fa-dollar-sign"></i> Valor do Serviço (Custo)</label>
+                        <input type="number" name="valor_servico" step="0.01" class="form-control" id="id_valor_servico" placeholder="Preenchido automaticamente" value="{{ form.valor_servico.value|default:'' }}">
+                    </div>
+                    
+                    <!-- Valor a Pagar -->
+                    <div class="form-group">
+                        <label><i class="fas fa-hand-holding-usd"></i> Valor a Pagar (Cliente)</label>
+                        <input type="number" name="valor_a_pagar" step="0.01" class="form-control" id="id_valor_a_pagar" placeholder="Preenchido automaticamente" value="{{ form.valor_a_pagar.value|default:'' }}">
+                    </div>
+                    
+                    <!-- WhatsApp -->
+                    <div class="form-group full-width">
+                        <label><i class="fab fa-whatsapp"></i> WhatsApp</label>
+                        <input type="text" name="whatsapp" id="id_whatsapp" class="form-control" placeholder="Ex: (55) 9 8765-4321" autocomplete="off" value="{{ form.whatsapp.value|default:'' }}">
+                        <span class="form-hint"><i class="fas fa-info-circle"></i> Cole ou digite o número. Será salvo apenas os números.</span>
+                        <div class="form-preview success" id="whatsapp-preview"></div>
+                    </div>
+                    
+                    <!-- Tags -->
+                    <div class="form-group full-width">
+                        <label><i class="fas fa-tags"></i> Tags</label>
+                        <select name="tags_select" id="id_tags" multiple="multiple" style="width:100%;"></select>
+                    </div>
+                    
+                    <!-- Observação -->
+                    <div class="form-group full-width">
+                        <label><i class="fas fa-sticky-note"></i> Observação</label>
+                        <textarea name="observacao" id="id_observacao" class="form-control" placeholder="Observações adicionais...">{{ form.observacao.value|default:'' }}</textarea>
+                    </div>
+                    
+                                    <!-- Enviar mensagem de boas-vindas -->
+                <div class="form-group full-width">
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;">
+                        <input type="checkbox" name="enviar_mensagem" id="id_enviar_mensagem" checked 
+                            style="width:20px;height:20px;cursor:pointer;">
+                        <label for="id_enviar_mensagem" style="cursor:pointer;font-weight:600;color:var(--text);">
+                            <i class="fab fa-whatsapp" style="color:#25D366;"></i> 
+                            Enviar mensagem de boas-vindas pelo WhatsApp
+                        </label>
+                    </div>
+                </div>
+                <!-- Substitua a div do Pago por isto: -->
+                <div class="form-group full-width">
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px 0;">
+                        <input type="checkbox" name="pago" id="id_pago" 
+                            style="width:20px;height:20px;cursor:pointer;">
+                        <label for="id_pago" style="cursor:pointer;font-weight:600;color:var(--text);">
+                            <i class="fas fa-check-circle"></i> 
+                            Marcar como pago
+                        </label>
+                    </div>
+                </div>
+                </div>
+                
+                <div class="form-actions">
+                    <a href="{% url 'listar_clientes' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Cancelar</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Cadastrar Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================
+// FORMATAR WHATSAPP
+// ============================================
+function limparWhatsApp(v) { return v.replace(/\D/g, ''); }
+function formatarVisual(n) {
+    if(!n) return '';
+    if(n.startsWith('55')&&n.length>=12) return '+'+n.substring(0,2)+' ('+n.substring(2,4)+') '+n.substring(4,9)+'-'+n.substring(9);
+    if(n.length===11) return '('+n.substring(0,2)+') '+n.substring(2,7)+'-'+n.substring(7);
+    if(n.length===10) return '('+n.substring(0,2)+') '+n.substring(2,6)+'-'+n.substring(6);
+    return n;
+}
+function atualizarPreview(n) {
+    var p=document.getElementById('whatsapp-preview');
+    if(!p)return;
+    p.innerHTML=n.length>=8?'<i class="fab fa-whatsapp"></i> Preview: '+formatarVisual(n):n.length>0?'<i class="fab fa-whatsapp"></i> Digitando: '+n:'';
+}
+(function(){
+    var i=document.getElementById('id_whatsapp');
+    if(i&&i.value){var l=limparWhatsApp(i.value);i.value=l;atualizarPreview(l);}
+})();
+document.getElementById('id_whatsapp').addEventListener('input',function(e){
+    var c=this.selectionStart,v=limparWhatsApp(this.value);
+    if(v!==this.value){this.value=v;this.setSelectionRange(Math.min(c,v.length),Math.min(c,v.length));}
+    atualizarPreview(v);
+});
+document.getElementById('id_whatsapp').addEventListener('paste',function(){
+    setTimeout(function(){var i=document.getElementById('id_whatsapp'),v=limparWhatsApp(i.value);if(v!==i.value)i.value=v;atualizarPreview(v);},50);
+});
+
+// ============================================
+// SUBMIT
+// ============================================
+document.getElementById('formCadastro').addEventListener('submit',function(e){
+    var w=document.getElementById('id_whatsapp'),n=limparWhatsApp(w.value);w.value=n;
+    if(n.length>0&&n.length<8){e.preventDefault();window.AppUI.alert('⚠️ WhatsApp inválido! Mínimo 8 dígitos.');w.focus();return false;}
+    if(n.length>15){e.preventDefault();window.AppUI.alert('⚠️ WhatsApp muito longo!');w.focus();return false;}
+    if(n.length>=10&&n.length<=11&&!n.startsWith('55'))w.value='55'+n;
+    var t=$('#id_tags').val();
+    this.querySelectorAll('input[name="tags"]').forEach(function(el){el.remove();});
+    if(t&&t.length>0){t.forEach(function(id){var inp=document.createElement('input');inp.type='hidden';inp.name='tags';inp.value=id;this.appendChild(inp);}.bind(this));}
+});
+
+// ============================================
+// SELECT2 TAGS
+// ============================================
+$('#id_tags').select2({
+    placeholder:'🔍 Digite para buscar tags...',
+    ajax:{url:'/buscar_tags/',dataType:'json',delay:250,data:function(p){return{q:p.term||''};},processResults:function(d){var r=[];if(Array.isArray(d)){r=d.map(function(t){return{id:t.id,text:t.nome||'Sem nome'};});}return{results:r};},cache:true},
+    minimumInputLength:0,allowClear:true,closeOnSelect:true,width:'100%',
+    language:{noResults:function(){return'Nenhuma tag';},searching:function(){return'Buscando...';}}
+});
+
+// ============================================
+// ATUALIZAR VALORES DO PLANO + INFO (CORRIGIDO - VAGAS REAIS)
+// ============================================
+document.getElementById('id_plano').addEventListener('change', function() {
+    var planoId = this.value;
+    var infoBox = document.getElementById('plano-info-box');
+    
+    if (planoId) {
+        // Busca informações completas do plano
+        fetch('/get_custo_fifo/' + planoId + '/')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    // Preenche valor de custo
+                    if (data.custo_fifo !== null && data.custo_fifo > 0) {
+                        document.getElementById('id_valor_servico').value = data.custo_fifo.toFixed(2);
+                    } else if (data.custo_cadastrado !== null && data.custo_cadastrado > 0) {
+                        document.getElementById('id_valor_servico').value = data.custo_cadastrado.toFixed(2);
+                    } else {
+                        document.getElementById('id_valor_servico').value = '';
+                    }
+                    
+                                        // Busca valor a pagar (SIMPLES)
+                    fetch('/get_valor_servico/?plano_id=' + planoId)
+                        .then(function(r2) { return r2.json(); })
+                        .then(function(data2) {
+                            if (data2.success) {
+                                document.getElementById('id_valor_a_pagar').value = data2.valor || '';
+                            }
+                        });
+                    
+                    // Monta info box
+                    infoBox.style.display = 'block';
+                    infoBox.className = 'plano-info-box';
+                    
+                    var html = '';
+                    
+                    // VAGAS (CORRIGIDO - USA estoque * multiplicador)
+                    // VAGAS (CORRIGIDO - BASEADO EM CRÉDITOS)
+                    // VAGAS - SIMPLES (apenas mostra se esgotado ou vagas)
+                if (data.controlar_estoque && data.vagas_restantes !== null) {
+                    if (data.vagas_restantes <= 0) {
+                        infoBox.classList.add('esgotado');
+                        html += '<div style="margin-bottom:8px;"><i class="fas fa-times-circle"></i> <strong>ESGOTADO</strong></div>';
+                    } else {
+                        infoBox.classList.add('multi');
+                        html += '<div style="margin-bottom:8px;"><i class="fas fa-check-circle"></i> <strong>' + data.vagas_restantes + ' vagas disponíveis</strong></div>';
+                    }
+                
+                    } else {
+                        infoBox.classList.add('multi');
+                        html += '<div style="margin-bottom:8px;"><i class="fas fa-infinity"></i> <strong>Vagas:</strong> Ilimitado</div>';
+                    }
+                    
+                    // Tipo de plano
+                    if (data.usuario_unico) {
+                        html += '<div style="margin-bottom:6px;"><i class="fas fa-user"></i> <strong>Plano:</strong> Usuário Único</div>';
+                    } else if (data.multiplicador > 1) {
+                        html += '<div style="margin-bottom:6px;"><i class="fas fa-users"></i> <strong>Plano:</strong> Compartilhado (Multiplicador: ' + data.multiplicador + ')</div>';
+                    }
+                    
+
+                    if (data.custo_fifo) {
+                        html += '<div style="margin:8px 0;font-size:0.73rem;color:var(--text-light);">';
+                        html += '<i class="fas fa-box"></i> Lote #' + data.lote_ordem + ' | R$ ' + data.custo_fifo.toFixed(2).replace('.', ',') + ' | Qtd: ' + data.lote_restante;
+                        html += '</div>';
+                    }
+                    
+                    // Todos os lotes disponíveis
+                    if (data.lotes_disponiveis && data.lotes_disponiveis.length > 0) {
+                        html += '<div style="margin-top:8px;"><strong><i class="fas fa-layer-group"></i> Lotes disponíveis (' + data.lotes_disponiveis.length + '):</strong></div>';
+                        html += '<div style="max-height:120px;overflow-y:auto;margin-top:5px;">';
+                        
+                        data.lotes_disponiveis.forEach(function(lote) {
+                            var isFifo = lote.ordem === data.lote_ordem;
+                            var bgColor = isFifo ? 'rgba(37,99,235,0.08)' : 'transparent';
+                            var borderColor = isFifo ? 'var(--primary)' : 'var(--border)';
+                            
+                            html += '<div style="background:' + bgColor + ';padding:5px 8px;margin-bottom:3px;border-radius:4px;border-left:3px solid ' + borderColor + ';font-size:0.73rem;">';
+                            html += '<i class="fas fa-' + (isFifo ? 'star' : 'circle') + '" style="color:' + (isFifo ? 'var(--primary)' : 'var(--text-light)') + ';font-size:0.65rem;"></i> ';
+                            html += '<strong>#' + lote.ordem + '</strong> | R$ ' + lote.custo.toFixed(2).replace('.', ',') + ' | Qtd: ' + lote.quantidade + ' | ' + lote.data;
+                            if (lote.fornecedor) html += ' | ' + lote.fornecedor;
+                            if (isFifo) html += ' <span style="background:var(--primary);color:white;padding:1px 6px;border-radius:10px;font-size:0.6rem;font-weight:600;">ATUAL</span>';
+                            html += '</div>';
+                        });
+                        
+                        html += '</div>';
+                    }
+                    
+                    infoBox.innerHTML = html;
+                    
+                } else {
+                    document.getElementById('id_valor_servico').value = '';
+                    document.getElementById('id_valor_a_pagar').value = '';
+                    infoBox.style.display = 'none';
+                }
+            })
+            .catch(function(error) {
+                console.error('Erro ao buscar dados do plano:', error);
+                document.getElementById('id_valor_servico').value = '';
+                document.getElementById('id_valor_a_pagar').value = '';
+                infoBox.style.display = 'none';
+            });
+    } else {
+        document.getElementById('id_valor_servico').value = '';
+        document.getElementById('id_valor_a_pagar').value = '';
+        infoBox.style.display = 'none';
+    }
+});
+
+// Controle inteligente do checkbox "pago" baseado na data de vencimento
+document.addEventListener('DOMContentLoaded', function() {
+    const dataVencimentoInput = document.querySelector('#id_data_vencimento'); // Ajuste o ID conforme seu form
+    const pagoCheckbox = document.querySelector('#id_pago'); // Ajuste o ID conforme seu form
+    
+    if (dataVencimentoInput && pagoCheckbox) {
+        // Função para atualizar o checkbox baseado na data
+        function atualizarCheckboxPago() {
+            const dataVencimento = dataVencimentoInput.value;
+            
+            if (dataVencimento) {
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                
+                const dataVenc = new Date(dataVencimento + 'T00:00:00');
+                
+                if (dataVenc > hoje) {
+                    // Data futura: marca como pago
+                    if (!pagoCheckbox.checked) {
+                        pagoCheckbox.checked = true;
+                    }
+                } else {
+                    // Data hoje ou passada: desmarca
+                    if (pagoCheckbox.checked) {
+                        pagoCheckbox.checked = false;
+                    }
+                }
+            }
+        }
+        
+        // Atualiza quando a data mudar
+        dataVencimentoInput.addEventListener('change', atualizarCheckboxPago);
+        
+        // Atualiza ao carregar a página
+        atualizarCheckboxPago();
+        
+        // Aviso quando o usuário alterar manualmente
+        pagoCheckbox.addEventListener('change', function() {
+            const dataVencimento = dataVencimentoInput.value;
+            if (dataVencimento) {
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                const dataVenc = new Date(dataVencimento + 'T00:00:00');
+                
+                if (dataVenc > hoje && !pagoCheckbox.checked) {
+                    console.warn('⚠️ Usuário desmarcou pagamento para data futura');
+                } else if (dataVenc <= hoje && pagoCheckbox.checked) {
+                    console.warn('⚠️ Usuário marcou pagamento para data atual/passada');
+                }
+            }
+        });
+    }
+});
+
+</script>
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Testes de Painel{% endblock %}
+{% block content %}
+<style>
+.tp-wrap{max-width:1300px;margin:0 auto;padding:8px}.tp-head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px;flex-wrap:wrap}.tp-head h1{font-size:1.35rem;margin:0;color:var(--text-primary)}.tp-grid{display:grid;grid-template-columns:minmax(280px,380px) 1fr;gap:18px}.tp-card{background:var(--bg-card);border:1px solid var(--border-color);border-radius:16px;padding:18px;box-shadow:0 8px 30px rgba(0,0,0,.05)}.tp-card h3{margin:0 0 14px;font-size:1rem;color:var(--text-primary)}.tp-field{margin-bottom:12px}.tp-field label{display:block;font-size:.75rem;font-weight:700;color:var(--text-secondary);margin-bottom:5px}.tp-field input,.tp-field select{width:100%;padding:10px 11px;border:1px solid var(--border-color);border-radius:10px;background:var(--bg);color:var(--text-primary)}.tp-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;text-decoration:none}.tp-primary{background:var(--primary);color:white}.tp-success{background:#16a34a;color:white}.tp-table-wrap{overflow-x:auto}.tp-table{width:100%;border-collapse:collapse;font-size:.78rem}.tp-table th,.tp-table td{padding:9px 8px;border-bottom:1px solid var(--border-light);text-align:left;white-space:nowrap}.tp-table th{color:var(--text-secondary);font-size:.68rem;text-transform:uppercase}.tp-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg-hover);padding:3px 6px;border-radius:6px}.tp-status{padding:4px 8px;border-radius:999px;font-size:.66rem;font-weight:800}.tp-status.ativo{background:rgba(22,163,74,.12);color:#16a34a}.tp-status.vencido{background:rgba(239,68,68,.12);color:#ef4444}.tp-status.convertido{background:rgba(37,99,235,.12);color:#2563eb}.tp-result{margin-bottom:16px;padding:14px;border-radius:14px;background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.25)}.tp-result strong{display:block;margin-bottom:8px}.tp-result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tp-result-grid div{font-size:.78rem;color:var(--text-secondary)}.tp-result-grid b{color:var(--text-primary)}@media(max-width:900px){.tp-grid{grid-template-columns:1fr}.tp-result-grid{grid-template-columns:1fr}}
+</style>
+<div class="tp-wrap">
+  <div class="tp-head">
+    <div><h1><i class="fas fa-flask"></i> Testes de Painel</h1><div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Cria teste no SIGMAN e mantém usuário/senha para a futura ativação.</div></div>
+  </div>
+
+  {% if criado %}
+  <div class="tp-result">
+    <strong>✅ Teste criado para {{ criado.nome }}</strong>
+    <div class="tp-result-grid">
+      <div>Usuário: <b class="tp-code">{{ criado.login_externo }}</b></div>
+      <div>Senha: <b class="tp-code">{{ criado.senha_leitura }}</b></div>
+      <div>Servidor: <b>{{ criado.servico.nome }}</b></div>
+      <div>Vence: <b>{{ criado.data_vencimento|date:"d/m/Y H:i"|default:"-" }}</b></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="tp-grid">
+    <div class="tp-card">
+      <h3><i class="fas fa-plus-circle"></i> Criar novo teste</h3>
+      {% if servicos %}
+      <form method="post">
+        {% csrf_token %}
+        <div class="tp-field"><label>Nome do cliente</label><input name="nome" required placeholder="Ex.: João Silva"></div>
+        <div class="tp-field"><label>WhatsApp</label><input name="whatsapp" placeholder="(64) 99999-9999"></div>
+        <div class="tp-field"><label>Servidor</label><select name="servico_id" required>{% for s in servicos %}<option value="{{ s.id }}">{{ s.nome }}</option>{% endfor %}</select></div>
+        <button class="tp-btn tp-primary" type="submit"><i class="fas fa-bolt"></i> Gerar teste</button>
+      </form>
+      {% else %}
+      <div style="font-size:.8rem;color:var(--text-muted)">Nenhum servidor SIGMAN com integração ativa. Configure no botão <strong>Integração</strong> do servidor.</div>
+      {% endif %}
+    </div>
+
+    <div class="tp-card">
+      <h3><i class="fas fa-list"></i> Testes recentes</h3>
+      <div class="tp-table-wrap">
+        <table class="tp-table">
+          <thead><tr><th>Cliente</th><th>Servidor</th><th>Usuário</th><th>Vencimento</th><th>Status</th><th>Ação</th></tr></thead>
+          <tbody>
+          {% for t in testes %}
+            <tr>
+              <td><strong>{{ t.nome }}</strong><br><small>{{ t.whatsapp|default:"" }}</small></td>
+              <td>{{ t.servico.nome }}</td>
+              <td><span class="tp-code">{{ t.login_externo }}</span></td>
+              <td>{{ t.data_vencimento|date:"d/m/Y H:i"|default:"-" }}</td>
+              <td><span class="tp-status {{ t.status_visual }}">{{ t.status_visual|upper }}</span></td>
+              <td>
+                {% if t.status != 'convertido' %}
+                <form method="post" action="{% url 'converter_teste_painel' t.id %}" onsubmit="return confirm('Renovar este teste no painel e transformá-lo em cliente?');" style="display:flex;gap:6px;align-items:center">
+                  {% csrf_token %}
+                  <select name="meses" style="padding:7px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg);color:var(--text-primary)">
+                    <option value="1">1 mês</option><option value="3">3 meses</option><option value="6">6 meses</option><option value="12">12 meses</option>
+                  </select>
+                  <button class="tp-btn tp-success" style="padding:7px 10px" type="submit"><i class="fas fa-user-check"></i> Virar cliente</button>
+                </form>
+                {% else %}
+                  {% if t.cliente_convertido %}<a href="{% url 'editar_cliente' t.cliente_convertido.id %}" class="tp-btn tp-primary" style="padding:7px 10px">Abrir cliente</a>{% endif %}
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:28px">Nenhum teste criado.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1263,8 +1263,6 @@ class Produto(models.Model):
             ("pode_ver_estoque", "Pode visualizar estoque"),
             ("pode_movimentar_estoque", "Pode movimentar estoque"),
             ("pode_ver_dashboard", "Pode acessar o dashboard"),
-            ("pode_ver_almoxarifado", "Pode visualizar almoxarifado"),
-            ("pode_gerenciar_almoxarifado", "Pode gerenciar almoxarifado"),
             ("pode_ver_empenhos", "Pode visualizar empenhos"),
             ("pode_criar_empenhos", "Pode criar empenhos"),
             ("pode_ver_mapa", "Pode acessar mapa canvas"),

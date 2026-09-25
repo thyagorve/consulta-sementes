@@ -1,0 +1,1915 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load l10n %}
+{% load humanize %}
+
+{% block title %}Dashboard - {{ dados_dashboard.mes_atual_nome }}/{{ dados_dashboard.ano_atual }}{% endblock %}
+
+{% block content %}
+<style>
+:root {
+    --card-creditos: #f59e0b;
+    --card-previsao: #8b5cf6;
+    --card-lucro: #10b981;
+    --card-ticket: #06b6d4;
+    --card-ranking: #ec4899;
+}
+
+* { box-sizing: border-box; }
+
+.dashboard-container { max-width: 1600px; margin: 0 auto; padding: 1rem; }
+
+/* ===== HEADER ===== */
+.dashboard-header { 
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark)); 
+    padding: 1.5rem 2rem; 
+    border-radius: 20px; 
+    margin-bottom: 1.5rem; 
+    color: white; 
+}
+
+.header-top { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    flex-wrap: wrap; 
+    gap: 1rem; 
+    margin-bottom: 1.5rem; 
+}
+
+.header-top h1 { 
+    font-size: 1.6rem; 
+    font-weight: 800; 
+    margin: 0; 
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.header-badges { 
+    display: flex; 
+    gap: 0.6rem; 
+    flex-wrap: wrap; 
+    align-items: center;
+}
+
+/* ===== BADGE BASE ===== */
+.header-badge { 
+    background: rgba(255,255,255,0.12); 
+    backdrop-filter: blur(10px); 
+    border: 1px solid rgba(255,255,255,0.2); 
+    border-radius: 12px; 
+    padding: 0.55rem 0.9rem; 
+    font-size: 0.85rem; 
+    display: flex; 
+    align-items: center; 
+    gap: 0.5rem;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.header-badge:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.4);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.badge-data { min-width: 150px; }
+.badge-data i { font-size: 1rem; flex-shrink: 0; }
+.badge-data .data-info { display: flex; flex-direction: column; line-height: 1.2; }
+.badge-data .data-dia { font-size: 0.85rem; font-weight: 600; letter-spacing: 0.3px; }
+.badge-data .data-mes { font-size: 0.65rem; opacity: 0.8; }
+
+.badge-hora { min-width: 90px; justify-content: center; }
+.badge-hora i { font-size: 0.9rem; flex-shrink: 0; animation: tick-clock 2s infinite; }
+.badge-hora .hora-valor { font-size: 0.9rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+
+@keyframes tick-clock { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
+
+.badge-agora {
+    background: rgba(245,158,11,0.3) !important; 
+    border-color: #f59e0b !important;
+    animation: pulse-badge 2s infinite;
+    min-width: auto;
+    padding: 0.55rem 0.8rem;
+}
+.badge-agora:hover { background: rgba(245,158,11,0.5) !important; transform: scale(1.05); }
+.badge-agora i { font-size: 0.85rem; }
+.badge-agora span { font-weight: 600; font-size: 0.8rem; }
+
+@keyframes pulse-badge {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+    50% { opacity: 0.85; box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+}
+
+.badge-data.historico, .badge-hora.historico {
+    border-color: rgba(245,158,11,0.6) !important;
+    background: rgba(245,158,11,0.2) !important;
+    box-shadow: 0 0 12px rgba(245,158,11,0.15);
+}
+
+.badge-data input[type="date"], .badge-hora input[type="time"] {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; z-index: 2;
+}
+.badge-data input[type="date"]::-webkit-calendar-picker-indicator,
+.badge-hora input[type="time"]::-webkit-calendar-picker-indicator {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;
+}
+
+.header-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.header-stat { background: rgba(255,255,255,0.12); border-radius: 14px; padding: 1rem; text-align: center; transition: all 0.3s; }
+.header-stat:hover { background: rgba(255,255,255,0.2); transform: translateY(-3px); }
+.header-stat .value { font-size: 1.8rem; font-weight: 800; }
+.header-stat .label { font-size: 0.75rem; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ===== SEÇÕES ===== */
+.section-title { 
+    display: flex; align-items: center; gap: 0.75rem; 
+    font-size: 1.2rem; font-weight: 700; margin: 1.75rem 0 1rem; 
+    padding-bottom: 0.75rem; border-bottom: 2px solid var(--border, #e2e8f0); 
+    color: var(--text, #1e293b); 
+}
+
+/* ===== GRID DE CARDS ===== */
+.kpi-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+    gap: 1rem; 
+    margin-bottom: 1.5rem; 
+}
+
+.kpi-grid-ranking { 
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 1rem; 
+    margin-bottom: 1.5rem; 
+}
+
+/* ===== CLIENTES DESTAQUE GRID ===== */
+.clientes-destaque-grid {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: stretch;
+}
+
+/* ===== CARDS ===== */
+.kpi-card { 
+    background: var(--bg-card, #fff); 
+    border: 2px solid var(--border, #e2e8f0); 
+    border-radius: 16px; 
+    padding: 1.25rem; 
+    transition: all 0.3s; 
+    position: relative; 
+    overflow: hidden; 
+    display: flex; 
+    flex-direction: column; 
+    min-height: 135px; 
+}
+
+.kpi-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.12); }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+.kpi-card.default::before { background: linear-gradient(90deg, var(--primary), var(--primary-dark)); }
+.kpi-card.success::before { background: linear-gradient(90deg, #10b981, #059669); }
+.kpi-card.warning::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.kpi-card.danger::before { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.kpi-card.creditos::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.kpi-card.previsao::before { background: linear-gradient(90deg, #8b5cf6, #6366f1); }
+.kpi-card.lucro::before { background: linear-gradient(90deg, #10b981, #059669); }
+.kpi-card.ranking::before { background: linear-gradient(90deg, #ec4899, #db2777); }
+
+.kpi-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.3rem; }
+.kpi-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-light, #64748b); }
+.kpi-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.95rem; flex-shrink: 0; }
+.kpi-icon.blue { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+.kpi-icon.green { background: linear-gradient(135deg, #10b981, #059669); }
+.kpi-icon.orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.kpi-icon.red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.kpi-icon.purple { background: linear-gradient(135deg, #8b5cf6, #6366f1); }
+.kpi-icon.cyan { background: linear-gradient(135deg, #06b6d4, #0891b2); }
+.kpi-icon.pink { background: linear-gradient(135deg, #ec4899, #db2777); }
+
+.kpi-value { font-size: 1.7rem; font-weight: 800; color: var(--text, #1e293b); margin-bottom: 0.2rem; line-height: 1.2; }
+.kpi-value.green { color: #10b981; }
+.kpi-sub { font-size: 0.75rem; color: var(--text-light, #64748b); min-height: 1.1rem; }
+.kpi-footer { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 0.6rem; border-top: 1px solid var(--border, #e2e8f0); font-size: 0.7rem; flex-wrap: wrap; gap: 0.3rem; }
+.kpi-trend { display: flex; align-items: center; gap: 0.3rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 8px; font-size: 0.68rem; }
+.kpi-trend.up { background: rgba(16,185,129,0.1); color: #10b981; }
+.kpi-trend.down { background: rgba(239,68,68,0.1); color: #ef4444; }
+.kpi-trend.warn { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.kpi-trend.info { background: color-mix(in srgb, var(--primary) 10%, transparent); color: var(--primary); }
+
+
+/* ===== KPI VISUAL V14 =====
+   Os cards-resumo ganham mais presença visual, com o ícone centralizado e
+   menos sensação de "bloco de texto". Rankings e cards por servidor mantêm
+   sua estrutura própria. */
+.kpi-grid > .kpi-card:not(.servidor-card){
+    --kpi-accent: var(--primary);
+    min-height: 190px;
+    padding: 1.35rem 1.2rem 1.1rem;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    isolation: isolate;
+    background:
+        radial-gradient(circle at 50% -12%, color-mix(in srgb, var(--kpi-accent) 17%, transparent) 0, transparent 48%),
+        linear-gradient(180deg, color-mix(in srgb, var(--kpi-accent) 4%, var(--bg-card, #fff)), var(--bg-card, #fff) 66%);
+}
+.kpi-grid > .kpi-card.default{--kpi-accent:var(--primary)}
+.kpi-grid > .kpi-card.success,
+.kpi-grid > .kpi-card.lucro{--kpi-accent:#10b981}
+.kpi-grid > .kpi-card.warning,
+.kpi-grid > .kpi-card.creditos{--kpi-accent:#f59e0b}
+.kpi-grid > .kpi-card.danger{--kpi-accent:#ef4444}
+.kpi-grid > .kpi-card.previsao{--kpi-accent:#8b5cf6}
+
+.kpi-grid > .kpi-card:not(.servidor-card)::before{
+    height: 5px;
+    background: linear-gradient(90deg, transparent, var(--kpi-accent), transparent);
+}
+.kpi-grid > .kpi-card:not(.servidor-card)::after{
+    content:'';
+    position:absolute;
+    width:150px;
+    height:150px;
+    border-radius:50%;
+    right:-78px;
+    bottom:-92px;
+    background:color-mix(in srgb,var(--kpi-accent) 7%,transparent);
+    z-index:-1;
+    pointer-events:none;
+}
+.kpi-grid > .kpi-card:not(.servidor-card) .kpi-header{
+    width:100%;
+    margin:0 0 .75rem;
+    display:flex;
+    flex-direction:column-reverse;
+    align-items:center;
+    justify-content:center;
+    gap:.7rem;
+}
+.kpi-grid > .kpi-card:not(.servidor-card) .kpi-icon{
+    width:58px;
+    height:58px;
+    border-radius:18px;
+    font-size:1.35rem;
+    box-shadow:0 10px 24px color-mix(in srgb,var(--kpi-accent) 24%,transparent);
+    transform:none;
+}
+.kpi-grid > .kpi-card:not(.servidor-card) .kpi-label{
+    font-size:.74rem;
+    line-height:1.25;
+    letter-spacing:.055em;
+    text-align:center;
+}
+.kpi-grid > .kpi-card:not(.servidor-card) .kpi-value{
+    width:100%;
+    margin:.05rem 0 .35rem;
+    font-size:clamp(1.55rem,2vw,2rem);
+    line-height:1.08;
+    text-align:center;
+}
+.kpi-grid > .kpi-card:not(.servidor-card) .kpi-sub{
+    width:100%;
+    min-height:0;
+    max-width:260px;
+    margin:0 auto;
+    font-size:.74rem;
+    line-height:1.45;
+    text-align:center;
+}
+.kpi-grid > .kpi-card:not(.servidor-card) .kpi-footer{
+    width:100%;
+    margin-top:.9rem;
+    padding-top:.72rem;
+    justify-content:center;
+    gap:.45rem .75rem;
+    text-align:center;
+}
+.kpi-grid > .kpi-card:not(.servidor-card) .alerta-estoque-inline{
+    width:100%;
+    margin-top:.8rem;
+    justify-content:center;
+    text-align:center;
+}
+.kpi-grid > .kpi-card:not(.servidor-card):hover .kpi-icon{
+    transform:translateY(-2px) scale(1.04);
+    transition:transform .2s ease;
+}
+
+/* ===== RANKING ===== */
+.ranking-list { list-style: none; padding: 0; margin: 0; flex: 1; }
+.ranking-list li { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border, #e2e8f0); font-size: 0.78rem; }
+.ranking-list li:last-child { border-bottom: none; }
+.ranking-pos { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.6rem; color: white; flex-shrink: 0; }
+.ranking-pos.gold { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.ranking-pos.silver { background: linear-gradient(135deg, #94a3b8, #64748b); }
+.ranking-pos.bronze { background: linear-gradient(135deg, #d97706, #92400e); }
+.ranking-pos.normal { background: #94a3b8; }
+.ranking-info { flex: 1; min-width: 0; }
+.ranking-name { font-weight: 600; font-size: 0.78rem; word-break: break-word; color: var(--text, #1e293b); }
+.ranking-meta { font-size: 0.65rem; color: var(--text-light, #64748b); }
+.ranking-value { font-weight: 700; font-size: 0.75rem; color: #10b981; white-space: nowrap; flex-shrink: 0; }
+
+/* ===== SERVIDOR ===== */
+.servidor-card { padding: 0.85rem !important; min-height: auto !important; }
+.servidor-card.alerta { border-color: #ef4444; background: rgba(239,68,68,0.03); }
+.servidor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem; }
+.servidor-nome { font-weight: 700; font-size: 0.82rem; }
+.servidor-creditos { font-weight: 800; font-size: 0.95rem; }
+.servidor-detalhes { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; font-size: 0.68rem; color: var(--text-light, #64748b); }
+.servidor-detalhes span { display: flex; align-items: center; gap: 0.15rem; }
+
+.alerta-estoque-inline { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 0.4rem 0.6rem; margin-top: 0.4rem; font-size: 0.68rem; color: #d97706; display: flex; align-items: center; gap: 0.3rem; }
+.alerta-estoque-inline.critico { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.4); color: #dc2626; }
+
+/* ===== GRÁFICOS ===== */
+.charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 2rem; }
+.chart-card { background: var(--bg-card, #fff); border: 2px solid var(--border, #e2e8f0); border-radius: 16px; padding: 1.25rem; min-height: 300px; display: flex; flex-direction: column; }
+.chart-title { font-size: 0.9rem; font-weight: 700; color: var(--text, #1e293b); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+.chart-container { flex: 1; position: relative; min-height: 250px; max-height: 280px; overflow: hidden; }
+.chart-container canvas { width: 100% !important; height: 100% !important; }
+.dashboard-chart-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-light, #64748b);
+    font-size: 0.78rem;
+}
+.dashboard-chart-empty i {
+    font-size: 1.5rem;
+    color: var(--primary);
+    opacity: 0.75;
+}
+
+.header-stat .value,
+.kpi-value,
+.servidor-creditos,
+.ranking-value {
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+/* ===== CLIENTE CAMPEÃO CARD ===== */
+.cliente-campeao-card {
+    border-left: 4px solid #f59e0b !important;
+    background: linear-gradient(135deg, rgba(245,158,11,0.05), color-mix(in srgb, var(--primary) 5%, transparent)) !important;
+    min-width: 280px;
+    height: 100%;
+}
+
+.cliente-campeao-nome {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0.3rem 0;
+    color: var(--text, #1e293b);
+    word-break: break-word;
+}
+
+.cliente-campeao-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.4rem;
+    margin: 0.5rem 0;
+}
+
+.cliente-campeao-stat {
+    text-align: center;
+}
+
+.cliente-campeao-valor {
+    font-size: 1.1rem !important;
+}
+
+.cliente-campeao-label {
+    font-size: 0.6rem;
+    color: var(--text-light, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.cliente-campeao-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0.5rem;
+    background: rgba(245,158,11,0.08);
+    border-radius: 8px;
+    margin-top: auto;
+    font-size: 0.68rem;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+}
+
+.cliente-campeao-footer span:first-child {
+    color: #d97706;
+}
+
+.cliente-campeao-footer span:last-child {
+    color: var(--text-light, #64748b);
+    font-size: 0.6rem;
+}
+
+/* ===== TABELA RANKING CARD ===== */
+.tabela-ranking-card {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+}
+
+.tabela-ranking-container {
+    overflow-y: auto;
+    max-height: 250px;
+    flex: 1;
+    -webkit-overflow-scrolling: touch;
+}
+
+.cliente-count-badge {
+    font-size: 0.7rem;
+}
+
+/* ===== TABELA ===== */
+.table-ranking {
+    width: 100%;
+    font-size: 0.8rem;
+    border-collapse: collapse;
+}
+
+.table-ranking thead {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card, #fff);
+    z-index: 1;
+}
+
+.table-ranking thead th {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 2px solid var(--border, #e2e8f0);
+    color: var(--text-light, #64748b);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.table-ranking tbody td {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.table-ranking tbody tr:first-child {
+    background: rgba(245,158,11,0.08);
+}
+
+.col-pos { width: 40px; text-align: center; }
+.col-nome { text-align: left; }
+.col-valor { text-align: right; width: 100px; color: #10b981; font-weight: 600; }
+.col-compras { text-align: right; width: 80px; }
+
+/* ===== TEMAS ===== */
+[data-theme="dark"] .kpi-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .kpi-value { color: #f1f5f9; }
+[data-theme="dark"] .kpi-value.green { color: #34d399; }
+[data-theme="dark"] .kpi-label { color: #94a3b8; }
+[data-theme="dark"] .section-title { color: #f1f5f9; border-color: #334155; }
+[data-theme="dark"] .chart-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .chart-title { color: #f1f5f9; }
+[data-theme="dark"] .servidor-card { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .ranking-list li { border-color: #334155; }
+[data-theme="dark"] .ranking-name { color: #f1f5f9; }
+[data-theme="dark"] .ranking-value { color: #34d399; }
+[data-theme="dark"] .kpi-footer { border-color: #334155; }
+[data-theme="dark"] .table-ranking thead th { border-color: #334155; color: #94a3b8; }
+[data-theme="dark"] .table-ranking tbody td { border-color: #334155; }
+[data-theme="dark"] .cliente-campeao-nome { color: #f1f5f9; }
+[data-theme="dark"] .table-ranking thead { background: #1e293b; }
+
+/* ===== ANIMAÇÕES ===== */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.kpi-card, .chart-card { animation: fadeIn 0.4s ease-out; }
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 1200px) { 
+    .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+    .clientes-destaque-grid { grid-template-columns: 260px 1fr; }
+    .cliente-campeao-card { min-width: 240px; }
+}
+
+@media (max-width: 1024px) { 
+    .charts-grid { grid-template-columns: 1fr; } 
+    .header-stats { grid-template-columns: repeat(2, 1fr); } 
+    .chart-card { min-height: 280px; } 
+    .chart-container { min-height: 220px; max-height: 250px; }
+    .clientes-destaque-grid { grid-template-columns: 1fr 1fr; }
+    .tabela-ranking-container { max-height: 200px; }
+}
+
+@media (max-width: 900px) { 
+    .kpi-grid-ranking { grid-template-columns: 1fr; }
+    .header-top { flex-direction: column; align-items: flex-start; }
+    .header-badges { width: 100%; justify-content: flex-start; }
+    .clientes-destaque-grid { grid-template-columns: 1fr; }
+    .cliente-campeao-card { min-width: auto; }
+}
+
+@media (max-width: 768px) { 
+    .dashboard-container { padding: 0.5rem; } 
+    .dashboard-header { padding: 1rem; } 
+    .header-stats { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; } 
+    .header-stat .value { font-size: 1.3rem; }
+    .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); } 
+    .kpi-value { font-size: 1.4rem; } 
+    .chart-card { min-height: 260px; } 
+    .chart-container { min-height: 200px; max-height: 220px; }
+    .header-top h1 { font-size: 1.3rem; }
+    .badge-data { min-width: 130px; }
+    .badge-hora { min-width: 75px; }
+    .badge-data .data-dia { font-size: 0.75rem; }
+    .badge-hora .hora-valor { font-size: 0.8rem; }
+    
+    .cliente-campeao-nome { font-size: 0.9rem; }
+    .cliente-campeao-valor { font-size: 1rem !important; }
+    .cliente-campeao-stats { gap: 0.2rem; }
+    .cliente-campeao-label { font-size: 0.55rem; }
+    
+    .table-ranking { font-size: 0.7rem; }
+    .table-ranking thead th, .table-ranking tbody td { padding: 0.35rem 0.3rem; }
+    .col-valor { width: 80px; }
+    .col-compras { width: 60px; }
+    .tabela-ranking-container { max-height: 180px; }
+}
+
+
+@media (max-width: 768px) {
+    .kpi-grid > .kpi-card:not(.servidor-card){min-height:168px;padding:1rem .85rem .85rem}
+    .kpi-grid > .kpi-card:not(.servidor-card) .kpi-icon{width:50px;height:50px;border-radius:15px;font-size:1.12rem}
+    .kpi-grid > .kpi-card:not(.servidor-card) .kpi-header{gap:.5rem;margin-bottom:.55rem}
+    .kpi-grid > .kpi-card:not(.servidor-card) .kpi-label{font-size:.67rem}
+    .kpi-grid > .kpi-card:not(.servidor-card) .kpi-value{font-size:1.45rem}
+    .kpi-grid > .kpi-card:not(.servidor-card) .kpi-sub{font-size:.68rem}
+    .kpi-grid > .kpi-card:not(.servidor-card) .kpi-footer{margin-top:.65rem;padding-top:.55rem;font-size:.64rem}
+}
+
+@media (max-width: 480px) { 
+    .kpi-grid { grid-template-columns: 1fr 1fr; } 
+    .kpi-value { font-size: 1.2rem; }
+    .header-stats { grid-template-columns: 1fr; }
+    .header-top h1 { font-size: 1.1rem; }
+    .header-badges { gap: 0.4rem; }
+    .badge-data { min-width: 115px; padding: 0.45rem 0.6rem; }
+    .badge-hora { min-width: 65px; padding: 0.45rem 0.6rem; }
+    .badge-data .data-dia { font-size: 0.7rem; }
+    .badge-data .data-mes { font-size: 0.6rem; }
+    .badge-hora .hora-valor { font-size: 0.7rem; }
+    .badge-agora { padding: 0.45rem 0.6rem; }
+    .badge-agora span { font-size: 0.7rem; }
+    .badge-data i, .badge-hora i { font-size: 0.8rem; }
+    
+    .cliente-campeao-card { padding: 0.85rem !important; min-height: auto !important; }
+    .cliente-campeao-nome { font-size: 0.85rem; margin: 0.15rem 0; }
+    .cliente-campeao-stats { gap: 0.1rem; margin: 0.25rem 0; }
+    .cliente-campeao-valor { font-size: 0.85rem !important; }
+    .cliente-campeao-label { font-size: 0.5rem; }
+    .cliente-campeao-footer { padding: 0.25rem 0.3rem; font-size: 0.6rem; flex-direction: row; }
+    
+    .table-ranking { font-size: 0.65rem; }
+    .table-ranking thead th, .table-ranking tbody td { padding: 0.3rem 0.2rem; }
+    .col-pos { width: 25px; }
+    .col-valor { width: 65px; font-size: 0.65rem; }
+    .col-compras { width: 50px; }
+    .tabela-ranking-container { max-height: 150px; }
+    .cliente-count-badge { font-size: 0.6rem; }
+}
+
+@media (max-width: 360px) {
+    .badge-data { min-width: 100px; }
+    .badge-hora { min-width: 55px; }
+    .badge-agora span { display: none; }
+    .badge-agora { padding: 0.45rem 0.5rem; }
+    
+    .cliente-campeao-stats { gap: 0.05rem; }
+    .cliente-campeao-valor { font-size: 0.75rem !important; }
+    
+    .table-ranking { font-size: 0.6rem; }
+    .col-valor { width: 55px; }
+    .col-compras { width: 45px; }
+    .table-ranking thead th, .table-ranking tbody td { padding: 0.25rem 0.15rem; }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ===== COMPARADOR MENSAL ===== */
+
+.comparacao-resumo {
+    margin-bottom: 0.9rem;
+}
+
+.comparacao-resumo-unico {
+    display: block;
+}
+
+.comparacao-mensagem {
+    position: relative;
+    overflow: hidden;
+    padding: 0.95rem;
+    border-radius: 14px;
+    border: 1px solid var(--border, #e2e8f0);
+    background: var(--bg-card, #ffffff);
+    color: var(--text, #1e293b);
+}
+
+.comparacao-mensagem::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: #94a3b8;
+}
+
+/* Cabeçalho */
+
+.comparacao-cabecalho {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.8rem;
+}
+
+.comparacao-cabecalho > div {
+    min-width: 0;
+}
+
+.comparacao-cabecalho strong {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.12rem;
+    font-size: 0.86rem;
+    font-weight: 750;
+    color: var(--text, #1e293b);
+}
+
+.comparacao-cabecalho small {
+    display: block;
+    font-size: 0.61rem;
+    color: var(--text-light, #64748b);
+}
+
+/* Percentual */
+
+.comparacao-percentual {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 68px;
+    margin: 0 !important;
+    padding: 0.38rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.82rem !important;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+    background: rgba(100, 116, 139, 0.1);
+}
+
+/* Valores */
+
+.comparacao-valores {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    padding: 0.65rem 0;
+    border-top: 1px solid var(--border, #e2e8f0);
+    border-bottom: 1px solid var(--border, #e2e8f0);
+}
+
+.comparacao-valores > div {
+    position: relative;
+    min-width: 0;
+    padding: 0 0.55rem;
+    text-align: center;
+}
+
+.comparacao-valores > div:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 15%;
+    right: 0;
+    width: 1px;
+    height: 70%;
+    background: var(--border, #e2e8f0);
+}
+
+.comparacao-valores small {
+    display: block;
+    margin-bottom: 0.22rem;
+    font-size: 0.52rem;
+    font-weight: 650;
+    color: var(--text-light, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.45px;
+}
+
+.comparacao-valores strong {
+    display: block;
+    overflow: hidden;
+    font-size: 0.76rem;
+    font-weight: 800;
+    color: var(--text, #1e293b);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* Mensagem final */
+
+.comparacao-texto {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    margin: 0.7rem 0 0;
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: var(--text-light, #64748b);
+}
+
+.comparacao-texto i {
+    flex-shrink: 0;
+    margin-top: 0.12rem;
+}
+
+/* Status positivo */
+
+.comparacao-mensagem.status-otimo {
+    border-color: rgba(16, 185, 129, 0.35);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(16, 185, 129, 0.08),
+            rgba(16, 185, 129, 0.015)
+        ),
+        var(--bg-card, #ffffff);
+}
+
+.comparacao-mensagem.status-otimo::before {
+    background: #10b981;
+}
+
+.comparacao-mensagem.status-otimo .comparacao-percentual {
+    color: #059669;
+    background: rgba(16, 185, 129, 0.13);
+}
+
+/* Status estável */
+
+.comparacao-mensagem.status-estavel {
+    border-color: rgba(245, 158, 11, 0.35);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(245, 158, 11, 0.08),
+            rgba(245, 158, 11, 0.015)
+        ),
+        var(--bg-card, #ffffff);
+}
+
+.comparacao-mensagem.status-estavel::before {
+    background: #f59e0b;
+}
+
+.comparacao-mensagem.status-estavel .comparacao-percentual {
+    color: #d97706;
+    background: rgba(245, 158, 11, 0.13);
+}
+
+/* Status abaixo */
+
+.comparacao-mensagem.status-atencao {
+    border-color: rgba(239, 68, 68, 0.32);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(239, 68, 68, 0.07),
+            rgba(239, 68, 68, 0.01)
+        ),
+        var(--bg-card, #ffffff);
+}
+
+.comparacao-mensagem.status-atencao::before {
+    background: #ef4444;
+}
+
+.comparacao-mensagem.status-atencao .comparacao-percentual {
+    color: #dc2626;
+    background: rgba(239, 68, 68, 0.12);
+}
+
+/* Status neutro */
+
+.comparacao-mensagem.status-neutro::before {
+    background: #94a3b8;
+}
+
+.comparacao-mensagem.status-neutro .comparacao-percentual {
+    color: var(--text-light, #64748b);
+}
+
+/* Tema escuro */
+
+[data-theme="dark"] .comparacao-mensagem {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+[data-theme="dark"] .comparacao-cabecalho strong,
+[data-theme="dark"] .comparacao-valores strong {
+    color: #f1f5f9;
+}
+
+[data-theme="dark"] .comparacao-valores {
+    border-color: #334155;
+}
+
+[data-theme="dark"] .comparacao-valores > div:not(:last-child)::after {
+    background: #334155;
+}
+
+[data-theme="dark"] .comparacao-mensagem.status-otimo {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(16, 185, 129, 0.11),
+            rgba(16, 185, 129, 0.02)
+        ),
+        #1e293b;
+}
+
+[data-theme="dark"] .comparacao-mensagem.status-estavel {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(245, 158, 11, 0.11),
+            rgba(245, 158, 11, 0.02)
+        ),
+        #1e293b;
+}
+
+[data-theme="dark"] .comparacao-mensagem.status-atencao {
+    background:
+        linear-gradient(
+            135deg,
+            rgba(239, 68, 68, 0.1),
+            rgba(239, 68, 68, 0.02)
+        ),
+        #1e293b;
+}
+
+/* Celular */
+
+@media (max-width: 480px) {
+    .comparacao-mensagem {
+        padding: 0.75rem 0.7rem 0.75rem 0.85rem;
+        border-radius: 12px;
+    }
+
+    .comparacao-cabecalho {
+        margin-bottom: 0.65rem;
+    }
+
+    .comparacao-cabecalho strong {
+        font-size: 0.74rem;
+    }
+
+    .comparacao-cabecalho small {
+        font-size: 0.53rem;
+    }
+
+    .comparacao-percentual {
+        min-width: 58px;
+        padding: 0.32rem 0.42rem;
+        font-size: 0.7rem !important;
+    }
+
+    .comparacao-valores {
+        padding: 0.55rem 0;
+    }
+
+    .comparacao-valores > div {
+        padding: 0 0.25rem;
+    }
+
+    .comparacao-valores small {
+        font-size: 0.44rem;
+        letter-spacing: 0.25px;
+    }
+
+    .comparacao-valores strong {
+        font-size: 0.63rem;
+    }
+
+    .comparacao-texto {
+        margin-top: 0.55rem;
+        font-size: 0.59rem;
+        line-height: 1.35;
+    }
+}
+
+@media (max-width: 360px) {
+    .comparacao-cabecalho strong {
+        font-size: 0.68rem;
+    }
+
+    .comparacao-percentual {
+        min-width: 52px;
+        font-size: 0.64rem !important;
+    }
+
+    .comparacao-valores strong {
+        font-size: 0.57rem;
+    }
+
+    .comparacao-valores small {
+        font-size: 0.4rem;
+    }
+}
+
+
+.chart-divider{
+    margin:.9rem -1rem;
+    border-top:1px solid var(--border);
+}
+
+
+.comparacao-chart-card {
+    overflow: hidden;
+}
+
+.comparacao-chart-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.comparacao-chart-title > div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.comparacao-chart-title small {
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: var(--text-light, #64748b);
+    white-space: nowrap;
+}
+
+.chart-divider {
+    margin: 0.85rem -1.25rem;
+    border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.comparacao-chart-container {
+    min-height: 260px;
+    max-height: 300px;
+    margin-top: 0;
+    padding: 0.75rem;
+    border-radius: 12px;
+    background: rgba(100, 116, 139, 0.045);
+}
+
+[data-theme="dark"] .comparacao-chart-container {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+@media (max-width: 480px) {
+    .comparacao-chart-title {
+        align-items: flex-start;
+    }
+
+    .comparacao-chart-title small {
+        font-size: 0.52rem;
+    }
+
+    .chart-divider {
+        margin: 0.7rem -0.85rem;
+    }
+
+    .comparacao-chart-container {
+        min-height: 220px;
+        max-height: 245px;
+        padding: 0.35rem;
+    }
+}
+</style>
+
+<div class="dashboard-container">
+    <!-- ===== HEADER ===== -->
+    <div class="dashboard-header">
+        <div class="header-top">
+            <h1 id="dashboard-title">
+                <i class="fas fa-chart-line"></i> Dashboard
+                {% if dados_dashboard.visualizando_passado %}
+                <small style="font-size: 0.55em; opacity: 0.75; font-weight: 400;">(Histórico)</small>
+                {% endif %}
+            </h1>
+            
+            <div class="header-badges">
+                <div class="header-badge badge-data {% if dados_dashboard.visualizando_passado %}historico{% endif %}" 
+                     title="Clique para selecionar a data">
+                    <i class="fas fa-calendar-alt"></i>
+                    <div class="data-info">
+                        <span class="data-dia" id="data-curta">{{ dados_dashboard.data_atual }}</span>
+                        <span class="data-mes" id="data-mes-ano">{{ dados_dashboard.mes_atual_nome }}/{{ dados_dashboard.ano_atual }}</span>
+                    </div>
+                    <input type="date" id="filtro-data" name="data_referencia" value="{{ dados_dashboard.data_referencia_iso }}" aria-label="Selecionar data">
+                </div>
+                
+                <div class="header-badge badge-hora {% if dados_dashboard.visualizando_passado %}historico{% endif %}" 
+                     title="Clique para selecionar a hora">
+                    <i class="fas fa-clock"></i>
+                    <span class="hora-valor" id="hora-display">{{ dados_dashboard.hora_referencia|default:"00:00" }}</span>
+                    <input type="time" id="filtro-hora" name="hora_referencia" value="{{ dados_dashboard.hora_referencia|default:'00:00' }}" aria-label="Selecionar hora">
+                </div>
+                
+                {% if dados_dashboard.visualizando_passado %}
+                <div class="header-badge badge-agora" onclick="window.location.href = window.location.pathname" title="Voltar para o dia e hora atual">
+                    <i class="fas fa-home"></i> <span>Agora</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="header-stats">
+            <div class="header-stat"><div class="value">{{ dados_dashboard.total_clientes_ativos_total }}</div><div class="label">Clientes Ativos</div></div>
+            <div class="header-stat"><div class="value">{{ dados_dashboard.clientes_a_vencer_hoje }}</div><div class="label">Vencem Hoje</div></div>
+            <div class="header-stat"><div class="value">R$ {{ dados_dashboard.receita_mensal_bruto|floatformat:2|intcomma }}</div><div class="label">Receita Mês</div></div>
+            <div class="header-stat"><div class="value">R$ {{ dados_dashboard.receita_mensal_liquido|floatformat:2|intcomma }}</div><div class="label">Lucro Mês</div></div>
+        </div>
+    </div>
+
+    <!-- ===== CLIENTES ===== -->
+    <div class="section-title"><i class="fas fa-users"></i> Clientes</div>
+    <div class="kpi-grid">
+        <div class="kpi-card success">
+            <div class="kpi-header"><span class="kpi-label">Em Dia</span><div class="kpi-icon green"><i class="fas fa-check-circle"></i></div></div>
+            <div class="kpi-value green">{{ dados_dashboard.clientes_ativos }}</div>
+            <div class="kpi-footer"><div class="kpi-trend up"><i class="fas fa-smile"></i> Saudável</div><span>{{ dados_dashboard.clientes_ativos }} de {{ dados_dashboard.total_clientes_ativos_total }}</span></div>
+        </div>
+        <div class="kpi-card danger">
+            <div class="kpi-header"><span class="kpi-label">Vencidos</span><div class="kpi-icon red"><i class="fas fa-exclamation-triangle"></i></div></div>
+            <div class="kpi-value">{{ dados_dashboard.clientes_vencidos }}</div>
+            <div class="kpi-footer"><div class="kpi-trend down"><i class="fas fa-exclamation"></i> Cobrar</div><span>Agora</span></div>
+        </div>
+        <div class="kpi-card warning">
+            <div class="kpi-header"><span class="kpi-label">Vencem Amanhã</span><div class="kpi-icon orange"><i class="fas fa-calendar-day"></i></div></div>
+            <div class="kpi-value">{{ dados_dashboard.clientes_a_vencer_amanha }}</div>
+            <div class="kpi-footer"><div class="kpi-trend warn"><i class="fas fa-bell"></i> Preparar</div><span>Renovação</span></div>
+        </div>
+        <div class="kpi-card default">
+            <div class="kpi-header"><span class="kpi-label">Novos este Mês</span><div class="kpi-icon blue"><i class="fas fa-user-plus"></i></div></div>
+            <div class="kpi-value">{{ dados_dashboard.clientes_criado_mes }}</div>
+            <div class="kpi-footer"><div class="kpi-trend up"><i class="fas fa-arrow-up"></i> Aquisição</div><span>Este mês</span></div>
+        </div>
+        <div class="kpi-card default">
+            <div class="kpi-header"><span class="kpi-label">Renovados este Mês</span><div class="kpi-icon blue"><i class="fas fa-redo"></i></div></div>
+            <div class="kpi-value">{{ dados_dashboard.clientes_renovado_mes }}</div>
+            <div class="kpi-footer"><div class="kpi-trend info"><i class="fas fa-sync-alt"></i> Retenção</div><span>{{ dados_dashboard.taxa_retencao }}%</span></div>
+        </div>
+        <div class="kpi-card default">
+            <div class="kpi-header"><span class="kpi-label">Inativos</span><div class="kpi-icon red"><i class="fas fa-user-slash"></i></div></div>
+            <div class="kpi-value">{{ dados_dashboard.clientes_desativados }}</div>
+            <div class="kpi-sub">Taxa: {{ dados_dashboard.taxa_desativacao }}%</div>
+            <div class="kpi-footer"><div class="kpi-trend down"><i class="fas fa-chart-line"></i> Churn</div><span>Histórico</span></div>
+        </div>
+    </div>
+
+    <!-- ===== FINANCEIRO ===== -->
+    <div class="section-title"><i class="fas fa-money-bill-wave"></i> Financeiro</div>
+    <div class="kpi-grid">
+        <div class="kpi-card lucro">
+            <div class="kpi-header"><span class="kpi-label">Receita Hoje</span><div class="kpi-icon green"><i class="fas fa-sun"></i></div></div>
+            <div class="kpi-value green">R$ {{ dados_dashboard.receita_diaria|floatformat:2|intcomma }}</div>
+            <div class="kpi-sub">Lucro: R$ {{ dados_dashboard.lucro_diario|floatformat:2|intcomma }}</div>
+        </div>
+        <div class="kpi-card lucro">
+            <div class="kpi-header"><span class="kpi-label">Receita Semanal</span><div class="kpi-icon green"><i class="fas fa-calendar-week"></i></div></div>
+            <div class="kpi-value green">R$ {{ dados_dashboard.receita_semanal|floatformat:2|intcomma}}</div>
+            <div class="kpi-sub">Lucro: R$ {{ dados_dashboard.lucro_semanal|floatformat:2|intcomma}}</div>
+        </div>
+        <div class="kpi-card success">
+            <div class="kpi-header"><span class="kpi-label">Receita Mensal</span><div class="kpi-icon green"><i class="fas fa-calendar-alt"></i></div></div>
+            <div class="kpi-value green">R$ {{ dados_dashboard.receita_mensal_bruto|floatformat:2|intcomma}}</div>
+            <div class="kpi-sub">Líquido: R$ {{ dados_dashboard.receita_mensal_liquido|floatformat:2|intcomma}}</div>
+            <div class="kpi-footer">
+                <div class="kpi-trend {% if dados_dashboard.crescimento_mensal >= 0 %}up{% else %}down{% endif %}">
+                    <i class="fas fa-{% if dados_dashboard.crescimento_mensal >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i> {{ dados_dashboard.crescimento_mensal }}%
+                </div><span>vs mês ant.</span>
+            </div>
+        </div>
+        <div class="kpi-card success">
+            <div class="kpi-header"><span class="kpi-label">Receita Anual</span><div class="kpi-icon green"><i class="fas fa-chart-bar"></i></div></div>
+            <div class="kpi-value green">R$ {{ dados_dashboard.receita_anual_bruto|floatformat:2|intcomma}}</div>
+            <div class="kpi-sub">Líquido: R$ {{ dados_dashboard.receita_anual_liquido|floatformat:2|intcomma}}</div>
+        </div>
+        <div class="kpi-card lucro">
+            <div class="kpi-header"><span class="kpi-label">Ticket Médio</span><div class="kpi-icon green"><i class="fas fa-receipt"></i></div></div>
+            <div class="kpi-value green">R$ {{ dados_dashboard.ticket_medio|floatformat:2|intcomma}}</div>
+            <div style="font-size:0.73rem;margin-top:0.2rem;color:var(--text-light);">Líquido: R$ {{ dados_dashboard.ticket_medio_liquido|floatformat:2|intcomma}}</div>
+            <div class="kpi-footer"><div class="kpi-trend info"><i class="fas fa-calculator"></i> Por cliente</div><span>Este mês</span></div>
+        </div>
+        <div class="kpi-card lucro">
+            <div class="kpi-header"><span class="kpi-label">Margem de Lucro</span><div class="kpi-icon green"><i class="fas fa-percent"></i></div></div>
+            <div class="kpi-value green">{{ dados_dashboard.margem_lucro }}%</div>
+            <div class="kpi-footer"><div class="kpi-trend up"><i class="fas fa-chart-pie"></i> Rentabilidade</div><span>Mês atual</span></div>
+        </div>
+    </div>
+
+    <!-- ===== RANKINGS ===== -->
+    <div class="section-title"><i class="fas fa-trophy"></i> Rankings</div>
+    
+    <!-- Rankings de Servidores -->
+    <div class="kpi-grid-ranking">
+        <div class="kpi-card ranking">
+            <div class="kpi-header"><span class="kpi-label">🏆 Servidores - Semana</span><div class="kpi-icon pink"><i class="fas fa-calendar-week"></i></div></div>
+            {% if dados_dashboard.ranking_semana %}
+            <ul class="ranking-list">
+                {% for s in dados_dashboard.ranking_semana %}
+                <li>
+                    <span class="ranking-pos {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% else %}normal{% endif %}">{{ forloop.counter }}</span>
+                    <div class="ranking-info"><div class="ranking-name">{{ s.servidor }}</div><div class="ranking-meta">{{ s.total_vendas }} vendas</div></div>
+                    <span class="ranking-value">R$ {{ s.lucro|floatformat:2|intcomma}}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}<p style="color:var(--text-light);text-align:center;padding:1rem;font-size:0.8rem;">Sem dados</p>{% endif %}
+        </div>
+        <div class="kpi-card ranking">
+            <div class="kpi-header"><span class="kpi-label">🏆 Servidores - Mês</span><div class="kpi-icon pink"><i class="fas fa-calendar-alt"></i></div></div>
+            {% if dados_dashboard.ranking_mes %}
+            <ul class="ranking-list">
+                {% for s in dados_dashboard.ranking_mes %}
+                <li>
+                    <span class="ranking-pos {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% else %}normal{% endif %}">{{ forloop.counter }}</span>
+                    <div class="ranking-info"><div class="ranking-name">{{ s.servidor }}</div><div class="ranking-meta">{{ s.total_vendas }} vendas</div></div>
+                    <span class="ranking-value">R$ {{ s.lucro|floatformat:2|intcomma}}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}<p style="color:var(--text-light);text-align:center;padding:1rem;font-size:0.8rem;">Sem dados</p>{% endif %}
+        </div>
+        <div class="kpi-card ranking">
+            <div class="kpi-header"><span class="kpi-label">🏆 Servidores - Ano</span><div class="kpi-icon pink"><i class="fas fa-chart-bar"></i></div></div>
+            {% if dados_dashboard.ranking_ano %}
+            <ul class="ranking-list">
+                {% for s in dados_dashboard.ranking_ano %}
+                <li>
+                    <span class="ranking-pos {% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% else %}normal{% endif %}">{{ forloop.counter }}</span>
+                    <div class="ranking-info"><div class="ranking-name">{{ s.servidor }}</div><div class="ranking-meta">{{ s.total_vendas }} vendas</div></div>
+                    <span class="ranking-value">R$ {{ s.lucro|floatformat:2|intcomma}}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}<p style="color:var(--text-light);text-align:center;padding:1rem;font-size:0.8rem;">Sem dados</p>{% endif %}
+        </div>
+    </div>
+
+    <!-- 🆕 CLIENTE CAMPEÃO + RANKING DE CLIENTES -->
+ <!-- 🆕 CLIENTE CAMPEÃO + RANKING DE CLIENTES -->
+{% if dados_dashboard.cliente_campeao %}
+<div class="section-title"><i class="fas fa-crown"></i> Clientes Destaque</div>
+<div class="clientes-destaque-grid">
+    <!-- Card Cliente Campeão -->
+    <div class="kpi-card default cliente-campeao-card">
+        <div class="kpi-header">
+            <span class="kpi-label">👑 Campeão do Ano</span>
+            <div class="kpi-icon orange" style="background: linear-gradient(135deg, #f59e0b, #d97706);"><i class="fas fa-crown"></i></div>
+        </div>
+        <div class="cliente-campeao-nome">{{ dados_dashboard.cliente_campeao.nome }}</div>
+        <div class="cliente-campeao-stats">
+            <div class="cliente-campeao-stat">
+                <div class="kpi-value green cliente-campeao-valor">R$ {{ dados_dashboard.cliente_campeao.total_gasto|floatformat:2|intcomma}}</div>
+                <div class="cliente-campeao-label">Bruto</div>
+            </div>
+            <div class="cliente-campeao-stat">
+                <div class="kpi-value green cliente-campeao-valor">R$ {{ dados_dashboard.cliente_campeao.total_liquido|floatformat:2|intcomma}}</div>
+                <div class="cliente-campeao-label">Líquido</div>
+            </div>
+            <div class="cliente-campeao-stat">
+                <div class="kpi-value cliente-campeao-valor">{{ dados_dashboard.cliente_campeao.total_vendas }}</div>
+                <div class="cliente-campeao-label">Compras</div>
+            </div>
+        </div>
+        <div class="cliente-campeao-footer">
+            <span><i class="fas fa-star"></i> Maior contribuidor!</span>
+            <span>Última: {{ dados_dashboard.cliente_campeao.ultima_compra }}</span>
+        </div>
+    </div>
+
+    <!-- Tabela de Ranking de Clientes -->
+    <div class="kpi-card default tabela-ranking-card">
+        <div class="kpi-header">
+            <span class="kpi-label">📊 Top Clientes - Receita Anual</span>
+            <span class="kpi-trend info cliente-count-badge"><i class="fas fa-users"></i> {{ dados_dashboard.ranking_clientes_ano|length }} compradores</span>
+        </div>
+        <div class="tabela-ranking-container">
+            <table class="table-ranking">
+                <thead>
+                    <tr>
+                        <th class="col-pos">#</th>
+                        <th class="col-nome">Cliente</th>
+                        <th class="col-valor">Valor</th>
+                        <th class="col-compras">Comp.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cliente in dados_dashboard.ranking_clientes_ano %}
+                    <tr>
+                        <td class="col-pos">{% if forloop.first %}🥇{% elif forloop.counter == 2 %}🥈{% elif forloop.counter == 3 %}🥉{% else %}{{ forloop.counter }}{% endif %}</td>
+                        <td class="col-nome" style="font-weight: {% if forloop.first %}700{% else %}500{% endif %};">{{ cliente.nome_exibicao|truncatechars:25 }}</td>
+                        <td class="col-valor">R$ {{ cliente.total_gasto|floatformat:2|intcomma}}</td>
+                        <td class="col-compras">{{ cliente.total_vendas }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ===== PREVISÕES ===== -->
+<div class="section-title"><i class="fas fa-crystal-ball"></i> Previsões</div>
+
+<div class="kpi-grid">
+    <!-- Semanal -->
+    <div class="kpi-card previsao">
+        <div class="kpi-header">
+            <span class="kpi-label">Semanal (Dom-Sáb)</span>
+            <div class="kpi-icon purple"><i class="fas fa-calendar-week"></i></div>
+        </div>
+        <div class="kpi-value">
+            R$ {{ dados_dashboard.previsao_semanal_bruto|floatformat:2|intcomma }}
+        </div>
+        <div class="kpi-sub">
+            Líquido: R$ {{ dados_dashboard.previsao_semanal_liquido|floatformat:2|intcomma }}
+            | {{ dados_dashboard.previsao_clientes_semana }} clientes
+        </div>
+    </div>
+
+    <!-- Mensal -->
+    <div class="kpi-card previsao">
+        <div class="kpi-header">
+            <span class="kpi-label">Mensal (até fim do mês)</span>
+            <div class="kpi-icon purple"><i class="fas fa-calendar-alt"></i></div>
+        </div>
+        <div class="kpi-value">
+            R$ {{ dados_dashboard.previsao_mensal_bruto|floatformat:2|intcomma }}
+        </div>
+        <div class="kpi-sub">
+            Líquido: R$ {{ dados_dashboard.previsao_mensal_liquido|floatformat:2|intcomma }}
+            | {{ dados_dashboard.previsao_clientes_mes }} clientes
+        </div>
+    </div>
+
+    <!-- Anual -->
+    <div class="kpi-card previsao">
+        <div class="kpi-header">
+            <span class="kpi-label">Anual (jan a dez)</span>
+            <div class="kpi-icon purple"><i class="fas fa-chart-line"></i></div>
+        </div>
+        <div class="kpi-value">
+            R$ {{ dados_dashboard.previsao_anual_bruto|floatformat:2|intcomma }}
+        </div>
+        <div class="kpi-sub">
+            Líquido: R$ {{ dados_dashboard.previsao_anual_liquido|floatformat:2|intcomma }}
+            | {{ dados_dashboard.previsao_clientes_ano }} restantes
+        </div>
+    </div>
+</div>
+
+
+    <!-- ===== CRÉDITOS ===== -->
+    <div class="section-title"><i class="fas fa-coins"></i> Gestão de Créditos</div>
+    <div class="kpi-grid">
+        <div class="kpi-card creditos">
+            <div class="kpi-header"><span class="kpi-label">Créditos Disponíveis</span><div class="kpi-icon orange"><i class="fas fa-database"></i></div></div>
+            <div class="kpi-value">{{ dados_dashboard.creditos_disponiveis }}</div>
+            <div class="kpi-sub">Custo médio: R$ {{ dados_dashboard.custo_medio_credito|floatformat:2|intcomma}}</div>
+            {% if dados_dashboard.planos_estoque_baixo %}
+            <div class="alerta-estoque-inline {% if dados_dashboard.creditos_disponiveis <= 5 %}critico{% endif %}">
+                <i class="fas fa-exclamation-triangle"></i>
+                {% for p in dados_dashboard.planos_estoque_baixo %}{{ p.nome }}: {{ p.disponivel }}{% if not forloop.last %}, {% endif %}{% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="kpi-card default">
+            <div class="kpi-header"><span class="kpi-label">Consumo Diário</span><div class="kpi-icon blue"><i class="fas fa-tachometer-alt"></i></div></div>
+            <div class="kpi-value">{{ dados_dashboard.consumo_medio_diario|floatformat:1 }}</div>
+            <div class="kpi-sub">créditos/dia (média 30d)</div>
+        </div>
+        <div class="kpi-card previsao">
+            <div class="kpi-header"><span class="kpi-label">Esgotamento em</span><div class="kpi-icon purple"><i class="fas fa-hourglass-half"></i></div></div>
+            <div class="kpi-value">{% if dados_dashboard.dias_ate_esgotar %}{{ dados_dashboard.dias_ate_esgotar }} dias{% else %}--{% endif %}</div>
+            <div class="kpi-sub">{% if dados_dashboard.dias_ate_esgotar and dados_dashboard.dias_ate_esgotar <= 7 %}⚠️ Comprar agora!{% elif dados_dashboard.dias_ate_esgotar %}✅ Tranquilo{% else %}Sem dados{% endif %}</div>
+        </div>
+        <div class="kpi-card default">
+            <div class="kpi-header"><span class="kpi-label">Gasto com Créditos</span><div class="kpi-icon blue"><i class="fas fa-shopping-cart"></i></div></div>
+            <div class="kpi-value green">R$ {{ dados_dashboard.gasto_creditos_12m|floatformat:2|intcomma}}</div>
+            <div class="kpi-sub">Últimos 12 meses</div>
+        </div>
+    </div>
+
+    <!-- ===== CRÉDITOS POR SERVIDOR ===== -->
+    {% if dados_dashboard.creditos_por_servidor %}
+    <div class="section-title"><i class="fas fa-server"></i> Créditos por Servidor</div>
+    <div class="kpi-grid">
+        {% for serv in dados_dashboard.creditos_por_servidor %}
+        <div class="kpi-card creditos servidor-card {% if serv.alerta %}alerta{% endif %}" style="border-left: 4px solid {{ serv.cor|default:'#6c757d' }};">
+            <div class="servidor-header">
+                <span class="servidor-nome" style="color: {{ serv.cor|default:'#6c757d' }};">{{ serv.nome }}</span>
+                <span class="servidor-creditos" style="color: {% if serv.alerta %}#ef4444{% else %}#10b981{% endif %};">{{ serv.disponivel }}</span>
+            </div>
+            <div class="servidor-detalhes">
+                <span><i class="fas fa-tachometer-alt"></i> {{ serv.consumo_diario|floatformat:1 }}/dia</span>
+                <span><i class="fas fa-users"></i> {{ serv.clientes_ativos }} ativos</span>
+                <span><i class="fas fa-clock"></i> {% if serv.data_esgotamento %}Esgota: {{ serv.data_esgotamento }}{% else %}--{% endif %}</span>
+                <span><i class="fas fa-redo"></i> {{ serv.renovacoes_30d }} renov.</span>
+            </div>
+            {% if serv.alerta %}
+            <div class="alerta-estoque-inline critico">
+                <i class="fas fa-exclamation-triangle"></i> {{ serv.motivo_alerta }}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ===== ANÁLISE GRÁFICA ===== -->
+    <div class="section-title"><i class="fas fa-chart-pie"></i> Análise Gráfica</div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-chart-pie"></i> Distribuição de Clientes</div>
+            <div class="chart-container"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-chart-line"></i> Evolução Financeira (12 meses)</div>
+            <div class="chart-container"><canvas id="evolutionChart"></canvas></div>
+
+
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-trophy"></i> Top Clientes - Receita Anual</div>
+            <div class="chart-container">
+                {% if dados_dashboard.nomes_clientes_bar_data %}
+                <canvas id="clientesBarChart"></canvas>
+                {% else %}
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-light);">
+                    <p><i class="fas fa-info-circle"></i> Sem dados de vendas no ano</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title"><i class="fas fa-server"></i> Top Servidor do Mês</div>
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; gap: 1rem;">
+                <div style="font-size: 3rem;">🏆</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: var(--text);">{{ dados_dashboard.servidor_mais_vendido|default:"Nenhum" }}</div>
+                <div style="color: var(--text-light); font-size: 0.85rem;">Servidor com mais vendas no mês</div>
+                {% if dados_dashboard.ranking_mes and dados_dashboard.ranking_mes.0 %}
+                <div style="color: #10b981; font-weight: 600;">R$ {{ dados_dashboard.ranking_mes.0.lucro|floatformat:2|intcomma}} em lucro</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
+    <div class="chart-card comparacao-chart-card">
+    <div class="chart-title comparacao-chart-title">
+        <div>
+            <i class="fas fa-chart-line"></i>
+            Comparativo Diário
+        </div>
+
+        <small>
+            {{ dados_dashboard.nome_mes_comparacao_atual }}
+            x
+            {{ dados_dashboard.nome_mes_comparacao_anterior }}
+        </small>
+    </div>
+
+    <div class="comparacao-resumo">
+        <div class="comparacao-mensagem status-{{ dados_dashboard.status_comparacao_dia }}">
+
+            <div class="comparacao-cabecalho">
+                <div>
+                    <strong>
+                        <i class="fas fa-calendar-day"></i>
+                        Dia {{ dados_dashboard.data_atual|slice:":2" }}
+                    </strong>
+
+                    <small>
+                        Entradas registradas no mesmo dia de cada mês
+                    </small>
+                </div>
+
+                {% if dados_dashboard.variacao_comparacao_dia is not None %}
+                    <span class="comparacao-percentual">
+                        {% if dados_dashboard.variacao_comparacao_dia > 0 %}+{% endif %}
+                        {{ dados_dashboard.variacao_comparacao_dia }}%
+                    </span>
+                {% endif %}
+            </div>
+
+            <div class="comparacao-valores">
+                <div>
+                    <small>{{ dados_dashboard.nome_mes_comparacao_atual }}</small>
+                    <strong>
+                        R$ {{ dados_dashboard.receita_dia_mes_atual|floatformat:2|intcomma }}
+                    </strong>
+                </div>
+
+                <div>
+                    <small>{{ dados_dashboard.nome_mes_comparacao_anterior }}</small>
+                    <strong>
+                        R$ {{ dados_dashboard.receita_dia_mes_anterior|floatformat:2|intcomma }}
+                    </strong>
+                </div>
+
+                <div>
+                    <small>Diferença</small>
+                    <strong>
+                        {% if dados_dashboard.diferenca_comparacao_dia > 0 %}
+                            +R$ {{ dados_dashboard.diferenca_comparacao_dia_absoluta|floatformat:2|intcomma }}
+                        {% elif dados_dashboard.diferenca_comparacao_dia < 0 %}
+                            -R$ {{ dados_dashboard.diferenca_comparacao_dia_absoluta|floatformat:2|intcomma }}
+                        {% else %}
+                            R$ 0,00
+                        {% endif %}
+                    </strong>
+                </div>
+            </div>
+
+            <p class="comparacao-texto">
+                {{ dados_dashboard.mensagem_comparacao_dia }}
+            </p>
+        </div>
+    </div>
+
+    <div class="chart-divider"></div>
+
+    <div class="chart-container comparacao-chart-container">
+        <canvas id="comparacaoMensalChart"></canvas>
+    </div>
+</div>
+
+{{ dados_dashboard.labels_12_meses_data|json_script:"dash-labels-12" }}
+{{ dados_dashboard.bruto_12_meses_data|json_script:"dash-bruto-12" }}
+{{ dados_dashboard.liquido_12_meses_data|json_script:"dash-liquido-12" }}
+{{ dados_dashboard.labels_comparacao_dias_data|json_script:"dash-labels-comparacao" }}
+{{ dados_dashboard.mes_atual_comparacao_data|json_script:"dash-mes-atual-comparacao" }}
+{{ dados_dashboard.mes_anterior_comparacao_data|json_script:"dash-mes-anterior-comparacao" }}
+{{ dados_dashboard.nomes_clientes_bar_data|json_script:"dash-clientes-nomes" }}
+{{ dados_dashboard.valores_clientes_bar_data|json_script:"dash-clientes-valores" }}
+{{ dados_dashboard.cores_clientes_bar_data|json_script:"dash-clientes-cores" }}
+<script>
+(function() {
+    'use strict';
+
+    function readJsonScript(id, fallback) {
+        var node = document.getElementById(id);
+        if (!node) return fallback;
+        try {
+            return JSON.parse(node.textContent);
+        } catch (error) {
+            console.error('Dashboard: dados inválidos em ' + id, error);
+            return fallback;
+        }
+    }
+
+    var statusData = [
+        {{ dados_dashboard.chart_ativos_futuros|default:0 }},
+        {{ dados_dashboard.chart_a_vencer_mes|default:0 }},
+        {{ dados_dashboard.chart_vencidos|default:0 }},
+        {{ dados_dashboard.chart_desativados|default:0 }}
+    ];
+    var evolucaoLabels = readJsonScript('dash-labels-12', []);
+    var evolucaoBruto = readJsonScript('dash-bruto-12', []);
+    var evolucaoLiquido = readJsonScript('dash-liquido-12', []);
+    var labelsComparacao = readJsonScript('dash-labels-comparacao', []);
+    var valoresMesAtual = readJsonScript('dash-mes-atual-comparacao', []);
+    var valoresMesAnterior = readJsonScript('dash-mes-anterior-comparacao', []);
+    var nomesClientes = readJsonScript('dash-clientes-nomes', []);
+    var valoresClientes = readJsonScript('dash-clientes-valores', []);
+    var coresClientes = readJsonScript('dash-clientes-cores', []);
+    var chartInstances = [];
+    var chartWaitTimer = null;
+
+    function withAlpha(color, alpha) {
+        var value = String(color || '').trim();
+        var safeAlpha = Math.max(0, Math.min(1, Number(alpha)));
+        var hexMatch = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+
+        if (hexMatch) {
+            var hex = hexMatch[1];
+            if (hex.length === 3) {
+                hex = hex.split('').map(function(c) { return c + c; }).join('');
+            }
+            if (hex.length === 8) hex = hex.slice(0, 6);
+            var number = parseInt(hex, 16);
+            var r = (number >> 16) & 255;
+            var g = (number >> 8) & 255;
+            var b = number & 255;
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + safeAlpha + ')';
+        }
+
+        var rgbMatch = value.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+        if (rgbMatch) {
+            return 'rgba(' + rgbMatch[1] + ',' + rgbMatch[2] + ',' + rgbMatch[3] + ',' + safeAlpha + ')';
+        }
+
+        return 'rgba(37,99,235,' + safeAlpha + ')';
+    }
+
+    function registerChart(chart) {
+        chartInstances.push(chart);
+        return chart;
+    }
+
+    function destroyCharts() {
+        chartInstances.forEach(function(chart) {
+            try { chart.destroy(); } catch (error) { /* noop */ }
+        });
+        chartInstances = [];
+    }
+
+    function setChartEmptyState(canvas, message) {
+        if (!canvas || !canvas.parentElement) return;
+        canvas.style.display = 'none';
+        var parent = canvas.parentElement;
+        var state = parent.querySelector('.dashboard-chart-empty');
+        if (!state) {
+            state = document.createElement('div');
+            state.className = 'dashboard-chart-empty';
+            state.innerHTML = '<i class="fas fa-chart-line"></i><span></span>';
+            parent.appendChild(state);
+        }
+        state.querySelector('span').textContent = message;
+    }
+
+    function clearChartEmptyState(canvas) {
+        if (!canvas || !canvas.parentElement) return;
+        canvas.style.display = '';
+        var state = canvas.parentElement.querySelector('.dashboard-chart-empty');
+        if (state) state.remove();
+    }
+
+    function getColors() {
+        var rootStyles = getComputedStyle(document.documentElement);
+        var css = function(name, fallback) {
+            return (rootStyles.getPropertyValue(name) || '').trim() || fallback;
+        };
+        var theme = document.documentElement.getAttribute('data-theme') || 'light';
+        var isDark = theme === 'dark' || theme === 'contrast';
+        return {
+            primary: css('--primary', '#2563eb'),
+            success: css('--success', '#10b981'),
+            warning: css('--warning', '#f59e0b'),
+            danger: css('--danger', '#ef4444'),
+            text: css('--text', isDark ? '#f1f5f9' : '#1e293b'),
+            textLight: css('--text-light', isDark ? '#94a3b8' : '#64748b'),
+            grid: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            bgCard: css('--bg-card', isDark ? '#1e293b' : '#ffffff')
+        };
+    }
+
+    function createCharts() {
+        if (typeof Chart === 'undefined') return;
+        destroyCharts();
+        var colors = getColors();
+        
+        var totalStatus = statusData.reduce(function(a,b) { return a+b; }, 0);
+        var statusCanvas = document.getElementById('statusChart');
+        if (statusCanvas) {
+            var labels = totalStatus > 0 ? ['Ativos Futuros', 'A Vencer Mês', 'Vencidos', 'Desativados'] : ['Sem dados', 'Sem dados', 'Sem dados', 'Sem dados'];
+            var values = totalStatus > 0 ? statusData : [1, 1, 1, 1];
+            var bgColors = totalStatus > 0 ? [colors.primary, colors.warning, colors.danger, '#94a3b8'] : ['#e2e8f0', '#cbd5e1', '#e2e8f0', '#cbd5e1'];
+            clearChartEmptyState(statusCanvas);
+            registerChart(new Chart(statusCanvas, {
+                type: 'doughnut',
+                data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: colors.bgCard, borderWidth: 3 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: colors.text, padding: 12, font: { size: 10 }, usePointStyle: true } }, tooltip: { enabled: totalStatus > 0 } },
+                    cutout: '65%'
+                }
+            }));
+        }
+        
+        var hasData = evolucaoBruto.some(function(v) { return v > 0; }) || evolucaoLiquido.some(function(v) { return v > 0; });
+        var evolutionCanvas = document.getElementById('evolutionChart');
+
+        var comparacaoCanvas = document.getElementById(
+            'comparacaoMensalChart'
+        );
+
+        if (comparacaoCanvas) {
+            clearChartEmptyState(comparacaoCanvas);
+            registerChart(new Chart(comparacaoCanvas, {
+                type: 'line',
+
+                data: {
+                    labels: labelsComparacao,
+
+                    datasets: [
+                        {
+                            label: '{{ dados_dashboard.nome_mes_comparacao_atual|escapejs }}',
+                            data: valoresMesAtual,
+                            borderColor: colors.success,
+                            backgroundColor: 'rgba(16,185,129,0.10)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        },
+                        {
+                            label: '{{ dados_dashboard.nome_mes_comparacao_anterior|escapejs }}',
+                            data: valoresMesAnterior,
+                            borderColor: colors.primary,
+                            backgroundColor: withAlpha(colors.primary, 0.08),
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2,
+                            pointRadius: 2,
+                            pointHoverRadius: 5
+                        }
+                    ]
+                },
+
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+
+                    plugins: {
+                        legend: {
+                            position: 'top',
+
+                            labels: {
+                                color: colors.text,
+                                usePointStyle: true,
+                                font: {
+                                    size: 10
+                                }
+                            }
+                        },
+
+                        tooltip: {
+                            callbacks: {
+                                title: function(items) {
+                                    return 'Dia ' + items[0].label;
+                                },
+
+                                label: function(ctx) {
+                                    return ctx.dataset.label
+                                        + ': R$ '
+                                        + Number(ctx.parsed.y).toLocaleString(
+                                            'pt-BR',
+                                            {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2
+                                            }
+                                        );
+                                }
+                            }
+                        }
+                    },
+
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Dia do mês',
+                                color: colors.textLight
+                            },
+
+                            grid: {
+                                color: colors.grid
+                            },
+
+                            ticks: {
+                                color: colors.textLight,
+                                font: {
+                                    size: 9
+                                }
+                            }
+                        },
+
+                        y: {
+                            beginAtZero: true,
+
+                            grid: {
+                                color: colors.grid
+                            },
+
+                            ticks: {
+                                color: colors.textLight,
+
+                                callback: function(valor) {
+                                    return 'R$ '
+                                        + Number(valor).toLocaleString(
+                                            'pt-BR'
+                                        );
+                                }
+                            }
+                        }
+                    }
+                }
+            }));
+        }
+        if (evolutionCanvas && hasData) {
+            clearChartEmptyState(evolutionCanvas);
+            registerChart(new Chart(evolutionCanvas, {
+                type: 'line',
+                data: {
+                    labels: evolucaoLabels,
+                    datasets: [
+                        { label: 'Bruto', data: evolucaoBruto, borderColor: colors.primary, backgroundColor: withAlpha(colors.primary, 0.10), fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 },
+                        { label: 'Líquido', data: evolucaoLiquido, borderColor: colors.success, backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { color: colors.text, font: { size: 10 }, usePointStyle: true, padding: 15 } }, tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits:2}); } } } },
+                    scales: { x: { grid: { color: colors.grid }, ticks: { color: colors.textLight, font: { size: 9 } } }, y: { grid: { color: colors.grid }, ticks: { color: colors.textLight, font: { size: 9 }, callback: function(v) { return 'R$ ' + v.toLocaleString('pt-BR'); } }, beginAtZero: true } },
+                    interaction: { intersect: false, mode: 'index' }
+                }
+            }));
+        } else if (evolutionCanvas) {
+            setChartEmptyState(evolutionCanvas, 'Sem movimentação financeira nos últimos 12 meses');
+        }
+        
+        var clientesBarCanvas = document.getElementById('clientesBarChart');
+        if (clientesBarCanvas) {
+            if (nomesClientes.length > 0 && valoresClientes.length > 0) {
+                clearChartEmptyState(clientesBarCanvas);
+                registerChart(new Chart(clientesBarCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: nomesClientes,
+                        datasets: [{
+                            label: 'Receita Bruta (R$)',
+                            data: valoresClientes,
+                            backgroundColor: coresClientes,
+                            borderColor: coresClientes,
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            borderSkipped: false,
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return 'R$ ' + ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2}); } } } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: colors.textLight, font: { size: 9, weight: '500' }, maxRotation: 45, minRotation: 0, autoSkip: false } },
+                            y: { grid: { color: colors.grid }, ticks: { color: colors.textLight, font: { size: 9 }, callback: function(v) { return v >= 1000 ? 'R$ ' + (v/1000).toFixed(1) + 'k' : 'R$ ' + v; } }, beginAtZero: true }
+                        }
+                    }
+                }));
+            } else {
+                setChartEmptyState(clientesBarCanvas, 'Sem dados de vendas no ano');
+            }
+        }
+    }
+
+    function waitForChart(attempt) {
+        if (typeof Chart !== 'undefined') {
+            if (chartWaitTimer) {
+                clearTimeout(chartWaitTimer);
+                chartWaitTimer = null;
+            }
+            createCharts();
+            return;
+        }
+
+        if (attempt >= 50) {
+            document.querySelectorAll('.chart-container canvas').forEach(function(canvas) {
+                setChartEmptyState(canvas, 'Não foi possível carregar a biblioteca de gráficos');
+            });
+            return;
+        }
+
+        chartWaitTimer = setTimeout(function() {
+            waitForChart(attempt + 1);
+        }, 100);
+    }
+
+    waitForChart(0);
+
+    // Chart.js pinta cores diretamente no canvas. Quando o usuário troca o
+    // tema sem recarregar a página, recriamos os gráficos para acompanhar as
+    // novas variáveis CSS.
+    new MutationObserver(function(mutations) {
+        var themeChanged = mutations.some(function(mutation) {
+            return mutation.attributeName === 'data-theme';
+        });
+        if (themeChanged) {
+            window.requestAnimationFrame(function() {
+                waitForChart(0);
+            });
+        }
+    }).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme']
+    });
+})();
+
+document.addEventListener('DOMContentLoaded', function() {
+    const filtroData = document.getElementById('filtro-data');
+    const filtroHora = document.getElementById('filtro-hora');
+    if (!filtroData) return;
+
+    const hojeStr = '{{ dados_dashboard.data_hoje_real_iso|escapejs }}';
+    const horaAgoraServidor = '{{ dados_dashboard.hora_agora_real|escapejs }}';
+    filtroData.max = hojeStr;
+    
+    if (filtroHora && filtroData.value === hojeStr) {
+        filtroHora.max = horaAgoraServidor;
+    }
+    
+    function aplicarFiltro() {
+        const dataSelecionada = filtroData.value;
+        const horaSelecionada = filtroHora ? filtroHora.value : '00:00';
+        if (!dataSelecionada) return;
+        
+        const dashboard = document.querySelector('.dashboard-container');
+        if (dashboard) dashboard.style.opacity = '0.5';
+        const params = new URLSearchParams();
+        params.append('data_referencia', dataSelecionada);
+        if (horaSelecionada) {
+    params.append('hora_referencia', horaSelecionada);
+}
+        window.location.href = window.location.pathname + '?' + params.toString();
+    }
+    
+    filtroData.addEventListener('change', function() {
+        if (filtroHora && this.value === hojeStr) {
+            filtroHora.max = horaAgoraServidor;
+            if (filtroHora.value > filtroHora.max) filtroHora.value = filtroHora.max;
+        } else if (filtroHora) { filtroHora.max = '23:59'; }
+        aplicarFiltro();
+    });
+    
+    if (filtroHora) filtroHora.addEventListener('change', aplicarFiltro);
+    
+    document.addEventListener('keydown', function(e) {
+        if (e.target.closest('input, select, textarea, button, [contenteditable="true"]')) return;
+        if (e.key === 'ArrowLeft') { e.preventDefault(); mudarData(-1); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); mudarData(1); }
+        else if (e.key === 't' || e.key === 'T') { e.preventDefault(); window.location.href = window.location.pathname; }
+    });
+});
+
+function mudarData(dias) {
+    const filtro = document.getElementById('filtro-data');
+    if (!filtro || !filtro.value) return;
+    const dataAtual = new Date(filtro.value + 'T12:00:00');
+    dataAtual.setDate(dataAtual.getDate() + dias);
+    const limiteMaximo = new Date((filtro.max || filtro.value) + 'T12:00:00');
+    if (dataAtual > limiteMaximo) dataAtual.setTime(limiteMaximo.getTime());
+    filtro.value = `${dataAtual.getFullYear()}-${String(dataAtual.getMonth()+1).padStart(2,'0')}-${String(dataAtual.getDate()).padStart(2,'0')}`;
+    filtro.dispatchEvent(new Event('change'));
+}
+</script>
+{% endblock %}

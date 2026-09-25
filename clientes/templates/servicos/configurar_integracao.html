@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Integração - {{ servico.nome }}{% endblock %}
+
+{% block content %}
+<style>
+.int-page{max-width:1180px;margin:0 auto;padding-bottom:2rem}.int-top{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}.int-title{display:flex;align-items:center;gap:.8rem}.int-title-icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:color-mix(in srgb,var(--primary) 14%,transparent);color:var(--primary);font-size:1.15rem}.int-title h2{margin:0;color:var(--text);font-size:1.35rem}.int-title small{display:block;color:var(--text-light);margin-top:.2rem}.int-back{display:inline-flex;align-items:center;gap:.45rem;text-decoration:none;color:var(--text);background:var(--bg-card);border:1px solid var(--border);padding:.65rem .9rem;border-radius:11px;font-size:.82rem;font-weight:700}.int-back:hover{color:var(--primary);border-color:var(--primary)}
+.int-card{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:1.2rem;margin-bottom:1rem;box-shadow:0 4px 18px rgba(15,23,42,.035)}.int-card-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:1rem}.int-card-title{display:flex;align-items:center;gap:.55rem;font-size:.95rem;font-weight:800;color:var(--text)}.int-step{width:26px;height:26px;border-radius:9px;display:grid;place-items:center;background:var(--primary);color:#fff;font-size:.72rem}.int-status{font-size:.72rem;font-weight:800;padding:.35rem .65rem;border-radius:999px;background:var(--bg-hover);color:var(--text-light)}.int-status.ok{background:rgba(22,163,74,.11);color:#16a34a}.int-status.erro{background:rgba(239,68,68,.11);color:#ef4444}
+.int-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.8rem}.int-field{min-width:0}.int-field label{display:flex;align-items:center;gap:.4rem;margin-bottom:.35rem;color:var(--text);font-weight:700;font-size:.76rem}.int-field input,.int-field select{width:100%;height:43px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:10px;padding:0 .78rem;outline:none;transition:border .15s,box-shadow .15s}.int-field input:focus,.int-field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 12%,transparent)}
+.int-choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.65rem}.int-choice{position:relative}.int-choice input{position:absolute;opacity:0;pointer-events:none}.int-choice label{display:flex;align-items:center;gap:.65rem;border:1px solid var(--border);background:var(--bg);border-radius:12px;padding:.85rem;cursor:pointer;transition:.15s;color:var(--text)}.int-choice label i{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:var(--bg-card);color:var(--text-light)}.int-choice input:checked+label{border-color:var(--primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--primary) 10%,transparent)}.int-choice input:checked+label i{background:var(--primary);color:#fff}.int-choice strong{display:block;font-size:.82rem}.int-choice small{display:block;color:var(--text-light);font-size:.68rem;margin-top:.12rem;line-height:1.25}
+.int-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;border:1px solid var(--border);background:var(--bg);padding:.8rem .9rem;border-radius:12px}.int-toggle-copy strong{display:block;color:var(--text);font-size:.82rem}.int-toggle-copy small{display:block;color:var(--text-light);font-size:.7rem;margin-top:.15rem}.int-switch{position:relative;width:46px;height:26px;flex:0 0 auto}.int-switch input{opacity:0;width:0;height:0}.int-switch span{position:absolute;inset:0;border-radius:999px;background:#94a3b8;cursor:pointer;transition:.2s}.int-switch span:before{content:"";position:absolute;width:20px;height:20px;left:3px;top:3px;border-radius:50%;background:white;transition:.2s;box-shadow:0 2px 5px rgba(0,0,0,.2)}.int-switch input:checked+span{background:#16a34a}.int-switch input:checked+span:before{transform:translateX(20px)}
+.int-actions{display:flex;gap:.6rem;flex-wrap:wrap}.int-btn{border:0;border-radius:10px;padding:.72rem 1rem;display:inline-flex;align-items:center;justify-content:center;gap:.45rem;font-weight:800;font-size:.78rem;cursor:pointer;text-decoration:none;transition:.15s}.int-btn:disabled{opacity:.6;cursor:wait}.int-primary{background:linear-gradient(135deg,var(--primary),var(--primary-dark));color:white}.int-primary:hover{color:white;transform:translateY(-1px)}.int-secondary{background:var(--bg);border:1px solid var(--border);color:var(--text)}.int-secondary:hover{color:var(--primary);border-color:var(--primary)}
+.int-note{display:none;margin-top:.75rem;padding:.7rem .8rem;border-radius:10px;font-size:.73rem;font-weight:650}.int-note.show{display:block}.int-note.ok{background:rgba(22,163,74,.09);color:#15803d}.int-note.err{background:rgba(239,68,68,.09);color:#dc2626}.int-note.info{background:rgba(14,165,233,.09);color:#0369a1}.int-mini-help{border:0;background:var(--bg-hover);color:var(--text-light);width:22px;height:22px;border-radius:50%;font-size:.7rem;cursor:pointer}.int-help-pop{display:none;margin-top:.45rem;font-size:.69rem;color:var(--text-light);line-height:1.45}.int-help-pop.open{display:block}.int-advanced{margin-top:.8rem;border-top:1px solid var(--border);padding-top:.75rem}.int-advanced summary{cursor:pointer;list-style:none;color:var(--text-light);font-size:.74rem;font-weight:750;display:flex;align-items:center;gap:.4rem}.int-advanced summary::-webkit-details-marker{display:none}.int-hidden{display:none!important}.int-op-wrap{overflow-x:auto;margin-top:.65rem}.int-table{width:100%;border-collapse:collapse;min-width:680px;font-size:.72rem}.int-table th,.int-table td{padding:.55rem .65rem;border-bottom:1px solid var(--border);text-align:left;color:var(--text)}.int-table th{font-size:.65rem;color:var(--text-light);text-transform:uppercase}.int-empty{color:var(--text-light);font-size:.73rem;padding:.5rem 0}
+[data-theme="dark"] .int-card{box-shadow:none}.int-field input,.int-field select,.int-choice label,.int-toggle-row,.int-secondary{background:var(--bg-card)}
+@media(max-width:640px){.int-page{padding:0}.int-card{padding:1rem;border-radius:13px}.int-actions{display:grid;grid-template-columns:1fr}.int-btn{width:100%}.int-top{align-items:flex-start}.int-back{width:100%;justify-content:center}.int-title h2{font-size:1.15rem}}
+</style>
+
+<div class="int-page">
+  <div class="int-top">
+    <div class="int-title">
+      <div class="int-title-icon"><i class="fas fa-plug"></i></div>
+      <div><h2>Integração do painel</h2><small>{{ servico.nome }}</small></div>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      {% if servico.controlar_estoque %}<a class="int-back" href="{% url 'abastecer_estoque' servico.id %}"><i class="fas fa-coins"></i> Abastecer</a>{% endif %}
+      <a class="int-back" href="{% url 'listar_servicos' %}"><i class="fas fa-arrow-left"></i> Planos</a>
+    </div>
+  </div>
+
+  <form method="post" id="intForm">
+    {% csrf_token %}
+    <input type="hidden" name="integracao_servidor_externo_id" id="intServidorId" value="{{ servico.integracao_servidor_externo_id|default:'' }}">
+    <input type="hidden" name="integracao_pacote_1_mes" id="intPacote1Id" value="{{ servico.integracao_pacote_1_mes|default:'' }}">
+    <input type="hidden" name="integracao_pacote_teste" id="intPacoteTesteId" value="{{ servico.integracao_pacote_teste|default:'' }}">
+
+    <section class="int-card">
+      <div class="int-card-head">
+        <div class="int-card-title"><span class="int-step">1</span> Escolha o painel</div>
+        <span class="int-status {% if servico.integracao_status == 'ok' %}ok{% elif servico.integracao_status == 'erro' %}erro{% endif %}" id="statusBadge">
+          {% if servico.integracao_status == 'ok' %}<i class="fas fa-check-circle"></i> Conectado{% elif servico.integracao_status == 'erro' %}<i class="fas fa-exclamation-circle"></i> Verificar{% else %}Não testado{% endif %}
+        </span>
+      </div>
+
+      <div class="int-toggle-row" style="margin-bottom:.75rem">
+        <div class="int-toggle-copy"><strong>Integração automática</strong><small>Quando desligada, a renovação continua somente no seu gestor.</small></div>
+        <label class="int-switch"><input type="checkbox" name="integracao_ativa" id="intAtiva" {% if servico.integracao_ativa %}checked{% endif %}><span></span></label>
+      </div>
+
+      <div class="int-choice-grid">
+        <div class="int-choice"><input type="radio" name="integracao_tipo" id="tipoNenhuma" value="nenhuma" {% if servico.integracao_tipo == 'nenhuma' %}checked{% endif %}><label for="tipoNenhuma"><i class="fas fa-ban"></i><span><strong>Sem integração</strong><small>Somente renovação manual.</small></span></label></div>
+        <div class="int-choice"><input type="radio" name="integracao_tipo" id="tipoSigman" value="sigman" {% if servico.integracao_tipo == 'sigman' %}checked{% endif %}><label for="tipoSigman"><i class="fas fa-bolt"></i><span><strong>SIGMAN</strong><small>Renovação e testes.</small></span></label></div>
+        <div class="int-choice"><input type="radio" name="integracao_tipo" id="tipoUnitv" value="unitv" {% if servico.integracao_tipo == 'unitv' %}checked{% endif %}><label for="tipoUnitv"><i class="fas fa-tv"></i><span><strong>UniTV</strong><small>Renovação automática.</small></span></label></div>
+      </div>
+
+      <div class="int-grid" id="policyRow" style="margin-top:.8rem">
+        <div class="int-field"><label>Como renovar</label><select name="integracao_politica"><option value="manual" {% if servico.integracao_politica == 'manual' %}selected{% endif %}>Somente manual</option><option value="facultativa" {% if servico.integracao_politica == 'facultativa' %}selected{% endif %}>Manual ou automático</option><option value="obrigatoria" {% if servico.integracao_politica == 'obrigatoria' %}selected{% endif %}>Automático obrigatório</option></select></div>
+      </div>
+    </section>
+
+    <section class="int-card" id="accessCard">
+      <div class="int-card-head"><div class="int-card-title"><span class="int-step">2</span> Acesso ao painel <button type="button" class="int-mini-help" data-help="accessHelp">i</button></div></div>
+      <div class="int-help-pop" id="accessHelp">Você só precisa informar as credenciais do painel. Os campos técnicos ficam escondidos e o sistema escolhe o formato correto.</div>
+
+      <div id="sigmanFields">
+        <div class="int-field" style="margin-bottom:.7rem"><label>Modo do SIGMAN</label></div>
+        <div class="int-choice-grid" style="margin-bottom:.8rem">
+          <div class="int-choice"><input type="radio" name="sigman_modo" id="sigmanDireto" value="direto" {% if servico.integracao_config.sigman_modo != 'oficial' %}checked{% endif %}><label for="sigmanDireto"><i class="fas fa-window-maximize"></i><span><strong>Direto pelo painel</strong><small>Mais simples. URL + token do painel.</small></span></label></div>
+          <div class="int-choice"><input type="radio" name="sigman_modo" id="sigmanOficial" value="oficial" {% if servico.integracao_config.sigman_modo == 'oficial' %}checked{% endif %}><label for="sigmanOficial"><i class="fas fa-code"></i><span><strong>API oficial</strong><small>x-api-key + x-painel-token.</small></span></label></div>
+        </div>
+        <div class="int-grid">
+          <div class="int-field"><label id="sigmanUrlLabel">URL do painel</label><input type="url" name="integracao_url" id="intUrl" value="{{ servico.integracao_url|default:'' }}" placeholder="https://seupainel.com"></div>
+          <div class="int-field"><label id="sigmanTokenLabel">Token do painel</label><input type="password" name="integracao_token" id="intToken" placeholder="{% if servico.integracao_token %}Token salvo • deixe vazio para manter{% else %}Cole o token{% endif %}" autocomplete="new-password"></div>
+          <div class="int-field" style="grid-column:1/-1"><small style="color:var(--text-light)">No modo direto use somente a raiz do painel, por exemplo <strong>https://sparkpainel.top</strong>. O sistema acrescenta <code>/api</code> automaticamente.</small></div>
+          <div class="int-field" id="apiKeyField"><label>API Key oficial</label><input type="password" name="integracao_api_key" placeholder="{% if servico.integracao_api_key %}API Key salva • deixe vazio para manter{% else %}Cole a x-api-key{% endif %}" autocomplete="new-password"></div>
+        </div>
+      </div>
+
+      <div id="unitvFields">
+        <div class="int-grid">
+          <div class="int-field"><label>URL do painel</label><input type="url" name="unitv_url" id="unitvUrl" value="{{ servico.integracao_url|default:'' }}" placeholder="https://panel-web.resell.media"></div>
+          <div class="int-field"><label>Token</label><input type="password" name="unitv_token" id="unitvToken" placeholder="{% if servico.integracao_token %}Token salvo • deixe vazio para manter{% else %}Cole o token{% endif %}" autocomplete="new-password"></div>
+          <div class="int-field"><label>Usuário/identificador da revenda</label><input type="text" name="integracao_usuario" value="{{ servico.integracao_usuario|default:'' }}" placeholder="Identificador usado no painel"></div>
+          <div class="int-field"><label>Produto</label><input type="text" name="unitv_customer" value="{{ servico.integracao_config.unitv_customer|default:'UniTV' }}" placeholder="UniTV"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="int-card" id="planCard">
+      <div class="int-card-head"><div class="int-card-title"><span class="int-step">3</span> Plano usado na renovação <button type="button" class="int-mini-help" data-help="planHelp">i</button></div></div>
+      <div class="int-help-pop" id="planHelp">Clique em “Buscar planos”. O sistema lê o painel e você só escolhe o servidor e o pacote de 1 mês.</div>
+      <div class="int-grid">
+        <div class="int-field"><label>Servidor externo</label><select id="intServidorSelect"><option value="{{ servico.integracao_servidor_externo_id|default:'' }}">{% if servico.integracao_servidor_externo_id %}Salvo: {{ servico.integracao_servidor_externo_id }}{% else %}Buscar planos primeiro{% endif %}</option></select></div>
+        <div class="int-field"><label>Pacote de 1 mês</label><select id="intPacote1Select"><option value="{{ servico.integracao_pacote_1_mes|default:'' }}">{% if servico.integracao_pacote_1_mes %}Salvo: {{ servico.integracao_pacote_1_mes }}{% else %}Buscar planos primeiro{% endif %}</option></select></div>
+        <div class="int-field" id="testPkgField"><label>Pacote de teste</label><select id="intPacoteTesteSelect"><option value="{{ servico.integracao_pacote_teste|default:'' }}">{% if servico.integracao_pacote_teste %}Salvo: {{ servico.integracao_pacote_teste }}{% else %}Opcional{% endif %}</option></select></div>
+        <div class="int-field"><label>Telas/conexões</label><input type="number" name="integracao_conexoes" min="1" value="{{ servico.integracao_conexoes|default:1 }}"></div>
+      </div>
+    </section>
+
+    <section class="int-card">
+      <div class="int-actions">
+        <button type="submit" class="int-btn int-primary" id="btnSalvar"><i class="fas fa-save"></i> Salvar configuração</button>
+        <button type="button" class="int-btn int-secondary" id="btnTestar"><i class="fas fa-plug"></i> Salvar e testar</button>
+        <button type="button" class="int-btn int-secondary" id="btnCatalogo"><i class="fas fa-sync"></i> Buscar planos</button>
+      </div>
+      <div class="int-note" id="intNote"></div>
+      {% if servico.integracao_erro %}<div class="int-note err show" style="margin-top:.65rem">Último erro: {{ servico.integracao_erro }}</div>{% endif %}
+
+      <details class="int-advanced">
+        <summary><i class="fas fa-sliders-h"></i> Opções da renovação manual</summary>
+        <div class="int-grid" style="margin-top:.7rem">
+          <div class="int-field"><label>Ao renovar manualmente</label><select name="renovacao_manual_credito"><option value="sempre" {% if servico.renovacao_manual_credito == 'sempre' %}selected{% endif %}>Consumir crédito</option><option value="nunca" {% if servico.renovacao_manual_credito == 'nunca' %}selected{% endif %}>Não consumir crédito</option><option value="perguntar" {% if servico.renovacao_manual_credito == 'perguntar' %}selected{% endif %}>Perguntar na hora</option></select></div>
+        </div>
+      </details>
+
+      <details class="int-advanced">
+        <summary><i class="fas fa-history"></i> Últimas operações</summary>
+        <div class="int-op-wrap">
+          {% if operacoes_integracao %}<table class="int-table"><thead><tr><th>Data</th><th>Tipo</th><th>Cliente/usuário</th><th>Status</th><th>Créditos</th><th>Resultado</th></tr></thead><tbody>{% for op in operacoes_integracao %}<tr><td>{{ op.criado_em|date:"d/m H:i" }}</td><td>{{ op.get_tipo_display }}</td><td>{% if op.cliente %}{{ op.cliente.nome }}{% elif op.teste %}{{ op.teste.nome }}{% else %}{{ op.login_externo|default:"-" }}{% endif %}</td><td>{{ op.get_status_display }}</td><td>{{ op.creditos_locais }} / {{ op.creditos_externos }}</td><td>{% if op.erro %}{{ op.erro|truncatechars:70 }}{% else %}{{ op.resposta_resumo.mensagem|default:"-"|truncatechars:70 }}{% endif %}</td></tr>{% endfor %}</tbody></table>{% else %}<div class="int-empty">Nenhuma operação registrada ainda.</div>{% endif %}
+        </div>
+      </details>
+    </section>
+  </form>
+</div>
+
+<script>
+(function(){
+  const form=document.getElementById('intForm');
+  const note=document.getElementById('intNote');
+  const badge=document.getElementById('statusBadge');
+  const serverSel=document.getElementById('intServidorSelect');
+  const pkgSel=document.getElementById('intPacote1Select');
+  const testSel=document.getElementById('intPacoteTesteSelect');
+  const hiddenServer=document.getElementById('intServidorId');
+  const hiddenPkg=document.getElementById('intPacote1Id');
+  const hiddenTest=document.getElementById('intPacoteTesteId');
+  const sigmanFields=document.getElementById('sigmanFields');
+  const unitvFields=document.getElementById('unitvFields');
+  const accessCard=document.getElementById('accessCard');
+  const planCard=document.getElementById('planCard');
+  const apiKeyField=document.getElementById('apiKeyField');
+  const testPkgField=document.getElementById('testPkgField');
+  const policyRow=document.getElementById('policyRow');
+
+  function tipo(){ const el=form.querySelector('[name="integracao_tipo"]:checked'); return el?el.value:'nenhuma'; }
+  function sigmanModo(){ const el=form.querySelector('[name="sigman_modo"]:checked'); return el?el.value:'direto'; }
+  function csrf(){return form.querySelector('[name=csrfmiddlewaretoken]').value;}
+  function showNote(text,kind='info'){note.className='int-note show '+kind;note.textContent=text;}
+  function clearNote(){note.className='int-note';note.textContent='';}
+
+  function sync(){
+    const t=tipo();
+    const none=t==='nenhuma';
+    accessCard.classList.toggle('int-hidden',none);
+    planCard.classList.toggle('int-hidden',none);
+    policyRow.classList.toggle('int-hidden',none);
+    sigmanFields.classList.toggle('int-hidden',t!=='sigman');
+    unitvFields.classList.toggle('int-hidden',t!=='unitv');
+    testPkgField.classList.toggle('int-hidden',t!=='sigman');
+    if(t==='sigman'){
+      const official=sigmanModo()==='oficial';
+      apiKeyField.classList.toggle('int-hidden',!official);
+      document.getElementById('sigmanUrlLabel').textContent=official?'URL da API oficial':'URL do painel';
+      document.getElementById('sigmanTokenLabel').textContent=official?'x-painel-token':'Token do painel';
+      document.getElementById('intUrl').placeholder=official?'https://apiiptv.quickgestor.com/api':'https://sparkpainel.top';
+    }
+    if(none) document.getElementById('intAtiva').checked=false;
+  }
+
+  form.querySelectorAll('[name="integracao_tipo"],[name="sigman_modo"]').forEach(el=>el.addEventListener('change',sync));
+  document.querySelectorAll('.int-mini-help').forEach(btn=>btn.addEventListener('click',()=>{const el=document.getElementById(btn.dataset.help);if(el)el.classList.toggle('open');}));
+
+  serverSel.addEventListener('change',()=>{hiddenServer.value=serverSel.value; const o=serverSel.selectedOptions[0]; fillPackages(o?o.dataset.packages||'[]':'[]');});
+  pkgSel.addEventListener('change',()=>hiddenPkg.value=pkgSel.value);
+  testSel.addEventListener('change',()=>hiddenTest.value=testSel.value);
+
+  function fillPackages(raw){
+    let packs=[]; try{packs=typeof raw==='string'?JSON.parse(raw):(raw||[]);}catch(e){packs=[];}
+    const currentPkg=hiddenPkg.value||''; const currentTest=hiddenTest.value||'';
+    pkgSel.innerHTML='<option value="">Selecione o pacote de 1 mês</option>';
+    testSel.innerHTML='<option value="">Sem pacote de teste</option>';
+    packs.forEach(p=>{
+      const label=`${p.nome||p.id}${p.creditos!==undefined?' • '+p.creditos+' crédito(s)':''}`;
+      const o=document.createElement('option');o.value=p.id;o.textContent=label;
+      if(p.trial){if(String(p.id)===String(currentTest))o.selected=true;testSel.appendChild(o);}else{if(String(p.id)===String(currentPkg))o.selected=true;pkgSel.appendChild(o);}
+    });
+    hiddenPkg.value=pkgSel.value||currentPkg; hiddenTest.value=testSel.value||currentTest;
+  }
+
+  async function saveAjax(){
+    clearNote();
+    const fd=new FormData(form);
+    const r=await fetch(window.location.href,{method:'POST',body:fd,headers:{'X-Requested-With':'XMLHttpRequest'}});
+    let d={}; try{d=await r.json();}catch(e){}
+    if(!r.ok||!d.success)throw new Error(d.message||'Não foi possível salvar a integração.');
+    return d;
+  }
+
+  async function busy(btn,text,fn){const old=btn.innerHTML;btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> '+text;try{return await fn();}finally{btn.disabled=false;btn.innerHTML=old;}}
+
+  document.getElementById('btnTestar').addEventListener('click',function(){
+    busy(this,'Testando...',async()=>{
+      try{
+        showNote('Salvando a configuração...','info'); await saveAjax();
+        const r=await fetch('{% url "api_integracao_testar" servico.id %}',{method:'POST',headers:{'X-CSRFToken':csrf(),'X-Requested-With':'XMLHttpRequest'}}); const d=await r.json();
+        if(!r.ok||!d.success)throw new Error(d.message||'Falha ao testar conexão.');
+        const parts=[]; if(d.info?.servidores!==undefined)parts.push('servidores: '+d.info.servidores); if(d.info?.pacotes!==undefined)parts.push('planos: '+d.info.pacotes); if(d.info?.testes!==undefined&&d.info.testes)parts.push('testes: '+d.info.testes);
+        showNote('Conexão funcionando'+(parts.length?' • '+parts.join(' • '):''),'ok'); badge.className='int-status ok'; badge.innerHTML='<i class="fas fa-check-circle"></i> Conectado';
+      }catch(e){showNote(e.message||'Erro ao testar.','err');badge.className='int-status erro';badge.innerHTML='<i class="fas fa-exclamation-circle"></i> Verificar';}
+    });
+  });
+
+  document.getElementById('btnCatalogo').addEventListener('click',function(){
+    busy(this,'Buscando...',async()=>{
+      try{
+        showNote('Salvando e consultando o painel...','info'); await saveAjax();
+        const r=await fetch('{% url "api_integracao_catalogo" servico.id %}',{headers:{'X-Requested-With':'XMLHttpRequest'}}); const d=await r.json();
+        if(!r.ok||!d.success)throw new Error(d.message||'Falha ao buscar planos.');
+        const servers=d.catalogo?.servidores||[]; if(!servers.length)throw new Error('O painel não retornou servidores/planos.');
+        serverSel.innerHTML=''; servers.forEach(server=>{const o=document.createElement('option');o.value=server.id;o.textContent=server.nome||server.id;o.dataset.packages=JSON.stringify(server.pacotes||[]);if(String(server.id)===String(hiddenServer.value||''))o.selected=true;serverSel.appendChild(o);});
+        if(!serverSel.value&&servers.length)serverSel.value=servers[0].id; hiddenServer.value=serverSel.value;
+        const selected=serverSel.selectedOptions[0]; fillPackages(selected?selected.dataset.packages||'[]':'[]');
+        if(tipo()==='unitv'){hiddenServer.value='unitv';}
+        showNote('Planos carregados. Escolha o pacote de 1 mês e clique em Salvar configuração.','ok');
+      }catch(e){showNote(e.message||'Erro ao buscar planos.','err');}
+    });
+  });
+
+  form.addEventListener('submit',function(){
+    if(tipo()==='unitv'){
+      document.getElementById('intUrl').disabled=true; document.getElementById('intToken').disabled=true;
+    }else{
+      document.getElementById('unitvUrl').disabled=true; document.getElementById('unitvToken').disabled=true;
+    }
+  });
+  sync();
+})();
+</script>
+{% endblock %}

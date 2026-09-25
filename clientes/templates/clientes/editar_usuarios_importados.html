@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Usuários Importados{% endblock %}
+
+{% block content %}
+<h2>Editar Usuários Importados</h2>
+
+{% if erro %}
+    <p style="color:red;">{{ erro }}</p>
+{% endif %}
+
+<form method="post" action="{% url 'salvar_usuarios_importados' %}">
+    {% csrf_token %}
+    <table>
+        <thead>
+            <tr>
+                <th>Usuário</th>
+                <th>Nome</th>
+                <th>Senha</th>
+                <th>Data de Vencimento</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for usuario in usuarios_importados %}
+            <tr>
+                <td><input type="text" name="usuarios[{{ forloop.counter0 }}][usuario]" value="{{ usuario.usuario }}" required></td>
+                <td><input type="text" name="usuarios[{{ forloop.counter0 }}][nome]" value="{{ usuario.nome }}"></td>
+                <td><input type="text" name="usuarios[{{ forloop.counter0 }}][senha]" value="{{ usuario.senha }}" required></td>
+                <td><input type="date" name="usuarios[{{ forloop.counter0 }}][data_vencimento]" value="{{ usuario.data_vencimento }}" required></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <button type="submit">Salvar Usuários1</button>
+</form>
+{% endblock %}

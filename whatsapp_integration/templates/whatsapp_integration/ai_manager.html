@@ -1,0 +1,482 @@
+<!-- whatsapp_integration/templates/whatsapp_integration/ai_manager.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Meu Assistente IA - WhatsApp{% endblock %}
+
+{% block content %}
+<style>
+.ia-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 20px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 10px 40px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.card-ia {
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.card-ia-header {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 5%, transparent), color-mix(in srgb, var(--primary-dark) 3%, transparent));
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    padding: 1rem 1.5rem;
+    font-weight: 700;
+}
+
+.btn-ia {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    color: white;
+    border: none;
+    font-weight: 700;
+    border-radius: 12px;
+    padding: 0.7rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+.btn-ia:hover { transform: translateY(-2px); box-shadow: 0 5px 20px color-mix(in srgb, var(--primary) 40%, transparent); }
+
+.btn-ia-outline {
+    background: transparent;
+    color: var(--primary-light);
+    border: 2px solid var(--primary-light);
+    font-weight: 700;
+    border-radius: 12px;
+    padding: 0.7rem 1.5rem;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+.btn-ia-outline:hover { background: var(--primary-light); color: white; }
+
+.form-control-ia {
+    border: 2px solid var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    padding: 0.7rem 1rem;
+    width: 100%;
+    transition: all 0.3s ease;
+    background: var(--bg-card, #fff);
+    color: var(--text-color, #333);
+}
+.form-control-ia:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 10%, transparent);
+    outline: none;
+}
+
+/* Toggle Switch */
+.switch-ia {
+    position: relative;
+    display: inline-block;
+    width: 56px;
+    height: 30px;
+}
+.switch-ia input { opacity: 0; width: 0; height: 0; }
+.slider-ia {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: 0.4s;
+    border-radius: 34px;
+}
+.slider-ia:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+input:checked + .slider-ia {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+}
+input:checked + .slider-ia:before {
+    transform: translateX(26px);
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.status-badge.online {
+    background: rgba(34, 197, 94, 0.15);
+    color: #15803d;
+    border: 1px solid #22c55e;
+}
+.status-badge.offline {
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+    border: 1px solid #ef4444;
+}
+
+.info-box {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 5%, transparent), rgba(124, 58, 237, 0.02));
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+    .ia-header { padding: 1.5rem 1rem; }
+    .ia-header h2 { font-size: 1.3rem; }
+}
+</style>
+
+<div class="container-fluid px-0">
+    
+    <!-- HEADER -->
+    <div class="ia-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2 class="mb-1 fw-bold"><i class="fas fa-robot me-2"></i>Meu Assistente IA</h2>
+                <p class="mb-0" style="opacity: 0.85;">Configure como a IA responde seus clientes</p>
+            </div>
+            <a href="{% url 'integra:whatsapp_dashboard' %}" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        
+        <!-- COLUNA ESQUERDA: ATIVAÇÃO E STATUS -->
+        <div class="col-lg-5">
+            
+            <!-- STATUS -->
+            <div class="card-ia">
+                <div class="card-ia-header">
+                    <span><i class="fas fa-broadcast-tower me-2" style="color: var(--primary-light);"></i>Status</span>
+                </div>
+                <div class="card-body p-4 text-center">
+                    <div id="statusDisplay">
+                        <div class="spinner-border mb-3" style="color: var(--primary-light);"></div>
+                        <p>Carregando...</p>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label class="switch-ia">
+                            <input type="checkbox" id="iaAtivada" onchange="toggleIA()">
+                            <span class="slider-ia"></span>
+                        </label>
+                        <p class="mt-2 fw-bold" id="statusLabel">Ativar Assistente</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- INFO -->
+            <div class="info-box">
+                <h6 class="fw-bold"><i class="fas fa-info-circle me-1" style="color: var(--primary-light);"></i>Como funciona</h6>
+                <p class="small text-muted mb-1">✅ Ative o assistente no toggle acima</p>
+                <p class="small text-muted mb-1">✏️ Personalize o prompt como quiser</p>
+                <p class="small text-muted mb-1">💬 A IA responderá seus clientes automaticamente</p>
+                <p class="small text-muted mb-0">⏸️ Você pode pausar a qualquer momento</p>
+            </div>
+            
+            <!-- ESTATÍSTICAS RÁPIDAS -->
+            <div class="card-ia mt-3">
+                <div class="card-ia-header">
+                    <span><i class="fas fa-chart-bar me-2" style="color: var(--primary-light);"></i>Uso Hoje</span>
+                </div>
+                <div class="card-body p-3 text-center">
+                    <div style="font-size: 3rem; font-weight: 800; color: var(--primary-light);" id="msgCount">0</div>
+                    <p class="text-muted small">mensagens enviadas hoje</p>
+                    <div class="progress" style="height: 8px; border-radius: 10px;">
+                        <div class="progress-bar" id="msgProgress" style="width: 0%; background: linear-gradient(135deg, var(--primary-light), var(--primary)); border-radius: 10px;"></div>
+                    </div>
+                    <small class="text-muted" id="msgLimit">Limite: 200/dia</small>
+                </div>
+            </div>
+            
+        </div>
+        
+        <!-- COLUNA DIREITA: CONFIGURAÇÃO -->
+        <div class="col-lg-7">
+            <div class="card-ia">
+                <div class="card-ia-header">
+                    <span><i class="fas fa-sliders-h me-2" style="color: var(--primary-light);"></i>Minhas Configurações</span>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <!-- Nome do Bot -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">🤖 Nome do Assistente</label>
+                        <input type="text" class="form-control-ia" id="botName" 
+                               placeholder="Ex: Assistente da Loja" maxlength="50">
+                        <small class="text-muted">Como o bot vai se identificar</small>
+                    </div>
+                    
+                    <!-- Prompt Personalizado -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">📝 Meu Prompt Personalizado</label>
+                        <textarea class="form-control-ia" id="promptPersonalizado" rows="6" 
+                                  placeholder="Ex: Você é o assistente da Loja X. Responda com simpatia e ofereça ajuda com planos..."></textarea>
+                        <small class="text-muted">
+                            ✨ Use <code>{nome}</code>, <code>{plano}</code>, <code>{vencimento}</code> para dados do cliente
+                        </small>
+                    </div>
+                    
+                    <!-- Mensagem de Saudação -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">👋 Mensagem de Saudação</label>
+                        <input type="text" class="form-control-ia" id="mensagemSaudacao" 
+                               value="Olá! Sou o assistente virtual. Como posso ajudar?" maxlength="200">
+                    </div>
+                    
+                    <!-- Horário -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">🕐 Horário Início</label>
+                            <input type="time" class="form-control-ia" id="horarioInicio">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">🕐 Horário Fim</label>
+                            <input type="time" class="form-control-ia" id="horarioFim">
+                        </div>
+                    </div>
+                    
+                    <!-- ========================================== -->
+<!-- REGRAS DE RESPOSTA - ADICIONE AQUI -->
+<!-- ========================================== -->
+<div class="card-ia mt-3">
+    <div class="card-ia-header">
+        <span><i class="fas fa-sliders-h me-2" style="color: var(--primary-light);"></i>Regras de Resposta</span>
+    </div>
+    <div class="card-body p-4">
+        
+        <!-- Responder no Privado -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="responderPrivado" checked>
+            <label class="form-check-label fw-bold">💬 Responder no Privado</label>
+            <br><small class="text-muted">IA responde mensagens diretas automaticamente</small>
+        </div>
+        
+        <!-- Responder em Grupos -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="responderGrupos" onchange="toggleGrupoConfig()">
+            <label class="form-check-label fw-bold">👥 Responder em Grupos</label>
+            <br><small class="text-muted">IA também responde em grupos de WhatsApp</small>
+        </div>
+        
+        <!-- Configurações de Grupo (aparece só quando marcar grupos) -->
+        <div id="grupoConfig" style="display:none;">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="precisaMarcacao" checked>
+                <label class="form-check-label">Precisa marcar @bot no grupo</label>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label small">Nome para marcação:</label>
+                <input type="text" class="form-control-ia" id="botMarcacao" 
+                       value="@bot" placeholder="@assistente">
+                <small class="text-muted">O bot só responde quando marcarem este nome</small>
+            </div>
+        </div>
+        
+        <!-- Palavras de Ativação -->
+        <div class="mb-3">
+            <label class="form-label fw-bold small">🔑 Palavras de Ativação</label>
+            <input type="text" class="form-control-ia" id="palavrasAtivacao" 
+                   placeholder="Ex: suporte, ajuda, plano, pagamento">
+            <small class="text-muted">Separadas por vírgula. Vazio = responde qualquer mensagem.</small>
+        </div>
+        
+    </div>
+</div>
+
+                    <button class="btn btn-ia py-2" onclick="saveMyConfig()">
+                        <i class="fas fa-save me-1"></i> Salvar Minhas Configurações
+                    </button>
+                    
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<script>
+const API = '/integra/api/ai';
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadMyConfig();
+    loadMyStats();
+});
+
+// ==========================================
+// CARREGAR MINHA CONFIG
+// ==========================================
+function loadMyConfig() {
+    fetch(`${API}/config/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && !data.is_admin) {
+                const config = data.config;
+                
+                // Status
+                document.getElementById('iaAtivada').checked = config.ia_ativada;
+                updateStatusDisplay(config.ia_ativada, config.pausado);
+                
+                // Campos
+                document.getElementById('botName').value = config.bot_name || '';
+                document.getElementById('promptPersonalizado').value = config.prompt_personalizado || '';
+                document.getElementById('mensagemSaudacao').value = config.mensagem_saudacao || '';
+                document.getElementById('horarioInicio').value = config.horario_inicio || '';
+                document.getElementById('horarioFim').value = config.horario_fim || '';
+                
+                // Limite
+                document.getElementById('msgCount').innerText = config.messages_today || 0;
+                document.getElementById('msgLimit').innerText = `Limite: ${config.max_messages || 200}/dia`;
+                
+                const pct = ((config.messages_today || 0) / (config.max_messages || 200)) * 100;
+                document.getElementById('msgProgress').style.width = Math.min(pct, 100) + '%';
+            }
+        });
+}
+
+// ==========================================
+// ESTATÍSTICAS
+// ==========================================
+function loadMyStats() {
+    fetch(`${API}/stats/`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('msgCount').innerText = data.stats.total_messages_today || 0;
+                document.getElementById('msgLimit').innerText = `Limite: ${data.stats.max_messages || 200}/dia`;
+                
+                const pct = ((data.stats.total_messages_today || 0) / (data.stats.max_messages || 200)) * 100;
+                document.getElementById('msgProgress').style.width = Math.min(pct, 100) + '%';
+            }
+        });
+}
+
+// ==========================================
+// ATUALIZAR STATUS
+// ==========================================
+function updateStatusDisplay(ativada, pausada) {
+    const display = document.getElementById('statusDisplay');
+    const label = document.getElementById('statusLabel');
+    
+    if (!ativada) {
+        display.innerHTML = '<span class="status-badge offline">🔴 Desativado</span>';
+        label.textContent = 'Ativar Assistente';
+    } else if (pausada) {
+        display.innerHTML = '<span class="status-badge" style="background: rgba(245,158,11,0.15); color: #d97706; border: 1px solid #f59e0b;">🟡 Pausado</span>';
+        label.textContent = 'Assistente Pausado';
+    } else {
+        display.innerHTML = '<span class="status-badge online">🟢 Ativo</span>';
+        label.textContent = 'Assistente Ativo';
+    }
+}
+
+// ==========================================
+// ATIVAR/DESATIVAR
+// ==========================================
+function toggleIA() {
+    const ativada = document.getElementById('iaAtivada').checked;
+    
+    fetch(`${API}/config/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify({ ia_ativada: ativada })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadMyConfig();
+        }
+    });
+}
+
+
+// Mostrar/ocultar config de grupo
+function toggleGrupoConfig() {
+    const checked = document.getElementById('responderGrupos').checked;
+    document.getElementById('grupoConfig').style.display = checked ? 'block' : 'none';
+}
+
+// Atualize a função saveMyConfig para incluir os novos campos:
+function saveMyConfig() {
+    const data = {
+        bot_name: document.getElementById('botName').value,
+        prompt_personalizado: document.getElementById('promptPersonalizado').value,
+        mensagem_saudacao: document.getElementById('mensagemSaudacao').value,
+        horario_inicio: document.getElementById('horarioInicio').value || null,
+        horario_fim: document.getElementById('horarioFim').value || null,
+        // NOVOS CAMPOS:
+        responder_privado: document.getElementById('responderPrivado').checked,
+        responder_grupos: document.getElementById('responderGrupos').checked,
+        precisa_marcacao: document.getElementById('precisaMarcacao').checked,
+        bot_marcacao: document.getElementById('botMarcacao').value,
+        palavras_ativacao: document.getElementById('palavrasAtivacao').value,
+    };
+    
+    fetch(`${API}/config/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.AppUI.alert('✅ Configurações salvas com sucesso!');
+        } else {
+            window.AppUI.alert('❌ Erro: ' + (data.error || 'Desconhecido'));
+        }
+    })
+    .catch(err => window.AppUI.alert('Erro: ' + err));
+}
+// ==========================================
+// SALVAR CONFIG
+// ==========================================
+function saveMyConfig() {
+    const data = {
+        bot_name: document.getElementById('botName').value,
+        prompt_personalizado: document.getElementById('promptPersonalizado').value,
+        mensagem_saudacao: document.getElementById('mensagemSaudacao').value,
+        horario_inicio: document.getElementById('horarioInicio').value || null,
+        horario_fim: document.getElementById('horarioFim').value || null,
+    };
+    
+    fetch(`${API}/config/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.AppUI.alert('✅ Configurações salvas com sucesso!');
+        } else {
+            window.AppUI.alert('❌ Erro: ' + (data.error || 'Desconhecido'));
+        }
+    })
+    .catch(err => window.AppUI.alert('Erro: ' + err));
+}
+</script>
+{% endblock %}

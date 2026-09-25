@@ -1,0 +1,1328 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+:root{
+  --pl-primary:var(--primary,var(--primary-color,#2563eb));
+  --pl-primary-light:var(--primary-light,var(--pl-primary));
+  --pl-primary-dark:var(--primary-dark,var(--pl-primary));
+  --pl-primary-soft:color-mix(in srgb,var(--pl-primary) 14%,transparent);
+  --pl-card:var(--bg-card,var(--card-bg,#ffffff));
+  --pl-bg:var(--bg,var(--body-bg,#f8fafc));
+  --pl-hover:var(--bg-hover,var(--secondary-color,#f1f5f9));
+  --pl-text:var(--text,var(--text-color,#1e293b));
+  --pl-muted:var(--text-light,var(--text-muted,#64748b));
+  --pl-lighter:var(--text-lighter,#94a3b8);
+  --pl-border:var(--border,var(--border-color,#e2e8f0));
+  --pl-danger:var(--danger,var(--danger-color,#dc2626));
+  --pl-info:var(--primary,var(--primary-color,#2563eb));
+  --pl-success:var(--success,var(--success-color,#16a34a));
+  --pl-warning:var(--warning,var(--warning-color,#d97706));
+  --pl-shadow-soft:var(--shadow-soft,0 4px 15px rgba(15,23,42,.08));
+  --pl-shadow-hard:var(--shadow-hard,0 24px 70px rgba(15,23,42,.22));
+  color-scheme:light;
+}
+:root[data-theme="dark"],
+:root[data-theme="contrast"]{
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+.pl-page{max-width:1500px;margin:auto;padding:18px;color:var(--pl-text)}
+.pl-hero{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:24px;margin-bottom:16px;border:1px solid var(--pl-border);border-radius:22px;background:radial-gradient(circle at 95% 10%,var(--pl-primary-soft),transparent 34%),var(--pl-card);box-shadow:var(--pl-shadow-soft)}
+.pl-kicker{margin-bottom:7px;color:var(--pl-primary);font-size:.77rem;font-weight:850;text-transform:uppercase;letter-spacing:.08em}
+.pl-title{margin:0;font-size:clamp(1.5rem,3vw,2.2rem);font-weight:850}
+.pl-sub{margin:8px 0 0;color:var(--pl-muted);line-height:1.5}
+.pl-hero-actions,.pl-actions,.pl-expanded-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pl-hero-actions{justify-content:flex-end;min-width:min(100%,490px)}
+.pl-search{display:flex;flex:1 1 290px;min-width:260px;border:1px solid var(--pl-border);border-radius:12px;overflow:hidden;background:var(--pl-card)}
+.pl-search:focus-within{border-color:var(--pl-primary);box-shadow:0 0 0 4px var(--pl-primary-soft)}
+.pl-search input{width:100%;min-width:0;padding:11px 13px;border:0;outline:0;background:transparent;color:var(--pl-text)}
+.pl-search button{padding:0 15px;border:0;border-left:1px solid var(--pl-border);background:var(--pl-hover);color:var(--pl-text);cursor:pointer}
+.pl-btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 13px;border:1px solid transparent;border-radius:11px;font-weight:750;cursor:pointer;white-space:nowrap;transition:.16s}
+.pl-btn:hover{transform:translateY(-1px);filter:brightness(.98)}
+.pl-btn:disabled{opacity:.62;cursor:wait;transform:none}
+.pl-primary{background:var(--pl-primary);color:#fff}.pl-secondary{border-color:var(--pl-border);background:var(--pl-card);color:var(--pl-text)}
+.pl-success{background:var(--pl-success);color:#fff}.pl-info{background:color-mix(in srgb,var(--pl-info) 12%,transparent);color:var(--pl-info)}
+.pl-danger{background:color-mix(in srgb,var(--pl-danger) 11%,transparent);color:var(--pl-danger)}.pl-dark{border-color:var(--pl-border);background:var(--pl-hover);color:var(--pl-text)}
+.pl-device-list{display:grid;gap:10px}.pl-device{overflow:hidden;border:1px solid var(--pl-border);border-radius:17px;background:var(--pl-card);box-shadow:var(--pl-shadow-soft)}
+.pl-device-head{display:grid;grid-template-columns:auto minmax(220px,1.35fr) minmax(160px,.65fr) minmax(220px,1fr);gap:14px;align-items:center;padding:13px 15px;cursor:pointer}.pl-device-head:hover{background:color-mix(in srgb,var(--pl-primary) 3%,transparent)}
+.pl-toggle{width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-bg);color:var(--pl-primary);cursor:pointer}
+.pl-toggle span{transition:.2s}.pl-device.open .pl-toggle span{transform:rotate(90deg)}
+.pl-device-name{display:flex;align-items:center;gap:11px;min-width:0}.pl-avatar{width:46px;height:46px;display:grid;place-items:center;flex:0 0 auto;border:1px solid var(--pl-border);border-radius:14px;background:var(--pl-primary-soft);color:var(--pl-primary);font-weight:900;overflow:hidden}
+.pl-avatar img{width:100%;height:100%;object-fit:cover;background:var(--pl-card)}.pl-avatar img[hidden]{display:none}.pl-provider-name{margin-top:3px;color:var(--pl-muted);font-size:.8rem}
+.pl-ellipsis{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pl-label{margin-bottom:4px;color:var(--pl-muted);font-size:.7rem;font-weight:850;text-transform:uppercase;letter-spacing:.055em}.pl-muted{color:var(--pl-muted);font-size:.82rem;line-height:1.35}
+.pl-device-body{display:none;padding:12px;border-top:1px solid var(--pl-border);background:var(--pl-bg)}.pl-device.open .pl-device-body{display:block}.pl-device-details{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;margin-bottom:10px;padding:12px;border:1px solid var(--pl-border);border-radius:13px;background:var(--pl-card)}.pl-device-facts{display:grid;grid-template-columns:repeat(3,minmax(130px,1fr));gap:10px}.pl-device-fact{min-width:0;padding:8px 10px;border-radius:10px;background:var(--pl-bg)}.pl-device-tools{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.pl-device-tools .pl-btn{min-height:38px;padding:7px 10px;font-size:.78rem}
+.pl-expanded-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px;padding:10px 11px;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-card)}
+.pl-expanded-info{min-width:0}.pl-expanded-info strong{display:block;font-size:.86rem}.pl-expanded-info span{display:block;margin-top:2px;color:var(--pl-muted);font-size:.73rem}.pl-expanded-actions{justify-content:flex-end}
+.pl-playlists{display:grid;gap:9px}.pl-playlist{display:grid;grid-template-columns:minmax(220px,1.35fr) minmax(130px,.5fr) minmax(150px,.65fr) auto;gap:14px;align-items:center;padding:11px 12px;border:1px solid var(--pl-border);border-radius:13px;background:var(--pl-card)}
+.pl-tags{display:flex;gap:6px;flex-wrap:wrap}.pl-badge{display:inline-flex;padding:5px 8px;border-radius:999px;background:var(--pl-bg);color:var(--pl-muted);font-size:.71rem;font-weight:850}.status-ativo{background:color-mix(in srgb,var(--pl-success) 16%,var(--pl-card));color:var(--pl-success)}.status-erro{background:color-mix(in srgb,var(--pl-danger) 15%,var(--pl-card));color:var(--pl-danger)}.status-rascunho,.status-confirmacao_pendente{background:color-mix(in srgb,var(--pl-warning) 17%,var(--pl-card));color:var(--pl-warning)}.status-nao_encontrada,.status-excluida{background:var(--pl-hover);color:var(--pl-muted)}
+.pl-id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.78rem}.pl-empty{padding:28px 16px;border:1px dashed var(--pl-border);border-radius:14px;text-align:center;color:var(--pl-muted);background:var(--pl-card)}.pl-empty strong{display:block;margin-bottom:5px;color:var(--pl-text)}
+.pl-modal{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(13,24,17,.62);backdrop-filter:blur(5px);overflow:hidden}.pl-modal.show{display:flex}.pl-dialog{width:min(680px,100%);max-height:min(82dvh,760px);display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--pl-border);border-radius:21px;background:var(--pl-card);box-shadow:var(--pl-shadow-hard)}.pl-dialog.small,.pl-dialog-small{width:min(520px,100%)}.pl-dialog>form{display:flex;flex-direction:column;min-height:0;max-height:min(82dvh,760px)}
+.pl-modal-head{display:flex;justify-content:space-between;gap:15px;flex:0 0 auto;padding:18px 20px 14px;border-bottom:1px solid var(--pl-border)}.pl-modal-head h2{margin:0;font-size:1.15rem}.pl-modal-head p{margin:5px 0 0;color:var(--pl-muted);font-size:.82rem}.pl-close{width:38px;height:38px;flex:0 0 auto;border:1px solid var(--pl-border);border-radius:10px;background:var(--pl-bg);cursor:pointer}.pl-modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:18px 20px;overscroll-behavior:contain}.pl-modal-foot{display:flex;justify-content:flex-end;gap:8px;flex:0 0 auto;padding:13px 20px;border-top:1px solid var(--pl-border);background:var(--pl-card);box-shadow:0 -8px 18px color-mix(in srgb,var(--pl-text) 7%,transparent)}
+.pl-section{margin-bottom:18px}.pl-section:last-child{margin-bottom:0}.pl-section-title{margin:0 0 11px;color:var(--pl-primary-dark);font-size:.86rem;font-weight:850}.pl-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.pl-field.full{grid-column:1/-1}.pl-field label{display:block;margin-bottom:6px;font-size:.79rem;font-weight:800}.pl-hint{color:var(--pl-muted);font-size:.71rem;font-weight:500}.pl-control{width:100%;min-height:43px;padding:10px 11px;border:1px solid var(--pl-border);border-radius:10px;outline:0;background:var(--pl-card);color:var(--pl-text)}textarea.pl-control{min-height:82px;resize:vertical}.pl-control:focus{border-color:var(--pl-primary);box-shadow:0 0 0 4px var(--pl-primary-soft)}.pl-field-help,.pl-help{display:block;margin-top:6px;color:var(--pl-muted);font-size:.72rem;line-height:1.4}.pl-input-password{position:relative}.pl-input-password .pl-control{padding-right:46px}.pl-password-toggle{position:absolute;top:50%;right:7px;width:34px;height:34px;border:0;border-radius:8px;background:transparent;cursor:pointer;transform:translateY(-50%)}.pl-password-toggle{color:var(--pl-muted)}.pl-password-toggle:hover{background:var(--pl-hover);color:var(--pl-text)}
+.pl-switch{display:flex!important;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--pl-border);border-radius:11px;background:var(--pl-bg)}.pl-switch input{width:18px;height:18px;accent-color:var(--pl-primary)}.pl-switch strong{display:block;font-size:.81rem}.pl-switch small{display:block;color:var(--pl-muted);font-weight:500}.pl-warning{padding:12px;border:1px solid color-mix(in srgb,var(--pl-warning) 38%,var(--pl-border));border-radius:11px;background:color-mix(in srgb,var(--pl-warning) 12%,var(--pl-card));color:var(--pl-warning);font-size:.8rem;line-height:1.45}.pl-delete-warning{display:flex;align-items:flex-start;gap:14px;padding:16px;border:1px solid color-mix(in srgb,var(--pl-danger) 35%,var(--pl-border));border-radius:12px;background:color-mix(in srgb,var(--pl-danger) 10%,var(--pl-card))}.pl-delete-icon{font-size:25px}.pl-delete-warning p{margin:5px 0 0;color:var(--pl-muted)}.pl-confirm-check{display:flex;align-items:flex-start;gap:10px;margin-top:18px;cursor:pointer}.pl-confirm-check input{margin-top:3px}.hidden{display:none!important}
+.pl-history{display:grid;gap:8px}.pl-history-item{padding:11px;border:1px solid var(--pl-border);border-radius:11px;background:var(--pl-bg)}.pl-history-head{display:flex;justify-content:space-between;gap:9px;margin-bottom:5px}.pl-history-item p{margin:0;color:var(--pl-muted);font-size:.8rem}.pl-time{color:var(--pl-muted);font-size:.71rem;white-space:nowrap}.pl-toasts{position:fixed;right:18px;top:18px;z-index:12000;width:min(390px,calc(100vw - 36px));display:grid;gap:8px}.pl-toast{display:grid;grid-template-columns:auto 1fr auto;gap:9px;padding:12px;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-card);box-shadow:var(--pl-shadow-hard)}.pl-toast.success{border-left:4px solid var(--pl-success)}.pl-toast.error{border-left:4px solid var(--pl-danger)}.pl-toast button{border:0;background:transparent;cursor:pointer}.pl-spinner{width:15px;height:15px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .6s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Compatibilidade total com os temas do base.html */
+.pl-page,
+.pl-page *{
+  scrollbar-color:color-mix(in srgb,var(--pl-primary) 42%,transparent) transparent;
+}
+.pl-page{
+  background:transparent;
+}
+.pl-hero,
+.pl-device-table,
+.pl-device,
+.pl-device-head,
+.pl-device-details,
+.pl-expanded-toolbar,
+.pl-playlist,
+.pl-empty,
+.pl-dialog,
+.pl-modal-foot,
+.pl-toast{
+  background-color:var(--pl-card);
+  color:var(--pl-text);
+}
+.pl-device-body,
+.pl-device-fact,
+.pl-history-item,
+.pl-switch,
+.pl-replace-summary,
+.pl-table-head{
+  background-color:var(--pl-bg);
+  color:var(--pl-text);
+}
+.pl-control,
+.pl-search input,
+.pl-page input,
+.pl-page textarea,
+.pl-page select{
+  background-color:var(--pl-card)!important;
+  color:var(--pl-text)!important;
+  border-color:var(--pl-border)!important;
+  color-scheme:inherit;
+}
+.pl-control option,
+.pl-page select option{
+  background:var(--pl-card);
+  color:var(--pl-text);
+}
+.pl-control::placeholder,
+.pl-search input::placeholder,
+.pl-page textarea::placeholder{
+  color:var(--pl-lighter)!important;
+  opacity:.85;
+}
+.pl-control:disabled,
+.pl-control[readonly]{
+  background:var(--pl-hover)!important;
+  color:var(--pl-muted)!important;
+  opacity:1;
+}
+.pl-control:-webkit-autofill,
+.pl-control:-webkit-autofill:hover,
+.pl-control:-webkit-autofill:focus,
+.pl-search input:-webkit-autofill{
+  -webkit-box-shadow:0 0 0 1000px var(--pl-card) inset!important;
+  -webkit-text-fill-color:var(--pl-text)!important;
+  caret-color:var(--pl-text)!important;
+}
+.pl-btn,
+.pl-toggle,
+.pl-close,
+.pl-password-toggle,
+.pl-search button{
+  font-family:inherit;
+}
+.pl-secondary,
+.pl-toggle,
+.pl-close{
+  background:var(--pl-card);
+  color:var(--pl-text);
+  border-color:var(--pl-border);
+}
+.pl-secondary:hover,
+.pl-toggle:hover,
+.pl-close:hover{
+  background:var(--pl-hover);
+  color:var(--pl-primary);
+}
+.pl-info{
+  background:color-mix(in srgb,var(--pl-info) 13%,var(--pl-card));
+}
+.pl-danger{
+  background:color-mix(in srgb,var(--pl-danger) 12%,var(--pl-card));
+}
+.pl-modal{
+  background:color-mix(in srgb,#000 62%,transparent);
+}
+.pl-modal-head,
+.pl-modal-foot,
+.pl-device-body,
+.pl-device-details,
+.pl-expanded-toolbar,
+.pl-playlist,
+.pl-history-item,
+.pl-toast,
+.pl-section{
+  border-color:var(--pl-border);
+}
+.pl-history-item p,
+.pl-delete-warning p,
+.pl-replace-summary p,
+.pl-hint,
+.pl-help,
+.pl-field-help,
+.pl-time{
+  color:var(--pl-muted);
+}
+.pl-toast button{
+  color:var(--pl-muted);
+}
+.pl-toast button:hover{
+  color:var(--pl-text);
+}
+.pl-spinner{
+  color:currentColor;
+}
+:root[data-theme="contrast"] .pl-device,
+:root[data-theme="contrast"] .pl-hero,
+:root[data-theme="contrast"] .pl-dialog,
+:root[data-theme="contrast"] .pl-playlist,
+:root[data-theme="contrast"] .pl-device-details{
+  border-width:2px;
+}
+:root[data-theme="contrast"] .pl-muted,
+:root[data-theme="contrast"] .pl-help,
+:root[data-theme="contrast"] .pl-field-help{
+  color:var(--text-light);
+}
+
+@media(max-width:1100px){.pl-device-head{grid-template-columns:auto minmax(180px,1fr) minmax(130px,.6fr)}.pl-device-message{grid-column:2/-1}.pl-device-details{grid-template-columns:1fr}.pl-device-tools{justify-content:flex-start}.pl-playlist{grid-template-columns:minmax(190px,1fr) minmax(130px,.55fr) auto}.pl-id-block{grid-column:1/3}}
+@media(max-width:760px){.pl-page{padding:8px}.pl-hero{align-items:stretch;flex-direction:column;padding:16px;border-radius:16px}.pl-title{font-size:1.45rem}.pl-sub{font-size:.86rem}.pl-hero-actions{min-width:0;justify-content:stretch}.pl-search{min-width:0;flex-basis:100%}.pl-hero-actions>.pl-btn{flex:1;min-height:40px}.pl-device-list{gap:8px}.pl-device{border-radius:14px}.pl-device-head{grid-template-columns:38px minmax(0,1fr);gap:9px;padding:10px}.pl-toggle{width:38px;height:38px;border-radius:10px}.pl-avatar{width:40px;height:40px;border-radius:11px}.pl-device-name{gap:9px}.pl-device-name strong{font-size:.9rem}.pl-provider-name{font-size:.72rem}.pl-device-meta,.pl-device-message{grid-column:2/-1}.pl-device-meta{display:none}.pl-device-message .pl-label{display:none}.pl-device-message .pl-muted{display:-webkit-box;overflow:hidden;-webkit-line-clamp:1;-webkit-box-orient:vertical;font-size:.73rem}.pl-device-body{padding:7px}.pl-device-details{grid-template-columns:1fr;gap:9px;margin-bottom:8px;padding:9px}.pl-device-facts{grid-template-columns:1fr 1fr;gap:7px}.pl-device-fact{padding:7px 8px}.pl-device-fact:last-child{grid-column:1/-1}.pl-device-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}.pl-device-tools .pl-btn{min-width:0;min-height:36px;padding:6px 7px;font-size:.72rem;border-radius:9px}.pl-expanded-toolbar{align-items:stretch;flex-direction:column;gap:8px;margin-bottom:8px;padding:9px}.pl-expanded-info span{display:none}.pl-expanded-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.pl-expanded-actions .pl-btn{min-height:38px;padding:7px 8px;font-size:.75rem}.pl-playlist{grid-template-columns:1fr;gap:7px;padding:9px;border-radius:11px}.pl-playlist>.pl-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}.pl-playlist>.pl-actions .pl-btn{min-width:0;min-height:35px;padding:6px 5px;font-size:.7rem;border-radius:8px}.pl-id-block{grid-column:auto}.pl-tags{gap:4px}.pl-badge{padding:4px 6px;font-size:.65rem}.pl-modal{align-items:center;padding:12px;height:100dvh}.pl-dialog,.pl-dialog.small,.pl-dialog-small{width:calc(100vw - 24px);max-height:84dvh;border-radius:14px}.pl-dialog>form{width:100%;max-height:84dvh}.pl-modal-head,.pl-modal-body{padding-left:15px;padding-right:15px}.pl-modal-foot{flex-wrap:wrap;padding:11px 15px max(11px,env(safe-area-inset-bottom))}.pl-modal-foot .pl-btn{flex:1 1 145px}.pl-grid{grid-template-columns:1fr}.pl-field.full{grid-column:auto}}
+@media(max-width:430px){.pl-avatar{display:none}.pl-device-head{grid-template-columns:36px minmax(0,1fr)}.pl-device-facts{grid-template-columns:1fr}.pl-device-fact:last-child{grid-column:auto}.pl-device-tools{grid-template-columns:1fr 1fr}.pl-device-tools .pl-btn:last-child{grid-column:1/-1}.pl-playlist>.pl-actions{grid-template-columns:1fr 1fr}.pl-playlist>.pl-actions .pl-btn:last-child:nth-child(odd){grid-column:1/-1}.pl-modal-foot .pl-btn{flex-basis:100%}}
+
+/* Substituição remota manual */
+.pl-warning-pending{border-color:color-mix(in srgb,var(--pl-warning) 42%,var(--pl-border));background:color-mix(in srgb,var(--pl-warning) 12%,var(--pl-card));color:var(--pl-warning)}
+.pl-btn-pending{border-color:var(--pl-warning);background:color-mix(in srgb,var(--pl-warning) 11%,var(--pl-card));color:var(--pl-warning)}
+.pl-btn-pending:hover{background:color-mix(in srgb,var(--pl-warning) 18%,var(--pl-card))}
+.pl-replace-summary{display:grid;gap:10px;padding:14px;border:1px solid var(--pl-border);border-radius:13px;background:var(--pl-bg)}
+.pl-replace-summary strong{font-size:.9rem}.pl-replace-summary p{margin:0;color:var(--pl-muted);font-size:.8rem;line-height:1.45}
+@media(max-width:760px){.pl-btn-pending{flex:1 1 100%}.pl-playlist .pl-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.pl-playlist .pl-actions .pl-btn{min-height:38px;padding:7px 9px;font-size:.76rem}.pl-playlist .pl-actions .pl-btn-pending{grid-column:1/-1}}
+
+
+/* Tabela expansível de dispositivos */
+.pl-device-table{display:table;border:0;border-radius:0;background:var(--pl-card);overflow:visible}
+.pl-table-head,.pl-device-head{display:grid;grid-template-columns:52px minmax(190px,1.25fr) minmax(130px,.75fr) minmax(170px,.85fr) 90px minmax(220px,1.2fr);align-items:center;gap:12px}
+.pl-table-head{position:sticky;top:0;z-index:8;padding:11px 14px;border-bottom:1px solid var(--pl-border);background:var(--pl-bg);color:var(--pl-muted);font-size:.7rem;font-weight:850;text-transform:uppercase;letter-spacing:.055em}
+.pl-device{border:0;border-bottom:1px solid var(--pl-border);border-radius:0;box-shadow:none;overflow:visible}
+.pl-device:last-child{border-bottom:0}
+.pl-device-head{padding:11px 14px;cursor:pointer;background:var(--pl-card)}
+.pl-device-head:hover{background:color-mix(in srgb,var(--pl-primary) 4%,var(--pl-card))}
+.pl-device.open>.pl-device-head{background:color-mix(in srgb,var(--pl-primary) 7%,var(--pl-card))}
+.pl-device-body{border-top:1px solid var(--pl-border);padding:12px 14px 14px;background:var(--pl-bg)}
+.pl-table-cell{min-width:0;font-size:.82rem}
+.pl-count-badge{display:inline-flex;min-width:30px;height:27px;align-items:center;justify-content:center;padding:0 8px;border-radius:999px;background:var(--pl-primary-soft);color:var(--pl-primary);font-weight:850}
+.pl-device-name .pl-avatar{width:36px;height:36px;border-radius:10px}
+.pl-device-name strong{font-size:.86rem}
+.pl-device-message .pl-muted{display:-webkit-box;overflow:hidden;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.pl-device-head:focus-visible{outline:3px solid var(--pl-primary-soft);outline-offset:-3px}
+
+@media(max-width:1050px){
+ .pl-table-head,.pl-device-head{grid-template-columns:48px minmax(180px,1.2fr) minmax(120px,.7fr) minmax(150px,.8fr) 76px}
+ .pl-table-head>div:last-child,.pl-device-head>.pl-device-message{display:none}
+}
+@media(max-width:760px){
+ .pl-device-table{border-radius:13px}
+ .pl-table-head{display:none}
+ .pl-device{border-bottom:1px solid var(--pl-border)}
+ .pl-device-head{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:9px;padding:10px}
+ .pl-device-head>.pl-device-name{grid-column:2}
+ .pl-device-head>.pl-table-cell{display:none}
+ .pl-device-head>.pl-table-cell[data-label="Playlists"]{display:flex;grid-column:3;align-items:center;justify-content:flex-end}
+ .pl-device-name .pl-avatar{width:36px;height:36px}
+ .pl-count-badge{min-width:27px;height:25px;font-size:.72rem}
+ .pl-device-body{padding:8px}
+}
+
+/* Uma única rolagem vertical: a da página. A tabela só rola na horizontal quando necessário. */
+.pl-page{overflow:visible}
+.pl-device-list,.pl-device-table{max-height:none!important;overflow-y:visible!important}
+
+/* =========================================================
+   TABELA RESPONSIVA REAL: TABLE / THEAD / TBODY / TR / TH / TD
+   ========================================================= */
+.pl-table-shell{
+  width:100%;
+  max-height:none;
+  min-height:0;
+  overflow-x:auto;
+  overflow-y:visible;
+  border:1px solid var(--pl-border);
+  border-radius:16px;
+  background:var(--pl-card);
+  box-shadow:var(--pl-shadow-soft);
+  scrollbar-gutter:auto;
+  overscroll-behavior-x:contain;
+  overscroll-behavior-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+
+.pl-device-table{
+  width:100%;
+  min-width:0;
+  border-collapse:separate;
+  border-spacing:0;
+  table-layout:fixed;
+  background:var(--pl-card);
+}
+
+.pl-device-table thead{
+  position:static;
+}
+
+.pl-device-table th{
+  padding:12px 10px;
+  border-bottom:1px solid var(--pl-border);
+  background:var(--pl-bg);
+  color:var(--pl-muted);
+  font-size:.7rem;
+  font-weight:850;
+  line-height:1.2;
+  text-align:left;
+  text-transform:uppercase;
+  letter-spacing:.055em;
+  white-space:nowrap;
+}
+
+.pl-device-table th:first-child,
+.pl-device-table td:first-child{padding-left:14px}
+.pl-device-table th:last-child,
+.pl-device-table td:last-child{padding-right:14px}
+
+.pl-device-table tbody.pl-device > tr.pl-device-head > td{
+  padding:11px 10px;
+  border-bottom:1px solid var(--pl-border);
+  background:var(--pl-card);
+  color:var(--pl-text);
+  vertical-align:middle;
+  overflow:visible;
+}
+
+.pl-device-table tbody.pl-device:last-of-type > tr.pl-device-head > td{
+  border-bottom:0;
+}
+
+.pl-device-table tbody.pl-device > tr.pl-device-head{
+  cursor:pointer;
+}
+
+.pl-device-table tbody.pl-device > tr.pl-device-head:hover > td{
+  background:color-mix(in srgb,var(--pl-primary) 4%,var(--pl-card));
+}
+
+.pl-device-table tbody.pl-device.open > tr.pl-device-head > td{
+  background:color-mix(in srgb,var(--pl-primary) 7%,var(--pl-card));
+  border-bottom-color:var(--pl-border);
+}
+
+.pl-device-table tbody.pl-device > tr.pl-device-expanded{
+  display:none;
+}
+
+.pl-device-table tbody.pl-device.open > tr.pl-device-expanded{
+  display:table-row;
+}
+
+.pl-device-table .pl-device-body{
+  display:table-cell;
+  padding:12px 14px 14px;
+  border-bottom:1px solid var(--pl-border);
+  background:var(--pl-bg);
+  overflow:visible;
+}
+
+.pl-device-table tbody.pl-device:last-of-type .pl-device-body{
+  border-bottom:0;
+}
+
+.pl-device-table .pl-toggle-cell{width:58px;text-align:center}
+.pl-device-table .pl-name-cell{width:22%}
+.pl-device-table .pl-mac-cell{width:16%}
+.pl-device-table .pl-provider-cell{width:15%}
+.pl-device-table .pl-status-cell{width:19%}
+.pl-device-table .pl-actions-cell{width:28%;text-align:right}
+
+.pl-device-name{display:flex;align-items:center;gap:10px;min-width:0}
+.pl-device-table .pl-table-cell{min-width:0}
+.pl-device-table .pl-device-message{min-width:0}
+.pl-device-table .pl-device-message .pl-muted{
+  display:-webkit-box;
+  overflow:hidden;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+
+.pl-device-actions{
+  position:relative;
+  display:flex;
+  justify-content:flex-end;
+  min-width:0;
+  overflow:visible;
+}
+
+.pl-device-actions-main{
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  width:100%;
+  overflow:visible;
+  padding:3px;
+}
+
+.pl-device-actions .pl-btn,
+.pl-actions .pl-btn,
+.pl-expanded-actions .pl-btn,
+.pl-hero-actions .pl-btn{
+  max-width:100%;
+  border-width:1px;
+  outline:0;
+  transform:none;
+  overflow:visible;
+  box-shadow:0 0 0 1px transparent;
+}
+
+.pl-device-actions .pl-btn:hover,
+.pl-actions .pl-btn:hover,
+.pl-expanded-actions .pl-btn:hover,
+.pl-hero-actions .pl-btn:hover{
+  transform:none;
+  box-shadow:0 2px 8px color-mix(in srgb,var(--pl-text) 10%,transparent);
+}
+
+.pl-device-actions .pl-btn:focus-visible,
+.pl-actions .pl-btn:focus-visible,
+.pl-expanded-actions .pl-btn:focus-visible,
+.pl-hero-actions .pl-btn:focus-visible,
+.pl-toggle:focus-visible{
+  outline:3px solid var(--pl-primary-soft);
+  outline-offset:2px;
+}
+
+.pl-device-actions-menu{
+  z-index:60;
+}
+
+.pl-mobile-device-meta{display:none}
+
+.pl-empty-row td{
+  padding:14px;
+  border:0;
+  background:var(--pl-card);
+}
+
+@media (max-width:1200px){
+  .pl-device-table .pl-name-cell{width:21%}
+  .pl-device-table .pl-mac-cell{width:15%}
+  .pl-device-table .pl-provider-cell{width:14%}
+  .pl-device-table .pl-status-cell{width:17%}
+  .pl-device-table .pl-actions-cell{width:33%}
+  .pl-device-actions-main .pl-btn{padding:8px 9px;font-size:.75rem}
+}
+
+@media (max-width:760px){
+  .pl-page{padding:8px}
+  .pl-table-shell{
+    max-height:none;
+    min-height:0;
+    overflow-x:auto;
+    overflow-y:visible;
+    border-radius:13px;
+    -webkit-overflow-scrolling:touch;
+  }
+
+  .pl-device-table{
+    width:max-content;
+    min-width:1050px;
+    table-layout:fixed;
+  }
+
+  .pl-device-table th{
+    padding:10px 9px;
+    font-size:.66rem;
+  }
+
+  .pl-device-table tbody.pl-device > tr.pl-device-head > td{
+    padding:9px;
+  }
+
+  .pl-device-table .pl-toggle-cell{width:54px}
+  .pl-device-table .pl-name-cell{width:220px}
+  .pl-device-table .pl-mac-cell{width:165px}
+  .pl-device-table .pl-provider-cell{width:165px}
+  .pl-device-table .pl-status-cell{width:220px}
+  .pl-device-table .pl-actions-cell{width:320px}
+
+  .pl-device-actions-main{
+    flex-wrap:nowrap;
+    justify-content:flex-end;
+    min-width:max-content;
+  }
+
+  .pl-device-actions-main .pl-btn{
+    flex:0 0 auto;
+    min-height:38px;
+    padding:7px 9px;
+    font-size:.74rem;
+  }
+
+  .pl-device-table .pl-device-body{
+    padding:9px;
+  }
+
+  .pl-playlists{
+    min-width:990px;
+  }
+
+  .pl-playlist{
+    grid-template-columns:minmax(260px,1.35fr) minmax(170px,.55fr) minmax(190px,.65fr) minmax(300px,auto);
+  }
+
+  .pl-playlist>.pl-actions{
+    display:flex;
+    flex-wrap:nowrap;
+    justify-content:flex-end;
+    min-width:max-content;
+  }
+}
+
+@media (max-width:430px){
+  .pl-device-table{min-width:1010px}
+  .pl-device-table .pl-actions-cell{width:300px}
+}
+
+
+.pl-bulk-select{display:inline-flex;align-items:center;justify-content:center;align-self:center}.pl-bulk-select input{position:absolute;opacity:0;pointer-events:none}.pl-bulk-select span{width:27px;height:27px;border:1px solid var(--pl-border);border-radius:8px;display:grid;place-items:center;color:transparent;background:var(--pl-bg);cursor:pointer;font-weight:900}.pl-bulk-select input:checked+span{background:var(--pl-primary);border-color:var(--pl-primary);color:#fff}.pl-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.pl-detail-item{padding:12px;border:1px solid var(--pl-border);border-radius:10px;background:var(--pl-hover)}.pl-detail-item small{display:block;color:var(--pl-muted);margin-bottom:4px}.pl-detail-item strong{display:block;word-break:break-word}.pl-detail-wide{grid-column:1/-1}@media(max-width:620px){.pl-detail-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="pl-page">
+  <header class="pl-hero">
+    <div>
+      <div class="pl-kicker">◉ Integrações de aplicativos</div>
+      <h1 class="pl-title">Gerenciador de playlists</h1>
+      <p class="pl-sub">Dispositivo e lista ficam no mesmo cadastro. Edite tudo em um único lugar.</p>
+    </div>
+    <div class="pl-hero-actions">
+      <form class="pl-search" method="get">
+        <input type="search" name="termo" value="{{ termo }}" placeholder="Nome do cliente, MAC ou usuário">
+        <button type="submit" title="Pesquisar" aria-label="Pesquisar">⌕</button>
+      </form>
+      <button type="button" class="pl-btn pl-secondary" data-open-config>⚙ Proteção da lista</button>
+      <button type="button" class="pl-btn pl-secondary" data-open-bulk-dns>⇄ Trocar DNS</button>
+      <button type="button" class="pl-btn pl-primary" data-new-device>＋ Novo cadastro</button>
+    </div>
+  </header>
+
+  <main class="pl-table-shell" aria-label="Dispositivos e playlists">
+    <table class="pl-device-table">
+      <thead>
+        <tr>
+          <th class="pl-toggle-cell" scope="col"><span class="sr-only">Selecionar</span></th>
+          <th class="pl-name-cell" scope="col">Nome</th>
+          <th class="pl-mac-cell" scope="col">MAC Address</th>
+          <th class="pl-provider-cell" scope="col">Aplicativo</th>
+          <th class="pl-access-cell" scope="col">Modo de acesso</th>
+          <th class="pl-status-cell" scope="col">Situação</th>
+          <th class="pl-actions-cell" scope="col">Ações</th>
+        </tr>
+      </thead>
+
+      {% for integracao in integracoes %}
+      <tbody class="pl-device" id="device-{{ integracao.id }}">
+        <tr class="pl-device-head">
+          <td class="pl-toggle-cell">
+            {% if integracao.lista_principal %}
+            <label class="pl-bulk-select" title="Selecionar para ações em massa">
+              <input type="checkbox" class="pl-bulk-check" value="{{ integracao.lista_principal.id }}"><span>✓</span>
+            </label>
+            {% else %}
+            <span class="pl-no-list-dot" title="Somente dispositivo">•</span>
+            {% endif %}
+          </td>
+          <td class="pl-name-cell">
+            <div class="pl-device-name">
+              <div class="pl-avatar" data-provider-avatar="{{ integracao.provedor|escape }}"><img alt="" hidden><span>{{ integracao.nome_exibicao|default:'D'|slice:':1'|upper }}</span></div>
+              <div class="pl-ellipsis">
+                <strong>{{ integracao.nome_exibicao }}</strong>
+                {% if integracao.cliente %}<div class="pl-muted">Vinculado ao cliente</div>{% else %}<div class="pl-muted">Cadastro avulso</div>{% endif %}
+              </div>
+            </div>
+          </td>
+          <td class="pl-table-cell pl-device-mac pl-mac-cell"><span class="pl-ellipsis" title="{{ integracao.mac_address|default:'' }}">{{ integracao.mac_address|default:'Não informado' }}</span></td>
+          <td class="pl-table-cell pl-device-provider pl-provider-cell"><span class="pl-provider-pill pl-ellipsis">{{ integracao.get_provedor_display }}</span></td>
+          <td class="pl-table-cell pl-access-cell">
+            {% if integracao.tem_lista_view %}
+              {% if integracao.modo_acesso_view == 'xtream' %}<span class="pl-access-badge">Xtream Code</span>
+              {% elif integracao.modo_acesso_view == 'parceria' %}<span class="pl-access-badge">Parceria</span>
+              {% else %}<span class="pl-access-badge">M3U</span>{% endif %}
+            {% else %}<span class="pl-access-empty">Sem lista</span>{% endif %}
+          </td>
+          <td class="pl-device-message pl-table-cell pl-status-cell">
+            {% if integracao.lista_principal %}
+              <div class="pl-tags"><span class="pl-badge status-{{ integracao.lista_principal.status }}">{{ integracao.lista_principal.get_status_display }}</span></div>
+              <div class="pl-muted">{{ integracao.lista_principal.ultima_mensagem|default:integracao.ultima_mensagem }}</div>
+            {% else %}
+              <div class="pl-muted">{{ integracao.ultima_mensagem|default:'Somente dispositivo cadastrado.' }}</div>
+            {% endif %}
+          </td>
+          <td class="pl-actions-cell">
+            <div class="pl-device-actions" data-device-actions>
+              <div class="pl-device-actions-main">
+                <button type="button" class="pl-btn pl-primary pl-action-main" data-edit-device data-id="{{ integracao.id }}" data-details-url="{% url 'detalhes_integracao_playlist' integracao.id %}" title="Editar este cadastro"><span aria-hidden="true">✎</span><b>Editar</b></button>
+                <button type="button" class="pl-btn pl-secondary pl-actions-more" title="Abrir outras ações" aria-label="Abrir outras ações" aria-haspopup="true" aria-expanded="false" data-device-more><span aria-hidden="true">⋮</span><b>Mais</b></button>
+              </div>
+              <div class="pl-device-actions-menu" role="menu">
+                {% if integracao.lista_principal and integracao.tem_lista_view %}
+                  {% if not integracao.lista_principal.remote_id %}
+                  <button type="button" class="pl-action-menu-item pl-action-menu-highlight" role="menuitem" data-post="{% url 'subir_playlist' integracao.lista_principal.id %}" data-reload="1" data-loading="Publicando..."><span class="pl-action-menu-icon">↑</span><span><strong>Publicar lista</strong><small>Enviar os dados deste cadastro ao aplicativo</small></span></button>
+                  {% elif integracao.lista_principal.status == 'confirmacao_pendente' %}
+                  <button type="button" class="pl-action-menu-item pl-action-menu-highlight" role="menuitem" data-replace-playlist data-provider="{{ integracao.provedor }}" data-name="{{ integracao.nome_exibicao|escape }}" data-protected="{{ integracao.lista_principal.protegida|yesno:'true,false' }}" data-url="{% url 'substituir_playlist_remota' integracao.lista_principal.id %}"><span class="pl-action-menu-icon">↻</span><span><strong>Atualizar no aplicativo</strong><small>Publicar as alterações salvas</small></span></button>
+                  {% endif %}
+                {% endif %}
+                <button type="button" class="pl-action-menu-item" role="menuitem" data-device-details data-details-url="{% url 'detalhes_integracao_playlist' integracao.id %}"><span class="pl-action-menu-icon">ⓘ</span><span><strong>Ver detalhes</strong><small>Dispositivo e dados de acesso em uma tela</small></span></button>
+                <button type="button" class="pl-action-menu-item" role="menuitem" data-history="{% url 'historico_integracao_playlist' integracao.id %}"><span class="pl-action-menu-icon">◷</span><span><strong>Ver histórico</strong><small>Consultar as últimas operações</small></span></button>
+                {% if integracao.provedor == 'ibo_player' %}
+                <button type="button" class="pl-action-menu-item pl-action-menu-highlight" role="menuitem" data-ibo-auth data-name="{{ integracao.nome_exibicao|escape }}" data-captcha-url="{% url 'gerar_captcha_ibo' integracao.id %}" data-auth-url="{% url 'autenticar_ibo_playlist' integracao.id %}"><span class="pl-action-menu-icon">🔐</span><span><strong>Autenticar IBO</strong><small>Liberar a integração pelo CAPTCHA</small></span></button>
+                {% endif %}
+                <div class="pl-action-menu-separator" aria-hidden="true"></div>
+                <button type="button" class="pl-action-menu-item pl-action-menu-danger" role="menuitem" data-delete-device data-name="{{ integracao.nome_exibicao|default:integracao.nome_avulso|escape }}" data-playlists="{{ integracao.playlists.count }}" data-url="{% url 'excluir_dispositivo_playlist' integracao.id %}"><span class="pl-action-menu-icon">🗑</span><span><strong>Excluir cadastro</strong><small>Remover dispositivo e dados de acesso</small></span></button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+      {% empty %}
+      <tbody><tr class="pl-empty-row"><td colspan="7"><div class="pl-empty"><strong>Nenhum cadastro encontrado</strong>Cadastre o primeiro dispositivo para começar.</div></td></tr></tbody>
+      {% endfor %}
+    </table>
+  </main>
+</div>
+
+{{ provedores_json|json_script:'playlist-providers-data' }}
+<div class="pl-toasts" id="plToasts"></div>
+
+
+<div class="pl-modal" id="iboAuthModal"><div class="pl-dialog small"><form id="iboAuthForm">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2>Autenticar IBO Player</h2><p id="iboAuthDevice">Resolva o CAPTCHA para liberar a integração.</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body">
+    <input type="hidden" id="iboCaptchaUrl"><input type="hidden" id="iboAuthUrl"><input type="hidden" name="captcha_token" id="iboCaptchaToken">
+    <div class="pl-field"><label>CAPTCHA</label><div id="iboCaptchaImage" style="min-height:120px;display:flex;align-items:center;justify-content:center;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-hover);color:var(--pl-text);overflow:hidden"><span>Carregando...</span></div></div>
+    <div class="pl-field"><label>Digite as letras</label><input class="pl-control" type="text" name="captcha" id="iboCaptchaValue" maxlength="10" autocomplete="off" autocapitalize="characters" required placeholder="Ex.: AB"><small class="pl-help">Se estiver difícil, clique em “Novo CAPTCHA”.</small></div>
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" id="iboReloadCaptcha">↻ Novo CAPTCHA</button><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button class="pl-btn pl-primary" type="submit">Autenticar</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="configModal"><div class="pl-dialog small"><form id="configForm" action="{% url 'salvar_configuracao_playlist' %}">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2>Proteção das listas</h2><p class="ui-help-text">Defina o código usado para proteger automaticamente novas listas.</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body">
+    <div class="pl-protection-note"><span>🔒</span><div><strong>Este código não é a Device Key.</strong><small>A Device Key continua pertencendo ao dispositivo. Este código serve somente como PIN de proteção da lista.</small></div></div>
+    <div class="pl-field"><label>Código de proteção padrão</label><div class="pl-input-password"><input class="pl-control" type="password" name="codigo_protecao_playlist" id="defaultProtectionCode" maxlength="150" autocomplete="new-password" placeholder="{% if codigo_protecao_playlist %}Código já configurado. Digite somente para trocar.{% else %}Defina o código de proteção{% endif %}"><button type="button" class="pl-password-toggle" data-toggle-password="#defaultProtectionCode">👁</button></div><small class="pl-help">Novas listas recebem esse código automaticamente. O código não aparece no cadastro do cliente.</small></div>
+    {% if codigo_protecao_playlist %}<label class="pl-confirm-check pl-clear-protection"><input type="checkbox" name="limpar_codigo_protecao" value="1"><span>Remover o código padrão para novas listas. As listas já protegidas não serão alteradas.</span></label>{% endif %}
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-primary">Salvar proteção</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="bulkDnsModal"><div class="pl-dialog small"><form id="bulkDnsForm" action="{% url 'trocar_dns_em_massa' %}">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2>Trocar DNS em massa</h2><p><span id="bulkDnsCount">0</span> playlist(s) selecionada(s).</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body"><div class="pl-field"><label>Novo DNS</label><input class="pl-control" name="novo_dns" id="bulkDnsValue" placeholder="http://servidor.com:80" required><small class="pl-help">O caminho e os parâmetros atuais da URL são preservados. IBO pode solicitar CAPTCHA para cada dispositivo sem sessão válida.</small></div></div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-primary">Aplicar DNS</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="detailsModal"><div class="pl-dialog"><div class="pl-modal-head"><div><h2 id="detailsTitle">Detalhes</h2><p class="ui-help-text">Informações carregadas somente quando solicitado.</p></div><button type="button" class="pl-close" data-close>✕</button></div><div class="pl-modal-body" id="detailsContent"><div class="pl-empty">Carregando...</div></div><div class="pl-modal-foot"><button type="button" class="pl-btn pl-primary" data-close>Fechar</button></div></div></div>
+
+
+<style id="pl-device-unified-style">
+#deviceModal .pl-device-unified{padding:16px;border-radius:16px}
+#deviceModal .pl-unified-divider{grid-column:1/-1;margin:16px 0 10px;padding-top:14px;border-top:1px solid var(--pl-border);font-size:.78rem;font-weight:850;color:var(--pl-muted);text-transform:uppercase;letter-spacing:.04em}
+#deviceModal .pl-device-unified>.pl-grid{margin-bottom:0}
+#deviceModal #initialPlaylistSection.hidden,#deviceModal #initialPlaylistSectionTitle.hidden{display:none!important}
+.pl-protection-note{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px;padding:13px 14px;border:1px solid color-mix(in srgb,var(--pl-primary) 24%,var(--pl-border));border-radius:13px;background:color-mix(in srgb,var(--pl-primary) 7%,var(--pl-card));color:var(--pl-text)}
+.pl-protection-note>span{font-size:1.15rem;line-height:1.2}.pl-protection-note div{display:grid;gap:4px}.pl-protection-note strong{font-size:.88rem}.pl-protection-note small{color:var(--pl-muted);line-height:1.45}.pl-clear-protection{margin-top:14px}
+#editProtectionField{margin-top:8px;padding:13px;border:1px solid color-mix(in srgb,var(--pl-warning,#f59e0b) 30%,var(--pl-border));border-radius:13px;background:color-mix(in srgb,#f59e0b 6%,var(--pl-card))}
+@media(max-width:760px){#deviceModal .pl-device-unified{padding:12px}#deviceModal .pl-unified-divider{margin-top:12px}}
+</style>
+<div class="pl-modal" id="deviceModal"><div class="pl-dialog"><form id="deviceForm" action="{% url 'salvar_integracao_playlist' %}">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2 id="deviceTitle">Novo cadastro</h2><p class="ui-help-text">Dispositivo e lista ficam juntos. Se os dados da lista ficarem vazios, será salvo somente o dispositivo.</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body"><input type="hidden" name="integracao_id" id="deviceId">
+    <section class="pl-section pl-device-unified">
+      <div class="pl-grid">
+        <div class="pl-field full"><label>Nome do cadastro</label><input class="pl-control" name="nome_avulso" id="deviceName" required placeholder="Ex.: Teste / TV da sala"><small class="pl-help">Este é o nome que aparecerá no Gerenciador de playlists, mesmo quando você vincular a lista a outro cliente.</small></div>
+        <div class="pl-field"><label>Cliente <span class="pl-hint">opcional</span></label><select class="pl-control" name="cliente_id" id="deviceClient"><option value="">Cadastro avulso</option>{% for c in clientes_disponiveis %}<option value="{{ c.id }}" data-details-url="{% url 'detalhes_cliente_playlist' c.id %}">{% firstof c.nome c.username %}</option>{% endfor %}</select><small class="pl-help">Ao selecionar um cliente existente, o usuário e a senha IPTV são preenchidos automaticamente.</small></div>
+        <div class="pl-field"><label>Aplicativo</label><select class="pl-control" name="provedor" id="deviceProvider" required>{% for p in provedores %}<option value="{{ p.slug }}">{{ p.nome }}</option>{% endfor %}</select></div>
+        <div class="pl-field" data-device-field="mac_address"><label data-label for="deviceMac">MAC Address</label><input type="text" class="pl-control" name="mac_address" id="deviceMac" maxlength="40" autocomplete="off" placeholder="00:11:22:33:44:55"><div class="pl-field-help">Informe exatamente como aparece no aplicativo.</div></div>
+        <div class="pl-field" data-device-field="device_key"><label data-label for="deviceKey">Device Key</label><div class="pl-input-password"><input type="password" class="pl-control" name="device_key" id="deviceKey" maxlength="150" autocomplete="new-password" placeholder="Key exibida no aplicativo"><button type="button" class="pl-password-toggle" data-toggle-password="#deviceKey">👁</button></div><div class="pl-field-help" id="deviceKeyHelp">Usada para autenticar o aplicativo.</div></div>
+      </div>
+
+      <div class="pl-unified-divider">Dados da lista <span class="pl-hint">opcional</span></div>
+      <div class="pl-grid">
+        <div class="pl-field full"><label>Modo de acesso</label><select class="pl-control" name="modo_acesso" id="accessMode"><option value="m3u">Lista M3U</option><option value="xtream">Xtream Code</option><option value="parceria">Parceria</option></select><small class="pl-help">Você pode deixar os campos abaixo vazios e cadastrar somente o dispositivo.</small></div>
+
+        <div class="pl-access-fields full" data-access-block="m3u">
+          <div class="pl-grid">
+            <div class="pl-field full"><label>URL da lista M3U</label><input class="pl-control" name="playlist_url" id="accessM3uUrl" placeholder="https://servidor/get.php?username=...&password=..."></div>
+            <div class="pl-field"><label>URL do EPG <span class="pl-hint">opcional</span></label><input class="pl-control" name="playlist_epg_url" id="accessEpgUrl" placeholder="https://servidor/xmltv.php?..." ></div>
+            <div class="pl-field"><label>Senha de edição <span class="pl-hint">opcional</span></label><div class="pl-input-password"><input type="password" class="pl-control" name="playlist_senha_edicao" id="accessEditPassword" autocomplete="new-password"><button type="button" class="pl-password-toggle" data-toggle-password="#accessEditPassword">👁</button></div></div>
+          </div>
+        </div>
+
+        <div class="pl-access-fields full hidden" data-access-block="xtream">
+          <div class="pl-grid">
+            <div class="pl-field full"><label>DNS / servidor</label><input class="pl-control" name="playlist_dns" id="accessXtreamDns" placeholder="http://servidor.com:80"></div>
+            <div class="pl-field"><label>Usuário</label><input class="pl-control" name="playlist_usuario" id="accessUser" autocomplete="off"></div>
+            <div class="pl-field"><label>Senha</label><div class="pl-input-password"><input type="password" class="pl-control" name="playlist_senha" id="accessPassword" autocomplete="new-password"><button type="button" class="pl-password-toggle" data-toggle-password="#accessPassword">👁</button></div></div>
+          </div>
+        </div>
+
+        <div class="pl-access-fields full hidden" data-access-block="parceria">
+          <div class="pl-grid">
+            <div class="pl-field"><label>Usuário</label><input class="pl-control" name="playlist_usuario_parceria" id="partnerUser" autocomplete="off"></div>
+            <div class="pl-field"><label>Senha</label><div class="pl-input-password"><input type="password" class="pl-control" name="playlist_senha_parceria" id="partnerPassword" autocomplete="new-password"><button type="button" class="pl-password-toggle" data-toggle-password="#partnerPassword">👁</button></div></div>
+            <div class="pl-field full"><label>Código do servidor</label><input class="pl-control" name="playlist_codigo_parceria" id="partnerServerCode" autocomplete="off" placeholder="Código do servidor/parceiro"></div>
+          </div>
+        </div>
+
+        <div class="pl-field full hidden" id="editProtectionField">
+          <label>Código de proteção para editar</label>
+          <div class="pl-input-password"><input type="password" class="pl-control" name="codigo_protecao_edicao" id="editProtectionCode" maxlength="150" autocomplete="off" disabled placeholder="Digite o código de proteção da lista"><button type="button" class="pl-password-toggle" data-toggle-password="#editProtectionCode">👁</button></div>
+          <small class="pl-help">Esta lista está protegida. Por segurança, informe o código antes de salvar qualquer alteração.</small>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-primary">Salvar cadastro</button></div>
+</form></div></div>
+<div class="pl-modal" id="playlistModal"><div class="pl-dialog"><form id="playlistForm">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2 id="playlistTitle">Nova playlist</h2><p id="playlistSubtitle">Salve como rascunho ou envie ao aplicativo.</p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body"><input type="hidden" id="playlistIntegration"><input type="hidden" id="playlistCreateUrl"><input type="hidden" id="playlistId"><input type="hidden" id="playlistEditUrl">
+    <section class="pl-section"><h3 class="pl-section-title">1. Dados da playlist</h3><div class="pl-grid"><div class="pl-field full"><label>Nome</label><input class="pl-control" name="nome" id="playlistName" required></div><div class="pl-field"><label>Cliente <span class="pl-hint">opcional</span></label><select class="pl-control" name="cliente_id" id="playlistClient"><option value="">Credencial manual ou padrão</option>{% for c in clientes_disponiveis %}<option value="{{ c.id }}" data-details-url="{% url 'detalhes_cliente_playlist' c.id %}">{% firstof c.nome c.username %}</option>{% endfor %}</select></div><div class="pl-field"><label>Modo de envio</label><select class="pl-control" name="modo_envio" id="playlistMode"><option value="url">URL ou DNS</option><option value="codigo">Código do servidor</option></select></div></div></section>
+    <section class="pl-section"><h3 class="pl-section-title">2. Credenciais IPTV</h3><div class="pl-grid"><div class="pl-field"><label>Usuário</label><input class="pl-control" name="usuario_iptv" id="playlistUser"></div><div class="pl-field"><label>Senha</label><input class="pl-control" type="password" name="senha_iptv" id="playlistPassword"></div><div class="pl-field" id="playlistDnsField"><label>DNS</label><input class="pl-control" name="dns" id="playlistDns"></div><div class="pl-field hidden" id="playlistCodeField"><label>Código</label><input class="pl-control" name="codigo" id="playlistCode"></div><div class="pl-field full" id="playlistUrlField"><label>URL completa <span class="pl-hint">opcional com DNS</span></label><textarea class="pl-control" name="url_playlist" id="playlistUrl"></textarea></div></div></section>
+    <section class="pl-section"><h3 class="pl-section-title">3. Proteção</h3><div class="pl-grid"><div class="pl-field full"><label class="pl-switch"><input type="checkbox" name="protegida" id="playlistProtected"><span><strong>Proteger com PIN</strong><small>Ative somente quando necessário.</small></span></label></div><div class="pl-field hidden" id="playlistPinField"><label>PIN</label><input class="pl-control" name="pin_protecao" id="playlistPin" inputmode="numeric"><small class="pl-help">Ao editar, deixe vazio para manter o PIN salvo.</small></div></div></section>
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-primary" name="action" value="save">Salvar</button><button type="submit" class="pl-btn pl-success" name="action" value="upload" id="saveUpload">↑ Salvar e subir agora</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="replaceModal"><div class="pl-dialog small"><form id="replaceForm">{% csrf_token %}
+  <div class="pl-modal-head"><div><h2 id="replaceTitle">Publicar alterações</h2><p id="replaceName"></p></div><button type="button" class="pl-close" data-close>✕</button></div>
+  <div class="pl-modal-body">
+    <input type="hidden" id="replaceUrl">
+    <div class="pl-replace-summary pl-warning-pending"><strong>A API não permite edição direta.</strong><p>Ao confirmar, o sistema excluirá a playlist atual do aplicativo e cadastrará outra usando os dados salvos no gestor. Nada acontece automaticamente.</p></div>
+    <div class="pl-field hidden" id="replacePinField" style="margin-top:14px"><label>PIN atual da playlist remota</label><input class="pl-control" type="password" name="pin_atual" id="replacePin" inputmode="numeric" autocomplete="off"><small class="pl-help">Necessário apenas quando a playlist atual está protegida.</small></div>
+    <label class="pl-confirm-check"><input type="checkbox" name="confirmar" id="confirmReplace" value="1" required><span>Confirmo que desejo excluir a versão remota e cadastrar novamente.</span></label>
+  </div>
+  <div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-btn-pending">Confirmar substituição</button></div>
+</form></div></div>
+
+<div class="pl-modal" id="deleteModal"><div class="pl-dialog small"><form id="deleteForm">{% csrf_token %}<div class="pl-modal-head"><div><h2>Excluir playlist</h2><p id="deleteName"></p></div><button type="button" class="pl-close" data-close>✕</button></div><div class="pl-modal-body"><input type="hidden" id="deleteUrl"><div class="pl-grid"><div class="pl-field full"><label>Onde excluir?</label><select class="pl-control" name="modo"><option value="ambas">Painel e gestor</option><option value="remota">Somente painel</option><option value="local">Somente gestor</option></select></div><div class="pl-field full hidden" id="deletePinField"><label>PIN atual</label><input class="pl-control" name="pin" id="deletePin"></div></div></div><div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button class="pl-btn pl-danger">Excluir</button></div></form></div></div>
+
+<div class="pl-modal" id="historyModal"><div class="pl-dialog small"><div class="pl-modal-head"><div><h2>Histórico</h2><p class="ui-help-text">Últimas operações registradas.</p></div><button type="button" class="pl-close" data-close>✕</button></div><div class="pl-modal-body"><div class="pl-history" id="historyContent"></div></div><div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Fechar</button></div></div></div>
+
+<div class="pl-modal" id="deleteDeviceModal"><div class="pl-dialog small"><form id="deleteDeviceForm">{% csrf_token %}<input type="hidden" id="deleteDeviceUrl"><div class="pl-modal-head"><div><h2>Excluir cadastro</h2><p class="ui-help-text">Remove o dispositivo e os dados de acesso vinculados.</p></div><button type="button" class="pl-close" data-close>✕</button></div><div class="pl-modal-body"><div class="pl-delete-warning"><div class="pl-delete-icon">🗑</div><div><strong id="deleteDeviceName"></strong><p id="deleteDeviceMessage">Confirme para excluir este cadastro.</p></div></div><label class="pl-confirm-check"><input type="checkbox" id="confirmDeleteDevice" required><span>Entendo que os dados de acesso vinculados também serão removidos.</span></label></div><div class="pl-modal-foot"><button type="button" class="pl-btn pl-secondary" data-close>Cancelar</button><button type="submit" class="pl-btn pl-danger">Excluir cadastro</button></div></form></div></div>
+
+<script>
+(()=>{'use strict';
+const $=(s,c=document)=>c.querySelector(s), $$=(s,c=document)=>[...c.querySelectorAll(s)];
+let providers=[];try{providers=JSON.parse($('#playlist-providers-data')?.textContent||'[]')}catch(e){console.warn('JSON de providers inválido',e)}
+const csrf=()=>$('[name="csrfmiddlewaretoken"]')?.value||'';
+const PRESELECTED_CLIENT={{ cliente_preselecionado_id|default:""|escapejs|default:"null" }} || null;
+const AUTO_OPEN_DEVICE={{ abrir_novo_dispositivo|yesno:"true,false" }};
+const esc=v=>{const d=document.createElement('div');d.textContent=String(v??'');return d.innerHTML};
+function toast(msg,type='info'){const box=$('#plToasts');if(!box)return;const el=document.createElement('div');el.className=`pl-toast ${type}`;el.innerHTML=`<b>${type==='success'?'✓':type==='error'?'!':'i'}</b><div>${esc(msg||'Operação concluída.')}</div><button type="button">✕</button>`;el.querySelector('button').onclick=()=>el.remove();box.appendChild(el);setTimeout(()=>el.remove(),5000)}
+function loading(btn,on,text='Processando...'){if(!btn)return;if(on){btn.dataset.html=btn.innerHTML;btn.disabled=true;btn.innerHTML=`<span class="pl-spinner"></span>${esc(text)}`}else{btn.disabled=false;btn.innerHTML=btn.dataset.html||btn.innerHTML}}
+async function request(url,opt={}){const response=await fetch(url,{credentials:'same-origin',headers:{'X-Requested-With':'XMLHttpRequest',...(opt.headers||{})},...opt});let data;try{data=await response.json()}catch{data={success:false,message:`Resposta inválida do servidor (${response.status}).`}}if(!response.ok&&data.success!==true)throw new Error(data.message||`Erro HTTP ${response.status}`);return data}
+function openModal(modal){if(!modal)return;modal.classList.add('show');document.body.style.overflow='hidden';setTimeout(()=>modal.querySelector('input:not([type=hidden]),select,textarea,button')?.focus(),40)}
+function closeModal(modal){if(!modal)return;modal.classList.remove('show');if(!$('.pl-modal.show'))document.body.style.overflow=''}
+$$('[data-close]').forEach(btn=>btn.addEventListener('click',()=>closeModal(btn.closest('.pl-modal'))));
+$$('.pl-modal').forEach(modal=>modal.addEventListener('mousedown',e=>{if(e.target===modal)closeModal(modal)}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal($('.pl-modal.show'))});
+
+function providerBySlug(slug){return providers.find(item=>String(item.slug||item.valor||'')===String(slug||''))||{}}
+function providerLogo(provider){return provider.logo_url||provider.imagem_url||provider.icone_url||provider.logo||''}
+$$('[data-provider-avatar]').forEach(avatar=>{const provider=providerBySlug(avatar.dataset.providerAvatar);const url=providerLogo(provider);const img=avatar.querySelector('img'),fallback=avatar.querySelector('span');if(url&&img){img.src=url;img.alt=provider.nome||'Aplicativo';img.onload=()=>{img.hidden=false;if(fallback)fallback.hidden=true};img.onerror=()=>{img.hidden=true;if(fallback)fallback.hidden=false}}});
+
+// Cadastro unificado: a linha não expande para uma segunda lista.
+$$('[data-post]').forEach(btn=>btn.addEventListener('click',async()=>{loading(btn,true,btn.dataset.loading||'Processando...');try{const body=new URLSearchParams({csrfmiddlewaretoken:csrf()});const data=await request(btn.dataset.post,{method:'POST',body});toast(data.message,data.success?'success':'error');if(data.success&&btn.dataset.reload)setTimeout(()=>location.reload(),450)}catch(e){toast(e.message,'error')}finally{loading(btn,false)}}));
+
+
+const iboAuthModal=$('#iboAuthModal'),iboAuthForm=$('#iboAuthForm');
+let iboAuthQueue=[],iboAuthOnComplete=null;
+async function carregarCaptchaIbo(){const box=$('#iboCaptchaImage'),url=$('#iboCaptchaUrl').value;box.innerHTML='<span>Carregando...</span>';try{const data=await request(url);if(!data.success)throw new Error(data.message||'Falha ao gerar CAPTCHA.');box.innerHTML=data.svg||'';$('#iboCaptchaToken').value=data.token||'';$('#iboCaptchaValue').value='';$('#iboCaptchaValue').focus()}catch(err){box.innerHTML=`<span>${esc(err.message)}</span>`;toast(err.message,'error')}}
+async function abrirAuthIbo(item){iboAuthForm.reset();$('#iboCaptchaUrl').value=item.captcha_url||item.captchaUrl||'';$('#iboAuthUrl').value=item.auth_url||item.authUrl||'';$('#iboAuthDevice').textContent=`Dispositivo: ${item.nome||item.name||'IBO Player'}`;openModal(iboAuthModal);await carregarCaptchaIbo()}
+async function proximoAuthIbo(){if(!iboAuthQueue.length){closeModal(iboAuthModal);const done=iboAuthOnComplete;iboAuthOnComplete=null;if(done)await done();return}await abrirAuthIbo(iboAuthQueue.shift())}
+async function iniciarFilaAuthIbo(items,onComplete){iboAuthQueue=[...(items||[])];iboAuthOnComplete=onComplete||null;await proximoAuthIbo()}
+$$('[data-ibo-auth]').forEach(btn=>btn.addEventListener('click',()=>iniciarFilaAuthIbo([{nome:btn.dataset.name,captcha_url:btn.dataset.captchaUrl,auth_url:btn.dataset.authUrl}],()=>setTimeout(()=>location.reload(),350))));
+$('#iboReloadCaptcha')?.addEventListener('click',carregarCaptchaIbo);
+iboAuthForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#iboAuthUrl').value;loading(btn,true,'Autenticando...');try{const data=await request(url,{method:'POST',body:new FormData(iboAuthForm)});toast(data.message,data.success?'success':'error');if(data.success)await proximoAuthIbo();else await carregarCaptchaIbo()}catch(err){toast(err.message,'error');await carregarCaptchaIbo()}finally{loading(btn,false)}});
+
+const dModal=$('#deviceModal'),dForm=$('#deviceForm'),dProvider=$('#deviceProvider');
+function providerFields(){
+  if(!dProvider)return;
+  const slug=dProvider.value,provider=providerBySlug(slug),config=provider.campos||{};
+  $$('[data-device-field]').forEach(wrapper=>{
+    const name=wrapper.dataset.deviceField,field=config[name]||{},input=wrapper.querySelector(`[name="${name}"]`),label=wrapper.querySelector('[data-label]');
+    if(!input)return;
+    let show=field.mostrar!==false,required=Boolean(field.obrigatorio);
+    if(['fun_plays','ibo_player'].includes(slug)&&['mac_address','device_key'].includes(name)){show=true;required=true}
+    wrapper.classList.toggle('hidden',!show);input.disabled=!show;input.required=show&&required;
+    if(field.label&&label)label.textContent=field.label;
+    if(field.placeholder)input.placeholder=field.placeholder;
+  });
+  const help=$('#deviceKeyHelp');
+  if(help)help.textContent=slug==='ibo_player'?'Obrigatória para autenticar o IBO com CAPTCHA.':slug==='fun_plays'?'Obrigatória para autenticar e administrar o Fun Plays.':'Informe a Key somente quando o aplicativo solicitar.';
+}
+function editProtection(required){
+  const field=$('#editProtectionField'),input=$('#editProtectionCode');
+  if(!field||!input)return;
+  field.classList.toggle('hidden',!required);
+  input.disabled=!required;
+  input.required=Boolean(required);
+  if(!required)input.value='';
+}
+function accessModeFields(){
+  const mode=$('#accessMode')?.value||'m3u';
+  $$('[data-access-block]').forEach(block=>block.classList.toggle('hidden',block.dataset.accessBlock!==mode));
+}
+function resetDevice(){
+  dForm.reset();
+  $('#deviceId').value='';
+  $('#deviceTitle').textContent='Novo cadastro';
+  if($('#accessMode'))$('#accessMode').value='m3u';
+  editProtection(false);
+  accessModeFields();
+  providerFields();
+}
+dProvider?.addEventListener('change',providerFields);
+$('#accessMode')?.addEventListener('change',accessModeFields);
+$('[data-new-device]')?.addEventListener('click',()=>{
+  resetDevice();
+  if(PRESELECTED_CLIENT){
+    $('#deviceClient').value=String(PRESELECTED_CLIENT);
+    $('#deviceClient')?.dispatchEvent(new Event('change'));
+  }
+  openModal(dModal);
+});
+$$('[data-edit-device]').forEach(btn=>btn.addEventListener('click',async()=>{
+  resetDevice();
+  try{
+    const data=await request(btn.dataset.detailsUrl),d=data.integracao||{},l=data.lista||{};
+    $('#deviceId').value=d.id||btn.dataset.id||'';
+    $('#deviceName').value=d.nome_avulso||d.nome||'';
+    $('#deviceClient').value=d.cliente_id||'';
+    dProvider.value=d.provedor||'';
+    $('#deviceMac').value=d.mac_address||'';
+    $('#deviceKey').value=d.device_key||'';
+    $('#accessMode').value=d.modo_acesso||l.modo_envio||'m3u';
+    $('#accessM3uUrl').value=l.url_playlist||'';
+    $('#accessEpgUrl').value=l.epg_url||'';
+    $('#accessEditPassword').value=l.senha_edicao||'';
+    $('#accessXtreamDns').value=l.dns||'';
+    $('#accessUser').value=l.usuario_iptv||'';
+    $('#accessPassword').value=l.senha_iptv||'';
+    $('#partnerUser').value=l.usuario_iptv||'';
+    $('#partnerPassword').value=l.senha_iptv||'';
+    $('#partnerServerCode').value=l.codigo||'';
+    editProtection(Boolean(l.requer_codigo_edicao||l.protegida));
+    $('#deviceTitle').textContent='Editar cadastro';
+    providerFields();accessModeFields();openModal(dModal);
+  }catch(err){toast(err.message,'error')}
+}));
+$('#deviceClient')?.addEventListener('change',async e=>{
+  const option=e.target.selectedOptions[0];
+  if(!option?.value){
+    return;
+  }
+
+  if(!$('#deviceName').value.trim())$('#deviceName').value=option.textContent.trim();
+
+  const detailsUrl=option.dataset.detailsUrl;
+  if(!detailsUrl)return;
+
+  try{
+    const data=await request(detailsUrl);
+    const c=data.cliente||{};
+    const usuario=c.usuario_iptv||'';
+    const senha=c.senha_iptv||'';
+
+    // Mantém as mesmas credenciais prontas para os dois modos que usam
+    // usuário/senha. A troca de modo não obriga o operador a selecionar
+    // o cliente novamente.
+    $('#accessUser').value=usuario;
+    $('#accessPassword').value=senha;
+    $('#partnerUser').value=usuario;
+    $('#partnerPassword').value=senha;
+
+    if(usuario||senha){
+      toast('Usuário e senha do cliente carregados automaticamente.','success');
+    }else{
+      toast('Este cliente não possui usuário e senha IPTV cadastrados.','info');
+    }
+  }catch(err){
+    toast('Não foi possível carregar o usuário e a senha deste cliente.','error');
+  }
+});
+dForm?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=e.submitter;
+  loading(btn,true,'Salvando...');
+  try{
+    const data=await request(dForm.action,{method:'POST',body:new FormData(dForm)});
+    toast(data.message,data.success?'success':'error');
+    if(data.success){closeModal(dModal);setTimeout(()=>location.reload(),450)}
+  }catch(err){toast(err.message,'error')}
+  finally{loading(btn,false)}
+});
+$$('[data-toggle-password]').forEach(btn=>btn.addEventListener('click',()=>{const input=$(btn.dataset.togglePassword);if(!input)return;const show=input.type==='password';input.type=show?'text':'password';btn.textContent=show?'🙈':'👁'}));
+
+const pModal=$('#playlistModal'),pForm=$('#playlistForm');
+function mode(){const code=$('#playlistMode')?.value==='codigo';$('#playlistCodeField')?.classList.toggle('hidden',!code);$('#playlistDnsField')?.classList.toggle('hidden',code);$('#playlistUrlField')?.classList.toggle('hidden',code)}
+function protect(){$('#playlistPinField')?.classList.toggle('hidden',!$('#playlistProtected')?.checked)}
+$('#playlistMode')?.addEventListener('change',mode);$('#playlistProtected')?.addEventListener('change',protect);
+function resetPlaylist(){pForm.reset();$('#playlistIntegration').value='';$('#playlistCreateUrl').value='';$('#playlistId').value='';$('#playlistEditUrl').value='';$('#playlistTitle').textContent='Nova playlist';$('#playlistSubtitle').textContent='Salve como rascunho ou envie ao aplicativo.';$('#saveUpload').classList.remove('hidden');mode();protect()}
+$$('[data-new-playlist]').forEach(btn=>btn.addEventListener('click',()=>{resetPlaylist();$('#playlistIntegration').value=btn.dataset.newPlaylist||'';$('#playlistCreateUrl').value=btn.dataset.createUrl||'';openModal(pModal)}));
+$$('[data-edit-playlist]').forEach(btn=>btn.addEventListener('click',async()=>{resetPlaylist();try{const data=await request(btn.dataset.detailsUrl);const p=data.playlist||{};$('#playlistId').value=p.id||btn.dataset.id||'';$('#playlistEditUrl').value=btn.dataset.editUrl||'';$('#playlistName').value=p.nome||'';$('#playlistClient').value=p.cliente_id||'';$('#playlistUser').value=p.usuario_iptv||'';$('#playlistPassword').value=p.senha_iptv||'';$('#playlistDns').value=p.dns||'';$('#playlistCode').value=p.codigo||'';$('#playlistUrl').value=p.url_playlist||'';$('#playlistMode').value=p.modo_envio||'url';$('#playlistProtected').checked=Boolean(p.protegida);$('#playlistPin').value=p.pin_protecao||'';$('#playlistTitle').textContent='Editar playlist';$('#playlistSubtitle').textContent=p.remote_id?`ID remoto: ${p.remote_id}`:'Playlist ainda não enviada ao painel.';$('#saveUpload').classList.add('hidden');mode();protect();openModal(pModal)}catch(err){toast(err.message,'error')}}));
+$('#playlistClient')?.addEventListener('change',async e=>{const option=e.target.selectedOptions[0];if(!option?.value||!option.dataset.detailsUrl)return;try{const data=await request(option.dataset.detailsUrl);const c=data.cliente||{};$('#playlistUser').value=c.usuario_iptv||'';$('#playlistPassword').value=c.senha_iptv||''}catch(err){toast('Não foi possível carregar as credenciais do cliente.','error')}});
+pForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,id=$('#playlistId').value,url=id?$('#playlistEditUrl').value:$('#playlistCreateUrl').value;if(!url)return toast('Rota do formulário não encontrada.','error');const fd=new FormData(pForm);fd.set('protegida',$('#playlistProtected').checked?'1':'');if(!id&&btn.value==='upload')fd.set('subir_agora','1');loading(btn,true,btn.value==='upload'?'Enviando...':'Salvando...');try{const data=await request(url,{method:'POST',body:fd});toast(data.message,data.success?'success':'error');if(data.success){closeModal(pModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const replaceModal=$('#replaceModal'),replaceForm=$('#replaceForm');
+$$('[data-replace-playlist]').forEach(btn=>btn.addEventListener('click',()=>{replaceForm.reset();$('#replaceUrl').value=btn.dataset.url||'';$('#replaceName').textContent=btn.dataset.name||'Playlist';const ibo=(btn.dataset.provider||'')==='ibo_player';$('#replaceTitle').textContent=ibo?'Atualizar no aplicativo':'Substituir no aplicativo';const protectedNow=!ibo&&btn.dataset.protected==='true';$('#replacePinField').classList.toggle('hidden',!protectedNow);$('#replacePin').disabled=!protectedNow;openModal(replaceModal)}));
+replaceForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#replaceUrl').value;if(!url)return toast('Rota de substituição não encontrada.','error');if(!$('#confirmReplace').checked)return toast('Confirme a substituição.','error');loading(btn,true,'Substituindo...');try{const data=await request(url,{method:'POST',body:new FormData(replaceForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(replaceModal);setTimeout(()=>location.reload(),550)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const delModal=$('#deleteModal'),delForm=$('#deleteForm');
+$$('[data-delete]').forEach(btn=>btn.addEventListener('click',()=>{delForm.reset();$('#deleteUrl').value=btn.dataset.url||'';$('#deleteName').textContent=btn.dataset.name||'';$('#deletePinField').classList.toggle('hidden',btn.dataset.protected!=='true');openModal(delModal)}));
+delForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#deleteUrl').value;loading(btn,true,'Excluindo...');try{const data=await request(url,{method:'POST',body:new FormData(delForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(delModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const deleteDeviceModal=$('#deleteDeviceModal'),deleteDeviceForm=$('#deleteDeviceForm');
+$$('[data-delete-device]').forEach(btn=>btn.addEventListener('click',()=>{deleteDeviceForm.reset();$('#deleteDeviceUrl').value=btn.dataset.url||'';$('#deleteDeviceName').textContent=btn.dataset.name||'Cadastro';const count=Number(btn.dataset.playlists||0);$('#deleteDeviceMessage').textContent=count?'Este cadastro possui dados de lista vinculados, que também serão removidos.':'Este cadastro possui somente o dispositivo.';openModal(deleteDeviceModal)}));
+deleteDeviceForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter,url=$('#deleteDeviceUrl').value;if(!$('#confirmDeleteDevice').checked)return toast('Confirme a exclusão do cadastro.','error');loading(btn,true,'Excluindo...');try{const data=await request(url,{method:'POST',body:new FormData(deleteDeviceForm)});toast(data.message,data.success?'success':'error');if(data.success){closeModal(deleteDeviceModal);setTimeout(()=>location.reload(),450)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const hModal=$('#historyModal');
+$$('[data-history]').forEach(btn=>btn.addEventListener('click',async()=>{const content=$('#historyContent');content.innerHTML='<div class="pl-empty">Carregando...</div>';openModal(hModal);try{const data=await request(btn.dataset.history);const items=data.historico||[];content.innerHTML=items.length?items.map(item=>`<article class="pl-history-item"><div class="pl-history-head"><strong>${esc(item.acao)}${item.playlist?' · '+esc(item.playlist):''}</strong><span class="pl-time">${esc(item.criado_em)}</span></div><p>${esc(item.mensagem||'Sem mensagem.')}</p></article>`).join(''):'<div class="pl-empty"><strong>Sem histórico</strong>As próximas operações aparecerão aqui.</div>'}catch(err){content.innerHTML=`<div class="pl-empty">${esc(err.message)}</div>`}}));
+
+// Ações da linha não devem expandir o dispositivo.
+$$('[data-device-actions] button').forEach(btn=>btn.addEventListener('click',e=>e.stopPropagation()));
+$$('[data-device-more]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();const actions=btn.closest('[data-device-actions]');$$('[data-device-actions].menu-open').forEach(x=>{if(x!==actions)x.classList.remove('menu-open')});const open=actions?.classList.toggle('menu-open');btn.setAttribute('aria-expanded',String(Boolean(open)))}));
+document.addEventListener('click',e=>{if(!e.target.closest('[data-device-actions]'))$$('[data-device-actions].menu-open').forEach(x=>{x.classList.remove('menu-open');x.querySelector('[data-device-more]')?.setAttribute('aria-expanded','false')})});
+
+const configModal=$('#configModal'),configForm=$('#configForm');
+$('[data-open-config]')?.addEventListener('click',()=>openModal(configModal));
+configForm?.addEventListener('submit',async e=>{e.preventDefault();const btn=e.submitter;loading(btn,true,'Salvando...');try{const data=await request(configForm.action,{method:'POST',body:new FormData(configForm)});toast(data.message,data.success?'success':'error');if(data.success){$('#defaultProtectionCode').value='';closeModal(configModal);setTimeout(()=>location.reload(),420)}}catch(err){toast(err.message,'error')}finally{loading(btn,false)}});
+
+const detailsModal=$('#detailsModal'),detailsContent=$('#detailsContent');
+function detailItem(label,value,wide=false){return `<div class="pl-detail-item${wide?' pl-detail-wide':''}"><small>${esc(label)}</small><strong>${esc(value||'Não informado')}</strong></div>`}
+async function mostrarDetalhes(url,tipo){
+  detailsContent.innerHTML='<div class="pl-empty">Carregando...</div>';
+  $('#detailsTitle').textContent='Detalhes do cadastro';
+  openModal(detailsModal);
+  try{
+    const data=await request(url),d=data.integracao||{},l=data.lista||null;
+    let acesso='<div class="pl-empty"><strong>Lista vazia</strong>Este cadastro possui somente o dispositivo.</div>';
+    if(l){
+      const modo=(d.modo_acesso||l.modo_envio||'m3u').toLowerCase();
+      if(modo==='m3u'){
+        acesso=`<div class="pl-detail-grid">${detailItem('Modo de acesso','Lista M3U')}${detailItem('URL M3U',l.url_playlist,true)}${detailItem('URL do EPG',l.epg_url,true)}${detailItem('Senha de edição',l.senha_edicao)}</div>`;
+      }else if(modo==='parceria'){
+        acesso=`<div class="pl-detail-grid">${detailItem('Modo de acesso','Parceria')}${detailItem('Usuário',l.usuario_iptv)}${detailItem('Senha',l.senha_iptv)}${detailItem('Código do servidor',l.codigo,true)}</div>`;
+      }else{
+        acesso=`<div class="pl-detail-grid">${detailItem('Modo de acesso','Xtream Code')}${detailItem('DNS / servidor',l.dns,true)}${detailItem('Usuário',l.usuario_iptv)}${detailItem('Senha',l.senha_iptv)}</div>`;
+      }
+    }
+    detailsContent.innerHTML=`<div class="pl-detail-grid">${detailItem('Nome',d.nome)}${detailItem('Cliente',d.cliente)}${detailItem('Aplicativo',d.provedor_nome)}${detailItem('Status',d.status)}${detailItem('MAC',d.mac_address)}${detailItem('Device Key',d.device_key)}${detailItem('Última situação',d.ultima_mensagem,true)}</div><div class="pl-section" style="margin-top:14px"><h3 class="pl-section-title">Dados da lista</h3>${acesso}</div>`;
+  }catch(err){detailsContent.innerHTML=`<div class="pl-empty">${esc(err.message)}</div>`}
+}
+$$('[data-device-details]').forEach(btn=>btn.addEventListener('click',()=>mostrarDetalhes(btn.dataset.detailsUrl,'device')));
+$$('[data-playlist-details]').forEach(btn=>btn.addEventListener('click',()=>mostrarDetalhes(btn.dataset.detailsUrl,'playlist')));
+
+const bulkDnsModal=$('#bulkDnsModal'),bulkDnsForm=$('#bulkDnsForm');
+function playlistsSelecionadas(){return $$('.pl-bulk-check:checked').map(x=>Number(x.value)).filter(Boolean)}
+function atualizarContagemBulk(){$('#bulkDnsCount').textContent=String(playlistsSelecionadas().length)}
+$$('.pl-bulk-check').forEach(x=>x.addEventListener('change',atualizarContagemBulk));
+$('[data-open-bulk-dns]')?.addEventListener('click',()=>{const ids=playlistsSelecionadas();if(!ids.length)return toast('Selecione as playlists marcando o ✓ ao lado de cada lista.','error');atualizarContagemBulk();openModal(bulkDnsModal)});
+let bulkRetry=0;
+async function executarBulkDns(){const ids=playlistsSelecionadas();if(!ids.length)return toast('Nenhuma playlist selecionada.','error');const btn=bulkDnsForm.querySelector('[type="submit"]'),fd=new FormData(bulkDnsForm);fd.set('playlist_ids',JSON.stringify(ids));loading(btn,true,'Aplicando...');try{const data=await request(bulkDnsForm.action,{method:'POST',body:fd});toast(data.message,data.falhas?.length?'info':'success');if(data.auth_required?.length&&bulkRetry<3){bulkRetry++;closeModal(bulkDnsModal);await iniciarFilaAuthIbo(data.auth_required,executarBulkDns);return}bulkRetry=0;closeModal(bulkDnsModal);setTimeout(()=>location.reload(),650)}catch(err){toast(err.message,'error')}finally{loading(btn,false)}}
+bulkDnsForm?.addEventListener('submit',e=>{e.preventDefault();bulkRetry=0;executarBulkDns()});
+
+if(AUTO_OPEN_DEVICE){setTimeout(()=>{resetDevice();if(PRESELECTED_CLIENT)$('#deviceClient').value=String(PRESELECTED_CLIENT);$('#deviceClient')?.dispatchEvent(new Event('change'));openModal(dModal)},80)}
+
+providerFields();accessModeFields();mode();protect();
+})();
+</script>
+
+
+<style>
+/* ==========================================================
+   FLUXO NATURAL DA PÁGINA
+   Uma única rolagem vertical: a do navegador. A listagem pode
+   rolar apenas na horizontal em telas estreitas.
+   ========================================================== */
+.pl-page{
+    display:block !important;
+    min-height:0 !important;
+    height:auto !important;
+    max-height:none !important;
+    overflow:visible !important;
+    padding-bottom:18px !important;
+}
+
+.pl-hero{
+    position:relative !important;
+    inset:auto !important;
+    z-index:20;
+    margin-bottom:10px !important;
+}
+
+.pl-device-list{
+    display:block !important;
+    width:100%;
+    height:auto !important;
+    min-height:0 !important;
+    max-height:none !important;
+    overflow:visible !important;
+    padding:2px 0 18px;
+    overscroll-behavior:auto;
+    scrollbar-gutter:auto;
+}
+
+@media(max-width:760px){
+    .pl-page{padding:6px 6px 16px !important}
+    .pl-hero{margin-bottom:7px !important;padding:12px !important;border-radius:14px !important}
+    .pl-kicker{display:none}
+    .pl-title{font-size:1.18rem}
+    .pl-sub{margin-top:4px;font-size:.76rem;line-height:1.35}
+    .pl-hero-actions{gap:6px}
+    .pl-search{min-height:38px;border-radius:10px}
+    .pl-search input{padding:8px 10px;font-size:.82rem}
+    .pl-search button{padding:0 12px}
+    .pl-hero-actions>.pl-btn{min-height:38px;padding:7px 10px;font-size:.76rem}
+    .pl-device-list{padding:1px 0 max(14px,env(safe-area-inset-bottom))}
+}
+</style>
+
+
+<style id="pl-device-row-layout">
+/* Tabela real, cabeçalho fixo e rolagem responsiva */
+.pl-table-shell{
+    width:100%;
+    height:auto!important;
+    min-height:0;
+    max-height:none!important;
+    overflow-x:auto!important;
+    overflow-y:visible!important;
+    border:1px solid var(--pl-border);
+    border-radius:16px;
+    background:var(--pl-card);
+    box-shadow:var(--pl-shadow-soft);
+    scrollbar-gutter:auto;
+    overscroll-behavior-x:contain;
+    overscroll-behavior-y:auto;
+    -webkit-overflow-scrolling:touch;
+}
+.pl-device-table{width:100%;min-width:0;border-collapse:separate;border-spacing:0;table-layout:fixed;background:var(--pl-card)}
+.pl-device-table thead{position:static;z-index:auto}
+.pl-device-table th{padding:11px 10px;border-bottom:1px solid var(--pl-border);background:var(--pl-bg);color:var(--pl-muted);font-size:.68rem;font-weight:850;text-align:left;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.pl-device-table th:first-child,.pl-device-table td:first-child{padding-left:14px}
+.pl-device-table th:last-child,.pl-device-table td:last-child{padding-right:14px}
+.pl-device-table tbody.pl-device>tr.pl-device-head>td{padding:10px;border-bottom:1px solid var(--pl-border);background:var(--pl-card);vertical-align:middle;overflow:visible}
+.pl-device-table tbody.pl-device>tr.pl-device-head{cursor:pointer}
+.pl-device-table tbody.pl-device>tr.pl-device-head:hover>td{background:color-mix(in srgb,var(--pl-primary) 4%,var(--pl-card))}
+.pl-device-table tbody.pl-device.open>tr.pl-device-head>td{background:color-mix(in srgb,var(--pl-primary) 7%,var(--pl-card))}
+.pl-device-table tbody.pl-device>tr.pl-device-expanded{display:none}
+.pl-device-table tbody.pl-device.open>tr.pl-device-expanded{display:table-row}
+.pl-device-table .pl-device-body{display:table-cell!important;width:auto!important;max-width:none!important;padding:12px 14px 14px;border-bottom:1px solid var(--pl-border);background:var(--pl-bg);overflow:visible}
+.pl-device-table tbody.pl-device:last-of-type>tr.pl-device-head>td,.pl-device-table tbody.pl-device:last-of-type .pl-device-body{border-bottom:0}
+.pl-toggle-cell{width:58px;text-align:center}.pl-name-cell{width:21%}.pl-mac-cell{width:15%}.pl-provider-cell{width:14%}.pl-status-cell{width:18%}.pl-actions-cell{width:32%;text-align:right}
+.pl-device-name{display:flex;align-items:center;gap:10px;min-width:0}.pl-device-name .pl-avatar{width:36px;height:36px;border-radius:10px}.pl-device-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.84rem}
+.pl-device-mac,.pl-device-provider{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.76rem}.pl-provider-pill{display:inline-flex;max-width:100%;padding:4px 7px;overflow:hidden;border:1px solid var(--pl-border);border-radius:999px;background:var(--pl-hover);font-size:.69rem;font-weight:750;text-overflow:ellipsis;white-space:nowrap}
+.pl-device-message{min-width:0}.pl-device-message .pl-muted{display:-webkit-box;overflow:hidden;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:.71rem}
+.pl-device-actions{position:relative;display:flex;align-items:center;justify-content:flex-end;min-width:0;overflow:visible}.pl-device-actions-main{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;width:100%;padding:3px;overflow:visible}
+.pl-device-actions .pl-btn{min-height:34px;padding:6px 8px;border-width:1px;border-radius:8px;font-size:.69rem;transform:none!important;overflow:visible;box-shadow:0 0 0 1px transparent}.pl-device-actions .pl-btn:hover{transform:none!important;box-shadow:0 2px 8px color-mix(in srgb,var(--pl-text) 10%,transparent)}
+.pl-device-actions .pl-btn:focus-visible,.pl-actions .pl-btn:focus-visible,.pl-toggle:focus-visible{outline:3px solid var(--pl-primary-soft);outline-offset:2px}.pl-device-actions-menu{z-index:60}.pl-mobile-more,.pl-device-actions-menu,.pl-mobile-device-meta{display:none}
+.pl-playlist-heading{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;padding:2px 2px 8px;border-bottom:1px solid var(--pl-border)}.pl-playlist-heading span{color:var(--pl-muted);font-size:.73rem}.pl-empty-row td{padding:14px;background:var(--pl-card)}
+@media(max-width:1450px){.pl-device-actions .pl-btn b{display:none}.pl-device-actions .pl-btn{width:34px;padding:0}}
+@media(max-width:900px){.pl-action-mobile-hide{display:none!important}.pl-mobile-more{display:inline-flex!important}.pl-device-actions-menu{position:absolute;top:40px;right:0;width:215px;padding:7px;border:1px solid var(--pl-border);border-radius:12px;background:var(--pl-card);box-shadow:var(--pl-shadow-hard)}.pl-device-actions.menu-open .pl-device-actions-menu{display:grid;gap:5px}.pl-device-actions-menu .pl-btn{width:100%;height:auto;justify-content:flex-start;padding:8px 10px}}
+@media(max-width:760px){
+    .pl-table-shell{overflow-x:auto!important;overflow-y:visible!important;border-radius:13px;-webkit-overflow-scrolling:touch;scrollbar-gutter:auto}
+    .pl-device-table{width:max-content;min-width:1050px;table-layout:fixed}
+    .pl-device-table th{padding:10px 9px;font-size:.65rem}
+    .pl-device-table tbody.pl-device>tr.pl-device-head>td{padding:9px}
+    .pl-toggle-cell{width:54px}.pl-name-cell{width:220px}.pl-mac-cell{width:165px}.pl-provider-cell{width:165px}.pl-status-cell{width:220px}.pl-actions-cell{width:320px}
+    .pl-device-actions-main{flex-wrap:nowrap;min-width:max-content}.pl-device-actions .pl-btn{flex:0 0 auto;width:auto!important;min-width:36px;min-height:38px;padding:7px 9px}.pl-device-actions .pl-btn b{display:inline}
+    .pl-action-mobile-hide{display:inline-flex!important}.pl-mobile-more{display:none!important}.pl-device-actions-menu{display:none!important}
+    .pl-device-table .pl-device-body{padding:9px}.pl-playlists{min-width:990px}.pl-playlist{grid-template-columns:minmax(260px,1.35fr) minmax(170px,.55fr) minmax(190px,.65fr) minmax(300px,auto)}.pl-playlist>.pl-actions{display:flex;flex-wrap:nowrap;justify-content:flex-end;min-width:max-content}
+}
+@media(max-width:430px){.pl-device-table{min-width:1010px}.pl-actions-cell{width:300px}}
+</style>
+
+
+<style id="pl-table-critical-fix">
+/* Correção crítica: restaura o comportamento nativo da tabela. */
+.pl-table-shell{
+  overflow-x:auto!important;
+  overflow-y:visible!important;
+}
+.pl-device-table{
+  display:table!important;
+  width:100%!important;
+  border-collapse:separate!important;
+  border-spacing:0!important;
+}
+.pl-device-table thead{display:table-header-group!important}
+.pl-device-table tbody.pl-device{display:table-row-group!important}
+.pl-device-table tr.pl-device-head,
+.pl-device-table tr.pl-device-expanded{display:table-row!important}
+.pl-device-table tr.pl-device-expanded{display:none!important}
+.pl-device-table tbody.pl-device.open tr.pl-device-expanded{display:table-row!important}
+.pl-device-table th,
+.pl-device-table td{display:table-cell!important}
+.pl-device-table .pl-device-body{display:table-cell!important}
+
+/* Evita linhas gigantes e mantém tudo alinhado. */
+.pl-device-table tbody.pl-device>tr.pl-device-head>td{
+  height:auto!important;
+  min-height:0!important;
+}
+.pl-device-actions-main{
+  flex-wrap:nowrap!important;
+}
+.pl-device-actions .pl-btn{
+  flex:0 0 auto!important;
+  outline-offset:2px!important;
+}
+
+@media (max-width:1450px){
+  .pl-device-actions-main{flex-wrap:wrap!important}
+}
+
+@media (max-width:760px){
+  .pl-table-shell{
+    overflow-x:auto!important;
+    overflow-y:visible!important;
+    -webkit-overflow-scrolling:touch;
+  }
+  .pl-device-table{
+    display:table!important;
+    width:1050px!important;
+    min-width:1050px!important;
+    table-layout:fixed!important;
+  }
+  .pl-device-table tbody.pl-device{display:table-row-group!important}
+  .pl-device-table tr.pl-device-head{display:table-row!important}
+  .pl-device-table th,
+  .pl-device-table td{display:table-cell!important}
+  .pl-device-actions-main{
+    flex-wrap:nowrap!important;
+    min-width:max-content!important;
+  }
+}
+</style>
+
+<style id="pl-actions-polished">
+/* Ações compactas e organizadas: duas ações principais + menu secundário. */
+.pl-actions-cell{
+  overflow:visible!important;
+  white-space:nowrap;
+}
+
+.pl-device-actions{
+  position:relative!important;
+  display:flex!important;
+  justify-content:flex-end!important;
+  width:100%;
+  overflow:visible!important;
+}
+
+.pl-device-actions-main{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  flex-wrap:nowrap!important;
+  gap:7px!important;
+  width:auto!important;
+  min-width:0!important;
+  padding:4px!important;
+  border:1px solid var(--pl-border);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--pl-bg) 72%,var(--pl-card));
+}
+
+.pl-device-actions-main .pl-btn{
+  width:auto!important;
+  min-width:0!important;
+  min-height:36px!important;
+  padding:7px 11px!important;
+  border-radius:9px!important;
+  font-size:.73rem!important;
+  line-height:1!important;
+  box-shadow:none!important;
+}
+
+.pl-device-actions-main .pl-btn span{
+  display:grid;
+  place-items:center;
+  width:17px;
+  height:17px;
+  font-size:.9rem;
+}
+
+.pl-device-actions-main .pl-btn b{
+  display:inline!important;
+  font-weight:800;
+}
+
+.pl-actions-more{
+  padding-inline:9px!important;
+}
+
+.pl-device-actions-menu{
+  position:absolute!important;
+  top:calc(100% + 8px)!important;
+  right:3px!important;
+  z-index:200!important;
+  display:none!important;
+  width:290px!important;
+  padding:7px!important;
+  border:1px solid var(--pl-border)!important;
+  border-radius:14px!important;
+  background:var(--pl-card)!important;
+  box-shadow:0 18px 45px rgba(15,23,42,.20)!important;
+  white-space:normal;
+}
+
+.pl-device-actions.menu-open .pl-device-actions-menu{
+  display:grid!important;
+  gap:3px!important;
+}
+
+.pl-action-menu-item{
+  width:100%;
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+  padding:9px 10px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--pl-text);
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+}
+
+.pl-action-menu-item:hover,
+.pl-action-menu-item:focus-visible{
+  outline:0;
+  background:var(--pl-hover);
+}
+
+.pl-action-menu-icon{
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border:1px solid var(--pl-border);
+  border-radius:9px;
+  background:var(--pl-bg);
+  font-size:.9rem;
+}
+
+.pl-action-menu-item strong,
+.pl-action-menu-item small{
+  display:block;
+}
+
+.pl-action-menu-item strong{
+  font-size:.78rem;
+  line-height:1.2;
+}
+
+.pl-action-menu-item small{
+  margin-top:3px;
+  color:var(--pl-muted);
+  font-size:.67rem;
+  line-height:1.25;
+}
+
+.pl-action-menu-highlight .pl-action-menu-icon{
+  border-color:color-mix(in srgb,var(--pl-primary) 32%,var(--pl-border));
+  background:var(--pl-primary-soft);
+  color:var(--pl-primary);
+}
+
+.pl-action-menu-separator{
+  height:1px;
+  margin:4px 5px;
+  background:var(--pl-border);
+}
+
+.pl-action-menu-danger{color:var(--pl-danger)}
+.pl-action-menu-danger:hover,
+.pl-action-menu-danger:focus-visible{
+  background:color-mix(in srgb,var(--pl-danger) 9%,var(--pl-card));
+}
+.pl-action-menu-danger .pl-action-menu-icon{
+  border-color:color-mix(in srgb,var(--pl-danger) 28%,var(--pl-border));
+  background:color-mix(in srgb,var(--pl-danger) 9%,var(--pl-card));
+}
+.pl-action-menu-danger small{color:color-mix(in srgb,var(--pl-danger) 70%,var(--pl-muted))}
+
+@media(max-width:1180px){
+  .pl-device-actions-main .pl-btn b{display:none!important}
+  .pl-device-actions-main .pl-btn{width:36px!important;padding:0!important}
+  .pl-device-actions-main{gap:5px!important}
+}
+
+@media(max-width:760px){
+  .pl-device-actions-main .pl-btn b{display:inline!important}
+  .pl-device-actions-main .pl-btn{width:auto!important;padding:7px 10px!important}
+  .pl-device-actions-menu{
+    position:fixed!important;
+    top:auto!important;
+    right:10px!important;
+    bottom:10px!important;
+    left:10px!important;
+    width:auto!important;
+    max-height:min(72dvh,520px);
+    overflow-y:auto;
+    border-radius:16px!important;
+  }
+}
+</style>
+<style id="pl-unified-cadastro-final">
+/* Cadastro unificado: dispositivo e lista são uma única linha visual. */
+#deviceModal .pl-access-fields.full{grid-column:1/-1}
+#deviceModal .pl-access-fields>.pl-grid{margin:0}
+.pl-access-cell{width:13%}
+.pl-toggle-cell{width:52px}
+.pl-name-cell{width:19%}
+.pl-mac-cell{width:14%}
+.pl-provider-cell{width:13%}
+.pl-status-cell{width:19%}
+.pl-actions-cell{width:22%}
+.pl-access-badge,.pl-access-empty{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border-radius:999px;font-size:.69rem;font-weight:800;white-space:nowrap}
+.pl-access-badge{border:1px solid color-mix(in srgb,var(--pl-primary) 28%,var(--pl-border));background:var(--pl-primary-soft);color:var(--pl-primary)}
+.pl-access-empty{border:1px dashed var(--pl-border);background:var(--pl-hover);color:var(--pl-muted)}
+.pl-no-list-dot{display:inline-grid;place-items:center;width:27px;height:27px;border:1px dashed var(--pl-border);border-radius:8px;color:var(--pl-muted);font-size:1.1rem}
+.pl-device-table tbody.pl-device>tr.pl-device-head{cursor:default!important}
+.pl-device-table tbody.pl-device>tr.pl-device-head>td{border-bottom:1px solid var(--pl-border)!important}
+@media(max-width:760px){
+  .pl-device-table{width:1160px!important;min-width:1160px!important}
+  .pl-toggle-cell{width:52px}.pl-name-cell{width:220px}.pl-mac-cell{width:170px}.pl-provider-cell{width:160px}.pl-access-cell{width:150px}.pl-status-cell{width:220px}.pl-actions-cell{width:188px}
+}
+</style>
+
+{% endblock %}

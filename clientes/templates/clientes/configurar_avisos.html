@@ -1,0 +1,1357 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configurar Avisos{% endblock %}
+
+{% block content %}
+<style>
+    /* ===== CONTAINER PRINCIPAL ===== */
+    .avisos-container {
+        max-width: 100%;
+        padding: 1.5rem 2rem;
+    }
+    
+    /* ===== CABEÇALHO ===== */
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+        background: var(--bg-card);
+        padding: 1.5rem 2rem;
+        border-radius: 20px;
+        border: 2px solid var(--border);
+        box-shadow: var(--shadow-soft);
+    }
+    
+    .page-header h1 {
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0;
+    }
+    
+    .page-header h1 i {
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 2.2rem;
+    }
+    
+    /* ===== BOTÕES ===== */
+    .btn {
+        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.3s;
+        text-decoration: none;
+        white-space: nowrap;
+        justify-content: center;
+    }
+    
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary), var(--primary-light));
+        color: white;
+        box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 30%, transparent);
+    }
+    
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px color-mix(in srgb, var(--primary) 50%, transparent);
+    }
+    
+    .btn-success {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+    }
+    
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5);
+    }
+    
+    .btn-outline {
+        background: var(--bg-card);
+        border: 2px solid var(--border);
+        color: var(--text-primary);
+    }
+    
+    .btn-outline:hover {
+        border-color: var(--primary);
+        background: var(--bg-hover);
+    }
+    
+    /* ===== GRID DE CARDS ===== */
+    .cards-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        align-items: start;
+    }
+    
+    /* ===== CARDS ===== */
+    .card {
+        background: var(--bg-card);
+        border: 2px solid var(--border);
+        border-radius: 20px;
+        padding: 1.5rem;
+        box-shadow: var(--shadow-soft);
+    }
+    
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--border);
+    }
+    
+    .card-header h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin: 0;
+    }
+    
+    .card-header h2 i {
+        color: var(--primary);
+    }
+    
+    .card-badge {
+        background: var(--primary);
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    /* ===== LISTA DE AVISOS ===== */
+    #lista-avisos {
+        max-height: 500px;
+        overflow-y: auto;
+        padding-right: 0.3rem;
+    }
+    
+    #lista-avisos::-webkit-scrollbar {
+        width: 5px;
+    }
+    
+    #lista-avisos::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    
+    #lista-avisos::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+    }
+    
+    .aviso-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.4rem;
+        background: var(--bg-hover);
+        border-radius: 12px;
+        border: 2px solid transparent;
+        cursor: grab;
+        transition: all 0.2s;
+    }
+    
+    .aviso-item:hover {
+        border-color: var(--primary-light);
+        background: var(--bg-card);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+    }
+    
+    .aviso-item.dragging {
+        opacity: 0.4;
+        transform: scale(0.95);
+    }
+    
+    .aviso-item.aviso-inativo {
+        opacity: 0.5;
+    }
+    
+    .aviso-icone {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        color: white;
+        flex-shrink: 0;
+    }
+    
+    .aviso-info {
+        flex: 1;
+        min-width: 0;
+    }
+    
+    .aviso-titulo {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        margin-bottom: 0.2rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .aviso-meta {
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+    }
+    
+    .aviso-meta span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.2rem;
+        background: var(--bg-card);
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+    }
+    
+    .aviso-actions {
+        display: flex;
+        gap: 0.2rem;
+        flex-shrink: 0;
+    }
+    
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        font-size: 0.85rem;
+    }
+    
+    .btn-icon:hover {
+        background: var(--primary-light);
+        color: white;
+    }
+    
+    .btn-icon.delete:hover {
+        background: #ef4444;
+        color: white;
+    }
+    
+    /* ===== ESTADO VAZIO ===== */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: var(--text-muted);
+    }
+    
+    .empty-state i {
+        font-size: 3.5rem;
+        display: block;
+        margin-bottom: 0.8rem;
+        opacity: 0.2;
+    }
+    
+    /* ===== FORMULÁRIO CONFIG ===== */
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 600;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.4rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    
+    .form-group input,
+    .form-group textarea,
+    .form-group select {
+        width: 100%;
+        padding: 0.75rem 0.9rem;
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        background: var(--bg-card);
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        box-sizing: border-box;
+        transition: all 0.3s;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .form-group input:focus,
+    .form-group textarea:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    
+    .form-hint {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+        display: block;
+    }
+    
+    .config-preview {
+        background: rgba(37, 211, 102, 0.06);
+        border: 2px solid rgba(37, 211, 102, 0.15);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .btn-whatsapp {
+        background: #25D366;
+        color: white;
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .btn-whatsapp:hover {
+        background: #1da851;
+    }
+    
+    /* ========================================== */
+    /* MODAL - TOTALMENTE REFEITO                */
+    /* ========================================== */
+    body.modal-aberto {
+        overflow: hidden !important;
+    }
+    
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(6px);
+        z-index: 99999;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 20px;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .modal-overlay.active {
+        display: block;
+    }
+    
+    .modal-dialog {
+        background: var(--bg-card);
+        border-radius: 20px;
+        width: 100%;
+        max-width: 750px;
+        margin: 20px auto;
+        box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+        animation: modalIn 0.3s ease;
+        pointer-events: auto;
+    }
+    
+    @keyframes modalIn {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.2rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        background: color-mix(in srgb, var(--primary) 7%, var(--bg-card));
+        border-radius: 20px 20px 0 0;
+    }
+    
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    
+    .modal-close {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 2px solid var(--border);
+        background: var(--bg-card);
+        cursor: pointer;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+    
+    .modal-close:hover {
+        background: #ef4444;
+        color: white;
+        border-color: #ef4444;
+    }
+    
+    .modal-body {
+        padding: 1.5rem;
+    }
+    
+    /* BOTÕES AGORA DENTRO DO MODAL-BODY, NO FINAL DO CONTEÚDO */
+    .modal-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: flex-end;
+        margin-top: 1.5rem;
+        padding-top: 1.2rem;
+        border-top: 1px solid var(--border);
+    }
+    
+    /* ===== ÍCONES SUGERIDOS ===== */
+    .icones-sugeridos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        margin-top: 0.4rem;
+    }
+    
+    .icone-sugestao {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        border: 2px solid var(--border);
+        background: var(--bg-card);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        transition: all 0.15s;
+    }
+    
+    .icone-sugestao:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: color-mix(in srgb, var(--primary) 8%, transparent);
+    }
+    
+    .icone-sugestao.selecionado {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: white;
+    }
+    
+    /* ===== FORMULÁRIO DO MODAL ===== */
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    .form-check {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0;
+    }
+    
+    .form-check input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--primary);
+        flex-shrink: 0;
+    }
+    
+    .form-check label {
+        cursor: pointer;
+        font-size: 0.8rem;
+        margin: 0;
+        font-weight: 500;
+    }
+    
+    .section-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin: 1.2rem 0 0.8rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    
+    .section-title i {
+        color: var(--primary);
+    }
+    
+    /* ===== TOAST ===== */
+    .toast-custom {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 999999;
+        padding: 0.8rem 1.2rem;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: white;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        animation: slideUp 0.3s ease;
+        transition: opacity 0.3s, transform 0.3s;
+    }
+    
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    /* ========================================== */
+    /* RESPONSIVO - CELULAR                      */
+    /* ========================================== */
+    @media (max-width: 1024px) {
+        .cards-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .modal-dialog {
+            max-width: 95%;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .avisos-container {
+            padding: 0.8rem;
+        }
+        
+        .page-header {
+            padding: 1rem;
+            border-radius: 16px;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .page-header h1 {
+            font-size: 1.3rem;
+        }
+        
+        .page-header h1 i {
+            font-size: 1.6rem;
+        }
+        
+        .card {
+            padding: 1rem;
+            border-radius: 16px;
+        }
+        
+        .card-header h2 {
+            font-size: 1rem;
+        }
+        
+        .btn {
+            padding: 0.65rem 1.2rem;
+            font-size: 0.8rem;
+            border-radius: 10px;
+        }
+        
+        /* Lista de avisos mobile */
+        #lista-avisos {
+            max-height: 400px;
+        }
+        
+        .aviso-item {
+            padding: 0.7rem 0.8rem;
+            gap: 0.5rem;
+        }
+        
+        .aviso-icone {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .aviso-titulo {
+            font-size: 0.8rem;
+        }
+        
+        .aviso-meta {
+            font-size: 0.65rem;
+        }
+        
+        .aviso-actions {
+            flex-direction: column;
+            gap: 0.15rem;
+        }
+        
+        .btn-icon {
+            width: 28px;
+            height: 28px;
+            font-size: 0.75rem;
+        }
+        
+        /* Modal mobile */
+        .modal-overlay {
+            padding: 0;
+        }
+        
+        .modal-dialog {
+            margin: 0;
+            max-width: 100%;
+            min-height: 100vh;
+            border-radius: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .modal-header {
+            border-radius: 0;
+            padding: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--bg-card);
+        }
+        
+        .modal-header h3 {
+            font-size: 1rem;
+        }
+        
+        .modal-body {
+            padding: 1rem;
+            flex: 1;
+        }
+        
+        .form-row {
+            grid-template-columns: 1fr;
+            gap: 0;
+        }
+        
+        .form-group {
+            margin-bottom: 0.8rem;
+        }
+        
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            padding: 0.65rem 0.8rem;
+            font-size: 0.8rem;
+        }
+        
+        .form-check label {
+            font-size: 0.75rem;
+        }
+        
+        .section-title {
+            font-size: 0.8rem;
+            margin: 1rem 0 0.6rem;
+        }
+        
+        /* Botões do modal mobile */
+        .modal-actions {
+            flex-direction: column-reverse;
+            gap: 0.5rem;
+            position: sticky;
+            bottom: 0;
+            background: var(--bg-card);
+            padding: 1rem;
+            margin: 0 -1rem -1rem -1rem;
+            border-top: 2px solid var(--border);
+        }
+        
+        .modal-actions .btn {
+            width: 100%;
+            padding: 0.8rem;
+            font-size: 0.9rem;
+        }
+        
+        .icones-sugeridos {
+            gap: 0.3rem;
+        }
+        
+        .icone-sugestao {
+            width: 32px;
+            height: 32px;
+            font-size: 0.85rem;
+        }
+        
+        .toast-custom {
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            text-align: center;
+            justify-content: center;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .page-header h1 {
+            font-size: 1.1rem;
+        }
+        
+        .btn {
+            width: 100%;
+        }
+        
+        .card-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+        
+        .aviso-meta {
+            gap: 0.2rem;
+        }
+        
+        .aviso-meta span {
+            padding: 0.1rem 0.3rem;
+            font-size: 0.6rem;
+        }
+    }
+</style>
+
+<div class="avisos-container">
+    <!-- CABEÇALHO -->
+    <div class="page-header">
+        <h1>
+            <i class="fas fa-bullhorn"></i> 
+            Configurar Avisos
+        </h1>
+        <button class="btn btn-primary" onclick="abrirModalAviso()">
+            <i class="fas fa-plus-circle"></i> Novo Aviso
+        </button>
+    </div>
+    
+    <!-- GRID DE CARDS -->
+    <div class="cards-grid">
+        <!-- LISTA DE AVISOS -->
+        <div class="card">
+            <div class="card-header">
+                <h2>
+                    <i class="fas fa-list-check"></i> 
+                    Avisos Cadastrados
+                </h2>
+                <span class="card-badge">{{ avisos.count }} aviso(s)</span>
+            </div>
+            
+            <div id="lista-avisos">
+                {% if avisos %}
+                    {% for aviso in avisos %}
+                    <div class="aviso-item {% if not aviso.ativo %}aviso-inativo{% endif %}" 
+                         data-id="{{ aviso.id }}" 
+                         draggable="true"
+                         style="border-left: 4px solid {{ aviso.cor_destaque }};">
+                        
+                        <div class="aviso-icone" style="background: {{ aviso.cor_destaque }};">
+                            <i class="fas {{ aviso.icone }}"></i>
+                        </div>
+                        
+                        <div class="aviso-info">
+                            <div class="aviso-titulo">{{ aviso.titulo }}</div>
+                            <div class="aviso-meta">
+                                <span>[{{ aviso.get_tipo_display }}]</span>
+                                {% if aviso.mostrar_a_cada_login %}<span>🔁 Login</span>{% endif %}
+                                {% if aviso.mostrar_primeiro_login %}<span>🆕 {{ aviso.repeticoes }}x</span>{% endif %}
+                                {% if aviso.mostrar_intervalo_horas %}<span>⏰ {{ aviso.mostrar_intervalo_horas }}h</span>{% endif %}
+                                {% if aviso.mostrar_antes_vencimento %}<span>📅 -{{ aviso.mostrar_antes_vencimento }}d</span>{% endif %}
+                                {% if aviso.mostrar_no_vencimento %}<span>🔴 Venc.</span>{% endif %}
+                                {% if aviso.permitir_ocultar %}<span>🙈 Ocultável</span>{% endif %}
+                                {% if not aviso.ativo %}<span style="background:#fef2f2;color:#ef4444;">⛔ Inativo</span>{% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="aviso-actions">
+                            <button class="btn-icon" onclick="editarAviso({{ aviso.id }})" title="Editar">
+                                <i class="fas fa-pen-to-square"></i>
+                            </button>
+                            <button class="btn-icon delete" onclick="excluirAviso({{ aviso.id }})" title="Excluir">
+                                <i class="fas fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p><strong>Nenhum aviso configurado</strong></p>
+                        <p>Clique em "Novo Aviso" para começar</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            {% if avisos %}
+            <div style="margin-top: 1rem; text-align: center; padding: 0.6rem; background: var(--bg-hover); border-radius: 10px;">
+                <small style="color: var(--text-muted);">
+                    <i class="fas fa-arrows-up-down"></i> Arraste para reordenar
+                </small>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- WHATSAPP SUPORTE -->
+        <div class="card">
+            <div class="card-header">
+                <h2>
+                    <i class="fas fa-headset"></i> 
+                    Canal de Suporte
+                </h2>
+            </div>
+            
+            <form id="form-config" onsubmit="salvarConfig(event)">
+                <div class="form-group">
+                    <label>
+                        <i class="fab fa-whatsapp" style="color:#25D366;"></i> 
+                        WhatsApp
+                    </label>
+                    <input 
+                        type="text" 
+                        name="whatsapp_suporte" 
+                        value="{{ config.numero_celular|default:'' }}" 
+                        placeholder="5564999999999"
+                        autocomplete="off"
+                    >
+                    <span class="form-hint">
+                        <i class="fas fa-info-circle"></i> Número com DDD
+                    </span>
+                </div>
+                
+                <button type="submit" class="btn btn-success" style="width:100%;">
+                    <i class="fas fa-floppy-disk"></i> Salvar
+                </button>
+            </form>
+            
+            <div class="config-preview">
+                <button class="btn btn-whatsapp" onclick="testarWhatsApp()">
+                    <i class="fab fa-whatsapp"></i> Testar WhatsApp
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE AVISO -->
+<div class="modal-overlay" id="modalAviso">
+    <div class="modal-dialog" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <h3 id="modalTitulo">
+                <i class="fas fa-plus-circle" style="color:var(--primary);"></i> 
+                Novo Aviso
+            </h3>
+            <button type="button" class="modal-close" onclick="fecharModalAviso()">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+        
+        <form id="formAviso" onsubmit="salvarAviso(event)">
+            <input type="hidden" name="aviso_id" id="aviso_id">
+            
+            <div class="modal-body">
+                <!-- TÍTULO -->
+                <div class="form-group">
+                    <label>Título do Aviso *</label>
+                    <input 
+                        type="text" 
+                        name="titulo" 
+                        id="aviso_titulo" 
+                        required 
+                        placeholder="Ex: Lembrete de Renovação"
+                        autocomplete="off"
+                    >
+                </div>
+                
+                <!-- MENSAGEM -->
+                <div class="form-group">
+                    <label>Mensagem *</label>
+                    <textarea 
+                        name="mensagem" 
+                        id="aviso_mensagem" 
+                        rows="4" 
+                        required 
+                        placeholder="Escreva a mensagem que será exibida..."
+                    ></textarea>
+                </div>
+                
+                <!-- TIPO + ÍCONE -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Tipo de Aviso</label>
+                        <select name="tipo" id="aviso_tipo">
+                            <option value="info">ℹ️ Informativo</option>
+                            <option value="success">✅ Sucesso</option>
+                            <option value="warning">⚠️ Alerta</option>
+                            <option value="danger">❌ Urgente</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Ícone</label>
+                        <input 
+                            type="text" 
+                            name="icone" 
+                            id="aviso_icone" 
+                            value="fa-bell" 
+                            placeholder="fa-bell"
+                            autocomplete="off"
+                        >
+                        <div class="icones-sugeridos" id="iconesSugeridos">
+                            <button type="button" class="icone-sugestao selecionado" data-icone="fa-bell" title="Sino">
+                                <i class="fas fa-bell"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-star" title="Estrela">
+                                <i class="fas fa-star"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-exclamation-triangle" title="Atenção">
+                                <i class="fas fa-exclamation-triangle"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-info-circle" title="Informação">
+                                <i class="fas fa-info-circle"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-check-circle" title="Sucesso">
+                                <i class="fas fa-check-circle"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-calendar-alt" title="Calendário">
+                                <i class="fas fa-calendar-alt"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-gift" title="Presente">
+                                <i class="fas fa-gift"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-bullhorn" title="Megafone">
+                                <i class="fas fa-bullhorn"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-envelope" title="Envelope">
+                                <i class="fas fa-envelope"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-comment-dots" title="Comentário">
+                                <i class="fas fa-comment-dots"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-lightbulb" title="Lâmpada">
+                                <i class="fas fa-lightbulb"></i>
+                            </button>
+                            <button type="button" class="icone-sugestao" data-icone="fa-rocket" title="Foguete">
+                                <i class="fas fa-rocket"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- COR + ORDEM -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Cor Destaque</label>
+                        <input 
+                            type="color" 
+                            name="cor_destaque" 
+                            id="aviso_cor" 
+                            value="#667eea"
+                            style="height:44px;padding:3px;cursor:pointer;"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label>Ordem</label>
+                        <input 
+                            type="number" 
+                            name="ordem" 
+                            id="aviso_ordem" 
+                            value="0" 
+                            min="0"
+                        >
+                        <span class="form-hint">Menor = aparece primeiro</span>
+                    </div>
+                </div>
+                
+                <!-- REGRAS -->
+                <div class="section-title">
+                    <i class="fas fa-sliders"></i> Regras de Exibição
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-check">
+                        <input type="checkbox" name="mostrar_a_cada_login" id="aviso_login">
+                        <label for="aviso_login">🔁 A cada login</label>
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="mostrar_primeiro_login" id="aviso_primeiro_login">
+                        <label for="aviso_primeiro_login">🆕 Primeiros logins</label>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Repetições</label>
+                        <input type="number" name="repeticoes" id="aviso_repeticoes" value="1" min="1">
+                    </div>
+                    <div class="form-check">
+                        <input type="checkbox" name="permitir_ocultar" id="aviso_ocultar" checked>
+                        <label for="aviso_ocultar">🙈 Permitir ocultar</label>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>A cada X horas</label>
+                        <input type="number" name="mostrar_intervalo_horas" id="aviso_intervalo" placeholder="Ex: 24" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>X dias antes do venc.</label>
+                        <input type="number" name="mostrar_antes_vencimento" id="aviso_antes" placeholder="Ex: 3" min="1">
+                    </div>
+                </div>
+                
+                <div class="form-check">
+                    <input type="checkbox" name="mostrar_no_vencimento" id="aviso_venc">
+                    <label for="aviso_venc">📅 No dia do vencimento</label>
+                </div>
+                
+                <!-- PERÍODO -->
+                <div class="section-title">
+                    <i class="fas fa-calendar-range"></i> Período
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Data Início</label>
+                        <input type="datetime-local" name="data_inicio" id="aviso_inicio">
+                    </div>
+                    <div class="form-group">
+                        <label>Data Fim</label>
+                        <input type="datetime-local" name="data_fim" id="aviso_fim">
+                    </div>
+                </div>
+                
+                <!-- ATIVO -->
+                <div class="form-check" style="padding:0.7rem;background:var(--bg-hover);border-radius:10px;margin-top:0.5rem;">
+                    <input type="checkbox" name="ativo" id="aviso_ativo" checked>
+                    <label for="aviso_ativo" style="font-weight:600;">✅ Aviso Ativo</label>
+                </div>
+                
+                <!-- 🔴 BOTÕES AGORA DENTRO DO MODAL-BODY -->
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="fecharModalAviso()">
+                        <i class="fas fa-xmark"></i> Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-floppy-disk"></i> Salvar Aviso
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+// ===== ÍCONES SUGERIDOS =====
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('iconesSugeridos');
+    if (!container) return;
+    
+    container.addEventListener('click', function(e) {
+        const btn = e.target.closest('.icone-sugestao');
+        if (!btn) return;
+        
+        e.preventDefault();
+        const icone = btn.getAttribute('data-icone');
+        document.getElementById('aviso_icone').value = icone;
+        
+        container.querySelectorAll('.icone-sugestao').forEach(b => b.classList.remove('selecionado'));
+        btn.classList.add('selecionado');
+    });
+});
+
+// ===== ABRIR MODAL =====
+function abrirModalAviso() {
+    document.getElementById('aviso_id').value = '';
+    document.getElementById('modalTitulo').innerHTML = '<i class="fas fa-plus-circle" style="color:var(--primary);"></i> Novo Aviso';
+    document.getElementById('formAviso').reset();
+    document.getElementById('aviso_ativo').checked = true;
+    document.getElementById('aviso_cor').value = '#667eea';
+    document.getElementById('aviso_ocultar').checked = true;
+    document.getElementById('aviso_repeticoes').value = 1;
+    document.getElementById('aviso_ordem').value = 0;
+    document.getElementById('aviso_icone').value = 'fa-bell';
+    
+    document.querySelectorAll('.icone-sugestao').forEach(b => b.classList.remove('selecionado'));
+    const btnBell = document.querySelector('[data-icone="fa-bell"]');
+    if (btnBell) btnBell.classList.add('selecionado');
+    
+    document.getElementById('modalAviso').classList.add('active');
+    document.body.classList.add('modal-aberto');
+    document.getElementById('modalAviso').scrollTop = 0;
+}
+
+// ===== FECHAR MODAL =====
+function fecharModalAviso() {
+    document.getElementById('modalAviso').classList.remove('active');
+    document.body.classList.remove('modal-aberto');
+}
+
+// Fechar ao clicar no overlay (fora do modal)
+document.getElementById('modalAviso').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalAviso();
+});
+
+// Fechar com ESC
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('modalAviso').classList.contains('active')) {
+        fecharModalAviso();
+    }
+});
+
+// ===== EDITAR AVISO =====
+async function editarAviso(id) {
+    try {
+        const resp = await fetch(`/avisos/editar/${id}/`);
+        const data = await resp.json();
+        
+        if (data.success) {
+            const a = data.aviso;
+            document.getElementById('aviso_id').value = a.id;
+            document.getElementById('modalTitulo').innerHTML = '<i class="fas fa-pen-to-square" style="color:var(--primary);"></i> Editar Aviso';
+            document.getElementById('aviso_titulo').value = a.titulo;
+            document.getElementById('aviso_mensagem').value = a.mensagem;
+            document.getElementById('aviso_tipo').value = a.tipo;
+            document.getElementById('aviso_icone').value = a.icone;
+            document.getElementById('aviso_cor').value = a.cor_destaque;
+            document.getElementById('aviso_ordem').value = a.ordem;
+            document.getElementById('aviso_ativo').checked = a.ativo;
+            document.getElementById('aviso_login').checked = a.mostrar_a_cada_login;
+            document.getElementById('aviso_primeiro_login').checked = a.mostrar_primeiro_login;
+            document.getElementById('aviso_repeticoes').value = a.repeticoes || 1;
+            document.getElementById('aviso_ocultar').checked = a.permitir_ocultar;
+            document.getElementById('aviso_intervalo').value = a.mostrar_intervalo_horas || '';
+            document.getElementById('aviso_antes').value = a.mostrar_antes_vencimento || '';
+            document.getElementById('aviso_venc').checked = a.mostrar_no_vencimento;
+            document.getElementById('aviso_inicio').value = a.data_inicio || '';
+            document.getElementById('aviso_fim').value = a.data_fim || '';
+            
+            document.querySelectorAll('.icone-sugestao').forEach(b => b.classList.remove('selecionado'));
+            const btnIcone = document.querySelector(`[data-icone="${a.icone}"]`);
+            if (btnIcone) btnIcone.classList.add('selecionado');
+            
+            document.getElementById('modalAviso').classList.add('active');
+            document.body.classList.add('modal-aberto');
+            document.getElementById('modalAviso').scrollTop = 0;
+        }
+    } catch (e) {
+        mostrarToast('Erro ao carregar aviso', 'error');
+    }
+}
+
+// ===== SALVAR AVISO =====
+async function salvarAviso(e) {
+    e.preventDefault();
+    const form = document.getElementById('formAviso');
+    const formData = new FormData(form);
+    
+    if (!formData.get('titulo').trim() || !formData.get('mensagem').trim()) {
+        mostrarToast('Preencha título e mensagem', 'warning');
+        return;
+    }
+    
+    try {
+        const resp = await fetch('/avisos/salvar/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF_TOKEN },
+            body: formData
+        });
+        
+        const data = await resp.json();
+        
+        if (data.success) {
+            mostrarToast('Aviso salvo!', 'success');
+            fecharModalAviso();
+            setTimeout(() => location.reload(), 500);
+        } else {
+            mostrarToast(data.message || 'Erro ao salvar', 'error');
+        }
+    } catch (e) {
+        mostrarToast('Erro de conexão', 'error');
+    }
+}
+
+// ===== EXCLUIR AVISO =====
+async function excluirAviso(id) {
+    if (!(await window.AppUI.confirm('Excluir este aviso?', {title:'Excluir aviso', danger:true, confirmText:'Excluir'}))) return;
+    
+    try {
+        const resp = await fetch(`/avisos/excluir/${id}/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF_TOKEN }
+        });
+        
+        const data = await resp.json();
+        
+        if (data.success) {
+            mostrarToast('Aviso excluído!', 'success');
+            setTimeout(() => location.reload(), 500);
+        }
+    } catch (e) {
+        mostrarToast('Erro ao excluir', 'error');
+    }
+}
+
+// ===== SALVAR CONFIG =====
+async function salvarConfig(e) {
+    e.preventDefault();
+    const form = document.getElementById('form-config');
+    const formData = new FormData(form);
+    
+    try {
+        const resp = await fetch('/avisos/config/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF_TOKEN },
+            body: formData
+        });
+        
+        const data = await resp.json();
+        
+        if (data.success) {
+            mostrarToast('Configuração salva!', 'success');
+        }
+    } catch (e) {
+        mostrarToast('Erro ao salvar', 'error');
+    }
+}
+
+// ===== TESTAR WHATSAPP =====
+function testarWhatsApp() {
+    const whatsapp = document.querySelector('[name="whatsapp_suporte"]').value.trim();
+    
+    if (whatsapp) {
+        window.open(`https://wa.me/${whatsapp.replace(/\D/g, '')}`, '_blank');
+    } else {
+        mostrarToast('Configure o número primeiro', 'warning');
+    }
+}
+
+// ===== DRAG AND DROP =====
+document.addEventListener('DOMContentLoaded', () => {
+    const lista = document.getElementById('lista-avisos');
+    if (!lista || !lista.querySelector('.aviso-item')) return;
+    
+    let dragItem = null;
+    
+    lista.addEventListener('dragstart', (e) => {
+        dragItem = e.target.closest('.aviso-item');
+        if (dragItem) {
+            dragItem.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+    });
+    
+    lista.addEventListener('dragend', () => {
+        if (dragItem) {
+            dragItem.classList.remove('dragging');
+            salvarOrdem();
+            dragItem = null;
+        }
+    });
+    
+    lista.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const after = getDragAfter(lista, e.clientY);
+        if (after == null) lista.appendChild(dragItem);
+        else lista.insertBefore(dragItem, after);
+    });
+});
+
+function getDragAfter(container, y) {
+    const items = [...container.querySelectorAll('.aviso-item:not(.dragging)')];
+    return items.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) return { offset, element: child };
+        return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+async function salvarOrdem() {
+    const items = document.querySelectorAll('#lista-avisos .aviso-item');
+    const ordemIds = [...items].map(el => el.dataset.id);
+    
+    try {
+        await fetch('/avisos/reordenar/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+            body: JSON.stringify({ ordem_ids: ordemIds })
+        });
+    } catch (e) {}
+}
+
+// ===== TOAST =====
+function mostrarToast(msg, tipo = 'info') {
+    const cores = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: 'var(--primary)' };
+    const icones = { success: 'fa-circle-check', error: 'fa-circle-xmark', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+    
+    document.querySelectorAll('.toast-custom').forEach(el => el.remove());
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast-custom';
+    toast.innerHTML = `<i class="fas ${icones[tipo]}"></i> ${msg}`;
+    toast.style.background = cores[tipo];
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(20px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+</script>
+{% endblock %}

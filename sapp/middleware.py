@@ -1,30 +1,25 @@
 import time
-from django.shortcuts import redirect
-from django.contrib import auth
-
-# sapp/middleware.py (apenas o Smart404FallbackMiddleware)
-from django.shortcuts import redirect
-from django.urls import reverse, NoReverseMatch
-from django.conf import settings
 from urllib.parse import urlparse
-from django.shortcuts import redirect
-from django.urls import reverse
-from django.contrib.auth.hashers import check_password
 
-# sapp/middleware.py
+from django.conf import settings
+from django.contrib import auth, messages
 from django.shortcuts import redirect
-from django.urls import reverse
-from django.contrib import messages
+from django.urls import NoReverseMatch, reverse
+
+from .access_control import (
+    first_allowed_url,
+    has_any_direct_permission,
+    has_direct_permission,
+)
+from .models import PerfilUsuario
+
 
 class AutoLogoutMiddleware:
-    """
-    Desloga usuário se ficar inativo por mais que AUTO_LOGOUT_DELAY segundos.
-    Redireciona para a página de login com aviso de sessão expirada.
-    """
+    """Desloga o usuário após o tempo de inatividade configurado."""
+
     def __init__(self, get_response):
         self.get_response = get_response
-        from django.conf import settings
-        self.timeout = getattr(settings, 'AUTO_LOGOUT_DELAY', 1800)  # 30min
+        self.timeout = getattr(settings, 'AUTO_LOGOUT_DELAY', 1800)
 
     def __call__(self, request):
         if request.user.is_authenticated:
@@ -32,130 +27,141 @@ class AutoLogoutMiddleware:
             last_activity = request.session.get('last_activity', now)
             if now - last_activity > self.timeout:
                 auth.logout(request)
-                # ✅ Redireciona com o parâmetro 'expired=1'
                 return redirect('/login/?expired=1')
             request.session['last_activity'] = now
         return self.get_response(request)
 
 
-
 class Smart404FallbackMiddleware:
-    """
-    - Se 404 e não autenticado: redireciona para o login.
-    - Se 404 e autenticado: tenta usar o último segmento como named URL (ex: 'historico').
-    """
+    """Em 404 autenticado, volta para a primeira tela permitida do usuário."""
+
     def __init__(self, get_response):
         self.get_response = get_response
-        # Obtém a URL de login corretamente, independente do formato
         login_url = settings.LOGIN_URL
-        if ':' in login_url:
-            # É um nome de URL (ex: 'sapp:login')
-            self.login_url = reverse(login_url)
-        else:
-            # É um caminho (ex: '/login/?expired=1')
-            self.login_url = login_url
+        self.login_url = reverse(login_url) if ':' in login_url else login_url
 
     def __call__(self, request):
         response = self.get_response(request)
-
         if response.status_code != 404:
             return response
 
         path = request.path
         if not request.user.is_authenticated:
-            # evita loop se já estiver no login
-            if path != self.login_url.split('?')[0]:  # Compara apenas o caminho, sem query string
+            if path != self.login_url.split('?')[0]:
                 return redirect(self.login_url)
             return response
 
-        # autenticado: tenta recuperar por último segmento
-        parts = [p for p in path.strip('/').split('/') if p]
-        if parts:
-            last = parts[-1]
-            try:
-                target = reverse(f'sapp:{last}')
-                return redirect(target)
-            except NoReverseMatch:
-                pass  # não encontrou, cai no 404 normal
+        destino = first_allowed_url(request.user)
+        return redirect(destino) if destino else response
 
-        return response
-
-
-
-SENHA_PADRAO = 'conceito123'
 
 class ForcarTrocaSenhaMiddleware:
+    """Obriga usuários comuns marcados como primeiro acesso a trocar a senha."""
+
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated:
-            if check_password(SENHA_PADRAO, request.user.password):
-                urls_permitidas = [
+        if request.user.is_authenticated and not request.user.is_superuser:
+            perfil, _ = PerfilUsuario.objects.get_or_create(usuario=request.user)
+            if perfil.primeiro_acesso:
+                current_path = request.path
+                paths_exatos = {
                     reverse('sapp:mudar_senha'),
                     reverse('sapp:logout'),
-                    reverse('sapp:login'),
-                    '/static/',
-                    '/media/',
-                    '/sw.js',
-                ]
-                current_path = request.path
-
-                if request.method == 'POST':
-                    return self.get_response(request)
-
-                if not any(current_path.startswith(url) for url in urls_permitidas):
+                }
+                prefixes = ('/static/', '/media/', '/service-worker.js', '/sw.js')
+                permitido = current_path in paths_exatos or current_path.startswith(prefixes)
+                if not permitido:
                     return redirect('sapp:mudar_senha')
 
         return self.get_response(request)
-    
-
 
 
 class PermissionMiddleware:
-    """
-    Middleware para verificar permissões de acesso às páginas
-    """
-    
-    # Mapeamento de URLs para permissões necessárias
-    URL_PERMISSIONS = {
-        # Estoque
-        '/estoque/lista/': 'sapp.pode_ver_estoque',
-        '/estoque/movimentar/': 'sapp.pode_movimentar_estoque',
-        
-        # Almoxarifado
-        '/almoxarifado/lista/': 'sapp.pode_ver_almoxarifado',
-        '/almoxarifado/criar/': 'sapp.pode_gerenciar_almoxarifado',
-        '/almoxarifado/editar/': 'sapp.pode_gerenciar_almoxarifado',
-        '/almoxarifado/excluir/': 'sapp.pode_gerenciar_almoxarifado',
-        
-        # Empenho
-        '/empenho/': 'sapp.pode_ver_empenhos',
-        '/empenho/criar/': 'sapp.pode_criar_empenhos',
-        
-        # Mapa
-        '/mapa/': 'sapp.pode_ver_mapa',
-        
-        # Configurações
-        '/configuracoes/': 'sapp.pode_configuracoes',
-    }
-    
+    """Bloqueia páginas principais que não estejam explicitamente liberadas."""
+
     def __init__(self, get_response):
         self.get_response = get_response
-    
+
+    def _deny(self, request):
+        messages.error(request, '❌ Você não tem permissão para acessar esta página.')
+        destino = first_allowed_url(request.user)
+        if destino and request.path != urlparse(destino).path:
+            return redirect(destino)
+        auth.logout(request)
+        return redirect('sapp:login')
+
     def __call__(self, request):
-        # Verifica se o usuário está autenticado
-        if request.user.is_authenticated and not request.user.is_superuser:
-            path = request.path
-            
-            # Verifica cada URL pattern
-            for url_path, permission_needed in self.URL_PERMISSIONS.items():
-                if url_path in path:
-                    # Se não tiver a permissão, redireciona para dashboard
-                    if not request.user.has_perm(permission_needed):
-                        messages.error(request, f"❌ Você não tem permissão para acessar esta página!")
-                        return redirect(reverse('sapp:dashboard'))
-                    break
-        
-        response = self.get_response(request)
-        return response
+        user = request.user
+        if not user.is_authenticated or user.is_superuser:
+            return self.get_response(request)
+
+        path = request.path
+
+        # Rotas de autenticação, assets e raiz de redirecionamento.
+        if (
+            path in {reverse('sapp:redirecionar'), reverse('sapp:mudar_senha'), reverse('sapp:logout')}
+            or path.startswith('/static/')
+            or path.startswith('/media/')
+            or path in {'/service-worker.js', '/sw.js'}
+        ):
+            return self.get_response(request)
+
+        required_all = None
+        required_any = None
+
+        # Dashboard é uma permissão independente do Estoque.
+        if path == '/dashboard/' or path.startswith('/dashboard-data/'):
+            required_all = 'sapp.pode_ver_dashboard'
+
+        # Estoque.
+        elif path.startswith('/estoque/gestao/') or path.startswith('/estoque/transferir/') \
+                or path.startswith('/estoque/editar/') or path.startswith('/estoque/excluir/') \
+                or path.startswith('/estoque/registrar-saida/') or path.startswith('/estoque/nova-saida/') \
+                or path.startswith('/estoque/nova-entrada/'):
+            required_all = 'sapp.pode_movimentar_estoque'
+        elif path == '/estoque/' or path.startswith('/estoque/inventario/') \
+                or path.startswith('/historico-geral/') or path.startswith('/ficha-rastreabilidade/'):
+            required_any = ('sapp.pode_ver_estoque', 'sapp.pode_movimentar_estoque')
+
+        # Mapa.
+        elif path.startswith('/mapa-armazem/') or path.startswith('/editor-mapa/'):
+            required_all = 'sapp.pode_ver_mapa'
+
+        # Solicitações e Kanban.
+        elif path.startswith('/solicitacoes/nova/'):
+            required_all = 'sapp.pode_criar_solicitacao'
+        elif path.startswith('/solicitacoes/'):
+            required_all = 'sapp.pode_ver_empenhos'
+        elif path.startswith('/kanban/') or path.startswith('/api/kanban/'):
+            required_any = (
+                'sapp.pode_ver_empenhos',
+                'sapp.pode_criar_solicitacao',
+                'sapp.pode_empenhar_solicitacao',
+                'sapp.pode_movimentar_solicitacao',
+                'sapp.pode_cancelar_solicitacao',
+                'sapp.pode_criar_empenhos',
+            )
+        elif path.startswith('/cargas/') or path.startswith('/api/cargas/'):
+            required_any = ('sapp.pode_ver_empenhos', 'sapp.pode_movimentar_solicitacao')
+        elif path == '/api/solicitacoes/listar/':
+            required_all = 'sapp.pode_ver_empenhos'
+
+        # Almoxarifado. CRUD continua protegido pelas decorators próprias.
+        elif path.startswith('/almoxarifado/'):
+            required_any = (
+                'almoxarifado.pode_ver_almoxarifado',
+                'almoxarifado.pode_gerenciar_almoxarifado',
+            )
+
+        # Configurações.
+        elif path.startswith('/configuracoes/') or path.startswith('/configuracao-workflow/'):
+            required_all = 'sapp.pode_configuracoes'
+
+        if required_all and not has_direct_permission(user, required_all):
+            return self._deny(request)
+        if required_any and not has_any_direct_permission(user, *required_any):
+            return self._deny(request)
+
+        return self.get_response(request)

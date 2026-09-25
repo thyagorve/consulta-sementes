@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Cadastrar Novo Plano{% endblock %}
+
+{% block content %}
+<style>
+    .cadastro-page { width: 100%; }
+    
+    .page-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 1.5rem 2rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        border-radius: 16px 16px 0 0; color: white; margin-bottom: 0;
+    }
+    .page-header h2 { margin: 0; font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .page-header p { margin: 0.3rem 0 0; opacity: 0.9; font-size: 0.9rem; }
+    
+    .form-card {
+        background: var(--bg-card); border-radius: 0 0 16px 16px;
+        border: 1px solid var(--border); border-top: none; padding: 2rem;
+    }
+    
+    .section-title {
+        font-size: 1.05rem; font-weight: 700; color: var(--text);
+        margin: 2rem 0 1rem; padding-bottom: 0.6rem;
+        border-bottom: 2px solid var(--border); display: flex; align-items: center; gap: 8px;
+    }
+    .section-title:first-child { margin-top: 0; }
+    .section-title i { color: var(--primary); }
+    
+    .row { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+    .col { flex: 1; min-width: 220px; }
+    .col-small { flex: 0 0 120px; }
+    
+    .form-group { margin-bottom: 1.2rem; }
+    .form-group label { display: block; font-weight: 600; font-size: 0.85rem; color: var(--text); margin-bottom: 0.4rem; }
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%; padding: 12px 16px; border: 2px solid var(--border);
+        border-radius: 12px; background: var(--bg-card); color: var(--text);
+        font-size: 0.95rem; transition: all 0.3s; font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 10%, transparent);
+    }
+    .form-group textarea { min-height: 80px; resize: vertical; }
+    
+    .checkbox-card {
+        display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+        border: 2px solid var(--border); border-radius: 12px; margin-bottom: 0.6rem;
+        transition: all 0.3s; cursor: pointer;
+    }
+    .checkbox-card:hover { background: var(--bg-hover); border-color: var(--primary); }
+    .checkbox-card input[type="checkbox"] { 
+        width: 22px; height: 22px; cursor: pointer; 
+        accent-color: var(--primary); flex-shrink: 0;
+    }
+    .checkbox-card label { flex: 1; cursor: pointer; margin: 0; }
+    .checkbox-card label strong { display: block; }
+    .checkbox-card label small { color: var(--text-light); font-size: 0.8rem; }
+    
+    .info-box {
+        padding: 12px 16px; border-radius: 10px; margin-top: 8px;
+        font-size: 0.85rem; font-weight: 500;
+        display: flex; align-items: center; gap: 8px;
+    }
+    
+    .btn-group { display: flex; gap: 12px; margin-top: 2rem; }
+    .btn-save, .btn-cancel {
+        flex: 1; padding: 15px; border-radius: 14px; font-size: 1rem;
+        font-weight: 700; cursor: pointer; transition: all 0.3s; text-align: center;
+        text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-save { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none; }
+    .btn-save:hover { transform: translateY(-2px); box-shadow: 0 8px 25px color-mix(in srgb, var(--primary) 40%, transparent); }
+    .btn-cancel { background: var(--bg-hover); color: var(--text); border: 2px solid var(--border); }
+    .btn-cancel:hover { background: var(--border); }
+    
+    @media (max-width: 768px) {
+        .page-header { padding: 1.2rem; }
+        .form-card { padding: 1.2rem; }
+        .col, .col-small { min-width: 100%; }
+        .btn-group { flex-direction: column; }
+    }
+</style>
+
+<div class="cadastro-page">
+    <div class="page-header">
+        <div>
+            <h2><i class="fas fa-plus-circle"></i> Cadastrar Novo Plano</h2>
+            <p>Configure as regras e comportamentos do plano</p>
+        </div>
+    </div>
+    
+    <div class="form-card">
+        <form method="post" id="servicoForm">
+            {% csrf_token %}
+            
+            <!-- ========== DADOS BÁSICOS ========== -->
+            <div class="section-title"><i class="fas fa-info-circle"></i> Dados Básicos</div>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group"><label>{{ form.nome.label }} *</label>{{ form.nome }}</div>
+                </div>
+                <div class="col">
+                    <div class="form-group"><label>{{ form.tipo_plano.label }} *</label>{{ form.tipo_plano }}</div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group"><label>{{ form.valor.label }} (R$)</label>{{ form.valor }}</div>
+                </div>
+                <div class="col">
+                    <div class="form-group"><label>{{ form.custos.label }} (R$)</label>{{ form.custos }}</div>
+                </div>
+                <div class="col-small">
+                    <div class="form-group"><label>Cor</label>{{ form.cor }}</div>
+                </div>
+            </div>
+            <div class="form-group"><label>{{ form.observacao.label }}</label>{{ form.observacao }}</div>
+            
+            <!-- ========== CONTROLE DE ESTOQUE ========== -->
+            <div class="section-title"><i class="fas fa-boxes"></i> Controle de Estoque (Créditos)</div>
+            <div class="checkbox-card">
+                <input type="checkbox" name="controlar_estoque" id="id_controlar_estoque" 
+                       style="width:22px;height:22px;cursor:pointer;"
+                       {% if form.controlar_estoque.value %}checked{% endif %}>
+                <label for="id_controlar_estoque">
+                    <strong>{{ form.controlar_estoque.label }}</strong>
+                    <small>Ative para controlar a quantidade de clientes via créditos (Abastecer)</small>
+                </label>
+            </div>
+            
+            <!-- ========== COMPARTILHAMENTO (MULTIPLICADOR + USUÁRIO ÚNICO) ========== -->
+            <div class="section-title"><i class="fas fa-users"></i> Compartilhamento de Acesso</div>
+            <p style="color:var(--text-light);font-size:0.85rem;margin-bottom:1rem;">
+                Defina quantos clientes podem usar o mesmo login e senha
+            </p>
+            
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>{{ form.multiplicador.label }}</label>
+                        {{ form.multiplicador }}
+                        <small style="color:var(--text-light);display:block;margin-top:4px;">
+                            <i class="fas fa-info-circle"></i> {{ form.multiplicador.help_text }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="checkbox-card">
+                <input type="checkbox" name="usuario_unico" id="id_usuario_unico" 
+                       style="width:22px;height:22px;cursor:pointer;"
+                       {% if form.usuario_unico.value %}checked{% endif %}>
+                <label for="id_usuario_unico">
+                    <strong>🔒 Usuário Único</strong>
+                    <small>Se marcado, NÃO permite compartilhamento de login. O Multiplicador será ignorado.</small>
+                </label>
+            </div>
+            
+            <div id="multiplicador-info" class="info-box">
+                <i class="fas fa-info-circle"></i>
+                <span id="info-text">Login COMPARTILHADO: Até 1 cliente(s) podem usar o mesmo login</span>
+            </div>
+            
+            <!-- ========== CAMPOS OBRIGATÓRIOS ========== -->
+            <div class="section-title"><i class="fas fa-check-square"></i> Campos Obrigatórios no Cadastro</div>
+            <p style="color:var(--text-light);font-size:0.85rem;margin-bottom:1rem;">
+                Defina quais campos serão obrigatórios ao cadastrar um cliente neste plano
+            </p>
+            <div class="row">
+                <div class="col">
+                    <div class="checkbox-card">
+                        <input type="checkbox" name="exigir_nome" id="id_exigir_nome" 
+                               style="width:22px;height:22px;cursor:pointer;"
+                               {% if form.exigir_nome.value %}checked{% endif %}>
+                        <label for="id_exigir_nome"><strong>{{ form.exigir_nome.label }}</strong></label>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="checkbox-card">
+                        <input type="checkbox" name="exigir_email" id="id_exigir_email" 
+                               style="width:22px;height:22px;cursor:pointer;"
+                               {% if form.exigir_email.value %}checked{% endif %}>
+                        <label for="id_exigir_email"><strong>{{ form.exigir_email.label }}</strong></label>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <div class="checkbox-card">
+                        <input type="checkbox" name="exigir_cpf" id="id_exigir_cpf" 
+                               style="width:22px;height:22px;cursor:pointer;"
+                               {% if form.exigir_cpf.value %}checked{% endif %}>
+                        <label for="id_exigir_cpf"><strong>{{ form.exigir_cpf.label }}</strong></label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ========== CONFIGURAÇÕES DE ACESSO ========== -->
+            <div class="section-title"><i class="fas fa-user-lock"></i> Campos de Acesso (Login/Senha)</div>
+            <div class="row">
+                <div class="col">
+                    <div class="checkbox-card">
+                        <input type="checkbox" name="exigir_usuario" id="id_exigir_usuario" 
+                               style="width:22px;height:22px;cursor:pointer;"
+                               {% if form.exigir_usuario.value %}checked{% endif %}>
+                        <label for="id_exigir_usuario"><strong>{{ form.exigir_usuario.label }}</strong></label>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="checkbox-card">
+                        <input type="checkbox" name="exigir_senha" id="id_exigir_senha" 
+                               style="width:22px;height:22px;cursor:pointer;"
+                               {% if form.exigir_senha.value %}checked{% endif %}>
+                        <label for="id_exigir_senha"><strong>{{ form.exigir_senha.label }}</strong></label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ========== BOTÕES ========== -->
+            <div class="btn-group">
+                <a href="{% url 'listar_servicos' %}" class="btn-cancel"><i class="fas fa-arrow-left"></i> Cancelar / Voltar</a>
+                <button type="submit" class="btn-save"><i class="fas fa-save"></i> Salvar Plano</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const usuarioUnico = document.getElementById('id_usuario_unico');
+    const multiplicador = document.getElementById('id_multiplicador');
+    const infoBox = document.getElementById('multiplicador-info');
+    const infoText = document.getElementById('info-text');
+    
+    function atualizarInfo() {
+        if (usuarioUnico && usuarioUnico.checked) {
+            infoBox.style.background = 'rgba(245,158,11,0.1)';
+            infoBox.style.color = '#d97706';
+            infoText.innerHTML = '<strong>Login EXCLUSIVO:</strong> Cada cliente tem seu próprio login. O Multiplicador será ignorado.';
+            if (multiplicador) multiplicador.value = 1;
+        } else {
+            infoBox.style.background = 'rgba(34,197,94,0.1)';
+            infoBox.style.color = '#16a34a';
+            const mult = multiplicador ? multiplicador.value : 1;
+            infoText.innerHTML = '<strong>Login COMPARTILHADO:</strong> Até <strong>' + mult + '</strong> cliente(s) podem usar o mesmo login e senha.';
+        }
+    }
+    
+    if (usuarioUnico) {
+        usuarioUnico.addEventListener('change', atualizarInfo);
+    }
+    if (multiplicador) {
+        multiplicador.addEventListener('input', atualizarInfo);
+    }
+    
+    // Auto-configurar por tipo de plano
+    const tipo = document.getElementById('id_tipo_plano');
+    const exigirUsuario = document.getElementById('id_exigir_usuario');
+    const exigirSenha = document.getElementById('id_exigir_senha');
+    
+    if (tipo && exigirUsuario && exigirSenha) {
+        tipo.addEventListener('change', function() {
+            if (this.value === 'assinatura') {
+                exigirUsuario.checked = true;
+                exigirSenha.checked = true;
+            }
+        });
+    }
+    
+    atualizarInfo();
+});
+</script>
+{% endblock %}

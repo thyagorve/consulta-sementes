@@ -661,101 +661,112 @@
           {% if user.is_authenticated %}
           
           <!-- ========== DASHBOARD ========== -->
-          {% if user.is_superuser or perms.sapp.pode_ver_dashboard or perms.sapp.pode_ver_estoque %}
+          {% if user.is_superuser or perms.sapp.pode_ver_dashboard %}
           <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+            <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"
                href="{% url 'sapp:dashboard' %}">
               <i class="fa-solid fa-chart-pie"></i> Dashboard
             </a>
           </li>
           {% endif %}
 
-          <!-- ========== ESTOQUE (DROPDOWN) ========== -->
-          {% if user.is_superuser or perms.sapp.pode_ver_estoque %}
+          <!-- ========== ESTOQUE ========== -->
+          {% if user.is_superuser or perms.sapp.pode_ver_estoque or perms.sapp.pode_movimentar_estoque %}
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if 'estoque' in request.path or 'gestao_estoque' in request.path %}active{% endif %}" 
+            <a class="nav-link dropdown-toggle {% if 'estoque' in request.path or 'historico' in request.path %}active{% endif %}"
                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="fa-solid fa-boxes-stacked"></i> Estoque
             </a>
             <ul class="dropdown-menu">
+              {% if user.is_superuser or perms.sapp.pode_ver_estoque %}
               <li>
-                <a class="dropdown-item {% if request.resolver_match.url_name == 'lista_estoque' %}active{% endif %}" 
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'lista_estoque' %}active{% endif %}"
                    href="{% url 'sapp:lista_estoque' %}">
                   <i class="fa-solid fa-table-list"></i> Visualizar Estoque
                 </a>
               </li>
+              <li>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'historico_geral' %}active{% endif %}"
+                   href="{% url 'sapp:historico_geral' %}">
+                  <i class="fa-solid fa-clock-rotate-left"></i> Histórico
+                </a>
+              </li>
+              {% endif %}
               {% if user.is_superuser or perms.sapp.pode_movimentar_estoque %}
               <li>
-                <a class="dropdown-item {% if request.resolver_match.url_name == 'gestao_estoque' %}active{% endif %}" 
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'gestao_estoque' %}active{% endif %}"
                    href="{% url 'sapp:gestao_estoque' %}">
                   <i class="fa-solid fa-dolly"></i> Movimentar Estoque
                 </a>
               </li>
               {% endif %}
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <a class="dropdown-item {% if request.resolver_match.url_name == 'historico_geral' %}active{% endif %}" 
-                   href="{% url 'sapp:historico_geral' %}">
-                  <i class="fa-solid fa-clock-rotate-left"></i> Histórico
-                </a>
-              </li>
+            </ul>
+          </li>
+          {% endif %}
 
-                              <!-- ========== MAPA ========== -->
+          <!-- ========== MAPA ========== -->
           {% if user.is_superuser or perms.sapp.pode_ver_mapa %}
           <li class="nav-item">
-            <a class="dropdown-item {% if 'mapa' in request.path %}active{% endif %}" 
+            <a class="nav-link {% if 'mapa' in request.path %}active{% endif %}"
                href="{% url 'sapp:mapa_canvas' 1 %}">
               <i class="fas fa-map-marked-alt"></i> Mapa
             </a>
           </li>
           {% endif %}
-            </ul>
-          </li>
 
-    
-          {% endif %}
-
-          <!-- ========== EMPENHO & SOLICITAÇÕES (DROPDOWN) ========== -->
-          {% if user.is_superuser or perms.sapp.pode_ver_empenhos %}
+          <!-- ========== SOLICITAÇÕES ========== -->
+          {% if user.is_superuser or perms.sapp.pode_ver_empenhos or perms.sapp.pode_criar_solicitacao or perms.sapp.pode_empenhar_solicitacao or perms.sapp.pode_movimentar_solicitacao or perms.sapp.pode_cancelar_solicitacao or perms.sapp.pode_criar_empenhos %}
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if 'empenho' in request.path or 'solicitacao' in request.path or 'rascunho' in request.path or 'kanban' in request.path %}active{% endif %}" 
+            <a class="nav-link dropdown-toggle {% if 'solicitacao' in request.path or 'kanban' in request.path or 'cargas' in request.path %}active{% endif %}"
                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="fa-solid fa-clipboard-list"></i> Solicitações
             </a>
             <ul class="dropdown-menu">
+              {% if user.is_superuser or perms.sapp.pode_ver_empenhos %}
               <li>
-                <a class="dropdown-item {% if request.resolver_match.url_name == 'pagina_solicitacoes' %}active{% endif %}" 
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'pagina_solicitacoes' %}active{% endif %}"
                    href="{% url 'sapp:pagina_solicitacoes' %}">
                   <i class="fa-solid fa-list-check"></i> Cards
                 </a>
               </li>
+              {% endif %}
+              {% if user.is_superuser or perms.sapp.pode_criar_solicitacao %}
               <li>
-                <a class="dropdown-item {% if request.resolver_match.url_name == 'pagina_kanban' %}active{% endif %}" 
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'criar_solicitacao' %}active{% endif %}"
+                   href="{% url 'sapp:criar_solicitacao' %}">
+                  <i class="fa-solid fa-plus-circle"></i> Nova Solicitação
+                </a>
+              </li>
+              {% endif %}
+              {% if user.is_superuser or perms.sapp.pode_ver_empenhos or perms.sapp.pode_empenhar_solicitacao or perms.sapp.pode_movimentar_solicitacao or perms.sapp.pode_cancelar_solicitacao or perms.sapp.pode_criar_empenhos %}
+              <li>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'pagina_kanban' %}active{% endif %}"
                    href="{% url 'sapp:pagina_kanban' %}">
                   <i class="fa-solid fa-columns"></i> Quadro Kanban
                 </a>
               </li>
+              {% endif %}
+              {% if user.is_superuser or perms.sapp.pode_ver_empenhos or perms.sapp.pode_movimentar_solicitacao %}
               <li>
-                <a class="dropdown-item {% if request.resolver_match.url_name == 'gestao_cargas' %}active{% endif %}" href="{% url 'sapp:gestao_cargas' %}">
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'gestao_cargas' %}active{% endif %}"
+                   href="{% url 'sapp:gestao_cargas' %}">
                   <i class="fa-solid fa-truck-ramp-box"></i> Gestão de Cargas
                 </a>
               </li>
-
-              
+              {% endif %}
             </ul>
           </li>
           {% endif %}
 
           <!-- ========== ALMOXARIFADO ========== -->
-          {% if user.is_superuser or perms.almoxarifado.pode_ver_almoxarifado %}
+          {% if user.is_superuser or perms.almoxarifado.pode_ver_almoxarifado or perms.almoxarifado.pode_gerenciar_almoxarifado %}
           <li class="nav-item">
-            <a class="nav-link {% if 'almoxarifado' in request.path %}active{% endif %}" 
+            <a class="nav-link {% if 'almoxarifado' in request.path %}active{% endif %}"
                href="{% url 'almoxarifado:lista_itens' %}">
               <i class="fa-solid fa-warehouse"></i> Almoxarifado
             </a>
           </li>
           {% endif %}
-
 
 
           <!-- ========== CONFIGURAÇÕES (DROPDOWN) ========== -->
@@ -1359,7 +1370,7 @@
     })();
   </script>
 
-  <script src="{% static 'js/offline-sync.js' %}?v=11.14-codigo-tratamento"></script>
+  <script src="{% static 'js/offline-sync.js' %}?v=11.16-acesso-usuarios"></script>
 
   {% block extra_js %}{% endblock %}
 </body>

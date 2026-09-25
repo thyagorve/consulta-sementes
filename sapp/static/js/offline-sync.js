@@ -5,11 +5,16 @@
   const userId = Number(root?.dataset?.offlineUserId || 0);
   if (!userId) return;
 
+  // A troca obrigatória de senha é uma etapa exclusivamente online.
+  // Não inicializa o bloqueio offline nessa tela para evitar que um token
+  // antigo cubra o formulário com o modal de "sessão offline expirada".
+  if (/^\/mudar-senha\/?$/i.test(location.pathname)) return;
+
   const DB_NAME = `infinity-stock-offline-u${userId}`;
   const DB_VERSION = 1;
   const SYNC_INTERVAL = 45000;
   const REFERENCE_REFRESH_MS = 10 * 60 * 1000;
-  const OFFLINE_CACHE_VERSION = '11.13';
+  const OFFLINE_CACHE_VERSION = '11.16';
   let softOffline = false;
   const WARN_QUEUE = 50;
   const CRITICAL_QUEUE = 200;
@@ -437,8 +442,18 @@
     if (!bubble) return;
     const all = await queueAll().catch(() => []);
     const actionable = all.filter(x => ['PENDENTE', 'CONFLITO', 'REJEITADA'].includes(x.status));
-    const session = await metaGet('session');
-    const loggedOut = Boolean(await metaGet('logged_out'));
+    let session = await metaGet('session');
+    let loggedOut = Boolean(await metaGet('logged_out'));
+
+    // Se a página está online e a sessão Django está válida, renova o token
+    // offline antes de considerar a sessão expirada. Isso evita o modal preto
+    // aparecer por causa de um token local antigo depois de um login normal.
+    if (navigator.onLine && (loggedOut || sessionExpired(session))) {
+      const renewed = await ensureSession(true).catch(() => null);
+      if (renewed && !sessionExpired(renewed)) session = renewed;
+      loggedOut = Boolean(await metaGet('logged_out'));
+    }
+
     const expired = loggedOut || sessionExpired(session);
     bubble.classList.remove('sync-green','sync-yellow','sync-red','sync-black');
     if (expired) bubble.classList.add('sync-black');
@@ -453,7 +468,7 @@
     const sessionBlock = document.getElementById('offlineSessionBlock');
     // Sem internet, uma sessão de 5h expirada bloqueia novas ações. Online,
     // ensureSession() pode renovar silenciosamente pela sessão Django.
-    const mustBlock = expired;
+    const mustBlock = expired && !navigator.onLine;
     sessionBlock?.classList.toggle('show', mustBlock);
     const pendingHint = document.getElementById('offlineSessionPendingHint');
     if (pendingHint) pendingHint.textContent = actionable.length

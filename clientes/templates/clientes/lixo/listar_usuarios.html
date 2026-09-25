@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Lista de Usuários{% endblock %}
+
+{% block content %}
+    <h2>Lista de Usuários</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Usuário</th>
+                <th>Data de Vencimento</th>
+                <th>Dias Restantes</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cliente in clientes %}
+            <tr>
+                <td>{{ cliente.nome }}</td>
+                <td>{{ cliente.usuario }}</td>
+                <td>{{ cliente.data_vencimento|date:"d/m/Y" }}</td>
+                <td>
+                    {% if cliente.dias_para_vencer is not None %}
+                        {{ cliente.dias_para_vencer }} dias
+                    {% else %}
+                        Data de vencimento não definida
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'editar_cliente' cliente.pk %}">Editar</a>
+                    {% if cliente.dias_para_vencer < 0 %}
+                        <a href="{% url 'renovar_cliente' cliente.pk %}">Renovar</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">Nenhum usuário encontrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

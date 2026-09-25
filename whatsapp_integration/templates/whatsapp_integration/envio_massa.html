@@ -1,0 +1,1596 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Envio em Massa - WhatsApp{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --em-bg: var(--bg-color, #f4f6f8);
+        --em-card: var(--bg-card, #ffffff);
+        --em-soft: var(--secondary-color, #f7f8fa);
+        --em-hover: var(--bg-hover, #eef2f6);
+        --em-text: var(--text-color, #1f2937);
+        --em-muted: var(--text-muted, #6b7280);
+        --em-border: var(--border-color, #dfe4ea);
+        --em-primary: var(--primary-color, #5865f2);
+        --em-primary-dark: var(--primary-dark, #4049c9);
+        --em-success: #16a34a;
+        --em-danger: #dc2626;
+        --em-warning: #d97706;
+        --em-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+    }
+
+    body.dark-mode,
+    body.theme-dark,
+    [data-theme="dark"] {
+        --em-bg: #0d1117;
+        --em-card: #161b22;
+        --em-soft: #1c232d;
+        --em-hover: #242d39;
+        --em-text: #f0f3f6;
+        --em-muted: #9aa7b5;
+        --em-border: #303b49;
+        --em-shadow: 0 10px 30px rgba(0, 0, 0, .28);
+    }
+
+    .em-page {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 20px 14px 42px;
+        color: var(--em-text);
+    }
+
+    .em-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+        padding: 22px 24px;
+        border-radius: 18px;
+        color: #fff;
+        background: linear-gradient(135deg, var(--em-primary), var(--em-primary-dark));
+        box-shadow: var(--em-shadow);
+    }
+
+    .em-header-title {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+
+    .em-header-icon {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: rgba(255,255,255,.16);
+        font-size: 1.3rem;
+    }
+
+    .em-header h1 {
+        margin: 0;
+        font-size: 1.45rem;
+        font-weight: 800;
+    }
+
+    .em-header p {
+        margin: 3px 0 0;
+        color: rgba(255,255,255,.82);
+        font-size: .86rem;
+    }
+
+    .em-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.14);
+        font-size: .78rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .em-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 330px;
+        gap: 18px;
+        align-items: start;
+    }
+
+    .em-card {
+        margin-bottom: 16px;
+        overflow: visible;
+        border: 1px solid var(--em-border);
+        border-radius: 16px;
+        background: var(--em-card);
+        box-shadow: var(--em-shadow);
+    }
+
+    .em-card-head {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--em-border);
+    }
+
+    .em-step {
+        width: 31px;
+        height: 31px;
+        display: grid;
+        place-items: center;
+        flex: 0 0 31px;
+        border-radius: 10px;
+        color: #fff;
+        background: var(--em-primary);
+        font-size: .78rem;
+        font-weight: 800;
+    }
+
+    .em-card-head h2 {
+        margin: 0;
+        color: var(--em-text);
+        font-size: .98rem;
+        font-weight: 800;
+    }
+
+    .em-card-head small {
+        display: block;
+        margin-top: 2px;
+        color: var(--em-muted);
+        font-size: .72rem;
+    }
+
+    .em-card-body {
+        padding: 18px;
+    }
+
+    .em-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 14px;
+    }
+
+    .em-col-12 { grid-column: span 12; }
+    .em-col-6 { grid-column: span 6; }
+    .em-col-4 { grid-column: span 4; }
+
+    .em-label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--em-text);
+        font-size: .77rem;
+        font-weight: 800;
+        text-transform: uppercase;
+    }
+
+    .em-label i {
+        width: 16px;
+        color: var(--em-primary);
+    }
+
+    .em-control {
+        width: 100%;
+        min-height: 44px;
+        box-sizing: border-box;
+        padding: 10px 12px;
+        border: 1px solid var(--em-border);
+        border-radius: 10px;
+        outline: none;
+        background: var(--em-soft);
+        color: var(--em-text);
+        font-size: .9rem;
+    }
+
+    .em-control:focus {
+        border-color: var(--em-primary);
+        box-shadow: 0 0 0 3px rgba(88, 101, 242, .14);
+        background: var(--em-card);
+    }
+
+    .em-control:disabled {
+        opacity: .55;
+        cursor: not-allowed;
+    }
+
+    textarea.em-control {
+        min-height: 175px;
+        resize: vertical;
+        line-height: 1.5;
+        font-family: inherit;
+    }
+
+    .em-help {
+        margin-top: 6px;
+        color: var(--em-muted);
+        font-size: .73rem;
+    }
+
+    /* TAGS */
+    .em-tag-wrap {
+        position: relative;
+    }
+
+    .em-tag-box {
+        min-height: 46px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 7px;
+        padding: 7px;
+        border: 1px solid var(--em-border);
+        border-radius: 10px;
+        background: var(--em-soft);
+        cursor: pointer;
+    }
+
+    .em-tag-box:focus,
+    .em-tag-box.open {
+        outline: none;
+        border-color: var(--em-primary);
+        box-shadow: 0 0 0 3px rgba(88, 101, 242, .14);
+    }
+
+    .em-tag-placeholder {
+        color: var(--em-muted);
+        font-size: .82rem;
+        padding: 4px;
+    }
+
+    .em-tag-selected {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 100%;
+        padding: 6px 9px;
+        border: 1px solid rgba(88, 101, 242, .35);
+        border-radius: 999px;
+        background: rgba(88, 101, 242, .12);
+        color: var(--em-text);
+        font-size: .76rem;
+        font-weight: 700;
+    }
+
+    .em-tag-remove {
+        width: 18px;
+        height: 18px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        color: var(--em-danger);
+        background: rgba(220, 38, 38, .12);
+        font-size: .85rem;
+    }
+
+    .em-tag-dropdown {
+        display: none;
+        position: absolute;
+        z-index: 1000;
+        top: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        max-height: 230px;
+        overflow-y: auto;
+        padding: 6px;
+        border: 1px solid var(--em-border);
+        border-radius: 10px;
+        background: var(--em-card);
+        box-shadow: 0 14px 34px rgba(0, 0, 0, .2);
+    }
+
+    .em-tag-dropdown.open { display: block; }
+
+    .em-tag-option {
+        padding: 10px;
+        border-radius: 8px;
+        color: var(--em-text);
+        cursor: pointer;
+        font-size: .84rem;
+    }
+
+    .em-tag-option:hover {
+        background: var(--em-hover);
+        color: var(--em-primary);
+    }
+
+    /* VARIÁVEIS */
+    .em-vars {
+        margin-bottom: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        background: var(--em-soft);
+    }
+
+    .em-vars-title {
+        margin-bottom: 9px;
+        color: var(--em-muted);
+        font-size: .75rem;
+        font-weight: 800;
+    }
+
+    .em-vars-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .em-var-btn {
+        border: 1px solid rgba(88, 101, 242, .35);
+        border-radius: 999px;
+        padding: 7px 10px;
+        background: var(--em-card);
+        color: var(--em-text);
+        cursor: pointer;
+        font-size: .74rem;
+        font-weight: 700;
+    }
+
+    .em-var-btn:hover,
+    .em-var-btn:focus {
+        border-color: var(--em-primary);
+        outline: none;
+        background: var(--em-primary);
+        color: #fff;
+    }
+
+    .em-message-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 7px;
+        color: var(--em-muted);
+        font-size: .72rem;
+    }
+
+    /* ANEXO */
+    .em-upload {
+        position: relative;
+        padding: 20px 14px;
+        border: 1px dashed var(--em-border);
+        border-radius: 11px;
+        text-align: center;
+        background: var(--em-soft);
+    }
+
+    .em-upload input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+    .em-upload i {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--em-primary);
+        font-size: 1.35rem;
+    }
+
+    .em-upload strong {
+        display: block;
+        color: var(--em-text);
+        font-size: .84rem;
+    }
+
+    .em-upload span {
+        color: var(--em-muted);
+        font-size: .72rem;
+    }
+
+    .em-file-preview {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+        padding: 10px;
+        border-radius: 10px;
+        background: var(--em-soft);
+    }
+
+    .em-file-preview.show { display: flex; }
+
+    .em-file-data {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .em-file-name {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        color: var(--em-text);
+        font-size: .8rem;
+        font-weight: 700;
+    }
+
+    .em-file-size {
+        color: var(--em-muted);
+        font-size: .7rem;
+    }
+
+    .em-file-remove {
+        width: 32px;
+        height: 32px;
+        border: 0;
+        border-radius: 9px;
+        color: var(--em-danger);
+        background: rgba(220, 38, 38, .1);
+        cursor: pointer;
+    }
+
+    /* LATERAL */
+    .em-side-card {
+        position: sticky;
+        top: 16px;
+    }
+
+    .em-counter {
+        padding: 18px;
+        border-radius: 12px;
+        text-align: center;
+        background: var(--em-soft);
+    }
+
+    .em-counter strong {
+        display: block;
+        color: var(--em-primary);
+        font-size: 2rem;
+        line-height: 1;
+    }
+
+    .em-counter span {
+        display: block;
+        margin-top: 6px;
+        color: var(--em-muted);
+        font-size: .74rem;
+    }
+
+    .em-summary {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0;
+    }
+
+    .em-summary-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 10px;
+        border-bottom: 1px solid var(--em-border);
+        color: var(--em-muted);
+        font-size: .76rem;
+    }
+
+    .em-summary-item strong {
+        color: var(--em-text);
+        text-align: right;
+    }
+
+    .em-wa {
+        overflow: hidden;
+        border-radius: 12px;
+        border: 1px solid var(--em-border);
+        background: #efeae2;
+    }
+
+    .em-wa-head {
+        padding: 10px 12px;
+        color: #fff;
+        background: #075e54;
+        font-size: .77rem;
+        font-weight: 700;
+    }
+
+    .em-wa-body {
+        min-height: 145px;
+        padding: 12px;
+        background: #efeae2;
+    }
+
+    .em-wa-bubble {
+        max-width: 94%;
+        margin-left: auto;
+        padding: 9px 10px;
+        border-radius: 10px 10px 3px 10px;
+        background: #d9fdd3;
+        color: #111827;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: .79rem;
+        line-height: 1.4;
+        box-shadow: 0 1px 2px rgba(0,0,0,.12);
+    }
+
+    .em-actions {
+        display: grid;
+        gap: 9px;
+        margin-top: 13px;
+    }
+
+    .em-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 9px 13px;
+        border: 0;
+        border-radius: 10px;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: .82rem;
+        font-weight: 800;
+    }
+
+    .em-btn:disabled {
+        opacity: .55;
+        cursor: not-allowed;
+    }
+
+    .em-btn-soft {
+        border: 1px solid var(--em-border);
+        color: var(--em-text);
+        background: var(--em-soft);
+    }
+
+    .em-btn-success {
+        color: #fff;
+        background: linear-gradient(135deg, #22c55e, #15803d);
+    }
+
+    .em-btn-danger {
+        border: 1px solid rgba(220,38,38,.28);
+        color: var(--em-danger);
+        background: rgba(220,38,38,.09);
+    }
+
+    /* LISTAS */
+    .em-list {
+        display: grid;
+        gap: 8px;
+        max-height: 320px;
+        overflow-y: auto;
+    }
+
+    .em-client {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 11px;
+        border-radius: 10px;
+        background: var(--em-soft);
+    }
+
+    .em-client strong {
+        display: block;
+        color: var(--em-text);
+        font-size: .8rem;
+    }
+
+    .em-client small {
+        color: var(--em-muted);
+        font-size: .7rem;
+    }
+
+    .em-badge {
+        padding: 4px 7px;
+        border-radius: 999px;
+        color: #15803d;
+        background: rgba(34,197,94,.13);
+        font-size: .65rem;
+        font-weight: 800;
+    }
+
+    .em-empty {
+        padding: 22px 12px;
+        text-align: center;
+        color: var(--em-muted);
+        font-size: .78rem;
+    }
+
+    .em-history-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .em-history-box {
+        display: none;
+        margin-top: 10px;
+    }
+
+    .em-history-box.open { display: block; }
+
+    .em-history-item {
+        display: block;
+        margin-bottom: 7px;
+        padding: 10px;
+        border-radius: 9px;
+        color: var(--em-text);
+        text-decoration: none;
+        background: var(--em-soft);
+    }
+
+    .em-history-item small {
+        display: block;
+        color: var(--em-muted);
+        font-size: .68rem;
+    }
+
+    .em-history-item strong {
+        display: block;
+        margin-top: 2px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        font-size: .77rem;
+    }
+
+    .em-mobile-actions { display: none; }
+
+    /* NOVO ESTILO PARA O AVISO DE AVULSOS */
+    .em-aviso-avulso {
+        background-color: #fff3cd;
+        color: #856404;
+        padding: 10px;
+        border-radius: 8px;
+        margin-top: 6px;
+        font-size: .78rem;
+        border: 1px solid #ffc107;
+    }
+
+    @media (max-width: 980px) {
+        .em-layout { grid-template-columns: 1fr; }
+        .em-side-card { position: static; }
+    }
+
+    @media (max-width: 700px) {
+        .em-page {
+            padding: 8px 0 82px;
+        }
+
+        .em-header {
+            margin: 0 8px 10px;
+            padding: 15px;
+            border-radius: 13px;
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .em-header-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+        }
+
+        .em-header h1 { font-size: 1.15rem; }
+        .em-header p { font-size: .76rem; }
+
+        .em-main,
+        .em-side {
+            width: 100%;
+        }
+
+        .em-card {
+            margin: 0 8px 10px;
+            border-left: 0;
+            border-right: 0;
+            border-radius: 12px;
+            box-shadow: none;
+        }
+
+        .em-card-head {
+            padding: 13px 14px;
+        }
+
+        .em-card-body {
+            padding: 14px;
+        }
+
+        .em-col-6,
+        .em-col-4 {
+            grid-column: span 12;
+        }
+
+        .em-vars {
+            padding: 10px;
+            border-radius: 9px;
+        }
+
+        .em-vars-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .em-var-btn {
+            width: 100%;
+            border-radius: 9px;
+            text-align: left;
+        }
+
+        .em-message-meta {
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .em-history-buttons {
+            grid-template-columns: 1fr;
+        }
+
+        .em-side .em-actions {
+            display: none;
+        }
+
+        .em-mobile-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            position: fixed;
+            z-index: 1100;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 9px 10px calc(9px + env(safe-area-inset-bottom));
+            border-top: 1px solid var(--em-border);
+            background: var(--em-card);
+            box-shadow: 0 -8px 22px rgba(0,0,0,.16);
+        }
+    }
+
+    @media (max-width: 420px) {
+        .em-vars-list { grid-template-columns: 1fr; }
+        .em-card-head small { display: none; }
+    }
+
+    /* MODO DE DESTINATÁRIOS */
+    .em-recipient-mode {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .em-mode-option {
+        position: relative;
+        cursor: pointer;
+    }
+    .em-mode-option input { position: absolute; opacity: 0; pointer-events: none; }
+    .em-mode-card {
+        min-height: 74px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid var(--em-border);
+        border-radius: 12px;
+        background: var(--em-soft);
+        transition: .18s ease;
+    }
+    .em-mode-card i { color: var(--em-primary); font-size: 1.1rem; }
+    .em-mode-card strong { display: block; font-size: .84rem; }
+    .em-mode-card small { display: block; margin-top: 2px; color: var(--em-muted); font-size: .69rem; }
+    .em-mode-option input:checked + .em-mode-card {
+        border-color: var(--em-primary);
+        background: rgba(88, 101, 242, .12);
+        box-shadow: 0 0 0 3px rgba(88, 101, 242, .12);
+    }
+    .em-disabled-area { opacity: .48; pointer-events: none; filter: grayscale(.2); }
+    @media (max-width: 700px) { .em-recipient-mode { grid-template-columns: 1fr; } }
+
+</style>
+
+{% csrf_token %}
+
+<div class="em-page">
+    <header class="em-header">
+        <div class="em-header-title">
+            <div class="em-header-icon"><i class="fab fa-whatsapp"></i></div>
+            <div>
+                <h1>Envio em Massa</h1>
+                <p>Selecione os clientes, monte a mensagem e programe o envio.</p>
+            </div>
+        </div>
+
+        {% if tem_instancia %}
+            <div class="em-status-pill"><i class="fas fa-circle" style="color:#86efac"></i> WhatsApp conectado</div>
+        {% else %}
+            <div class="em-status-pill"><i class="fas fa-exclamation-triangle" style="color:#fde68a"></i> WhatsApp desconectado</div>
+        {% endif %}
+    </header>
+
+    <div id="msg-status"></div>
+
+    <div class="em-layout">
+        <main class="em-main">
+            <section class="em-card">
+                <div class="em-card-head">
+                    <div class="em-step">1</div>
+                    <div><h2>Agendamento</h2><small>Escolha a data e o horário</small></div>
+                </div>
+                <div class="em-card-body">
+                    <div class="em-grid">
+                        <div class="em-col-6">
+                            <label class="em-label" for="data_envio"><i class="far fa-calendar"></i> Data</label>
+                            <input type="date" id="data_envio" class="em-control"
+                                   value="{{ rascunho_atual.data_agendamento|date:'Y-m-d'|default:data_minima }}"
+                                   min="{{ hoje }}" onchange="atualizarResumo()">
+                        </div>
+                        <div class="em-col-6">
+                            <label class="em-label" for="hora_envio"><i class="far fa-clock"></i> Horário</label>
+                            <input type="time" id="hora_envio" class="em-control"
+                                   value="{{ rascunho_atual.data_agendamento|time:'H:i'|default:'09:00' }}"
+                                   onchange="atualizarResumo()">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="em-card">
+                <div class="em-card-head">
+                    <div class="em-step">2</div>
+                    <div><h2>Quem vai receber?</h2><small>Use os filtros para selecionar os clientes</small></div>
+                </div>
+                <div class="em-card-body">
+                    <div class="em-recipient-mode">
+                        <label class="em-mode-option">
+                            <input type="radio" name="modo_destinatarios" value="clientes" checked onchange="alterarModoDestinatarios()">
+                            <span class="em-mode-card"><i class="fas fa-users"></i><span><strong>Clientes cadastrados</strong><small>Usa filtros e variáveis personalizadas</small></span></span>
+                        </label>
+                        <label class="em-mode-option">
+                            <input type="radio" name="modo_destinatarios" value="avulsos" onchange="alterarModoDestinatarios()">
+                            <span class="em-mode-card"><i class="fas fa-mobile-alt"></i><span><strong>Somente avulsos</strong><small>Remove os clientes da seleção</small></span></span>
+                        </label>
+                        <label class="em-mode-option">
+                            <input type="radio" name="modo_destinatarios" value="ambos" onchange="alterarModoDestinatarios()">
+                            <span class="em-mode-card"><i class="fas fa-layer-group"></i><span><strong>Clientes + avulsos</strong><small>Combina as duas listas sem duplicar</small></span></span>
+                        </label>
+                    </div>
+                    <div id="area-clientes-cadastrados">
+                    <div class="em-grid">
+                        <div class="em-col-4">
+                            <label class="em-label" for="filtro_plano"><i class="fas fa-layer-group"></i> Plano</label>
+                            <select id="filtro_plano" class="em-control" onchange="buscarClientes()">
+                                <option value="">Todos os planos</option>
+                                {% for servico in servicos %}
+                                    <option value="{{ servico.id }}" {% if rascunho_atual.plano_filtro.id == servico.id %}selected{% endif %}>{{ servico.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="em-col-4">
+                            <label class="em-label" for="filtro_status"><i class="fas fa-user-check"></i> Status</label>
+                            <select id="filtro_status" class="em-control" onchange="verificarStatus()">
+                                <option value="" {% if not rascunho_atual.status_filtro %}selected{% endif %}>Todos</option>
+                                <option value="ativos" {% if rascunho_atual.status_filtro == 'ativos' %}selected{% endif %}>Ativos</option>
+                                <option value="vencidos" {% if rascunho_atual.status_filtro == 'vencidos' %}selected{% endif %}>Vencidos</option>
+                                <option value="desativados" {% if rascunho_atual.status_filtro == 'desativados' %}selected{% endif %}>Desativados</option>
+                            </select>
+                        </div>
+
+                        <div class="em-col-4">
+                            <label class="em-label" for="dias_vencido"><i class="fas fa-hourglass-half"></i> Dias vencido</label>
+                            <input type="number" id="dias_vencido" class="em-control" min="0" placeholder="Ex.: 5"
+                                   value="{{ rascunho_atual.dias_vencido_filtro|default:'' }}"
+                                   {% if rascunho_atual.status_filtro != 'vencidos' %}disabled{% endif %}
+                                   oninput="agendarBuscaClientes()">
+                        </div>
+
+                        <div class="em-col-12 em-tag-wrap">
+                            <label class="em-label"><i class="fas fa-tags"></i> Tags</label>
+                            <div id="tag-box" class="em-tag-box" tabindex="0" onclick="toggleTags(event)" onkeydown="teclaTags(event)"></div>
+                            <div id="tag-dropdown" class="em-tag-dropdown">
+                                {% for tag in tags %}
+                                    <div class="em-tag-option" onclick="addTag('{{ tag.id }}', '{{ tag.nome|escapejs }}')">
+                                        <i class="fas fa-tag"></i> {{ tag.nome }}
+                                    </div>
+                                {% empty %}
+                                    <div class="em-empty">Nenhuma tag cadastrada.</div>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" id="tags_json" value="[]">
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- NOVA SEÇÃO: NÚMEROS AVULSOS -->
+            <section class="em-card" id="secao-avulsos">
+                <div class="em-card-head">
+                    <div class="em-step"><i class="fas fa-mobile-alt"></i></div>
+                    <div>
+                        <h2>Números avulsos (opcional)</h2>
+                        <small>Adicione números que não estão na sua base de clientes</small>
+                    </div>
+                </div>
+                <div class="em-card-body">
+                    <div class="em-grid">
+                        <div class="em-col-12">
+                            <label class="em-label" for="numeros_avulsos">
+                                <i class="fas fa-phone-alt"></i> Lista de números
+                            </label>
+                            <textarea id="numeros_avulsos" class="em-control" rows="4" oninput="atualizarResumo()" disabled
+                                      placeholder="5511999999999&#10;5521988888888&#10;5531997777777"
+                            >{{ rascunho_atual.numeros_avulsos|default:'' }}</textarea>
+                            <div class="em-aviso-avulso">
+                                ⚠️ <strong>Atenção:</strong> Esses números <u>não receberão as variáveis personalizadas</u> ({nome}, {plano}, etc.). A mensagem será enviada exatamente como digitada, sem substituições.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="em-card">
+                <div class="em-card-head">
+                    <div class="em-step">3</div>
+                    <div><h2>Mensagem</h2><small>Clique nas variáveis para inserir</small></div>
+                </div>
+                <div class="em-card-body">
+                    <div class="em-vars">
+                        <div class="em-vars-title"><i class="fas fa-code"></i> Variáveis disponíveis</div>
+                        <div class="em-vars-list">
+                            <button type="button" class="em-var-btn" onclick="insertVar('{saudacao}')">Saudação</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{nome}')">Nome</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{data_vencimento}')">Vencimento</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{plano}')">Plano</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{whatsapp}')">WhatsApp</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{usuario}')">Usuário</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{senha}')">Senha</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{saldo}')">Saldo</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{debitos}')">Débitos</button>
+                           
+                            <button type="button" class="em-var-btn" onclick="insertVar('{valor_total_a_pagar}')">Valor a pagar</button>
+                            <button type="button" class="em-var-btn" onclick="insertVar('{observacao}')">Observação</button>
+                        </div>
+                    </div>
+
+                    <textarea id="mensagem" class="em-control" maxlength="4000"
+                              placeholder="Ex.: {saudacao}, {nome}! Seu plano {plano} vence em {data_vencimento}."
+                              oninput="atualizarMensagem()">{{ rascunho_atual.mensagem|default:'' }}</textarea>
+                    <div class="em-message-meta">
+                        <span>A prévia usa dados de exemplo. No envio serão usados os dados reais do cliente.</span>
+                        <strong><span id="char-count">0</span>/4000</strong>
+                    </div>
+                </div>
+            </section>
+
+            <section class="em-card">
+                <div class="em-card-head">
+                    <div class="em-step">4</div>
+                    <div><h2>Anexo</h2><small>Imagem, vídeo, áudio ou documento</small></div>
+                </div>
+                <div class="em-card-body">
+                    <div class="em-upload">
+                        <input type="file" id="arquivo_midia"
+                               accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+                               onchange="mostrarArquivo()">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <strong>Clique para selecionar um arquivo</strong>
+                        <span>Limite recomendado: 16 MB</span>
+                    </div>
+
+                    <div id="file-preview" class="em-file-preview">
+                        <i class="fas fa-file" style="color:var(--em-primary)"></i>
+                        <div class="em-file-data">
+                            <div id="file-name" class="em-file-name"></div>
+                            <div id="file-size" class="em-file-size"></div>
+                        </div>
+                        <button type="button" class="em-file-remove" onclick="removerArquivo()"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    {% if rascunho_atual.midia %}
+                        <div class="em-help">
+                            Arquivo atual: <a href="{{ rascunho_atual.midia.url }}" target="_blank">visualizar</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="em-card">
+                <div class="em-card-head">
+                    <div class="em-step"><i class="fas fa-folder-open"></i></div>
+                    <div><h2>Campanhas salvas</h2><small>Rascunhos e envios agendados</small></div>
+                </div>
+                <div class="em-card-body">
+                    <div class="em-history-buttons">
+                        <button type="button" class="em-btn em-btn-soft" onclick="toggleBox('boxRascunhos')">
+                            <i class="fas fa-edit"></i> Rascunhos ({{ rascunhos.count }})
+                        </button>
+                        <button type="button" class="em-btn em-btn-soft" onclick="toggleBox('boxAgendadas')">
+                            <i class="far fa-clock"></i> Agendadas ({{ agendadas.count }})
+                        </button>
+                    </div>
+
+                    <div id="boxRascunhos" class="em-history-box">
+                        {% for r in rascunhos %}
+                            <a href="?rascunho_id={{ r.id }}" class="em-history-item">
+                                <small>{{ r.data_criacao|date:"d/m/Y H:i" }}</small>
+                                <strong>{{ r.mensagem|truncatechars:70 }}</strong>
+                            </a>
+                        {% empty %}
+                            <div class="em-empty">Nenhum rascunho salvo.</div>
+                        {% endfor %}
+                    </div>
+
+                    <div id="boxAgendadas" class="em-history-box">
+                        {% for a in agendadas %}
+                            <a href="{% url 'integra:detalhe_mensagem_massa' a.id %}" class="em-history-item">
+                                <small>{{ a.data_agendamento|date:"d/m/Y H:i" }}</small>
+                                <strong>{{ a.mensagem|truncatechars:70 }}</strong>
+                            </a>
+                        {% empty %}
+                            <div class="em-empty">Nenhum envio agendado.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+
+            <section class="em-card">
+                <div class="em-card-head">
+                    <div class="em-step"><i class="fas fa-list"></i></div>
+                    <div><h2>Clientes selecionados</h2><small>Todos os clientes filtrados são exibidos abaixo</small></div>
+                </div>
+                <div class="em-card-body">
+                    <div id="lista-clientes" class="em-list">
+                        <div class="em-empty"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <aside class="em-side">
+            <section class="em-card em-side-card">
+                <div class="em-card-head">
+                    <div class="em-step"><i class="fas fa-paper-plane"></i></div>
+                    <div><h2>Resumo</h2><small>Confira antes de salvar</small></div>
+                </div>
+                <div class="em-card-body">
+                    <div class="em-counter">
+                        <strong id="contador-clientes">0</strong>
+                        <span>clientes selecionados</span>
+                    </div>
+
+                    <div class="em-summary">
+                        <div class="em-summary-item"><span>Data</span><strong id="summary-date">--/--/----</strong></div>
+                        <div class="em-summary-item"><span>Horário</span><strong id="summary-time">--:--</strong></div>
+                        <div class="em-summary-item"><span>Anexo</span><strong id="summary-file">Sem anexo</strong></div>
+                    </div>
+
+                    <div class="em-wa">
+                        <div class="em-wa-head"><i class="fab fa-whatsapp"></i> Cliente de exemplo</div>
+                        <div class="em-wa-body">
+                            <div id="wa-preview" class="em-wa-bubble">Sua mensagem aparecerá aqui.</div>
+                        </div>
+                    </div>
+
+                    <div class="em-actions">
+                        {% if rascunho_atual %}
+                            <a href="{% url 'integra:enviar_mensagem_massa' %}" class="em-btn em-btn-danger">
+                                <i class="fas fa-times"></i> Cancelar edição
+                            </a>
+                        {% endif %}
+
+                        <button type="button" id="btn-save" class="em-btn em-btn-soft" onclick="enviar('rascunho')">
+                            <i class="fas fa-save"></i> {% if rascunho_atual %}Salvar alterações{% else %}Salvar rascunho{% endif %}
+                        </button>
+
+                        {% if tem_instancia %}
+                            <button type="button" id="btn-send-now" class="em-btn em-btn-success" onclick="enviar('agora')">
+                                <i class="fas fa-bolt"></i> Enviar agora
+                            </button>
+                            <button type="button" id="btn-send" class="em-btn em-btn-success" onclick="enviar('agendar')">
+                                <i class="far fa-clock"></i> Agendar envio
+                            </button>
+                        {% else %}
+                            <button type="button" class="em-btn em-btn-soft" disabled><i class="fas fa-plug"></i> WhatsApp offline</button>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+        </aside>
+    </div>
+</div>
+
+<div class="em-mobile-actions">
+    <button type="button" id="btn-save-mobile" class="em-btn em-btn-soft" onclick="enviar('rascunho')"><i class="fas fa-save"></i> Salvar</button>
+    {% if tem_instancia %}
+        <button type="button" id="btn-send-now-mobile" class="em-btn em-btn-success" onclick="enviar('agora')"><i class="fas fa-bolt"></i> Agora</button>
+        <button type="button" id="btn-send-mobile" class="em-btn em-btn-success" onclick="enviar('agendar')"><i class="far fa-clock"></i> Agendar</button>
+    {% else %}
+        <button type="button" class="em-btn em-btn-soft" disabled><i class="fas fa-plug"></i> Offline</button>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    var URLS = {
+        filtrar: "{% url 'integra:api_filter_clients' %}",
+        enviar: "{% url 'integra:api_send_mass_message' %}",
+        salvar: "{% url 'integra:api_save_mass_message' %}",
+        statusBase: "{% url 'integra:api_mass_message_status' 0 %}"
+    };
+
+    var TAGS_PRE = {{ tags_pre_selecionadas|default:'[]'|safe }};
+    var TAGS_SELECIONADAS = Array.isArray(TAGS_PRE) ? TAGS_PRE : [];
+    var CLIENTES_IDS = [];
+    var TIMER_BUSCA = null;
+    var PROCESSANDO = false;
+    var MODO_DESTINATARIOS = 'clientes';
+
+    var DADOS_PREVIA = {
+        saudacao: 'Boa noite',
+        nome: 'João da Silva',
+        data_vencimento: '10/08/2026',
+        plano: 'Plano Premium',
+        whatsapp: '5564999999999',
+        usuario: 'joao123',
+        senha: '123456',
+        saldo: 'R$ 35,00',
+        debitos: 'R$ 15,00',
+        valor_total_a_pagar: 'R$ 65,00',
+        observacao: 'Cliente prefere contato no período da noite.'
+    };
+
+    function escapeHtml(texto) {
+        var div = document.createElement('div');
+        div.textContent = texto == null ? '' : String(texto);
+        return div.innerHTML;
+    }
+
+    function getCsrf() {
+        var campo = document.querySelector('[name="csrfmiddlewaretoken"]');
+        return campo ? campo.value : '';
+    }
+
+    function formatarData(valor) {
+        if (!valor) return '--/--/----';
+        var partes = valor.split('-');
+        return partes.length === 3 ? partes[2] + '/' + partes[1] + '/' + partes[0] : valor;
+    }
+
+    function formatarTamanho(bytes) {
+        if (!bytes) return '0 KB';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function atualizarResumo() {
+        document.getElementById('summary-date').textContent = formatarData(document.getElementById('data_envio').value);
+        document.getElementById('summary-time').textContent = document.getElementById('hora_envio').value || '--:--';
+
+        var arquivo = document.getElementById('arquivo_midia').files[0];
+        document.getElementById('summary-file').textContent = arquivo ? arquivo.name : 'Sem anexo';
+    }
+
+    function atualizarMensagem() {
+        var campo = document.getElementById('mensagem');
+        document.getElementById('char-count').textContent = campo.value.length;
+        atualizarPreview();
+    }
+
+    function atualizarPreview() {
+        var texto = document.getElementById('mensagem').value || '';
+
+        Object.keys(DADOS_PREVIA).forEach(function(chave) {
+            texto = texto.split('{' + chave + '}').join(DADOS_PREVIA[chave]);
+        });
+
+        if (!texto.trim()) texto = 'Sua mensagem aparecerá aqui.';
+        document.getElementById('wa-preview').innerHTML = escapeHtml(texto).replace(/\n/g, '<br>');
+    }
+
+    function insertVar(valor) {
+        var campo = document.getElementById('mensagem');
+        var inicio = typeof campo.selectionStart === 'number' ? campo.selectionStart : campo.value.length;
+        var fim = typeof campo.selectionEnd === 'number' ? campo.selectionEnd : campo.value.length;
+        var antes = campo.value.substring(0, inicio);
+        var depois = campo.value.substring(fim);
+        var inserir = valor;
+
+        if (antes && !/\s$/.test(antes)) inserir = ' ' + inserir;
+        if (depois && !/^\s/.test(depois)) inserir = inserir + ' ';
+
+        campo.value = antes + inserir + depois;
+        var posicao = inicio + inserir.length;
+        campo.focus();
+        campo.setSelectionRange(posicao, posicao);
+        atualizarMensagem();
+    }
+
+    function renderTags() {
+        var box = document.getElementById('tag-box');
+        document.getElementById('tags_json').value = JSON.stringify(TAGS_SELECIONADAS);
+
+        if (!TAGS_SELECIONADAS.length) {
+            box.innerHTML = '<span class="em-tag-placeholder"><i class="fas fa-plus-circle"></i> Clique para selecionar tags</span>';
+            return;
+        }
+
+        var html = '';
+        TAGS_SELECIONADAS.forEach(function(tag) {
+            html += '<span class="em-tag-selected">' +
+                    '<span>' + escapeHtml(tag.nome) + '</span>' +
+                    '<span class="em-tag-remove" onclick="event.stopPropagation(); removeTag(\'' + escapeHtml(String(tag.id)) + '\')">&times;</span>' +
+                    '</span>';
+        });
+        box.innerHTML = html;
+    }
+
+    function toggleTags(evento) {
+        if (evento) evento.stopPropagation();
+        var dropdown = document.getElementById('tag-dropdown');
+        var box = document.getElementById('tag-box');
+        var abrir = !dropdown.classList.contains('open');
+        dropdown.classList.toggle('open', abrir);
+        box.classList.toggle('open', abrir);
+    }
+
+    function teclaTags(evento) {
+        if (evento.key === 'Enter' || evento.key === ' ') {
+            evento.preventDefault();
+            toggleTags(evento);
+        }
+    }
+
+    function addTag(id, nome) {
+        id = String(id);
+        var existe = TAGS_SELECIONADAS.some(function(tag) { return String(tag.id) === id; });
+        if (!existe) TAGS_SELECIONADAS.push({ id: id, nome: nome });
+        renderTags();
+        document.getElementById('tag-dropdown').classList.remove('open');
+        document.getElementById('tag-box').classList.remove('open');
+        buscarClientes();
+    }
+
+    function removeTag(id) {
+        id = String(id);
+        TAGS_SELECIONADAS = TAGS_SELECIONADAS.filter(function(tag) { return String(tag.id) !== id; });
+        renderTags();
+        buscarClientes();
+    }
+
+    function verificarStatus() {
+        var vencidos = document.getElementById('filtro_status').value === 'vencidos';
+        var campoDias = document.getElementById('dias_vencido');
+        campoDias.disabled = !vencidos;
+        if (!vencidos) campoDias.value = '';
+        buscarClientes();
+    }
+
+    function agendarBuscaClientes() {
+        clearTimeout(TIMER_BUSCA);
+        TIMER_BUSCA = setTimeout(buscarClientes, 450);
+    }
+
+    function obterModoDestinatarios() {
+        var marcado = document.querySelector('input[name="modo_destinatarios"]:checked');
+        return marcado ? marcado.value : 'clientes';
+    }
+
+    function contarNumerosAvulsos() {
+        var campo = document.getElementById('numeros_avulsos');
+        if (!campo || !campo.value.trim()) return 0;
+        var vistos = {};
+        campo.value.split(/[\n,;]+/).forEach(function(item) {
+            var numero = String(item || '').replace(/\D/g, '');
+            if (numero) vistos[numero] = true;
+        });
+        return Object.keys(vistos).length;
+    }
+
+    function alterarModoDestinatarios() {
+        MODO_DESTINATARIOS = obterModoDestinatarios();
+        var areaClientes = document.getElementById('area-clientes-cadastrados');
+        var secaoAvulsos = document.getElementById('secao-avulsos');
+        var somenteAvulsos = MODO_DESTINATARIOS === 'avulsos';
+        var somenteClientes = MODO_DESTINATARIOS === 'clientes';
+
+        areaClientes.classList.toggle('em-disabled-area', somenteAvulsos);
+        secaoAvulsos.classList.toggle('em-disabled-area', somenteClientes);
+        document.getElementById('numeros_avulsos').disabled = somenteClientes;
+
+        if (somenteAvulsos) {
+            CLIENTES_IDS = [];
+            document.getElementById('contador-clientes').textContent = '0';
+            document.getElementById('lista-clientes').innerHTML = '<div class="em-empty">Modo somente avulsos: clientes cadastrados foram retirados da seleção.</div>';
+        } else {
+            buscarClientes();
+        }
+        atualizarResumo();
+    }
+
+    function formDataFiltros() {
+        var formData = new FormData();
+        formData.append('plano', document.getElementById('filtro_plano').value);
+        formData.append('status', document.getElementById('filtro_status').value);
+        formData.append('dias_vencido', document.getElementById('dias_vencido').value);
+        formData.append('tags_json', document.getElementById('tags_json').value);
+        formData.append('csrfmiddlewaretoken', getCsrf());
+
+        TAGS_SELECIONADAS.forEach(function(tag) {
+            formData.append('tags[]', String(tag.id));
+        });
+
+        return formData;
+    }
+
+    function buscarClientes() {
+        clearTimeout(TIMER_BUSCA);
+        if (obterModoDestinatarios() === 'avulsos') {
+            CLIENTES_IDS = [];
+            document.getElementById('contador-clientes').textContent = '0';
+            document.getElementById('lista-clientes').innerHTML = '<div class="em-empty">Modo somente avulsos: nenhum cliente cadastrado será incluído.</div>';
+            return;
+        }
+        var lista = document.getElementById('lista-clientes');
+        lista.innerHTML = '<div class="em-empty"><i class="fas fa-spinner fa-spin"></i> Atualizando...</div>';
+
+        fetch(URLS.filtrar, {
+            method: 'POST',
+            body: formDataFiltros(),
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(resposta) {
+            return resposta.json().then(function(data) {
+                return { ok: resposta.ok, data: data };
+            });
+        })
+        .then(function(resultado) {
+            var data = resultado.data;
+            if (!resultado.ok || !data.success) {
+                CLIENTES_IDS = [];
+                document.getElementById('contador-clientes').textContent = '0';
+                lista.innerHTML = '<div class="em-empty">' + escapeHtml(data.message || 'Nenhum cliente encontrado.') + '</div>';
+                return;
+            }
+
+            var clientes = Array.isArray(data.clientes) ? data.clientes : [];
+            CLIENTES_IDS = clientes.map(function(cliente) { return cliente.id; });
+            document.getElementById('contador-clientes').textContent = clientes.length;  // <-- USA O TAMANHO REAL
+
+            if (!clientes.length) {
+                lista.innerHTML = '<div class="em-empty">Nenhum cliente encontrado.</div>';
+                return;
+            }
+
+            var html = '';
+            // EXIBE TODOS OS CLIENTES (SEM LIMITE)
+            clientes.forEach(function(cliente) {
+                var nome = cliente.nome || 'Cliente sem nome';
+                var numero = cliente.whatsapp || cliente.numero || 'Sem WhatsApp';
+                html += '<div class="em-client">' +
+                        '<div><strong>' + escapeHtml(nome) + '</strong><small><i class="fab fa-whatsapp"></i> ' + escapeHtml(numero) + '</small></div>' +
+                        '<span class="em-badge">Selecionado</span>' +
+                        '</div>';
+            });
+
+            lista.innerHTML = html;
+        })
+        .catch(function(erro) {
+            console.error(erro);
+            CLIENTES_IDS = [];
+            document.getElementById('contador-clientes').textContent = '0';
+            lista.innerHTML = '<div class="em-empty">Erro ao consultar clientes.</div>';
+        });
+    }
+
+    function mostrarArquivo() {
+        var arquivo = document.getElementById('arquivo_midia').files[0];
+        var preview = document.getElementById('file-preview');
+
+        if (!arquivo) {
+            preview.classList.remove('show');
+            atualizarResumo();
+            return;
+        }
+
+        document.getElementById('file-name').textContent = arquivo.name;
+        document.getElementById('file-size').textContent = formatarTamanho(arquivo.size);
+        preview.classList.add('show');
+        atualizarResumo();
+    }
+
+    function removerArquivo() {
+        document.getElementById('arquivo_midia').value = '';
+        document.getElementById('file-preview').classList.remove('show');
+        atualizarResumo();
+    }
+
+    function toggleBox(id) {
+        document.getElementById(id).classList.toggle('open');
+    }
+
+    function mostrarStatus(tipo, mensagem) {
+        var classe = tipo === 'success' ? 'alert-success' :
+                     tipo === 'warning' ? 'alert-warning' :
+                     tipo === 'danger' ? 'alert-danger' : 'alert-info';
+
+        document.getElementById('msg-status').innerHTML =
+            '<div class="alert ' + classe + '">' + escapeHtml(mensagem) + '</div>';
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function bloquearBotoes(bloquear) {
+        PROCESSANDO = bloquear;
+        ['btn-save', 'btn-send', 'btn-send-now', 'btn-save-mobile', 'btn-send-mobile', 'btn-send-now-mobile'].forEach(function(id) {
+            var botao = document.getElementById(id);
+            if (botao) botao.disabled = bloquear;
+        });
+    }
+
+    function validar(modoEnvio) {
+        var ehAgendamento = modoEnvio === 'agendar';
+        var mensagem = document.getElementById('mensagem').value.trim();
+        if (!mensagem) {
+            mostrarStatus('warning', 'Escreva a mensagem antes de continuar.');
+            document.getElementById('mensagem').focus();
+            return false;
+        }
+
+        var modo = obterModoDestinatarios();
+        var quantidadeAvulsos = contarNumerosAvulsos();
+        var usaClientes = modo === 'clientes' || modo === 'ambos';
+        var usaAvulsos = modo === 'avulsos' || modo === 'ambos';
+
+        if (usaClientes && !CLIENTES_IDS.length && !usaAvulsos) {
+            mostrarStatus('warning', 'Nenhum cliente cadastrado está selecionado.');
+            return false;
+        }
+        if (usaAvulsos && !quantidadeAvulsos && !usaClientes) {
+            mostrarStatus('warning', 'Informe pelo menos um número avulso.');
+            document.getElementById('numeros_avulsos').focus();
+            return false;
+        }
+        if (!CLIENTES_IDS.length && !quantidadeAvulsos) {
+            mostrarStatus('warning', 'Selecione clientes cadastrados ou informe números avulsos.');
+            return false;
+        }
+
+        if (ehAgendamento && (!document.getElementById('data_envio').value || !document.getElementById('hora_envio').value)) {
+            mostrarStatus('warning', 'Informe a data e o horário.');
+            return false;
+        }
+
+        var arquivo = document.getElementById('arquivo_midia').files[0];
+        if (arquivo && arquivo.size > 16 * 1024 * 1024) {
+            mostrarStatus('warning', 'O anexo ultrapassa 16 MB.');
+            return false;
+        }
+
+        return true;
+    }
+
+    function formDataEnvio(modoEnvio) {
+        var ehAgendamento = modoEnvio === 'agendar';
+        var formData = formDataFiltros();
+        formData.append('mensagem', document.getElementById('mensagem').value.trim());
+        formData.append('modo_destinatarios', obterModoDestinatarios());
+        formData.append('clientes_ids', JSON.stringify(CLIENTES_IDS));
+        formData.append('numeros_avulsos', document.getElementById('numeros_avulsos').value.trim());
+
+        if (ehAgendamento) {
+            formData.append('agendamento', 'horario');
+            formData.append('data_agendamento', document.getElementById('data_envio').value);
+            formData.append('hora_agendamento', document.getElementById('hora_envio').value);
+            formData.append('hora_agendada', document.getElementById('hora_envio').value);
+        } else {
+            formData.append('agendamento', modoEnvio === 'agora' ? 'agora' : 'rascunho');
+        }
+
+        var arquivo = document.getElementById('arquivo_midia').files[0];
+        if (arquivo) formData.append('midia', arquivo);
+        return formData;
+    }
+
+    async function enviar(modoEnvio) {
+        if (PROCESSANDO || !validar(modoEnvio)) return;
+
+        var textoAcao = modoEnvio === 'agendar' ? 'agendar o envio' : modoEnvio === 'agora' ? 'enviar agora' : 'salvar o rascunho';
+        var modo = obterModoDestinatarios();
+        var total = (modo === 'avulsos' ? 0 : CLIENTES_IDS.length) + (modo === 'clientes' ? 0 : contarNumerosAvulsos());
+        var confirmado = await window.AppUI.confirm(
+            'Deseja ' + textoAcao + ' para ' + total + ' destinatário(s)?',
+            { title: modoEnvio === 'agora' ? 'Confirmar envio imediato' : 'Confirmar operação', confirmText: modoEnvio === 'agora' ? 'Enviar agora' : 'Confirmar' }
+        );
+        if (!confirmado) return;
+
+        bloquearBotoes(true);
+        mostrarStatus('info', modoEnvio === 'agendar' ? 'Agendando campanha...' : modoEnvio === 'agora' ? 'Colocando envio na fila...' : 'Salvando rascunho...');
+
+        try {
+            var resposta = await fetch(modoEnvio === 'rascunho' ? URLS.salvar : URLS.enviar, {
+                method: 'POST',
+                body: formDataEnvio(modoEnvio),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            var raw = await resposta.text();
+            var data;
+            try { data = JSON.parse(raw); }
+            catch (_) { throw new Error('O servidor respondeu de forma inválida (HTTP ' + resposta.status + ').'); }
+            if (!resposta.ok || !data.success) throw new Error(data.message || 'Não foi possível concluir a operação.');
+
+            if (modoEnvio === 'agora' && data.mensagem_id) {
+                mostrarStatus('info', 'Envio iniciado. Confirmando o processador...');
+                var statusUrl = URLS.statusBase.replace('/0/', '/' + data.mensagem_id + '/');
+                var estado = null;
+                for (var tentativa = 0; tentativa < 30; tentativa++) {
+                    await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+                    var rs = await fetch(statusUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                    var txt = await rs.text();
+                    try { estado = JSON.parse(txt); } catch (_) { estado = null; }
+                    if (!rs.ok) throw new Error((estado && estado.message) || 'Falha ao consultar o status do envio.');
+                    if (estado && estado.status === 'enviando') {
+                        mostrarStatus('info', 'Enviando... ' + (estado.enviados || 0) + '/' + (estado.total || 0) + ' concluído(s), ' + (estado.falhas || 0) + ' falha(s).');
+                    }
+                    if (estado && ['concluida', 'falha'].includes(estado.status)) break;
+                }
+                if (estado && estado.status === 'falha') {
+                    var detalhes = Array.isArray(estado.erros) && estado.erros.length
+                        ? estado.erros.map(function(item) {
+                            return (item.cliente__nome || item.whatsapp || 'Destinatário') + ': ' + (item.mensagem_erro || 'Falha no envio');
+                        }).join(' | ')
+                        : '';
+                    throw new Error((estado.message || 'O envio em massa falhou.') + (detalhes ? ' Detalhes: ' + detalhes : ''));
+                }
+                if (!estado || estado.status === 'agendada') {
+                    throw new Error('A campanha foi criada, mas o processador imediato não assumiu a fila. Verifique o serviço/cron processar_envio_massa no servidor.');
+                }
+                if (estado.status === 'enviando') {
+                    mostrarStatus('warning', 'O envio continua em processamento. Consulte a campanha para acompanhar o resultado final.');
+                    await window.AppUI.alert('O envio continua em processamento. Acompanhe a campanha para ver enviados, pendentes e possíveis falhas.', { title: 'Envio em massa' });
+                    window.location.reload();
+                    return;
+                }
+                var resumo = 'Envio concluído: ' + (estado.enviados || 0) + ' enviado(s)';
+                if (estado.falhas) resumo += ' e ' + estado.falhas + ' falha(s)';
+                resumo += '.';
+                if (estado.falhas) {
+                    var erroFinal = estado.message || 'Uma ou mais mensagens falharam.';
+                    mostrarStatus('danger', resumo + ' ' + erroFinal);
+                    await window.AppUI.alert(resumo + '\n' + erroFinal, { title: 'Envio concluído com falhas', danger: true });
+                } else {
+                    mostrarStatus('success', resumo);
+                    await window.AppUI.alert(resumo, { title: 'Envio em massa' });
+                }
+                window.location.reload();
+                return;
+            }
+
+            mostrarStatus('success', data.message || 'Operação concluída com sucesso.');
+            await window.AppUI.alert(data.message || 'Operação concluída com sucesso.', { title: 'Envio em massa' });
+            if (data.redirect_url) window.location.href = data.redirect_url;
+            else window.location.reload();
+        } catch (erro) {
+            var mensagemErro = erro.message || 'Erro de comunicação com o servidor.';
+            mostrarStatus('danger', mensagemErro);
+            await window.AppUI.alert(mensagemErro, { title: 'Falha no envio', danger: true });
+            bloquearBotoes(false);
+        }
+    }
+
+    document.addEventListener('click', function(evento) {
+        var box = document.getElementById('tag-box');
+        var dropdown = document.getElementById('tag-dropdown');
+        if (box && dropdown && !box.contains(evento.target) && !dropdown.contains(evento.target)) {
+            dropdown.classList.remove('open');
+            box.classList.remove('open');
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        renderTags();
+        atualizarMensagem();
+        atualizarResumo();
+        alterarModoDestinatarios();
+    });
+</script>
+{% endblock %}

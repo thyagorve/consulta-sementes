@@ -1,0 +1,1038 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Relatório Financeiro | {{ user.nome|default:user.username }}{% endblock %}
+
+{% block content %}
+
+<style>
+/* ============================================================
+   RELATÓRIO FINANCEIRO - DESIGN PREMIUM
+   Tema claro/escuro 100% compatível | Responsivo | Impressão NFS-e
+============================================================ */
+:root {
+    --rf-primary: var(--primary);
+    --rf-success: #10b981;
+    --rf-danger: #ef4444;
+    --rf-warning: #f59e0b;
+    --rf-purple: var(--primary-dark);
+    --rf-cyan: var(--primary-light);
+    --rf-radius-lg: 20px;
+    --rf-radius: 14px;
+    --rf-radius-sm: 10px;
+    --rf-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --rf-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rf-container {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 0.5rem;
+}
+
+/* ===== TOP HEADER ===== */
+.rf-header {
+    background: var(--bg-card, #ffffff);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: var(--rf-radius-lg);
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    box-shadow: var(--rf-shadow);
+}
+.rf-header-brand { display: flex; align-items: center; gap: 0.75rem; }
+.rf-header-icon {
+    width: 45px; height: 45px;
+    border-radius: var(--rf-radius);
+    background: linear-gradient(135deg, var(--rf-primary), var(--rf-purple));
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 1.2rem; flex-shrink: 0;
+}
+.rf-header-info h1 {
+    margin: 0; font-size: 1.25rem; font-weight: 800;
+    color: var(--text, #111827); line-height: 1.2;
+}
+.rf-header-info span {
+    font-size: 0.75rem; color: var(--text-light, #6b7280);
+    display: flex; align-items: center; gap: 0.3rem;
+}
+.rf-header-actions { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* ===== BOTÕES ===== */
+.rf-btn {
+    padding: 0.5rem 1rem; border: none; border-radius: var(--rf-radius-sm);
+    font-size: 0.8rem; font-weight: 600; cursor: pointer;
+    transition: var(--rf-transition); display: inline-flex;
+    align-items: center; gap: 0.4rem; text-decoration: none;
+    white-space: nowrap; letter-spacing: 0.01em;
+}
+.rf-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
+.rf-btn-primary { background: linear-gradient(135deg, var(--rf-primary), var(--rf-purple)); color: #fff; }
+.rf-btn-success { background: linear-gradient(135deg, var(--rf-success), #059669); color: #fff; }
+.rf-btn-danger { background: linear-gradient(135deg, var(--rf-danger), #dc2626); color: #fff; }
+.rf-btn-outline {
+    background: transparent; border: 2px solid var(--border, #e5e7eb);
+    color: var(--text, #111827);
+}
+.rf-btn-outline:hover { border-color: var(--rf-primary); color: var(--rf-primary); background: color-mix(in srgb, var(--rf-primary) 4%, transparent); }
+.rf-btn-sm { padding: 0.3rem 0.7rem; font-size: 0.74rem; }
+
+/* ===== RESUMO EXECUTIVO ===== */
+.rf-executive-summary {
+    background: var(--bg-card, #ffffff);
+    border: 2px solid var(--border, #e5e7eb);
+    border-radius: var(--rf-radius-lg);
+    padding: 1.25rem; margin-bottom: 1rem;
+    box-shadow: var(--rf-shadow); position: relative; overflow: hidden;
+}
+.rf-executive-summary::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--rf-success), var(--rf-primary), var(--rf-danger));
+}
+.rf-executive-title {
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.8px; color: var(--rf-primary);
+    margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
+}
+.rf-executive-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+.rf-executive-item {
+    text-align: center; padding: 0.6rem;
+    border-radius: var(--rf-radius); border: 1px solid var(--border, #e5e7eb);
+    background: var(--bg, #f9fafb); transition: var(--rf-transition);
+}
+.rf-executive-item:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+.rf-executive-label {
+    font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px;
+    font-weight: 600; color: var(--text-light, #6b7280); margin-bottom: 0.3rem;
+}
+.rf-executive-value {
+    font-size: 1.3rem; font-weight: 800;
+    font-family: 'Inter', 'SF Mono', 'Monaco', monospace; letter-spacing: -0.02em;
+}
+.rf-executive-value.entrada { color: var(--rf-success); }
+.rf-executive-value.saida { color: var(--rf-danger); }
+.rf-executive-value.saldo { color: var(--rf-primary); }
+.rf-executive-value.transacoes { color: var(--rf-warning); }
+.rf-executive-sub { font-size: 0.65rem; color: var(--text-light, #6b7280); margin-top: 0.15rem; }
+
+/* ===== FILTROS ===== */
+.rf-filters {
+    background: var(--bg-card, #ffffff);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: var(--rf-radius); padding: 1rem 1.25rem;
+    margin-bottom: 1rem; box-shadow: var(--rf-shadow);
+}
+.rf-filters-title {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.6px; color: var(--text-light, #6b7280);
+    margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;
+}
+.rf-filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.7rem; }
+.rf-filter-group label {
+    display: block; font-size: 0.68rem; font-weight: 600;
+    color: var(--text-light, #6b7280); margin-bottom: 0.25rem;
+    text-transform: uppercase; letter-spacing: 0.4px;
+}
+.rf-filter-group select {
+    width: 100%; padding: 0.5rem 0.7rem;
+    border: 2px solid var(--border, #e5e7eb); border-radius: var(--rf-radius-sm);
+    background: var(--bg, #f9fafb); color: var(--text, #111827);
+    font-size: 0.8rem; font-weight: 500; transition: var(--rf-transition);
+    cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 0.6rem center; padding-right: 1.8rem;
+}
+.rf-filter-group select:focus {
+    outline: none; border-color: var(--rf-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--rf-primary) 10%, transparent);
+}
+
+/* ===== TABELA ===== */
+.rf-table-container {
+    background: var(--bg-card, #ffffff);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: var(--rf-radius); overflow: hidden;
+    box-shadow: var(--rf-shadow);
+}
+.rf-table-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.8rem 1.25rem; border-bottom: 1px solid var(--border, #e5e7eb);
+    flex-wrap: wrap; gap: 0.5rem;
+}
+.rf-table-title {
+    font-size: 0.9rem; font-weight: 700;
+    color: var(--text, #111827); display: flex; align-items: center; gap: 0.5rem;
+}
+.rf-table-stats { display: flex; gap: 1rem; font-size: 0.7rem; color: var(--text-light, #6b7280); flex-wrap: wrap; }
+.rf-table-stats span { display: flex; align-items: center; gap: 0.3rem; }
+.rf-table-stats strong { color: var(--text, #111827); }
+.rf-table-wrap { overflow-x: auto; }
+
+.rf-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 900px; }
+.rf-table thead th {
+    background: var(--bg, #f9fafb); padding: 0.6rem 0.7rem;
+    text-align: left; font-weight: 700; font-size: 0.65rem;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-light, #6b7280); border-bottom: 2px solid var(--border, #e5e7eb);
+    white-space: nowrap; cursor: pointer; user-select: none; transition: var(--rf-transition);
+}
+.rf-table thead th:hover { color: var(--rf-primary); background: color-mix(in srgb, var(--rf-primary) 4%, transparent); }
+.rf-table thead th i { margin-left: 0.2rem; font-size: 0.5rem; opacity: 0.5; }
+.rf-table tbody td {
+    padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border, #f3f4f6);
+    color: var(--text, #1f2937); vertical-align: middle;
+}
+.rf-table tbody tr { transition: var(--rf-transition); }
+.rf-table tbody tr:hover { background: rgba(99,102,241,0.025); }
+.rf-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.01); }
+
+.rf-money { font-family: 'SF Mono', 'Monaco', 'Consolas', monospace; font-weight: 600; font-size: 0.76rem; }
+.rf-money.positive { color: var(--rf-success); }
+.rf-money.negative { color: var(--rf-danger); }
+
+.rf-badge {
+    padding: 0.18rem 0.5rem; border-radius: 20px; font-size: 0.62rem;
+    font-weight: 600; white-space: nowrap; display: inline-flex;
+    align-items: center; gap: 0.2rem; letter-spacing: 0.02em;
+}
+.rf-badge-success { background: rgba(16,185,129,0.1); color: #10b981; }
+.rf-badge-danger { background: rgba(239,68,68,0.1); color: #ef4444; }
+.rf-badge-primary { background: color-mix(in srgb, var(--rf-primary) 10%, transparent); color: #6366f1; }
+.rf-badge-warning { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.rf-badge-purple { background: rgba(139,92,246,0.1); color: #8b5cf6; }
+
+.rf-actions { display: flex; gap: 0.2rem; }
+.rf-action-btn {
+    width: 28px; height: 28px; border: none; border-radius: 7px;
+    cursor: pointer; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 0.68rem; transition: var(--rf-transition);
+}
+.rf-action-btn.edit { background: color-mix(in srgb, var(--rf-primary) 8%, transparent); color: var(--rf-primary); }
+.rf-action-btn.edit:hover { background: var(--rf-primary); color: #fff; }
+.rf-action-btn.delete { background: rgba(239,68,68,0.08); color: var(--rf-danger); }
+.rf-action-btn.delete:hover { background: var(--rf-danger); color: #fff; }
+
+/* ===== RODAPÉ TABELA ===== */
+.rf-table tfoot tr {
+    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+    border-top: 3px solid var(--rf-primary);
+}
+.rf-table tfoot td {
+    padding: 0.8rem 0.7rem; font-weight: 600; font-size: 0.78rem;
+    color: var(--text, #1f2937);
+}
+
+/* ===== PAGINAÇÃO ===== */
+.rf-pagination { display: flex; justify-content: center; align-items: center; gap: 0.25rem; padding: 1rem; }
+.rf-pagination a, .rf-pagination span {
+    display: flex; align-items: center; justify-content: center;
+    min-width: 34px; height: 34px; border-radius: 8px;
+    text-decoration: none; font-size: 0.8rem; font-weight: 500;
+    border: 2px solid var(--border, #e5e7eb); color: var(--text, #374151);
+    transition: var(--rf-transition);
+}
+.rf-pagination a:hover { border-color: var(--rf-primary); color: var(--rf-primary); background: color-mix(in srgb, var(--rf-primary) 4%, transparent); }
+.rf-pagination .active { background: var(--rf-primary); color: #fff; border-color: var(--rf-primary); font-weight: 700; }
+.rf-pagination .disabled { opacity: 0.35; pointer-events: none; }
+
+/* ===== EMPTY STATE ===== */
+.rf-empty { text-align: center; padding: 2.5rem 2rem; color: var(--text-light, #9ca3af); }
+.rf-empty i { font-size: 3rem; opacity: 0.2; display: block; margin-bottom: 0.75rem; }
+
+/* ===== MODAIS ===== */
+.rf-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: none; justify-content: center; align-items: center;
+    z-index: 10000; backdrop-filter: blur(4px);
+}
+.rf-modal-box {
+    background: var(--bg-card, #ffffff); border-radius: var(--rf-radius-lg);
+    width: 92%; max-width: 440px; max-height: 85vh; overflow-y: auto;
+    border: 1px solid var(--border, #e5e7eb); box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+}
+.rf-modal-header {
+    padding: 1rem 1.25rem; border-bottom: 1px solid var(--border, #e5e7eb);
+    display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; background: var(--bg-card, #ffffff); z-index: 1;
+    border-radius: var(--rf-radius-lg) var(--rf-radius-lg) 0 0;
+}
+.rf-modal-header h3 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; }
+.rf-modal-close {
+    background: none; border: none; font-size: 1.1rem; cursor: pointer;
+    color: var(--text-light, #6b7280); width: 30px; height: 30px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.rf-modal-close:hover { background: var(--bg-hover, #f3f4f6); color: var(--text, #111827); }
+.rf-modal-body { padding: 1rem 1.25rem; }
+.rf-modal-footer {
+    padding: 0.8rem 1.25rem; border-top: 1px solid var(--border, #e5e7eb);
+    display: flex; justify-content: flex-end; gap: 0.5rem;
+    position: sticky; bottom: 0; background: var(--bg-card, #ffffff);
+    border-radius: 0 0 var(--rf-radius-lg) var(--rf-radius-lg);
+}
+.rf-form-group { margin-bottom: 0.8rem; }
+.rf-form-group label { display: block; font-weight: 600; font-size: 0.76rem; margin-bottom: 0.25rem; color: var(--text, #374151); }
+.rf-form-control {
+    width: 100%; padding: 0.55rem 0.7rem; border: 2px solid var(--border, #e5e7eb);
+    border-radius: var(--rf-radius-sm); font-size: 0.85rem;
+    background: var(--bg, #f9fafb); color: var(--text, #111827);
+    transition: var(--rf-transition);
+}
+.rf-form-control:focus { outline: none; border-color: var(--rf-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rf-primary) 8%, transparent); }
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 1200px) { .rf-executive-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px) {
+    .rf-container { padding: 0.25rem; }
+    .rf-header { flex-direction: column; text-align: center; padding: 1rem; }
+    .rf-header-actions { justify-content: center; }
+    .rf-executive-grid { grid-template-columns: 1fr; }
+    .rf-filters-grid { grid-template-columns: 1fr; }
+    .rf-table-header { flex-direction: column; }
+    .rf-executive-value { font-size: 1.1rem; }
+}
+@media (max-width: 480px) {
+    .rf-container { padding: 0; }
+    .rf-header { padding: 0.75rem; border-radius: var(--rf-radius); }
+    .rf-btn { font-size: 0.72rem; padding: 0.4rem 0.7rem; }
+    .rf-executive-value { font-size: 1rem; }
+}
+
+/* ==========================================
+   TEMA ESCURO - 100% COMPATÍVEL
+========================================== */
+[data-theme="dark"] .rf-header,
+[data-theme="dark"] .rf-executive-summary,
+[data-theme="dark"] .rf-table-container,
+[data-theme="dark"] .rf-filters {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3) !important;
+}
+
+[data-theme="dark"] .rf-header-info h1,
+[data-theme="dark"] .rf-table-title,
+[data-theme="dark"] .rf-executive-title { color: #f1f5f9 !important; }
+
+[data-theme="dark"] .rf-header-info span,
+[data-theme="dark"] .rf-table-stats,
+[data-theme="dark"] .rf-executive-label,
+[data-theme="dark"] .rf-executive-sub,
+[data-theme="dark"] .rf-filters-title { color: #94a3b8 !important; }
+
+[data-theme="dark"] .rf-executive-item {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+}
+[data-theme="dark"] .rf-executive-value { color: #f1f5f9 !important; }
+[data-theme="dark"] .rf-executive-value.entrada { color: #34d399 !important; }
+[data-theme="dark"] .rf-executive-value.saida { color: #f87171 !important; }
+[data-theme="dark"] .rf-executive-value.saldo { color: #818cf8 !important; }
+[data-theme="dark"] .rf-executive-value.transacoes { color: #fbbf24 !important; }
+
+[data-theme="dark"] .rf-table thead th {
+    background: #0f172a !important;
+    color: #94a3b8 !important;
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .rf-table tbody td {
+    color: #e2e8f0 !important;
+    border-bottom-color: #1e293b !important;
+}
+[data-theme="dark"] .rf-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.02) !important; }
+[data-theme="dark"] .rf-table tbody tr:hover { background: rgba(129,140,248,0.06) !important; }
+[data-theme="dark"] .rf-table tfoot tr { background: #0f172a !important; border-top-color: #334155 !important; }
+[data-theme="dark"] .rf-table tfoot td { color: #e2e8f0 !important; }
+
+[data-theme="dark"] .rf-money.positive { color: #34d399 !important; }
+[data-theme="dark"] .rf-money.negative { color: #f87171 !important; }
+
+[data-theme="dark"] .rf-badge-success { background: rgba(52,211,153,0.15) !important; color: #34d399 !important; }
+[data-theme="dark"] .rf-badge-danger { background: rgba(248,113,113,0.15) !important; color: #f87171 !important; }
+[data-theme="dark"] .rf-badge-primary { background: rgba(129,140,248,0.15) !important; color: #818cf8 !important; }
+[data-theme="dark"] .rf-badge-warning { background: rgba(251,191,36,0.15) !important; color: #fbbf24 !important; }
+[data-theme="dark"] .rf-badge-purple { background: rgba(167,139,250,0.15) !important; color: #a78bfa !important; }
+
+[data-theme="dark"] .rf-filter-group select {
+    background-color: #0f172a !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .rf-filter-group label { color: #94a3b8 !important; }
+
+[data-theme="dark"] .rf-pagination a,
+[data-theme="dark"] .rf-pagination span {
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+    background: #1e293b !important;
+}
+[data-theme="dark"] .rf-pagination a:hover { border-color: #818cf8 !important; color: #818cf8 !important; }
+[data-theme="dark"] .rf-pagination .active { background: #818cf8 !important; color: #fff !important; }
+
+[data-theme="dark"] .rf-btn-outline {
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+    background: #1e293b !important;
+}
+[data-theme="dark"] .rf-btn-outline:hover { border-color: #818cf8 !important; color: #818cf8 !important; }
+
+[data-theme="dark"] .rf-action-btn.edit { background: rgba(129,140,248,0.12) !important; color: #818cf8 !important; }
+[data-theme="dark"] .rf-action-btn.delete { background: rgba(248,113,113,0.12) !important; color: #f87171 !important; }
+
+[data-theme="dark"] .rf-modal-box { background: #1e293b !important; border-color: #334155 !important; }
+[data-theme="dark"] .rf-modal-header,
+[data-theme="dark"] .rf-modal-footer { background: #1e293b !important; border-color: #334155 !important; }
+[data-theme="dark"] .rf-modal-header h3 { color: #f1f5f9 !important; }
+[data-theme="dark"] .rf-form-control {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .rf-form-group label { color: #e2e8f0 !important; }
+[data-theme="dark"] .rf-empty { color: #64748b !important; }
+[data-theme="dark"] .rf-executive-summary::before { opacity: 0.6; }
+[data-theme="dark"] .rf-table-stats strong { color: #f1f5f9 !important; }
+
+/* ==========================================
+   IMPRESSÃO - ESTILO NFS-e
+========================================== */
+@media print {
+    @page { size: A4 landscape; margin: 8mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+    .wrapper, .content-wrapper, .main-content, .content, main,
+    [class*="content"], [class*="wrapper"], [id*="content"], [id*="wrapper"] {
+        margin-left: 0 !important; padding-left: 0 !important;
+        left: 0 !important; position: static !important; width: 100% !important;
+    }
+    nav, .sidebar, .navbar, .main-header, .main-sidebar, .main-footer,
+    .no-print, .rf-header-actions, .rf-filters, .rf-pagination, .rf-actions,
+    .rf-header-icon, .rf-modal, .rf-table thead th i,
+    button, .btn, .rf-btn, header:not(.rf-header), footer:not(.rf-table-footer),
+    [class*="sidebar"], [class*="navbar"], [class*="menu"],
+    [id*="sidebar"], [id*="navbar"], [id*="menu"] { display: none !important; }
+    
+    .rf-container {
+        display: block !important; visibility: visible !important;
+        position: static !important; width: 100% !important;
+        max-width: 100% !important; margin: 0 !important;
+        padding: 0 !important; background: #fff !important;
+    }
+    .rf-header {
+        display: flex !important; border: 2px solid #000 !important;
+        border-radius: 0 !important; padding: 10px 15px !important;
+        margin-bottom: 10px !important; box-shadow: none !important;
+        background: #fff !important; color: #000 !important;
+    }
+    .rf-header-info h1 { font-size: 16px !important; color: #000 !important; }
+    .rf-header-info span { font-size: 9px !important; color: #333 !important; }
+    .rf-executive-summary {
+        display: block !important; border: 2px solid #000 !important;
+        border-radius: 0 !important; padding: 10px 15px !important;
+        margin-bottom: 10px !important; box-shadow: none !important;
+        background: #fff !important; page-break-inside: avoid;
+    }
+    .rf-executive-summary::before { display: none !important; }
+    .rf-executive-title { font-size: 11px !important; color: #000 !important; border-bottom: 1px solid #000 !important; }
+    .rf-executive-grid { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; border: 1px solid #000 !important; }
+    .rf-executive-item { border: 1px solid #000 !important; background: #fff !important; }
+    .rf-executive-label { font-size: 7px !important; color: #000 !important; }
+    .rf-executive-value { font-size: 14px !important; color: #000 !important; }
+    .rf-executive-sub { font-size: 6px !important; color: #666 !important; }
+    .rf-executive-value.entrada, .rf-executive-value.saida,
+    .rf-executive-value.saldo, .rf-executive-value.transacoes { color: #000 !important; }
+    
+    .rf-table-container { border: 2px solid #000 !important; border-radius: 0 !important; box-shadow: none !important; }
+    .rf-table { font-size: 7px !important; min-width: auto !important; }
+    .rf-table thead th { background: #e5e5e5 !important; font-size: 7px !important; color: #000 !important; }
+    .rf-table tbody td { font-size: 7px !important; color: #000 !important; }
+    .rf-table tfoot tr { background: #e5e5e5 !important; }
+    .rf-table tfoot td { font-size: 8px !important; color: #000 !important; }
+    .rf-money { font-size: 7px !important; color: #000 !important; }
+    .rf-badge { border: 1px solid #000 !important; background: #fff !important; color: #000 !important; border-radius: 0 !important; }
+    .rf-watermark {
+        display: block !important; position: fixed !important;
+        top: 50% !important; left: 50% !important;
+        transform: translate(-50%, -50%) rotate(-25deg) !important;
+        font-size: 50px !important; color: rgba(0,0,0,0.03) !important;
+        pointer-events: none !important; z-index: 9999 !important;
+        white-space: nowrap !important; font-weight: bold !important;
+    }
+}
+.rf-watermark { display: none; }
+</style>
+
+<div class="rf-container">
+
+    <div class="rf-watermark">RELATÓRIO FINANCEIRO</div>
+
+    <!-- HEADER -->
+    <div class="rf-header">
+        <div class="rf-header-brand">
+            <div class="rf-header-icon no-print"><i class="fas fa-file-invoice-dollar"></i></div>
+            <div class="rf-header-info">
+                <h1>Relatório Financeiro</h1>
+                <span><strong>Emitido:</strong> {% now "d/m/Y H:i" %} | <strong>Usuário:</strong> {{ user.nome|default:user.username }}</span>
+            </div>
+        </div>
+        <div class="rf-header-actions no-print">
+            <button class="rf-btn rf-btn-outline rf-btn-sm" onclick="window.location.href='?'"><i class="fas fa-broom"></i> Limpar</button>
+            <button class="rf-btn rf-btn-outline rf-btn-sm" onclick="window.print()"><i class="fas fa-print"></i> Imprimir</button>
+            <button class="rf-btn rf-btn-success rf-btn-sm" onclick="abrirModal('modalEntrada')"><i class="fas fa-plus-circle"></i> Entrada</button>
+            <button class="rf-btn rf-btn-danger rf-btn-sm" onclick="abrirModal('modalSaida')"><i class="fas fa-minus-circle"></i> Saída</button>
+        </div>
+    </div>
+
+    <!-- RESUMO EXECUTIVO -->
+    <div class="rf-executive-summary">
+        <div class="rf-executive-title"><i class="fas fa-chart-bar"></i> Resumo Executivo</div>
+        <div class="rf-executive-grid">
+            <div class="rf-executive-item">
+                <div class="rf-executive-label">Total Entradas</div>
+                <div class="rf-executive-value entrada">R$ {{ total_entradas|floatformat:2|intcomma }}</div>
+                <div class="rf-executive-sub">Créditos do período</div>
+            </div>
+            <div class="rf-executive-item">
+                <div class="rf-executive-label">Total Saídas</div>
+                <div class="rf-executive-value saida">R$ {{ total_saidas|floatformat:2|intcomma }}</div>
+                <div class="rf-executive-sub">Débitos do período</div>
+            </div>
+            <div class="rf-executive-item">
+                <div class="rf-executive-label">Saldo Líquido</div>
+                <div class="rf-executive-value saldo">R$ {{ saldo_liquido|floatformat:2|intcomma }}</div>
+                <div class="rf-executive-sub">{% if saldo_liquido >= 0 %}Positivo{% else %}Negativo{% endif %}</div>
+            </div>
+            <div class="rf-executive-item">
+                <div class="rf-executive-label">Transações</div>
+                <div class="rf-executive-value transacoes">{{ total_transacoes|intcomma }}</div>
+                <div class="rf-executive-sub">Média: R$ {{ media_transacao|floatformat:2|intcomma }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FILTROS AVANÇADOS -->
+<div class="rf-filters no-print">
+    <div class="rf-filters-title"><i class="fas fa-sliders-h"></i> Filtros Avançados</div>
+    <div class="rf-filters-grid">
+        <div class="rf-filter-group">
+            <label>Período</label>
+            <select id="filtroPeriodo" onchange="aplicarFiltroPeriodo()">
+                <option value="all" {% if filtro_periodo == 'all' %}selected{% endif %}>📅 Todos</option>
+                <option value="today" {% if filtro_periodo == 'today' %}selected{% endif %}>🕐 Hoje</option>
+                <option value="yesterday" {% if filtro_periodo == 'yesterday' %}selected{% endif %}>📆 Ontem</option>
+                <option value="week" {% if filtro_periodo == 'week' %}selected{% endif %}>📅 Esta Semana</option>
+                <option value="last_week" {% if filtro_periodo == 'last_week' %}selected{% endif %}>📅 Semana Passada</option>
+                <option value="month" {% if filtro_periodo == 'month' %}selected{% endif %}>🗓️ Este Mês</option>
+                <option value="last_month" {% if filtro_periodo == 'last_month' %}selected{% endif %}>🗓️ Mês Passado</option>
+                <option value="last_3_months" {% if filtro_periodo == 'last_3_months' %}selected{% endif %}>📊 Últimos 3 Meses</option>
+                <option value="last_6_months" {% if filtro_periodo == 'last_6_months' %}selected{% endif %}>📊 Últimos 6 Meses</option>
+                <option value="year" {% if filtro_periodo == 'year' %}selected{% endif %}>📊 Este Ano</option>
+                <option value="custom_month" {% if filtro_periodo == 'custom_month' %}selected{% endif %}>📅 Mês Específico</option>
+            </select>
+        </div>
+        
+        <div class="rf-filter-group" id="filtroMesContainer" style="display: {% if filtro_periodo == 'custom_month' %}block{% else %}none{% endif %};">
+            <label>Mês</label>
+            <select id="filtroMes" onchange="aplicarFiltros()">
+                {% if meses_disponiveis %}
+                    {% for mes_num in meses_disponiveis %}
+                        {% if mes_num == 1 %}<option value="1" {% if mes_especifico == '1' %}selected{% endif %}>Janeiro</option>{% endif %}
+                        {% if mes_num == 2 %}<option value="2" {% if mes_especifico == '2' %}selected{% endif %}>Fevereiro</option>{% endif %}
+                        {% if mes_num == 3 %}<option value="3" {% if mes_especifico == '3' %}selected{% endif %}>Março</option>{% endif %}
+                        {% if mes_num == 4 %}<option value="4" {% if mes_especifico == '4' %}selected{% endif %}>Abril</option>{% endif %}
+                        {% if mes_num == 5 %}<option value="5" {% if mes_especifico == '5' %}selected{% endif %}>Maio</option>{% endif %}
+                        {% if mes_num == 6 %}<option value="6" {% if mes_especifico == '6' %}selected{% endif %}>Junho</option>{% endif %}
+                        {% if mes_num == 7 %}<option value="7" {% if mes_especifico == '7' %}selected{% endif %}>Julho</option>{% endif %}
+                        {% if mes_num == 8 %}<option value="8" {% if mes_especifico == '8' %}selected{% endif %}>Agosto</option>{% endif %}
+                        {% if mes_num == 9 %}<option value="9" {% if mes_especifico == '9' %}selected{% endif %}>Setembro</option>{% endif %}
+                        {% if mes_num == 10 %}<option value="10" {% if mes_especifico == '10' %}selected{% endif %}>Outubro</option>{% endif %}
+                        {% if mes_num == 11 %}<option value="11" {% if mes_especifico == '11' %}selected{% endif %}>Novembro</option>{% endif %}
+                        {% if mes_num == 12 %}<option value="12" {% if mes_especifico == '12' %}selected{% endif %}>Dezembro</option>{% endif %}
+                    {% endfor %}
+                {% else %}
+                    <option value="1">Janeiro</option>
+                    <option value="2">Fevereiro</option>
+                    <option value="3">Março</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Maio</option>
+                    <option value="6">Junho</option>
+                    <option value="7">Julho</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Setembro</option>
+                    <option value="10">Outubro</option>
+                    <option value="11">Novembro</option>
+                    <option value="12">Dezembro</option>
+                {% endif %}
+            </select>
+        </div>
+        
+        <div class="rf-filter-group" id="filtroAnoContainer" style="display: {% if filtro_periodo == 'custom_month' %}block{% else %}none{% endif %};">
+            <label>Ano</label>
+            <select id="filtroAno" onchange="atualizarMesesPorAno()">
+                {% for ano in anos_disponiveis %}
+                <option value="{{ ano }}" {% if ano_especifico == ano|stringformat:"s" %}selected{% endif %}>{{ ano }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="rf-filter-group">
+            <label>Tipo</label>
+            <select id="filtroTipo" onchange="aplicarFiltros()">
+                <option value="all" {% if filtro_tipo == 'all' %}selected{% endif %}>🔄 Todas</option>
+                <option value="entrada" {% if filtro_tipo == 'entrada' %}selected{% endif %}>✅ Entradas</option>
+                <option value="saida" {% if filtro_tipo == 'saida' %}selected{% endif %}>❌ Saídas</option>
+            </select>
+        </div>
+        <div class="rf-filter-group">
+            <label>Origem</label>
+            <select id="filtroOrigem" onchange="aplicarFiltros()">
+                <option value="all" {% if filtro_origem == 'all' %}selected{% endif %}>🌐 Todas</option>
+                <option value="servico" {% if filtro_origem == 'servico' %}selected{% endif %}>🔧 Serviços</option>
+                <option value="caixa" {% if filtro_origem == 'caixa' %}selected{% endif %}>💰 Caixa</option>
+            </select>
+        </div>
+        <div class="rf-filter-group">
+            <label>Categoria</label>
+            <select id="filtroCategoria" onchange="aplicarFiltros()">
+                <option value="all" {% if filtro_categoria == 'all' %}selected{% endif %}>📂 Todas</option>
+                {% for cat in categorias_disponiveis %}
+                <option value="{{ cat }}" {% if filtro_categoria == cat %}selected{% endif %}>{{ cat|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="rf-filter-group">
+            <label>Ordenar</label>
+            <select id="filtroOrdem" onchange="aplicarFiltros()">
+                <option value="-data" {% if filtro_ordem == '-data' %}selected{% endif %}>📅 Mais recente</option>
+                <option value="data" {% if filtro_ordem == 'data' %}selected{% endif %}>📅 Mais antigo</option>
+                <option value="-valor_liquido" {% if filtro_ordem == '-valor_liquido' %}selected{% endif %}>💎 Maior valor</option>
+                <option value="valor_liquido" {% if filtro_ordem == 'valor_liquido' %}selected{% endif %}>💎 Menor valor</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+    <!-- TABELA -->
+    <div class="rf-table-container">
+        <div class="rf-table-header">
+            <div class="rf-table-title"><i class="fas fa-list-ul"></i> Transações</div>
+            <div class="rf-table-stats">
+                <span><i class="fas fa-database"></i> <strong>{{ page_obj.paginator.count|default:"0"|intcomma }}</strong> registros</span>
+                <span><i class="fas fa-file-alt"></i> Pág. <strong>{{ page_obj.number|default:"1" }}</strong>/<strong>{{ page_obj.paginator.num_pages|default:"1" }}</strong></span>
+            </div>
+        </div>
+        <div class="rf-table-wrap">
+            <table class="rf-table">
+                <thead>
+                    <tr>
+                        <th onclick="ordenar('data')">Data <i class="fas fa-sort"></i></th>
+                        <th>Origem</th>
+                        <th>Cliente</th>
+                        <th>Descrição</th>
+                        <th>Categoria</th>
+                        <th onclick="ordenar('valor_pago')">Entrada <i class="fas fa-sort"></i></th>
+                        <th onclick="ordenar('valor_servico')">Saída/Custo <i class="fas fa-sort"></i></th>
+                        <th onclick="ordenar('valor_liquido')">Saldo <i class="fas fa-sort"></i></th>
+                        <th>Tipo</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in page_obj %}
+                    <tr>
+                        <td><strong>{{ item.data|date:"d/m/Y" }}</strong><br><small style="opacity:0.6;">{{ item.data|time:"H:i" }}</small></td>
+                        <td>
+                            {% if item.origem == 'servico' %}
+                                <span class="rf-badge rf-badge-primary"><i class="fas fa-server"></i> Serviço</span>
+                            {% else %}
+                                <span class="rf-badge {% if item.tipo_transacao == 'entrada' %}rf-badge-success{% else %}rf-badge-danger{% endif %}">
+                                    <i class="fas fa-{% if item.tipo_transacao == 'entrada' %}arrow-down{% else %}arrow-up{% endif %}"></i>
+                                    {{ item.tipo_transacao|title }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ item.cliente_nome|truncatechars:22 }}</strong></td>
+                        <td title="{{ item.descricao }}">{{ item.descricao|truncatechars:40 }}</td>
+                        <td><span class="rf-badge rf-badge-purple">{{ item.categoria|default:"Outros"|title }}</span></td>
+                        <td class="rf-money {% if item.valor_pago > 0 %}positive{% endif %}">{% if item.valor_pago > 0 %}R$ {{ item.valor_pago|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                        <td class="rf-money negative">{% if item.valor_servico > 0 %}R$ {{ item.valor_servico|floatformat:2|intcomma }}{% else %}-{% endif %}</td>
+                        <td class="rf-money {% if item.valor_liquido >= 0 %}positive{% else %}negative{% endif %}">R$ {{ item.valor_liquido|floatformat:2|intcomma }}</td>
+                        <td>
+                            {% if item.origem == 'servico' %}
+                                <span class="rf-badge rf-badge-warning">{{ item.tipo_transacao|title }}</span>
+                            {% else %}
+                                <span class="rf-badge {% if item.tipo_transacao == 'entrada' %}rf-badge-success{% else %}rf-badge-danger{% endif %}">{{ item.tipo_transacao|title }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="no-print">
+                            <div class="rf-actions">
+                                <button class="rf-action-btn edit" onclick="editarItem('{{ item.origem }}', {{ item.id }})" title="Editar"><i class="fas fa-pen"></i></button>
+                                <button class="rf-action-btn delete" onclick="excluirItem('{{ item.origem }}', {{ item.id }})" title="Excluir"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10">
+                            <div class="rf-empty"><i class="fas fa-inbox"></i>Nenhuma transação encontrada</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if page_obj %}
+                <tfoot>
+                    <tr>
+                        <td colspan="5" style="text-align:right;padding:0.8rem 1.25rem;">
+                            <span style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;">
+                                <i class="fas fa-calculator" style="color:var(--rf-primary);margin-right:0.5rem;"></i>TOTAIS DO PERÍODO
+                            </span>
+                        </td>
+                        <td style="background:rgba(16,185,129,0.06);">
+                            <div style="display:flex;flex-direction:column;">
+                                <span style="font-size:0.55rem;text-transform:uppercase;color:var(--text-light);">Entradas</span>
+                                <span class="rf-money positive" style="font-size:0.9rem;">R$ {{ total_valor_pago|floatformat:2|intcomma }}</span>
+                            </div>
+                        </td>
+                        <td style="background:rgba(239,68,68,0.04);">
+                            <div style="display:flex;flex-direction:column;">
+                                <span style="font-size:0.55rem;text-transform:uppercase;color:var(--text-light);">Saídas</span>
+                                <span class="rf-money negative" style="font-size:0.9rem;">R$ {{ total_custo_servico|floatformat:2|intcomma }}</span>
+                            </div>
+                        </td>
+                        <td style="background:{% if total_lucro_liquido >= 0 %}rgba(16,185,129,0.08){% else %}rgba(239,68,68,0.06){% endif %};">
+                            <div style="display:flex;flex-direction:column;">
+                                <span style="font-size:0.55rem;text-transform:uppercase;color:var(--text-light);">Saldo Líquido</span>
+                                <span class="rf-money {% if total_lucro_liquido >= 0 %}positive{% else %}negative{% endif %}" style="font-size:1rem;font-weight:800;">R$ {{ total_lucro_liquido|floatformat:2|intcomma }}</span>
+                            </div>
+                        </td>
+                        <td colspan="2" style="text-align:center;">
+                            <div style="display:flex;flex-direction:column;align-items:center;">
+                                <span style="font-size:0.55rem;text-transform:uppercase;color:var(--text-light);"><i class="fas fa-chart-line"></i> Média</span>
+                                <span style="font-size:0.85rem;font-weight:700;color:var(--rf-warning);">R$ {{ media_transacao|floatformat:2|intcomma }}</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+
+    <!-- PAGINAÇÃO -->
+    {% if page_obj and page_obj.paginator.num_pages > 1 %}
+    <div class="rf-pagination no-print">
+        {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"><i class="fas fa-chevron-left"></i></a>
+        {% else %}
+            <span class="disabled"><i class="fas fa-chevron-left"></i></span>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if num == page_obj.number %}
+                <span class="active">{{ num }}</span>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <a href="?page={{ num }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"><i class="fas fa-chevron-right"></i></a>
+        {% else %}
+            <span class="disabled"><i class="fas fa-chevron-right"></i></span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- MODAL ENTRADA -->
+<div id="modalEntrada" class="rf-modal">
+    <div class="rf-modal-box">
+        <div class="rf-modal-header">
+            <h3 style="color:var(--rf-success);"><i class="fas fa-arrow-down"></i> Nova Entrada</h3>
+            <button class="rf-modal-close" onclick="fecharModal('modalEntrada')">&times;</button>
+        </div>
+        <div class="rf-modal-body">
+            <form id="formEntrada" method="post" action="{% url 'financeiro:adicionar_movimentacao_caixa' %}">
+                {% csrf_token %}
+                <input type="hidden" name="tipo" value="entrada">
+                <div class="rf-form-group"><label>Valor (R$)</label><input type="text" name="valor" class="rf-form-control" placeholder="0,00" required></div>
+                <div class="rf-form-group"><label>Descrição</label><input type="text" name="descricao" class="rf-form-control" placeholder="Ex: Venda avulsa" required></div>
+                <div class="rf-form-group"><label>Categoria</label><select name="categoria" class="rf-form-control"><option value="venda">Venda</option><option value="servico">Serviço</option><option value="investimento">Investimento</option><option value="outros">Outros</option></select></div>
+                <div class="rf-form-group"><label>Data/Hora</label><input type="datetime-local" name="data_personalizada" class="rf-form-control" value="{% now 'Y-m-d\TH:i' %}"></div>
+            </form>
+        </div>
+        <div class="rf-modal-footer">
+            <button class="rf-btn rf-btn-outline" onclick="fecharModal('modalEntrada')">Cancelar</button>
+            <button class="rf-btn rf-btn-success" onclick="document.getElementById('formEntrada').submit()"><i class="fas fa-check"></i> Salvar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL SAÍDA -->
+<div id="modalSaida" class="rf-modal">
+    <div class="rf-modal-box">
+        <div class="rf-modal-header">
+            <h3 style="color:var(--rf-danger);"><i class="fas fa-arrow-up"></i> Nova Saída</h3>
+            <button class="rf-modal-close" onclick="fecharModal('modalSaida')">&times;</button>
+        </div>
+        <div class="rf-modal-body">
+            <form id="formSaida" method="post" action="{% url 'financeiro:adicionar_movimentacao_caixa' %}">
+                {% csrf_token %}
+                <input type="hidden" name="tipo" value="saida">
+                <div class="rf-form-group"><label>Valor (R$)</label><input type="text" name="valor" class="rf-form-control" placeholder="0,00" required></div>
+                <div class="rf-form-group"><label>Descrição</label><input type="text" name="descricao" class="rf-form-control" placeholder="Ex: Pagamento de conta" required></div>
+                <div class="rf-form-group"><label>Categoria</label><select name="categoria" class="rf-form-control"><option value="despesa">Despesa</option><option value="servico">Serviço</option><option value="outros">Outros</option></select></div>
+                <div class="rf-form-group"><label>Data/Hora</label><input type="datetime-local" name="data_personalizada" class="rf-form-control" value="{% now 'Y-m-d\TH:i' %}"></div>
+            </form>
+        </div>
+        <div class="rf-modal-footer">
+            <button class="rf-btn rf-btn-outline" onclick="fecharModal('modalSaida')">Cancelar</button>
+            <button class="rf-btn rf-btn-danger" onclick="document.getElementById('formSaida').submit()"><i class="fas fa-check"></i> Salvar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== FUNÇÕES DOS MODAIS =====
+function abrirModal(id) { 
+    var modal = document.getElementById(id);
+    if (modal) modal.style.display = 'flex'; 
+}
+
+function fecharModal(id) { 
+    var modal = document.getElementById(id);
+    if (modal) modal.style.display = 'none'; 
+}
+
+function fecharModalEdicao(id) {
+    var modal = document.getElementById(id);
+    if (modal) modal.remove();
+}
+
+// ===== FILTROS E ORDENAÇÃO =====
+function aplicarFiltroPeriodo() {
+    var periodoSelect = document.getElementById('filtroPeriodo');
+    if (!periodoSelect) return;
+    
+    var periodo = periodoSelect.value;
+    var mesContainer = document.getElementById('filtroMesContainer');
+    var anoContainer = document.getElementById('filtroAnoContainer');
+    
+    if (periodo === 'custom_month') {
+        if (mesContainer) mesContainer.style.display = 'block';
+        if (anoContainer) anoContainer.style.display = 'block';
+    } else {
+        if (mesContainer) mesContainer.style.display = 'none';
+        if (anoContainer) anoContainer.style.display = 'none';
+        aplicarFiltros();
+    }
+}
+
+
+// Adicione esta função ao seu JavaScript
+function atualizarMesesPorAno() {
+    // Os 12 meses permanecem disponíveis. Trocar o ano reaplica exatamente
+    // o mês escolhido, inclusive para anos anteriores sem movimento.
+    aplicarFiltros();
+}
+
+// Função atualizada para aplicar filtros
+function aplicarFiltros() {
+    var params = new URLSearchParams();
+    
+    // Período
+    var periodo = document.getElementById('filtroPeriodo');
+    if (periodo && periodo.value !== 'all') {
+        params.set('periodo', periodo.value);
+        
+        if (periodo.value === 'custom_month') {
+            var mes = document.getElementById('filtroMes');
+            var ano = document.getElementById('filtroAno');
+            if (mes && mes.value) params.set('mes', mes.value);
+            if (ano && ano.value) params.set('ano', ano.value);
+        }
+    }
+    
+    // Tipo
+    var tipo = document.getElementById('filtroTipo');
+    if (tipo && tipo.value !== 'all') params.set('tipo', tipo.value);
+    
+    // Origem
+    var origem = document.getElementById('filtroOrigem');
+    if (origem && origem.value !== 'all') params.set('origem', origem.value);
+    
+    // Categoria
+    var categoria = document.getElementById('filtroCategoria');
+    if (categoria && categoria.value !== 'all') params.set('categoria', categoria.value);
+    
+    // Ordem
+    var ordem = document.getElementById('filtroOrdem');
+    if (ordem && ordem.value !== '-data') params.set('ordem', ordem.value);
+    
+    var queryString = params.toString();
+    window.location.href = queryString ? '?' + queryString : window.location.pathname;
+}
+
+
+function ordenar(campo) {
+    var params = new URLSearchParams(window.location.search);
+    var atual = params.get('ordem') || '-data';
+    params.set('ordem', atual === '-' + campo ? campo : '-' + campo);
+    window.location.href = '?' + params.toString();
+}
+
+// ===== EDITAR/EXCLUIR ITENS =====
+function editarItem(origem, id) {
+    id = parseInt(String(id).replace(/[^0-9]/g, ''));
+    if (isNaN(id)) { console.error('ID inválido:', id); return; }
+    
+    if (origem === 'caixa') {
+        abrirModalEditarCaixa(id);
+    } else {
+        abrirModalEditarRelatorio(id);
+    }
+}
+
+async function excluirItem(origem, id) {
+    id = parseInt(String(id).replace(/[^0-9]/g, ''));
+    if (isNaN(id)) { console.error('ID inválido:', id); return; }
+    
+    if (!(await window.AppUI.confirm('Tem certeza que deseja excluir este registro?', {title:'Excluir registro', danger:true, confirmText:'Excluir'}))) return;
+    
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = origem === 'caixa' 
+        ? '/financeiro/caixa/excluir/' + id + '/' 
+        : '/financeiro/relatorio/excluir/' + id + '/';
+    
+    var csrf = document.createElement('input');
+    csrf.type = 'hidden';
+    csrf.name = 'csrfmiddlewaretoken';
+    csrf.value = getCsrfToken();
+    form.appendChild(csrf);
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// ===== EDITAR CAIXA (MODAL) =====
+function abrirModalEditarCaixa(id) {
+    fetch('/financeiro/caixa/json/' + id + '/')
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.error) { window.AppUI.alert('Erro: ' + data.error); return; }
+            
+            var modalAntigo = document.getElementById('modalEditarCaixa');
+            if (modalAntigo) modalAntigo.remove();
+            
+            var overlay = document.createElement('div');
+            overlay.className = 'rf-modal';
+            overlay.id = 'modalEditarCaixa';
+            overlay.style.display = 'flex';
+            
+            var dataFormatada = data.data ? data.data.slice(0, 16) : '';
+            
+            overlay.innerHTML = 
+                '<div class="rf-modal-box">' +
+                    '<div class="rf-modal-header">' +
+                        '<h3 style="color:var(--rf-primary);"><i class="fas fa-edit"></i> Editar Movimentação</h3>' +
+                        '<button class="rf-modal-close" onclick="fecharModalEdicao(\'modalEditarCaixa\')">&times;</button>' +
+                    '</div>' +
+                    '<div class="rf-modal-body">' +
+                        '<form id="formEditarCaixa" method="post" action="/financeiro/caixa/editar/' + id + '/">' +
+                            '<input type="hidden" name="csrfmiddlewaretoken" value="' + getCsrfToken() + '">' +
+                            '<div class="rf-form-group"><label>Tipo</label><select name="tipo" class="rf-form-control"><option value="entrada"' + (data.tipo === 'entrada' ? ' selected' : '') + '>Entrada</option><option value="saida"' + (data.tipo === 'saida' ? ' selected' : '') + '>Saída</option></select></div>' +
+                            '<div class="rf-form-group"><label>Valor (R$)</label><input type="text" name="valor" class="rf-form-control" value="' + data.valor.replace('.', ',') + '" required></div>' +
+                            '<div class="rf-form-group"><label>Descrição</label><input type="text" name="descricao" class="rf-form-control" value="' + (data.descricao || '') + '" required></div>' +
+                            '<div class="rf-form-group"><label>Categoria</label><select name="categoria" class="rf-form-control"><option value="venda"' + (data.categoria === 'venda' ? ' selected' : '') + '>Venda</option><option value="servico"' + (data.categoria === 'servico' ? ' selected' : '') + '>Serviço</option><option value="despesa"' + (data.categoria === 'despesa' ? ' selected' : '') + '>Despesa</option><option value="investimento"' + (data.categoria === 'investimento' ? ' selected' : '') + '>Investimento</option><option value="outros"' + (data.categoria === 'outros' ? ' selected' : '') + '>Outros</option></select></div>' +
+                            '<div class="rf-form-group"><label>Data/Hora</label><input type="datetime-local" name="data" class="rf-form-control" value="' + dataFormatada + '" required></div>' +
+                        '</form>' +
+                    '</div>' +
+                    '<div class="rf-modal-footer">' +
+                        '<button class="rf-btn rf-btn-outline" onclick="fecharModalEdicao(\'modalEditarCaixa\')">Cancelar</button>' +
+                        '<button class="rf-btn rf-btn-primary" onclick="salvarEdicaoCaixa()"><i class="fas fa-check"></i> Salvar</button>' +
+                    '</div>' +
+                '</div>';
+            
+            document.body.appendChild(overlay);
+        })
+        .catch(function(error) { console.error('Erro:', error); });
+}
+
+function salvarEdicaoCaixa() {
+    var form = document.getElementById('formEditarCaixa');
+    if (form) form.submit();
+}
+
+// ===== EDITAR RELATÓRIO (MODAL) =====
+function abrirModalEditarRelatorio(id) {
+    fetch('/financeiro/relatorio/json/' + id + '/')
+        .then(function(response) { return response.json(); })
+        .then(function(response) {
+            if (!response.success) { window.AppUI.alert('Erro: ' + (response.error || 'Desconhecido')); return; }
+            
+            var data = response.data;
+            var modalAntigo = document.getElementById('modalEditarRelatorio');
+            if (modalAntigo) modalAntigo.remove();
+            
+            var overlay = document.createElement('div');
+            overlay.className = 'rf-modal';
+            overlay.id = 'modalEditarRelatorio';
+            overlay.style.display = 'flex';
+            
+            var dataFormatada = data.data_geracao ? data.data_geracao.slice(0, 16) : '';
+            
+            overlay.innerHTML = 
+                '<div class="rf-modal-box">' +
+                    '<div class="rf-modal-header">' +
+                        '<h3 style="color:var(--rf-primary);"><i class="fas fa-edit"></i> Editar Relatório</h3>' +
+                        '<button class="rf-modal-close" onclick="fecharModalEdicao(\'modalEditarRelatorio\')">&times;</button>' +
+                    '</div>' +
+                    '<div class="rf-modal-body">' +
+                        '<form id="formEditarRelatorio" method="post" action="/financeiro/relatorio/editar/' + id + '/">' +
+                            '<input type="hidden" name="csrfmiddlewaretoken" value="' + getCsrfToken() + '">' +
+                            '<div class="rf-form-group"><label>Servidor/Descrição</label><input type="text" name="servidor" class="rf-form-control" value="' + (data.servidor || '') + '"></div>' +
+                            '<div class="rf-form-group"><label>Valor Pago (R$)</label><input type="text" name="valor_pago" class="rf-form-control" value="' + data.valor_pago.replace('.', ',') + '" required></div>' +
+                            '<div class="rf-form-group"><label>Valor do Serviço/Custo (R$)</label><input type="text" name="valor_servico" class="rf-form-control" value="' + data.valor_servico.replace('.', ',') + '" required></div>' +
+                            '<div class="rf-form-group"><label>Data/Hora</label><input type="datetime-local" name="data_geracao" class="rf-form-control" value="' + dataFormatada + '" required></div>' +
+                        '</form>' +
+                    '</div>' +
+                    '<div class="rf-modal-footer">' +
+                        '<button class="rf-btn rf-btn-outline" onclick="fecharModalEdicao(\'modalEditarRelatorio\')">Cancelar</button>' +
+                        '<button class="rf-btn rf-btn-primary" onclick="salvarEdicaoRelatorio()"><i class="fas fa-check"></i> Salvar</button>' +
+                    '</div>' +
+                '</div>';
+            
+            document.body.appendChild(overlay);
+        })
+        .catch(function(error) { console.error('Erro:', error); });
+}
+
+function salvarEdicaoRelatorio() {
+    var form = document.getElementById('formEditarRelatorio');
+    if (form) form.submit();
+}
+
+function getCsrfToken() {
+    var cookies = document.cookie.split('; ');
+    for (var i = 0; i < cookies.length; i++) {
+        var parts = cookies[i].split('=');
+        if (parts[0] === 'csrftoken') return parts[1];
+    }
+    return '';
+}
+
+// Inicializar ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    var filtroPeriodo = document.getElementById('filtroPeriodo');
+    if (filtroPeriodo && filtroPeriodo.value === 'custom_month') {
+        var mesContainer = document.getElementById('filtroMesContainer');
+        var anoContainer = document.getElementById('filtroAnoContainer');
+        if (mesContainer) mesContainer.style.display = 'block';
+        if (anoContainer) anoContainer.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

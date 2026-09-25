@@ -880,12 +880,24 @@
                             <input type="hidden" name="active_tab" value="conferente">
                             <div class="mb-3"><label>Nome de Usuário (Login) *</label><input type="text" name="username" class="form-control-pro" data-preserve-case="true" placeholder="Ex: joao.silva" minlength="3" required autocomplete="off" autocapitalize="none"><small class="text-muted">Mínimo 3 caracteres. Maiúsculas/minúsculas são preservadas.</small></div>
                             <div class="mb-3"><label>Nome Completo *</label><input type="text" name="first_name" class="form-control-pro" data-preserve-case="true" placeholder="Ex: João Silva" required></div>
-                            <div class="mb-3"><label>Senha</label><input type="text" name="password" class="form-control-pro" placeholder="Deixe em branco para usar 'conceito123'"><small class="text-muted">Mínimo 6 caracteres</small></div>
-                            <div class="mb-3" id="userGroupWrapper"><label>Grupo de Acesso *</label><select name="group" class="form-control-pro-select" required id="groupSelect"><option value="">Selecione...</option><option value="conferente">Conferente (Acesso básico)</option><option value="almoxarife">Almoxarife (Estoque + Almoxarifado)</option><option value="operador">Operador (Consulta apenas)</option>{% if user.is_superuser %}<option value="admin">Administrador (Acesso total)</option>{% endif %}</select></div>
+                            <div class="alert alert-light border mb-3" id="userDefaultPasswordInfo">
+                                <i class="fas fa-key me-2 text-warning"></i>
+                                <strong>Senha inicial automática:</strong> conceito123
+                                <div class="small text-muted mt-1">O usuário será obrigado a criar uma nova senha no primeiro acesso.</div>
+                            </div>
+                            <div class="mb-3" id="userPasswordWrapper" style="display:none;">
+                                <label>Nova senha (somente edição)</label>
+                                <input type="password" name="password" class="form-control-pro" placeholder="Deixe em branco para manter a senha atual" autocomplete="new-password">
+                                <small class="text-muted">Use apenas quando quiser trocar a senha durante a edição.</small>
+                            </div>
                             
-                            <div class="mb-3" id="permissions-container" style="display: none;">
-                                <label class="fw-bold mb-2">Permissões Específicas</label>
+                            <div class="mb-3" id="permissions-container">
+                                <label class="fw-bold mb-2">Permissões de acesso</label>
+                                <div class="small text-muted mb-2"><i class="fas fa-shield-alt me-1"></i>Somente as permissões marcadas abaixo serão liberadas. Não são usados grupos de acesso.</div>
                                 <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
+                                    <div class="permissions-group"><div class="permissions-group-title"><i class="fas fa-chart-pie me-1"></i> Dashboard</div>
+                                        <div class="form-check"><input class="form-check-input" type="checkbox" name="pode_ver_dashboard" id="perm_ver_dashboard" value="on"><label class="form-check-label" for="perm_ver_dashboard"><i class="fas fa-eye me-1"></i> Pode acessar o Dashboard</label></div>
+                                    </div>
                                     <div class="permissions-group"><div class="permissions-group-title"><i class="fas fa-boxes me-1"></i> Módulo Estoque</div>
                                         <div class="form-check"><input class="form-check-input" type="checkbox" name="pode_ver_estoque" id="perm_ver_estoque" value="on"><label class="form-check-label" for="perm_ver_estoque"><i class="fas fa-eye me-1"></i> Pode visualizar estoque</label></div>
                                         <div class="form-check"><input class="form-check-input" type="checkbox" name="pode_movimentar_estoque" id="perm_movimentar_estoque" value="on"><label class="form-check-label" for="perm_movimentar_estoque"><i class="fas fa-exchange-alt me-1"></i> Pode movimentar estoque</label></div>
@@ -930,7 +942,7 @@
                                         <div class="form-check"><input class="form-check-input" type="checkbox" name="pode_configuracoes" id="perm_configuracoes" value="on"><label class="form-check-label" for="perm_configuracoes"><i class="fas fa-sliders-h me-1"></i> Pode alterar configurações do sistema</label></div>
                                     </div>
                                 </div>
-                                <small class="text-muted mt-2 d-block"><i class="fas fa-info-circle"></i> As permissões serão somadas ao grupo selecionado</small>
+                                <small class="text-muted mt-2 d-block"><i class="fas fa-info-circle"></i> A lista acima é a fonte de verdade do acesso deste usuário.</small>
                             </div>
                             <div class="d-flex gap-2 mt-2"><button type="submit" class="btn-main flex-grow-1" id="userConfigSubmit"><i class="fas fa-save"></i> CRIAR USUÁRIO</button><button type="button" class="btn-outline-sm d-none" id="userConfigCancel" onclick="resetUserConfigForm()"><i class="fas fa-times"></i> Cancelar</button></div>
                         </form>
@@ -1022,14 +1034,14 @@
         const btn=document.getElementById('userConfigSubmit');
         if(btn) btn.innerHTML='<i class="fas fa-save"></i> CRIAR USUÁRIO';
         const senha=f.querySelector('[name="password"]');
-        if(senha) senha.placeholder="Deixe em branco para usar 'conceito123'";
+        if(senha){ senha.value=''; senha.placeholder='Deixe em branco para manter a senha atual'; }
         document.getElementById('userConfigCancel')?.classList.add('d-none');
-        const groupWrap=document.getElementById('userGroupWrapper');
-        const group=document.getElementById('groupSelect');
-        if(groupWrap) groupWrap.style.display='';
-        if(group) group.required=true;
+        const passWrap=document.getElementById('userPasswordWrapper');
+        const passInfo=document.getElementById('userDefaultPasswordInfo');
+        if(passWrap) passWrap.style.display='none';
+        if(passInfo) passInfo.style.display='block';
         const perms=document.getElementById('permissions-container');
-        if(perms) perms.style.display='none';
+        if(perms) perms.style.display='block';
     }
     function editarUsuarioConfig(id,loginAtual,nomeAtual){
         const f=document.getElementById('form-create-user'); if(!f)return;
@@ -1044,10 +1056,10 @@
         const btn=document.getElementById('userConfigSubmit');
         if(btn) btn.innerHTML='<i class="fas fa-save"></i> SALVAR ALTERAÇÕES';
         document.getElementById('userConfigCancel')?.classList.remove('d-none');
-        const groupWrap=document.getElementById('userGroupWrapper');
-        const group=document.getElementById('groupSelect');
-        if(groupWrap) groupWrap.style.display='none';
-        if(group) group.required=false;
+        const passWrap=document.getElementById('userPasswordWrapper');
+        const passInfo=document.getElementById('userDefaultPasswordInfo');
+        if(passWrap) passWrap.style.display='block';
+        if(passInfo) passInfo.style.display='none';
         const perms=document.getElementById('permissions-container');
         if(perms) perms.style.display='none';
         f.scrollIntoView({behavior:'smooth',block:'center'});
@@ -1227,15 +1239,8 @@
     }
 
     function setupPermissionSelector() {
-        const groupSelect = document.getElementById('groupSelect');
         const permissionsContainer = document.getElementById('permissions-container');
-        if(groupSelect && permissionsContainer) {
-            groupSelect.addEventListener('change', function() {
-                const selectedGroup = this.value;
-                if(selectedGroup && selectedGroup !== 'admin') { permissionsContainer.style.display = 'block'; }
-                else { permissionsContainer.style.display = 'none'; if(selectedGroup === 'admin') { document.querySelectorAll('#permissions-container input[type="checkbox"]').forEach(cb => cb.checked = false); } }
-            });
-        }
+        if (permissionsContainer) permissionsContainer.style.display = 'block';
     }
 
     async function editUserPermissions(userId, username) {
@@ -1259,13 +1264,16 @@
                 `;
                 
                 const modules = [
+                    { name: 'Dashboard', icon: 'chart-pie', permissions: [
+                        { codename: 'pode_ver_dashboard', label: 'Pode acessar o Dashboard', icon: 'eye' }
+                    ]},
                     { name: 'Estoque', icon: 'box', permissions: [
                         { codename: 'pode_ver_estoque', label: 'Pode visualizar estoque', icon: 'eye' },
                         { codename: 'pode_movimentar_estoque', label: 'Pode movimentar estoque', icon: 'exchange-alt' }
                     ]},
                     { name: 'Almoxarifado', icon: 'warehouse', permissions: [
                         { codename: 'pode_ver_almoxarifado', label: 'Pode visualizar almoxarifado', icon: 'eye' },
-                        { codename: 'pode_gerenciar_almoxarifado', label: 'Pode gerenciar almoxarifado', icon: 'edit' }
+                        { codename: 'pode_gerenciar_almoxarifado', label: 'Pode gerenciar almoxarifado (CRUD)', icon: 'edit' }
                     ]},
                     { name: 'Solicitações', icon: 'clipboard-list', permissions: [
                         { codename: 'pode_ver_empenhos', label: 'Ver solicitações/empenhos', icon: 'eye' },

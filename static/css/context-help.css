@@ -1,0 +1,97 @@
+/* ==============================================================
+   CONTEXT HELP - V7
+   Tira textos explicativos do layout e deixa a orientação disponível
+   em um botão discreto, exibida somente quando o usuário pedir.
+   ============================================================== */
+.ui-help-source-collapsed { display: none !important; }
+
+.ui-help-button {
+  width: 23px;
+  height: 23px;
+  min-width: 23px;
+  padding: 0;
+  margin-left: 6px;
+  display: inline-grid;
+  place-items: center;
+  vertical-align: middle;
+  border: 1px solid color-mix(in srgb,var(--primary,var(--primary-color,#2563eb)) 28%,var(--border,#e2e8f0));
+  border-radius: 50%;
+  background: color-mix(in srgb,var(--primary,var(--primary-color,#2563eb)) 7%,var(--bg-card,#fff));
+  color: var(--primary,var(--primary-color,#2563eb));
+  font: 800 12px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background .14s ease,border-color .14s ease,transform .14s ease;
+}
+.ui-help-button:hover,
+.ui-help-button:focus-visible {
+  background: color-mix(in srgb,var(--primary,var(--primary-color,#2563eb)) 14%,var(--bg-card,#fff));
+  border-color: var(--primary,var(--primary-color,#2563eb));
+  transform: translateY(-1px);
+  outline: none;
+}
+.ui-help-button[aria-expanded="true"] {
+  background: var(--primary,var(--primary-color,#2563eb));
+  border-color: var(--primary,var(--primary-color,#2563eb));
+  color: #fff;
+}
+
+.ui-help-popover {
+  position: fixed;
+  z-index: 2147483100;
+  width: min(330px, calc(100vw - 24px));
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb,var(--primary,var(--primary-color,#2563eb)) 18%,var(--border,#e2e8f0));
+  border-radius: 11px;
+  background: color-mix(in srgb,var(--bg-card,var(--card-bg,#fff)) 96%,transparent);
+  color: var(--text,var(--text-color,#0f172a));
+  box-shadow: 0 16px 38px rgba(15,23,42,.18);
+  font-size: .78rem;
+  line-height: 1.45;
+  opacity: 0;
+  transform: translateY(3px) scale(.99);
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+}
+.ui-help-popover.show {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.ui-help-popover::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: var(--ui-help-arrow-x, 24px);
+  width: 9px;
+  height: 9px;
+  background: inherit;
+  border-left: 1px solid color-mix(in srgb,var(--primary,var(--primary-color,#2563eb)) 18%,var(--border,#e2e8f0));
+  border-top: 1px solid color-mix(in srgb,var(--primary,var(--primary-color,#2563eb)) 18%,var(--border,#e2e8f0));
+  transform: rotate(45deg);
+}
+.ui-help-popover.above::before {
+  top: auto;
+  bottom: -5px;
+  transform: rotate(225deg);
+}
+
+/* Títulos/labels passam a aceitar o ícone sem quebrar o layout. */
+label:has(> .ui-help-button),
+h1:has(> .ui-help-button),
+h2:has(> .ui-help-button),
+h3:has(> .ui-help-button),
+h4:has(> .ui-help-button),
+.pl-title:has(> .ui-help-button) {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 2px;
+}
+
+@media (max-width:640px) {
+  .ui-help-popover { width: calc(100vw - 20px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-help-button,.ui-help-popover { transition:none !important; }
+}

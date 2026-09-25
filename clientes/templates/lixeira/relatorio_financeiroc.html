@@ -1,0 +1,1553 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Financeiro{% endblock %}
+
+{% block content %}
+
+<style>
+/* ============================================================
+   DASHBOARD FINANCEIRO - ESTILOS COMPLETOS E OTIMIZADOS
+============================================================ */
+:root {
+    --border-radius-lg: 16px;
+    --border-radius-md: 12px;
+    --border-radius-sm: 8px;
+    --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 8px 25px rgba(0,0,0,0.1);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-container {
+    padding: 1rem;
+    max-width: 1500px;
+    margin: 0 auto;
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1.75rem 2rem;
+    border-radius: var(--border-radius-lg);
+    margin-bottom: 1.75rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+}
+
+.dashboard-header::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 50%;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.header-title h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.header-title p {
+    margin: 0.35rem 0 0;
+    font-size: 0.85rem;
+    opacity: 0.85;
+}
+
+.header-stats {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255,255,255,0.12);
+    border-radius: var(--border-radius-sm);
+    font-size: 0.8rem;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 2rem 0 1.25rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.section-title i {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.metrics-highlight-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.highlight-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    padding: 1.5rem;
+    border: 2px solid var(--border-color);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.highlight-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+}
+
+.highlight-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 5px;
+    height: 100%;
+}
+
+.highlight-card.lucro::before { background: #10b981; }
+.highlight-card.caixa::before { background: #667eea; }
+
+.highlight-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.highlight-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--border-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.highlight-card.lucro .highlight-icon { background: rgba(16,185,129,0.1); color: #10b981; }
+.highlight-card.caixa .highlight-icon { background: rgba(102,126,234,0.1); color: #667eea; }
+
+.highlight-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.highlight-details { display: flex; flex-direction: column; gap: 0.65rem; }
+
+.highlight-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.55rem 0;
+}
+
+.highlight-row:not(:last-child) { border-bottom: 1px solid var(--border-light); }
+
+.highlight-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.highlight-value {
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+.highlight-total {
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 2px solid var(--border-color);
+}
+
+.highlight-total .highlight-value {
+    font-size: 1.3rem;
+    color: var(--primary-color) !important;
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.metric-card {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.25rem;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.metric-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.metric-card.receita::before { background: #10b981; }
+.metric-card.custo::before { background: #ef4444; }
+.metric-card.transacoes::before { background: #f59e0b; }
+
+.metric-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.metric-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--border-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+.metric-card.receita .metric-icon { background: rgba(16,185,129,0.1); color: #10b981; }
+.metric-card.custo .metric-icon { background: rgba(239,68,68,0.1); color: #ef4444; }
+.metric-card.transacoes .metric-icon { background: rgba(245,158,11,0.1); color: #f59e0b; }
+
+.metric-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.metric-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    margin: 0.5rem 0;
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+.metric-card.receita .metric-value { color: #10b981; }
+.metric-card.custo .metric-value { color: #ef4444; }
+.metric-card.transacoes .metric-value { color: #f59e0b; }
+
+.metric-change {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.metric-change.positive { background: rgba(16,185,129,0.08); color: #10b981; }
+.metric-change.negative { background: rgba(239,68,68,0.08); color: #ef4444; }
+
+.kpi-grid-advanced {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card-advanced {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: var(--transition);
+    position: relative;
+}
+
+.kpi-card-advanced:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.kpi-card-advanced.lucro { border-left: 4px solid #10b981; }
+.kpi-card-advanced.ticket { border-left: 4px solid #06b6d4; }
+.kpi-card-advanced.crescimento { border-left: 4px solid #667eea; }
+.kpi-card-advanced.vencidos { border-left: 4px solid #ef4444; }
+.kpi-card-advanced.previsao { border-left: 4px solid #8b5cf6; }
+.kpi-card-advanced.desativacao { border-left: 4px solid #f59e0b; }
+
+.kpi-icon-advanced {
+    width: 46px;
+    height: 46px;
+    border-radius: var(--border-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.kpi-card-advanced.lucro .kpi-icon-advanced { background: rgba(16,185,129,0.1); color: #10b981; }
+.kpi-card-advanced.ticket .kpi-icon-advanced { background: rgba(6,182,212,0.1); color: #06b6d4; }
+.kpi-card-advanced.crescimento .kpi-icon-advanced { background: rgba(102,126,234,0.1); color: #667eea; }
+.kpi-card-advanced.vencidos .kpi-icon-advanced { background: rgba(239,68,68,0.1); color: #ef4444; }
+.kpi-card-advanced.previsao .kpi-icon-advanced { background: rgba(139,92,246,0.1); color: #8b5cf6; }
+.kpi-card-advanced.desativacao .kpi-icon-advanced { background: rgba(245,158,11,0.1); color: #f59e0b; }
+
+.kpi-content-advanced {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.kpi-label-advanced {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+}
+
+.kpi-value-advanced {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-color);
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+.kpi-trend-advanced {
+    font-size: 0.7rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.kpi-trend-advanced.up { color: #10b981; }
+.kpi-trend-advanced.down { color: #ef4444; }
+.kpi-trend-advanced.info { color: #667eea; }
+
+.caixa-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.caixa-card {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    transition: var(--transition);
+}
+
+.caixa-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+}
+
+.caixa-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.caixa-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.caixa-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    font-family: 'SF Mono', 'Monaco', monospace;
+    margin: 0.5rem 0;
+}
+
+.caixa-card:first-child .caixa-value { color: #10b981; }
+.caixa-card:last-child .caixa-value { color: #ef4444; }
+
+.caixa-info {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.chart-card {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 1.5rem;
+    min-height: 350px;
+    display: flex;
+    flex-direction: column;
+    transition: var(--transition);
+}
+
+.chart-card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.chart-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-info {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.chart-container {
+    flex: 1;
+    position: relative;
+    min-height: 280px;
+}
+
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.filters-container {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-md);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+.filter-select {
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.85rem;
+    min-width: 130px;
+    cursor: pointer;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+}
+
+.table-card {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.table-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.table-responsive { overflow-x: auto; }
+
+.custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    min-width: 1000px;
+}
+
+.custom-table thead { background: var(--secondary-color); }
+
+.custom-table th {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 2px solid var(--border-color);
+    white-space: nowrap;
+}
+
+.custom-table tbody tr {
+    transition: background 0.2s;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.custom-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.015); }
+.custom-table tbody tr:hover { background: rgba(102,126,234,0.04); }
+
+.custom-table td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+    color: var(--text-color);
+}
+
+.val-money { font-family: 'SF Mono', 'Monaco', monospace; font-weight: 600; }
+.text-success { color: #10b981 !important; }
+.text-danger { color: #ef4444 !important; }
+.text-primary { color: #667eea !important; }
+
+.status-badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.badge-servico { background: rgba(102,126,234,0.1); color: #667eea; }
+.badge-caixa-entrada { background: rgba(16,185,129,0.1); color: #10b981; }
+.badge-caixa-saida { background: rgba(239,68,68,0.1); color: #ef4444; }
+.badge-manual { background: rgba(245,158,11,0.1); color: #f59e0b; }
+.badge-auto { background: rgba(139,92,246,0.1); color: #8b5cf6; }
+
+.categoria-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.table-totals {
+    background: var(--secondary-color);
+    border-top: 2px solid var(--border-color);
+}
+
+.table-totals td {
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+}
+
+.total-label {
+    text-align: right;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.total-value { font-size: 0.9rem; color: #10b981 !important; }
+
+.pagination-wrapper {
+    display: flex;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.pagination-custom {
+    display: flex;
+    list-style: none;
+    padding: 0;
+    gap: 0.25rem;
+}
+
+.page-link-custom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 0.5rem;
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-color);
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: var(--transition);
+}
+
+.page-link-custom:hover:not(.disabled) {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.page-item.active .page-link-custom {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.page-link-custom.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-action {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.btn-primary { background: #667eea; color: white; }
+.btn-primary:hover { background: #5a6fd6; }
+.btn-success { background: #10b981; color: white; }
+.btn-success:hover { background: #059669; }
+.btn-danger { background: #ef4444; color: white; }
+.btn-danger:hover { background: #dc2626; }
+.btn-secondary { background: var(--secondary-color); color: var(--text-color); border: 1px solid var(--border-color); }
+.btn-sm { padding: 0.3rem 0.6rem; font-size: 0.78rem; }
+
+.action-buttons { display: flex; gap: 0.25rem; justify-content: center; }
+
+.action-btn {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    min-width: 28px;
+    height: 28px;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+}
+
+.action-btn.edit { background: rgba(102,126,234,0.1); color: #667eea; }
+.action-btn.edit:hover { background: #667eea; color: white; }
+.action-btn.delete { background: rgba(239,68,68,0.1); color: #ef4444; }
+.action-btn.delete:hover { background: #ef4444; color: white; }
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.65);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    backdrop-filter: blur(3px);
+}
+
+.modal-box {
+    background: var(--card-bg);
+    border-radius: var(--border-radius-lg);
+    width: 90%;
+    max-width: 500px;
+    max-height: 85vh;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--secondary-color);
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-close-modal {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-close-modal:hover { background: var(--bg-hover); color: var(--text-color); }
+
+.modal-body { padding: 1.5rem; }
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    background: var(--secondary-color);
+    border-radius: 0 0 var(--border-radius-lg) var(--border-radius-lg);
+    position: sticky;
+    bottom: 0;
+}
+
+.form-group { margin-bottom: 1rem; }
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--text-color);
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    background: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.5s ease forwards;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1200px) {
+    .charts-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .dashboard-container { padding: 0.5rem; }
+    .dashboard-header { padding: 1.25rem; }
+    .header-content { flex-direction: column; text-align: center; }
+    .metrics-highlight-grid, .caixa-grid { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-grid-advanced { grid-template-columns: repeat(2, 1fr); }
+    .filters-container { flex-direction: column; align-items: stretch; }
+    .filter-select { width: 100%; }
+    .kpi-value-advanced { font-size: 1.2rem; }
+}
+
+@media (max-width: 480px) {
+    .metrics-grid { grid-template-columns: 1fr; }
+    .kpi-grid-advanced { grid-template-columns: 1fr; }
+    .modal-box { width: 95%; }
+}
+</style>
+
+<div class="dashboard-container">
+    <!-- HEADER -->
+    <div class="dashboard-header fade-in-up">
+        <div class="header-content">
+            <div class="header-title">
+                <i class="fas fa-chart-line" style="font-size:1.8rem;"></i>
+                <div>
+                    <h1>Dashboard Financeiro</h1>
+                    <p><i class="fas fa-calendar-alt"></i> {% now "F Y" %} • <i class="fas fa-sync-alt"></i> Atualizado em {% now "H:i" %}</p>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-item"><i class="fas fa-user-tag"></i> {{ user.tipo_usuario|default:"Cliente"|title }}</div>
+                {% if is_admin and total_revendas > 0 %}
+                <div class="stat-item"><i class="fas fa-store"></i> {{ total_revendas }} revendas</div>
+                {% endif %}
+                <div class="stat-item"><i class="fas fa-users"></i> {{ total_clientes_revenda|default:0 }} clientes</div>
+                <div class="stat-item"><i class="fas fa-database"></i> {{ total_transacoes }} transações</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTROLE DE VISUALIZAÇÃO -->
+    <div class="fade-in-up" style="margin-bottom:1.5rem;">
+        <div style="display:flex;gap:0.5rem;background:var(--secondary-color);padding:0.4rem;border-radius:10px;width:fit-content;border:1px solid var(--border-color);">
+            <a href="?grafico=servicos{% for key, value in request.GET.items %}{% if key != 'grafico' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               class="btn-action {% if not grafico_inclui_caixa %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+                <i class="fas fa-server"></i> Serviços
+            </a>
+            <a href="?grafico=completo{% for key, value in request.GET.items %}{% if key != 'grafico' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" 
+               class="btn-action {% if grafico_inclui_caixa %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+                <i class="fas fa-cash-register"></i> Serviços + Caixa
+            </a>
+        </div>
+    </div>
+
+    <!-- LUCRO + CAIXA DESTAQUE -->
+    <div class="metrics-highlight-grid">
+        <div class="highlight-card lucro fade-in-up">
+            <div class="highlight-header">
+                <div class="highlight-icon"><i class="fas fa-chart-line"></i></div>
+                <h3 class="highlight-title">Lucro Líquido (Serviços)</h3>
+            </div>
+            <div class="highlight-details">
+                <div class="highlight-row">
+                    <div class="highlight-label"><i class="fas fa-money-bill-wave"></i> Receita</div>
+                    <div class="highlight-value text-success">R$ {{ receita_servicos|floatformat:2 }}</div>
+                </div>
+                <div class="highlight-row">
+                    <div class="highlight-label"><i class="fas fa-tools"></i> Custos</div>
+                    <div class="highlight-value text-danger">R$ {{ custo_servicos|floatformat:2 }}</div>
+                </div>
+                <div class="highlight-row highlight-total">
+                    <div class="highlight-label"><i class="fas fa-calculator"></i> <strong>Lucro</strong></div>
+                    <div class="highlight-value text-primary">R$ {{ lucro_servicos|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="highlight-card caixa fade-in-up">
+            <div class="highlight-header">
+                <div class="highlight-icon"><i class="fas fa-cash-register"></i></div>
+                <h3 class="highlight-title">Saldo do Caixa</h3>
+            </div>
+            <div class="highlight-details">
+                <div class="highlight-row">
+                    <div class="highlight-label"><i class="fas fa-arrow-down"></i> Entradas (Mês)</div>
+                    <div class="highlight-value text-success">R$ {{ entrada_caixa|floatformat:2 }}</div>
+                </div>
+                <div class="highlight-row">
+                    <div class="highlight-label"><i class="fas fa-arrow-up"></i> Saídas (Mês)</div>
+                    <div class="highlight-value text-danger">R$ {{ saida_caixa|floatformat:2 }}</div>
+                </div>
+                <div class="highlight-row highlight-total">
+                    <div class="highlight-label"><i class="fas fa-wallet"></i> <strong>Saldo Total</strong></div>
+                    <div class="highlight-value text-success">R$ {{ saldo_caixa_atual|floatformat:2 }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MÉTRICAS PRINCIPAIS -->
+    <div class="metrics-grid">
+        <div class="metric-card receita fade-in-up">
+            <div class="metric-header">
+                <div class="metric-icon"><i class="fas fa-money-bill-wave"></i></div>
+                <h4 class="metric-title">Receita Total</h4>
+            </div>
+            <div class="metric-value">R$ {{ total_receita|floatformat:2 }}</div>
+            <div class="metric-change positive"><i class="fas fa-layer-group"></i> Serviços + Caixa</div>
+        </div>
+        <div class="metric-card custo fade-in-up">
+            <div class="metric-header">
+                <div class="metric-icon"><i class="fas fa-tools"></i></div>
+                <h4 class="metric-title">Custos Totais</h4>
+            </div>
+            <div class="metric-value">R$ {{ total_custos|floatformat:2 }}</div>
+            <div class="metric-change negative"><i class="fas fa-layer-group"></i> Serviços + Caixa</div>
+        </div>
+        <div class="metric-card transacoes fade-in-up">
+            <div class="metric-header">
+                <div class="metric-icon"><i class="fas fa-exchange-alt"></i></div>
+                <h4 class="metric-title">Transações</h4>
+            </div>
+            <div class="metric-value">{{ total_transacoes }}</div>
+            <div class="metric-change positive"><i class="fas fa-calendar-day"></i> {{ media_transacao|floatformat:2 }} média</div>
+        </div>
+    </div>
+
+    <!-- ENTRADAS / SAÍDAS HOJE -->
+    <div class="caixa-grid">
+        <div class="caixa-card fade-in-up">
+            <div class="caixa-header">
+                <div class="caixa-title"><i class="fas fa-arrow-down text-success"></i> Entradas Hoje</div>
+                <button class="btn-action btn-success btn-sm" onclick="abrirModalCaixa('entrada')"><i class="fas fa-plus"></i> Nova</button>
+            </div>
+            <div class="caixa-value">R$ {{ entradas_caixa_hoje|floatformat:2 }}</div>
+            <div class="caixa-info"><i class="fas fa-info-circle"></i> Total mês: R$ {{ entrada_caixa|floatformat:2 }}</div>
+        </div>
+        <div class="caixa-card fade-in-up">
+            <div class="caixa-header">
+                <div class="caixa-title"><i class="fas fa-arrow-up text-danger"></i> Saídas Hoje</div>
+                <button class="btn-action btn-danger btn-sm" onclick="abrirModalCaixa('saida')"><i class="fas fa-minus"></i> Nova</button>
+            </div>
+            <div class="caixa-value">R$ {{ saidas_caixa_hoje|floatformat:2 }}</div>
+            <div class="caixa-info"><i class="fas fa-info-circle"></i> Total mês: R$ {{ saida_caixa|floatformat:2 }}</div>
+        </div>
+    </div>
+
+    <!-- MÉTRICAS AVANÇADAS -->
+    <div class="section-title fade-in-up"><i class="fas fa-chart-pie"></i> Métricas Avançadas</div>
+    <div class="kpi-grid-advanced">
+        <div class="kpi-card-advanced lucro">
+            <div class="kpi-icon-advanced"><i class="fas fa-percentage"></i></div>
+            <div class="kpi-content-advanced">
+                <span class="kpi-label-advanced">Margem de Lucro</span>
+                <span class="kpi-value-advanced">{{ margem_lucro|floatformat:1|default:"0.0" }}%</span>
+                <span class="kpi-trend-advanced {% if margem_lucro > 20 %}up{% else %}down{% endif %}">
+                    {% if margem_lucro > 20 %}Saudável{% else %}Atenção{% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="kpi-card-advanced ticket">
+            <div class="kpi-icon-advanced"><i class="fas fa-receipt"></i></div>
+            <div class="kpi-content-advanced">
+                <span class="kpi-label-advanced">Ticket Médio</span>
+                <span class="kpi-value-advanced">R$ {{ ticket_medio|floatformat:2|default:"0.00" }}</span>
+                <span class="kpi-trend-advanced info">Por cliente</span>
+            </div>
+        </div>
+        <div class="kpi-card-advanced crescimento">
+            <div class="kpi-icon-advanced"><i class="fas fa-chart-line"></i></div>
+            <div class="kpi-content-advanced">
+                <span class="kpi-label-advanced">Crescimento</span>
+                <span class="kpi-value-advanced">{{ crescimento_mensal|floatformat:1|default:"0.0" }}%</span>
+                <span class="kpi-trend-advanced {% if crescimento_mensal > 0 %}up{% else %}down{% endif %}">Vs. mês anterior</span>
+            </div>
+        </div>
+        <div class="kpi-card-advanced vencidos">
+            <div class="kpi-icon-advanced"><i class="fas fa-user-clock"></i></div>
+            <div class="kpi-content-advanced">
+                <span class="kpi-label-advanced">Clientes Vencidos</span>
+                <span class="kpi-value-advanced">{{ clientes_vencidos|default:"0" }}</span>
+                <span class="kpi-trend-advanced down">Cobrar</span>
+            </div>
+        </div>
+        <div class="kpi-card-advanced previsao">
+            <div class="kpi-icon-advanced"><i class="fas fa-crystal-ball"></i></div>
+            <div class="kpi-content-advanced">
+                <span class="kpi-label-advanced">Previsão Futura</span>
+                <span class="kpi-value-advanced">R$ {{ previsao_futura_vencimento|floatformat:2|default:"0.00" }}</span>
+                <span class="kpi-trend-advanced info">{{ clientes_ativos_com_vencimento|default:"0" }} clientes</span>
+            </div>
+        </div>
+        <div class="kpi-card-advanced desativacao">
+            <div class="kpi-icon-advanced"><i class="fas fa-user-slash"></i></div>
+            <div class="kpi-content-advanced">
+                <span class="kpi-label-advanced">Desativação/Mês</span>
+                <span class="kpi-value-advanced">{{ taxa_desativacao_mes|floatformat:1|default:"0.0" }}%</span>
+                <span class="kpi-trend-advanced {% if taxa_desativacao_mes < 5 %}up{% else %}down{% endif %}">{{ desativados_este_mes|default:"0" }} este mês</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div class="charts-grid">
+        <div class="chart-card fade-in-up">
+            <div class="chart-header">
+                <div class="chart-title"><i class="fas fa-users"></i> Top Clientes/Serviços</div>
+                <div class="chart-info">Total: R$ {{ receita_servicos|floatformat:2 }}</div>
+            </div>
+            <div class="chart-container"><canvas id="clientesChart"></canvas></div>
+        </div>
+        <div class="chart-card fade-in-up">
+            <div class="chart-header">
+                <div class="chart-title"><i class="fas fa-calendar-alt"></i> Evolução (6 meses)</div>
+                <div class="chart-info">{% if grafico_inclui_caixa %}Serviços + Caixa{% else %}Serviços{% endif %}</div>
+            </div>
+            <div class="chart-container"><canvas id="evolucaoChart"></canvas></div>
+        </div>
+        <div class="chart-card fade-in-up">
+            <div class="chart-header">
+                <div class="chart-title"><i class="fas fa-balance-scale"></i> Comparação Receita vs Custos</div>
+                <div class="chart-info">Últimos 4 meses</div>
+            </div>
+            <div class="chart-container"><canvas id="comparacaoMensalChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- FILTROS -->
+    <div class="filters-container fade-in-up">
+        <div class="filter-group">
+            <span class="filter-label">Período:</span>
+            <select class="filter-select" id="filtroPeriodo" onchange="aplicarFiltros()">
+                <option value="all" {% if filtro_periodo == 'all' %}selected{% endif %}>Todos</option>
+                <option value="today" {% if filtro_periodo == 'today' %}selected{% endif %}>Hoje</option>
+                <option value="week" {% if filtro_periodo == 'week' %}selected{% endif %}>Semana</option>
+                <option value="month" {% if filtro_periodo == 'month' %}selected{% endif %}>Mês</option>
+                <option value="year" {% if filtro_periodo == 'year' %}selected{% endif %}>Ano</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <span class="filter-label">Tipo:</span>
+            <select class="filter-select" id="filtroTipo" onchange="aplicarFiltros()">
+                <option value="all" {% if filtro_tipo == 'all' %}selected{% endif %}>Todos</option>
+                <option value="manual" {% if filtro_tipo == 'manual' %}selected{% endif %}>Manual</option>
+                <option value="auto" {% if filtro_tipo == 'auto' %}selected{% endif %}>Automático</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <span class="filter-label">Origem:</span>
+            <select class="filter-select" id="filtroOrigem" onchange="aplicarFiltros()">
+                <option value="all" {% if filtro_origem == 'all' %}selected{% endif %}>Todas</option>
+                <option value="servico" {% if filtro_origem == 'servico' %}selected{% endif %}>Serviços</option>
+                <option value="caixa" {% if filtro_origem == 'caixa' %}selected{% endif %}>Caixa</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <button class="btn-action btn-secondary btn-sm" onclick="window.location.href='?'"><i class="fas fa-redo"></i> Limpar</button>
+        </div>
+    </div>
+
+    <!-- TABELA -->
+    <div class="table-card fade-in-up">
+        <div class="table-header">
+            <h3 class="table-title"><i class="fas fa-list"></i> Transações <span class="table-count">({{ page_obj.paginator.count }} registros)</span></h3>
+        </div>
+        <div class="table-responsive">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Origem</th><th>Cliente</th><th>Descrição</th><th>Categoria</th>
+                        <th>Valor Pago</th><th>Custo</th><th>Lucro</th><th>Data</th><th>Tipo</th><th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in page_obj %}
+                    <tr>
+                        <td>
+                            {% if item.origem == 'servico' %}
+                                <span class="status-badge badge-servico"><i class="fas fa-server"></i> Serviço</span>
+                            {% else %}
+                                <span class="status-badge {% if item.tipo_transacao == 'entrada' %}badge-caixa-entrada{% else %}badge-caixa-saida{% endif %}">
+                                    <i class="fas fa-arrow-{% if item.tipo_transacao == 'entrada' %}down{% else %}up{% endif %}"></i>
+                                    {{ item.tipo_transacao|title }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ item.cliente_nome|truncatechars:20 }}</strong></td>
+                        <td title="{{ item.descricao }}">{{ item.descricao|truncatechars:25 }}</td>
+                        <td><span class="categoria-badge">{{ item.categoria|default:"Outros"|title }}</span></td>
+                        <td class="val-money {% if item.valor_pago > 0 %}text-success{% endif %}">
+                            {% if item.valor_pago > 0 %}R$ {{ item.valor_pago|floatformat:2 }}{% else %}-{% endif %}
+                        </td>
+                        <td class="val-money text-danger">
+                            {% if item.valor_servico > 0 %}R$ {{ item.valor_servico|floatformat:2 }}{% else %}-{% endif %}
+                        </td>
+                        <td class="val-money {% if item.valor_liquido >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            R$ {{ item.valor_liquido|floatformat:2 }}
+                        </td>
+                        <td>{{ item.data|date:"d/m/Y" }}<br><small>{{ item.data|time:"H:i" }}</small></td>
+                        <td>
+                            {% if item.origem == 'servico' %}
+                                <span class="status-badge {% if item.tipo_transacao == 'manual' %}badge-manual{% else %}badge-auto{% endif %}">{{ item.tipo_transacao|title }}</span>
+                            {% else %}
+                                <span class="status-badge {% if item.tipo_transacao == 'entrada' %}badge-caixa-entrada{% else %}badge-caixa-saida{% endif %}">{{ item.tipo_transacao|title }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                {% if item.origem == 'servico' %}
+                                    <button class="action-btn edit" onclick="abrirModalEditarRelatorio('{{ item.id }}')" title="Editar"><i class="fas fa-edit"></i></button>
+                                    <button class="action-btn delete" onclick="confirmarExclusaoRelatorio('{{ item.id }}')" title="Excluir"><i class="fas fa-trash-alt"></i></button>
+                                {% else %}
+                                    <button class="action-btn edit" onclick="abrirModalEditarCaixa('{{ item.id }}')" title="Editar"><i class="fas fa-edit"></i></button>
+                                    <button class="action-btn delete" onclick="confirmarExclusaoCaixa('{{ item.id }}')" title="Excluir"><i class="fas fa-trash-alt"></i></button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" style="text-align:center;padding:2rem;color:var(--text-muted);">
+                            <i class="fas fa-file-invoice-dollar" style="font-size:2.5rem;opacity:0.3;display:block;margin-bottom:1rem;"></i>
+                            Nenhuma transação encontrada
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-totals">
+                    <tr>
+                        <td colspan="4" class="total-label"><strong>TOTAIS:</strong></td>
+                        <td class="total-value">R$ {{ total_valor_pago|floatformat:2 }}</td>
+                        <td class="total-value text-danger">R$ {{ total_custo_servico|floatformat:2 }}</td>
+                        <td class="total-value text-success">R$ {{ total_lucro_liquido|floatformat:2 }}</td>
+                        <td colspan="3" style="font-size:0.8rem;">Média: R$ {{ media_transacao|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% if page_obj.has_other_pages %}
+        <div class="pagination-wrapper">
+            <ul class="pagination-custom">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link-custom" href="?page={{ page_obj.previous_page_number }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"><i class="fas fa-chevron-left"></i></a></li>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link-custom">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item"><a class="page-link-custom" href="?page={{ num }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}">{{ num }}</a></li>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link-custom" href="?page={{ page_obj.next_page_number }}{% for k,v in request.GET.items %}{% if k != 'page' %}&{{ k }}={{ v }}{% endif %}{% endfor %}"><i class="fas fa-chevron-right"></i></a></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- MODAL CAIXA ENTRADA -->
+<div id="modalCaixaEntrada" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 style="color:#10b981;"><i class="fas fa-arrow-down"></i> Nova Entrada</h3>
+            <button class="btn-close-modal" onclick="fecharModalCaixa('entrada')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="formCaixaEntrada" method="post" action="{% url 'financeiro:adicionar_movimentacao_caixa' %}">
+                {% csrf_token %}<input type="hidden" name="tipo" value="entrada">
+                <div class="form-group"><label>Valor (R$):</label><input type="text" name="valor" class="form-control" placeholder="0,00" required></div>
+                <div class="form-group"><label>Descrição:</label><input type="text" name="descricao" class="form-control" placeholder="Ex: Venda avulsa" required></div>
+                <div class="form-group"><label>Categoria:</label><select name="categoria" class="form-control"><option value="venda">Venda</option><option value="servico">Serviço</option><option value="outros">Outros</option></select></div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-action btn-secondary" onclick="fecharModalCaixa('entrada')">Cancelar</button>
+            <button class="btn-action btn-success" onclick="salvarCaixa('entrada')"><i class="fas fa-check"></i> Salvar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CAIXA SAÍDA -->
+<div id="modalCaixaSaida" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 style="color:#ef4444;"><i class="fas fa-arrow-up"></i> Nova Saída</h3>
+            <button class="btn-close-modal" onclick="fecharModalCaixa('saida')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="formCaixaSaida" method="post" action="{% url 'financeiro:adicionar_movimentacao_caixa' %}">
+                {% csrf_token %}<input type="hidden" name="tipo" value="saida">
+                <div class="form-group"><label>Valor (R$):</label><input type="text" name="valor" class="form-control" placeholder="0,00" required></div>
+                <div class="form-group"><label>Descrição:</label><input type="text" name="descricao" class="form-control" placeholder="Ex: Pagamento de conta" required></div>
+                <div class="form-group"><label>Categoria:</label><select name="categoria" class="form-control"><option value="despesa">Despesa</option><option value="servico">Serviço</option><option value="outros">Outros</option></select></div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-action btn-secondary" onclick="fecharModalCaixa('saida')">Cancelar</button>
+            <button class="btn-action btn-danger" onclick="salvarCaixa('saida')"><i class="fas fa-check"></i> Salvar</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+// ==========================================
+// DADOS DOS GRÁFICOS
+// ==========================================
+const dadosGraficos = {
+    clientes: { 
+        labels: {{ labels_clientes|safe|default:"['Sem dados']" }}, 
+        valores: {{ valores_clientes|safe|default:"[0]" }} 
+    },
+    evolucao: { 
+        meses: {{ meses_labels|safe|default:"['Sem dados']" }}, 
+        receita: {{ receita_dados|safe|default:"[0]" }}, 
+        lucro: {{ lucro_dados|safe|default:"[0]" }}, 
+        custo: {{ custo_dados|safe|default:"[0]" }} 
+    },
+    comparacao: { 
+        meses: {{ evolucao_meses|safe|default:"['Jan','Fev','Mar','Abr']" }}, 
+        receita: {{ evolucao_mensal_receita|safe|default:"[0,0,0,0]" }}, 
+        custos: {{ evolucao_mensal_custos|safe|default:"[0,0,0,0]" }} 
+    }
+};
+
+function cores() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+        primary: '#667eea', success: '#10b981', danger: '#ef4444', warning: '#f59e0b',
+        purple: '#8b5cf6', cyan: '#06b6d4',
+        text: s.getPropertyValue('--text-color') || '#1e293b',
+        muted: s.getPropertyValue('--text-muted') || '#64748b',
+        grid: 'rgba(0,0,0,0.06)'
+    };
+}
+
+function initGraficos() {
+    const c = cores();
+    
+    const ctx1 = document.getElementById('clientesChart');
+    if (ctx1 && dadosGraficos.clientes.valores.length > 0 && dadosGraficos.clientes.valores[0] !== 0) {
+        new Chart(ctx1, { type: 'bar', data: { labels: dadosGraficos.clientes.labels, datasets: [{ label: 'Faturamento (R$)', data: dadosGraficos.clientes.valores, backgroundColor: ['rgba(102,126,234,0.8)','rgba(16,185,129,0.8)','rgba(245,158,11,0.8)','rgba(239,68,68,0.8)','rgba(139,92,246,0.8)','rgba(6,182,212,0.8)'], borderRadius: 8, borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { labels: { color: c.text, font: { size: 12 }, padding: 15 } }, tooltip: { callbacks: { label: ctx => 'R$ ' + ctx.parsed.x.toLocaleString('pt-BR', {minimumFractionDigits: 2}) } } }, scales: { x: { ticks: { color: c.muted, callback: v => 'R$ ' + v.toLocaleString('pt-BR'), font: { size: 11 } }, grid: { color: c.grid } }, y: { ticks: { color: c.muted, font: { size: 10 } }, grid: { display: false } } } } });
+    }
+    
+    const ctx2 = document.getElementById('evolucaoChart');
+    if (ctx2 && dadosGraficos.evolucao.meses.length > 0) {
+        new Chart(ctx2, { type: 'line', data: { labels: dadosGraficos.evolucao.meses, datasets: [{ label: 'Receita', data: dadosGraficos.evolucao.receita, borderColor: c.primary, backgroundColor: 'rgba(102,126,234,0.1)', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: c.primary }, { label: 'Lucro', data: dadosGraficos.evolucao.lucro, borderColor: c.success, backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, borderWidth: 2.5, pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: c.success }, { label: 'Custos', data: dadosGraficos.evolucao.custo, borderColor: c.danger, backgroundColor: 'rgba(239,68,68,0.05)', fill: true, tension: 0.4, borderWidth: 2, borderDash: [5,5], pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: c.danger }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: c.text, font: { size: 12 }, padding: 20, usePointStyle: true } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2}) } } }, scales: { y: { ticks: { color: c.muted, callback: v => 'R$ ' + v.toLocaleString('pt-BR'), font: { size: 11 } }, grid: { color: c.grid } }, x: { ticks: { color: c.muted, font: { size: 11 } }, grid: { display: false } } } } });
+    }
+    
+    const ctx3 = document.getElementById('comparacaoMensalChart');
+    if (ctx3 && dadosGraficos.comparacao.meses.length > 0) {
+        new Chart(ctx3, { type: 'bar', data: { labels: dadosGraficos.comparacao.meses, datasets: [{ label: 'Receita', data: dadosGraficos.comparacao.receita, backgroundColor: 'rgba(16,185,129,0.7)', borderColor: '#10b981', borderWidth: 1, borderRadius: 6 }, { label: 'Custos', data: dadosGraficos.comparacao.custos, backgroundColor: 'rgba(239,68,68,0.7)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: c.text, font: { size: 12 }, padding: 15, usePointStyle: true } }, tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2}) } } }, scales: { y: { beginAtZero: true, ticks: { color: c.muted, callback: v => 'R$ ' + v.toLocaleString('pt-BR'), font: { size: 11 } }, grid: { color: c.grid } }, x: { ticks: { color: c.muted, font: { size: 11 } }, grid: { display: false } } } } });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initGraficos);
+
+// ==========================================
+// MODAIS DE CAIXA
+// ==========================================
+let modalAtual = null;
+
+function abrirModalCaixa(tipo) {
+    modalAtual = tipo;
+    const modal = document.getElementById(tipo === 'entrada' ? 'modalCaixaEntrada' : 'modalCaixaSaida');
+    if (modal) { modal.style.display = 'flex'; modal.querySelector('.modal-box').style.animation = 'fadeInUp 0.3s ease forwards'; }
+}
+
+function fecharModalCaixa(tipo) {
+    const modal = document.getElementById(tipo === 'entrada' ? 'modalCaixaEntrada' : 'modalCaixaSaida');
+    if (modal) { modal.style.display = 'none'; modalAtual = null; }
+}
+
+function salvarCaixa(tipo) {
+    const form = document.getElementById(tipo === 'entrada' ? 'formCaixaEntrada' : 'formCaixaSaida');
+    if (form) { fecharModalCaixa(tipo); form.submit(); }
+}
+
+// ==========================================
+// EDIÇÃO E EXCLUSÃO
+// ==========================================
+
+function abrirModalEditarCaixa(id) {
+    fetch('/financeiro/caixa/json/' + id + '/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.id) {
+                // Remove modal anterior se existir
+                const modalAntigo = document.getElementById('modalEditarCaixa');
+                if (modalAntigo) modalAntigo.remove();
+                
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.id = 'modalEditarCaixa';
+                overlay.style.display = 'flex';
+                
+                overlay.innerHTML = `
+                    <div class="modal-box">
+                        <div class="modal-header">
+                            <h3 style="color:#667eea;"><i class="fas fa-edit"></i> Editar Movimentação</h3>
+                            <button class="btn-close-modal" onclick="fecharModalEdicaoCaixa()"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="formEditarCaixa" method="post" action="/financeiro/caixa/editar/${id}/">
+                                <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrfToken()}">
+                                <div class="form-group">
+                                    <label>Tipo:</label>
+                                    <select name="tipo" class="form-control">
+                                        <option value="entrada" ${data.tipo === "entrada" ? "selected" : ""}>Entrada</option>
+                                        <option value="saida" ${data.tipo === "saida" ? "selected" : ""}>Saída</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Valor (R$):</label>
+                                    <input type="text" name="valor" class="form-control" value="${data.valor.replace('.', ',')}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Descrição:</label>
+                                    <input type="text" name="descricao" class="form-control" value="${data.descricao || ''}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Categoria:</label>
+                                    <select name="categoria" class="form-control">
+                                        <option value="venda" ${data.categoria === "venda" ? "selected" : ""}>Venda</option>
+                                        <option value="servico" ${data.categoria === "servico" ? "selected" : ""}>Serviço</option>
+                                        <option value="despesa" ${data.categoria === "despesa" ? "selected" : ""}>Despesa</option>
+                                        <option value="investimento" ${data.categoria === "investimento" ? "selected" : ""}>Investimento</option>
+                                        <option value="outros" ${data.categoria === "outros" ? "selected" : ""}>Outros</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Data:</label>
+                                    <input type="datetime-local" name="data" class="form-control" value="${data.data.slice(0, 16)}" required>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-action btn-secondary" onclick="fecharModalEdicaoCaixa()">Cancelar</button>
+                            <button class="btn-action btn-primary" onclick="salvarEdicaoCaixa()"><i class="fas fa-check"></i> Salvar</button>
+                        </div>
+                    </div>
+                `;
+                
+                overlay.onclick = function(e) { 
+                    if (e.target === overlay) fecharModalEdicaoCaixa(); 
+                };
+                
+                document.body.appendChild(overlay);
+            }
+        })
+        .catch(error => console.error('Erro:', error));
+}
+
+function fecharModalEdicaoCaixa() {
+    const modal = document.getElementById('modalEditarCaixa');
+    if (modal) modal.remove();
+}
+
+function salvarEdicaoCaixa() {
+    const form = document.getElementById('formEditarCaixa');
+    if (form) {
+        form.submit();
+    } else {
+        console.error('Formulário de edição não encontrado!');
+    }
+}
+
+function abrirModalEditarRelatorio(id) {
+    fetch('/financeiro/relatorio/json/' + id + '/')
+        .then(response => response.json())
+        .then(response => {
+            if (response.success && response.data) {
+                const data = response.data;
+                
+                // Remove modal anterior se existir
+                const modalAntigo = document.getElementById('modalEditarRelatorio');
+                if (modalAntigo) modalAntigo.remove();
+                
+                // Criar o modal
+                const overlay = document.createElement('div');
+                overlay.className = 'modal-overlay';
+                overlay.id = 'modalEditarRelatorio';
+                overlay.style.display = 'flex';
+                
+                const valorPago = data.valor_pago.replace('.', ',');
+                const valorServico = data.valor_servico.replace('.', ',');
+                const dataGeracao = data.data_geracao.slice(0, 16);
+                
+                overlay.innerHTML = `
+                    <div class="modal-box">
+                        <div class="modal-header">
+                            <h3 style="color:#667eea;"><i class="fas fa-edit"></i> Editar Relatório</h3>
+                            <button class="btn-close-modal" onclick="fecharModalEdicaoRelatorio()"><i class="fas fa-times"></i></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="formEditarRelatorio" method="post" action="/financeiro/relatorio/editar/${id}/">
+                                <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrfToken()}">
+                                <div class="form-group">
+                                    <label>Servidor/Descrição:</label>
+                                    <input type="text" name="servidor" class="form-control" value="${data.servidor || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label>Valor Pago (R$):</label>
+                                    <input type="text" name="valor_pago" class="form-control" value="${valorPago}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Valor do Serviço (R$):</label>
+                                    <input type="text" name="valor_servico" class="form-control" value="${valorServico}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Data:</label>
+                                    <input type="datetime-local" name="data_geracao" class="form-control" value="${dataGeracao}" required>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-action btn-secondary" onclick="fecharModalEdicaoRelatorio()">Cancelar</button>
+                            <button class="btn-action btn-primary" onclick="salvarEdicaoRelatorio()"><i class="fas fa-check"></i> Salvar</button>
+                        </div>
+                    </div>
+                `;
+                
+                // Fechar ao clicar fora
+                overlay.onclick = function(e) { 
+                    if (e.target === overlay) fecharModalEdicaoRelatorio(); 
+                };
+                
+                document.body.appendChild(overlay);
+            } else {
+                alert('Erro ao carregar dados do relatório');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar dados do relatório');
+        });
+}
+
+function fecharModalEdicaoRelatorio() {
+    const modal = document.getElementById('modalEditarRelatorio');
+    if (modal) modal.remove();
+}
+
+function salvarEdicaoRelatorio() {
+    const form = document.getElementById('formEditarRelatorio');
+    if (form) {
+        form.submit();
+    } else {
+        console.error('Formulário de edição não encontrado!');
+    }
+}
+
+function confirmarExclusaoCaixa(id) {
+    if (confirm('Tem certeza que deseja excluir esta movimentação?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/financeiro/caixa/excluir/' + id + '/';
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'csrfmiddlewaretoken'; input.value = getCsrfToken();
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function confirmarExclusaoRelatorio(id) {
+    if (confirm('Tem certeza que deseja excluir este relatório?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/financeiro/relatorio/excluir/' + id + '/';
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'csrfmiddlewaretoken'; input.value = getCsrfToken();
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+function getCsrfToken() {
+    const cookie = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+    return cookie ? cookie.split('=')[1] : '';
+}
+
+function aplicarFiltros() {
+    const p = document.getElementById('filtroPeriodo').value;
+    const t = document.getElementById('filtroTipo').value;
+    const o = document.getElementById('filtroOrigem').value;
+    let url = window.location.pathname + '?';
+    if (p !== 'all') url += 'periodo=' + p + '&';
+    if (t !== 'all') url += 'tipo=' + t + '&';
+    if (o !== 'all') url += 'origem=' + o + '&';
+    window.location.href = url.endsWith('&') ? url.slice(0, -1) : url;
+}
+
+// Fechar modais com ESC
+document.addEventListener('keydown', function(e) { 
+    if (e.key === 'Escape') {
+        if (modalAtual) fecharModalCaixa(modalAtual);
+        fecharModalEdicaoCaixa();
+        fecharModalEdicaoRelatorio();
+    }
+});
+</script>
+{% endblock %}

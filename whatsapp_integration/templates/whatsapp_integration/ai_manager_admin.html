@@ -1,0 +1,427 @@
+<!-- whatsapp_integration/templates/whatsapp_integration/ai_manager_admin.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}IA Admin - WhatsApp{% endblock %}
+
+{% block content %}
+<style>
+/* Mesmo CSS de antes + estilos extras */
+.ia-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 20px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 10px 40px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.card-ia {
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.card-ia-header {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 5%, transparent), color-mix(in srgb, var(--primary-dark) 3%, transparent));
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    padding: 1rem 1.5rem;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-ia {
+    background: linear-gradient(135deg, var(--primary-light), var(--primary));
+    color: white;
+    border: none;
+    font-weight: 700;
+    border-radius: 12px;
+    padding: 0.6rem 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.btn-ia:hover { transform: translateY(-2px); box-shadow: 0 5px 20px color-mix(in srgb, var(--primary) 40%, transparent); }
+
+.form-control-ia {
+    border: 2px solid var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    padding: 0.7rem 1rem;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+.form-control-ia:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 10%, transparent);
+    outline: none;
+}
+
+.revenda-row {
+    transition: all 0.3s ease;
+    padding: 1rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+}
+.revenda-row:hover {
+    background: color-mix(in srgb, var(--primary) 3%, transparent);
+    border-color: var(--primary-light);
+}
+.revenda-row.active {
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border-color: var(--primary-light);
+    border-left: 4px solid var(--primary-light);
+}
+
+.badge-status {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+</style>
+
+<div class="container-fluid px-0">
+    
+    <!-- HEADER -->
+    <div class="ia-header">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2 class="mb-1 fw-bold"><i class="fas fa-robot me-2"></i>Gerenciador de IA</h2>
+                <p class="mb-0" style="opacity: 0.85;">Painel do Administrador - Controle Total</p>
+            </div>
+            <div class="d-flex gap-2">
+                <span class="badge bg-white text-dark px-3 py-2">
+                    <i class="fas fa-shield-alt me-1" style="color: var(--primary-light);"></i> Admin
+                </span>
+                <a href="{% url 'integra:whatsapp_dashboard' %}" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Voltar
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4">
+        
+        <!-- COLUNA ESQUERDA: LISTA DE REVENDAS -->
+        <div class="col-lg-4">
+            <div class="card-ia">
+                <div class="card-ia-header">
+                    <span><i class="fas fa-users me-2" style="color: var(--primary-light);"></i>Revendas</span>
+                    <span class="badge bg-light text-dark" id="revendaCount">0</span>
+                </div>
+                <div class="card-body p-2" style="max-height: 600px; overflow-y: auto;" id="revendasList">
+                    <div class="text-center py-4 text-muted">Carregando...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- COLUNA DIREITA: CONFIGURAÇÃO -->
+        <div class="col-lg-8">
+            <div class="card-ia" id="configPanel">
+                <div class="card-ia-header">
+                    <span><i class="fas fa-cog me-2" style="color: var(--primary-light);"></i><span id="configTitle">Configuração Global</span></span>
+                </div>
+                <div class="card-body p-4">
+                    
+                    <!-- Selecionar Revenda -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Configurar para:</label>
+                        <select class="form-select form-control-ia" id="selectRevenda" onchange="loadRevendaConfig()">
+                            <option value="">🌍 Global (Padrão para todos)</option>
+                        </select>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- Nome da Config -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Nome da Configuração</label>
+                        <input type="text" class="form-control-ia" id="configNome" placeholder="Configuração Padrão">
+                    </div>
+                    
+                    <!-- Provedor -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Provedor de IA</label>
+                        <select class="form-select form-control-ia" id="aiProvider">
+                            <option value="groq">🆓 Groq (Grátis)</option>
+                            <option value="openai">🤖 OpenAI (ChatGPT)</option>
+                            <option value="deepseek">🧠 DeepSeek</option>
+                        </select>
+                    </div>
+                    
+                    <!-- API Key -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">API Key (opcional)</label>
+                        <input type="password" class="form-control-ia" id="apiKey" placeholder="Deixe vazio para usar a chave do sistema">
+                    </div>
+                    
+                    <!-- Prompt do Sistema -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Prompt do Sistema</label>
+                        <textarea class="form-control-ia" id="systemPrompt" rows="5" 
+                                  placeholder="Você é um assistente virtual..."></textarea>
+                        <small class="text-muted">Este prompt define o comportamento base da IA</small>
+                    </div>
+                    
+                    <!-- Limites -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Msg/Dia</label>
+                            <input type="number" class="form-control-ia" id="maxMessages" value="200" min="10">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Histórico</label>
+                            <input type="number" class="form-control-ia" id="maxHistory" value="10" min="2" max="50">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small">Delay (seg)</label>
+                            <input type="number" class="form-control-ia" id="responseDelay" value="2" min="0" max="10">
+                        </div>
+                    </div>
+                    
+
+                    <!-- ========================================== -->
+<!-- REGRAS DE RESPOSTA DO ADMIN -->
+<!-- ========================================== -->
+<div class="card-ia mt-3">
+    <div class="card-ia-header">
+        <span><i class="fas fa-sliders-h me-2" style="color: var(--primary-light);"></i>Regras de Resposta (Admin)</span>
+    </div>
+    <div class="card-body p-4">
+        
+        <div class="alert alert-info small">
+            <i class="fas fa-info-circle me-1"></i>
+            Estas regras valem para <strong>TODAS</strong> as revendas (padrão). 
+            Cada revenda pode personalizar as próprias regras.
+        </div>
+        
+        <!-- Responder no Privado -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="adminResponderPrivado" checked>
+            <label class="form-check-label fw-bold">💬 Responder no Privado</label>
+            <br><small class="text-muted">IA responde mensagens diretas automaticamente</small>
+        </div>
+        
+        <!-- Responder em Grupos -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="adminResponderGrupos" onchange="toggleAdminGrupoConfig()">
+            <label class="form-check-label fw-bold">👥 Responder em Grupos</label>
+            <br><small class="text-muted">IA também responde em grupos de WhatsApp</small>
+        </div>
+        
+        <!-- Configurações de Grupo -->
+        <div id="adminGrupoConfig" style="display:none;">
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="adminPrecisaMarcacao" checked>
+                <label class="form-check-label">Precisa marcar @bot no grupo</label>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label small">Nome para marcação:</label>
+                <input type="text" class="form-control-ia" id="adminBotMarcacao" 
+                       value="@bot" placeholder="@assistente">
+            </div>
+        </div>
+        
+        <!-- Palavras de Ativação -->
+        <div class="mb-3">
+            <label class="form-label fw-bold small">🔑 Palavras de Ativação (Padrão)</label>
+            <input type="text" class="form-control-ia" id="adminPalavrasAtivacao" 
+                   placeholder="Ex: suporte, ajuda, plano, pagamento">
+            <small class="text-muted">Separadas por vírgula. Vazio = responde qualquer mensagem.</small>
+        </div>
+        
+    </div>
+</div>
+                    <!-- Status -->
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="isActive" checked>
+                        <label class="form-check-label fw-bold small">Ativar esta configuração</label>
+                    </div>
+                    
+                    <button class="btn btn-ia w-100 py-2" onclick="saveAdminConfig()">
+                        <i class="fas fa-save me-1"></i> Salvar Configuração
+                    </button>
+                    
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<script>
+const API = '/integra/api/ai';
+const CSRF_TOKEN = '{{ csrf_token }}';
+let currentRevendaId = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadRevendas();
+    loadGlobalConfig();
+});
+
+// ==========================================
+// CARREGAR LISTA DE REVENDAS
+// ==========================================
+function loadRevendas() {
+    fetch('/integra/api/ai/admin/revendas/')
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('revendasList');
+            const select = document.getElementById('selectRevenda');
+            
+            // Limpar select (mantém opção Global)
+            select.innerHTML = '<option value="">🌍 Global (Padrão)</option>';
+            
+            if (data.revendas && data.revendas.length > 0) {
+                let html = '';
+                data.revendas.forEach(rev => {
+                    // Adicionar no select
+                    select.innerHTML += `<option value="${rev.id}">👤 ${rev.nome}</option>`;
+                    
+                    // Card na lista
+                    const temConfig = rev.tem_config;
+                    const configAtiva = rev.config_ativa;
+                    
+                    html += `
+                    <div class="revenda-row ${temConfig ? 'active' : ''}" onclick="selectRevenda(${rev.id}, '${rev.nome}')">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${rev.nome}</strong>
+                                <br>
+                                <small class="text-muted">${rev.email || rev.username}</small>
+                            </div>
+                            <div>
+                                ${temConfig ? 
+                                    `<span class="badge-status" style="background: ${configAtiva ? '#22c55e20' : '#ef444420'}; color: ${configAtiva ? '#22c55e' : '#ef4444'};">
+                                        ${configAtiva ? '✅ Ativa' : '❌ Inativa'}
+                                    </span>` :
+                                    `<span class="badge-status" style="background: #6b728020; color: #6b7280;">⚙️ Padrão</span>`
+                                }
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+                document.getElementById('revendaCount').innerText = data.revendas.length;
+            } else {
+                container.innerHTML = '<div class="text-center py-4 text-muted">Nenhuma revenda encontrada</div>';
+            }
+        });
+}
+
+// ==========================================
+// SELECIONAR REVENDA
+// ==========================================
+function selectRevenda(id, nome) {
+    currentRevendaId = id;
+    document.getElementById('configTitle').innerText = id ? `Config: ${nome}` : 'Configuração Global';
+    
+    // Destacar na lista
+    document.querySelectorAll('.revenda-row').forEach(el => el.style.borderLeft = '');
+    event.currentTarget.style.borderLeft = '4px solid var(--primary-light)';
+    
+    loadRevendaConfig();
+}
+
+// Mostrar/ocultar config de grupo do admin
+function toggleAdminGrupoConfig() {
+    const checked = document.getElementById('adminResponderGrupos').checked;
+    document.getElementById('adminGrupoConfig').style.display = checked ? 'block' : 'none';
+}
+
+// Atualize a função loadRevendaConfig para carregar as regras:
+function loadRevendaConfig() {
+    const revendaId = document.getElementById('selectRevenda').value;
+    currentRevendaId = revendaId || null;
+    
+    let url = `${API}/config/`;
+    if (revendaId) url += `?revenda_id=${revendaId}`;
+    
+    fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const config = data.config || {};
+                document.getElementById('configNome').value = config.nome || '';
+                document.getElementById('aiProvider').value = config.provider || 'groq';
+                document.getElementById('apiKey').value = '';
+                document.getElementById('systemPrompt').value = config.system_prompt || '';
+                document.getElementById('maxMessages').value = config.max_messages || 200;
+                document.getElementById('maxHistory').value = config.max_history || 10;
+                document.getElementById('responseDelay').value = config.response_delay || 2;
+                document.getElementById('isActive').checked = config.is_active !== false;
+                
+                // NOVO: Carregar regras de resposta
+                document.getElementById('adminResponderPrivado').checked = config.responder_privado !== false;
+                document.getElementById('adminResponderGrupos').checked = config.responder_grupos || false;
+                document.getElementById('adminPrecisaMarcacao').checked = config.precisa_marcacao !== false;
+                document.getElementById('adminBotMarcacao').value = config.bot_marcacao || '@bot';
+                document.getElementById('adminPalavrasAtivacao').value = config.palavras_ativacao || '';
+                
+                // Mostrar/ocultar config de grupo
+                toggleAdminGrupoConfig();
+                
+                if (revendaId) {
+                    document.getElementById('configTitle').innerText = 'Configuração da Revenda';
+                } else {
+                    document.getElementById('configTitle').innerText = 'Configuração Global';
+                }
+            }
+        });
+}
+
+// Atualize a função saveAdminConfig para incluir as regras:
+function saveAdminConfig() {
+    const data = {
+        revenda_id: currentRevendaId || null,
+        nome: document.getElementById('configNome').value,
+        provider: document.getElementById('aiProvider').value,
+        api_key: document.getElementById('apiKey').value,
+        system_prompt: document.getElementById('systemPrompt').value,
+        max_messages: parseInt(document.getElementById('maxMessages').value),
+        max_history: parseInt(document.getElementById('maxHistory').value),
+        response_delay: parseInt(document.getElementById('responseDelay').value),
+        is_active: document.getElementById('isActive').checked,
+        // NOVO: Regras de resposta
+        responder_privado: document.getElementById('adminResponderPrivado').checked,
+        responder_grupos: document.getElementById('adminResponderGrupos').checked,
+        precisa_marcacao: document.getElementById('adminPrecisaMarcacao').checked,
+        bot_marcacao: document.getElementById('adminBotMarcacao').value,
+        palavras_ativacao: document.getElementById('adminPalavrasAtivacao').value,
+    };
+    
+    fetch(`${API}/config/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF_TOKEN
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.AppUI.alert('✅ Configuração salva com sucesso!');
+            loadRevendas();
+        } else {
+            window.AppUI.alert('❌ Erro: ' + (data.error || 'Desconhecido'));
+        }
+    })
+    .catch(err => window.AppUI.alert('Erro: ' + err));
+}
+// ==========================================
+// CARREGAR CONFIG GLOBAL
+// ==========================================
+function loadGlobalConfig() {
+    loadRevendaConfig();
+}
+
+
+</script>
+{% endblock %}

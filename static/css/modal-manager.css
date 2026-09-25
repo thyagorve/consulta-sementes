@@ -1,0 +1,175 @@
+/* ==============================================================
+   MODAL MANAGER GLOBAL - V7
+   Mantém qualquer modal preso à viewport, acima do conteúdo e
+   impede a página de rolar enquanto houver uma janela aberta.
+   ============================================================== */
+
+html.app-modal-open,
+body.app-modal-open {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+body.app-modal-open {
+  width: 100% !important;
+}
+
+/* Raízes de modal conhecidas do painel. Não força display quando ocultas. */
+.modal,
+.modal-overlay[id],
+.custom-modal-overlay,
+.rf-modal,
+.pl-modal,
+#modalRenovarOverlay,
+#avisosOverlay,
+.tls-tags-modal,
+.appui-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  max-width: none !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  overscroll-behavior: contain !important;
+  z-index: 2147482000 !important;
+  box-sizing: border-box !important;
+}
+
+/* Backdrops internos continuam preenchendo apenas a raiz do modal. */
+.modal > .modal-overlay,
+.tls-tags-modal > .tls-tags-backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Janela sempre centralizada, sem depender da posição atual da página. */
+.modal-dialog,
+.modal-box,
+.custom-modal-box,
+.modal-renovar-dialog,
+.rf-modal-box,
+.pl-dialog,
+.tls-tags-dialog,
+.appui-dialog,
+.modal > .modal-content {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  margin: auto !important;
+  transform-origin: center center !important;
+  max-height: min(84dvh, 760px) !important;
+  z-index: 2 !important;
+}
+
+/* Somente o conteúdo interno do modal pode rolar. */
+.modal-body,
+.custom-modal-body,
+.modal-renovar-body,
+.rf-modal-body,
+.pl-modal-body,
+.modal-body-scroll,
+.tls-tags-body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-gutter: stable;
+}
+
+/* Quando visível, garante centralização real mesmo em modais antigos. */
+.modal.show,
+.modal[style*="display: flex"],
+.modal[style*="display:flex"],
+.modal[style*="display: block"],
+.modal[style*="display:block"],
+.modal-overlay.active,
+.modal-overlay[style*="display: flex"],
+.modal-overlay[style*="display:flex"],
+.custom-modal-overlay.active,
+.custom-modal-overlay[style*="display: flex"],
+.rf-modal.show,
+.rf-modal.active,
+.pl-modal.show,
+#modalRenovarOverlay.active,
+#avisosOverlay[style*="display: flex"],
+#avisosOverlay[style*="display:flex"],
+.tls-tags-modal[style*="display: flex"],
+.tls-tags-modal[style*="display:flex"],
+.appui-backdrop.is-open {
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Pequena entrada, rápida. Nada de modal vindo do fim da página. */
+.modal.show .modal-dialog,
+.modal.show > .modal-content,
+.modal-overlay.active > .modal-box,
+.modal-overlay.active > .modal-dialog,
+.custom-modal-overlay.active > .custom-modal-box,
+.pl-modal.show > .pl-dialog,
+#modalRenovarOverlay.active > .modal-renovar-dialog,
+.tls-tags-modal[style*="display: flex"] > .tls-tags-dialog,
+.tls-tags-modal[style*="display:flex"] > .tls-tags-dialog,
+.appui-backdrop.is-open > .appui-dialog {
+  animation: appModalFocusIn .16s cubic-bezier(.2,.8,.2,1) both !important;
+}
+
+@keyframes appModalFocusIn {
+  from { opacity: .72; transform: scale(.985) translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (max-width: 640px) {
+  .modal,
+  .modal-overlay[id],
+  .custom-modal-overlay,
+  .rf-modal,
+  .pl-modal,
+  #modalRenovarOverlay,
+  #avisosOverlay,
+  .tls-tags-modal,
+  .appui-backdrop {
+    padding: 10px !important;
+  }
+
+  .modal-dialog,
+  .modal-box,
+  .custom-modal-box,
+  .modal-renovar-dialog,
+  .rf-modal-box,
+  .pl-dialog,
+  .tls-tags-dialog,
+  .appui-dialog,
+  .modal > .modal-content {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+    max-height: calc(100dvh - 20px) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal.show .modal-dialog,
+  .modal.show > .modal-content,
+  .modal-overlay.active > .modal-box,
+  .modal-overlay.active > .modal-dialog,
+  .custom-modal-overlay.active > .custom-modal-box,
+  .pl-modal.show > .pl-dialog,
+  #modalRenovarOverlay.active > .modal-renovar-dialog,
+  .tls-tags-modal > .tls-tags-dialog,
+  .appui-backdrop.is-open > .appui-dialog {
+    animation: none !important;
+  }
+}

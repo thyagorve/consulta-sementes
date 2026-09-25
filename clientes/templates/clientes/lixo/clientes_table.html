@@ -1,0 +1,43 @@
+<table>
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Usuário</th>
+            <th>Plano</th>
+            <th>Valor do Serviço</th>
+            <th>Valor a Pagar</th>
+            <th>Data de Criação</th>
+            <th>Data de Vencimento</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cliente in clientes %}
+        <tr>
+            <td>{{ cliente.nome }}</td>
+            <td>{{ cliente.usuario }}</td>
+            <td>{{ cliente.plano }}</td>
+            <td>{{ cliente.valor_servico }}</td>
+            <td>{{ cliente.valor_a_pagar }}</td>
+            <td>{{ cliente.data_criacao }}</td>
+            <td>{{ cliente.data_vencimento }}</td>
+            <td>
+                <a href="{% url 'editar_cliente' cliente.pk %}">Editar</a>
+                <button type="button" data-toggle="modal" data-target="#confirmModal{{ cliente.pk }}">Excluir</button>
+
+                <!-- Modal de exclusão -->
+                <div id="confirmModal{{ cliente.pk }}" class="modal">
+                    <div class="modal-content">
+                        <p>Tem certeza que deseja excluir o cliente {{ cliente.nome }}?</p>
+                        <form method="POST" action="{% url 'excluir_cliente' cliente.pk %}">
+                            {% csrf_token %}
+                            <button type="submit">Sim, Excluir</button>
+                            <button type="button" class="close-modal">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

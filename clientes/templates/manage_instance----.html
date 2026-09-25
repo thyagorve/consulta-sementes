@@ -1,0 +1,1775 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}WhatsApp Manager - Conexão{% endblock %}
+
+{% block content %}
+<!-- WhatsApp Manager CSS -->
+<style>
+/* ==========================================
+   RESET E CONFIGURAÇÕES
+========================================== */
+.whatsapp-manager-container {
+    --whatsapp-green: #25D366;
+    --whatsapp-green-dark: #128C7E;
+    --whatsapp-teal: #075E54;
+    --whatsapp-blue: #34B7F1;
+    --whatsapp-gray: #667781;
+    --whatsapp-gray-light: #f0f2f5;
+    --whatsapp-gray-border: #e6e6e6;
+    --whatsapp-success: #25D366;
+    --whatsapp-warning: #FFC107;
+    --whatsapp-danger: #DC3545;
+    --whatsapp-info: #17A2B8;
+    
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.whatsapp-manager-container * {
+    box-sizing: border-box;
+}
+
+/* Container principal */
+.whatsapp-manager-container {
+    padding: 20px;
+    min-height: calc(100vh - 140px);
+    margin: -24px;
+    margin-top: -70px;
+    padding-top: 90px;
+    background: #f5f5f5;
+}
+
+/* ==========================================
+   HEADER
+========================================== */
+.whatsapp-header {
+    background: linear-gradient(135deg, var(--whatsapp-teal) 0%, var(--whatsapp-green-dark) 100%);
+    padding: 1.5rem;
+    border-radius: 15px 15px 0 0;
+    margin-bottom: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    color: white;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.logo-section {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logo-section i {
+    font-size: 2rem;
+}
+
+.logo-section h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.user-info {
+    text-align: right;
+}
+
+.user-info .username {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.user-info .user-id {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+/* Status global */
+.global-status {
+    text-align: center;
+    margin-top: 1rem;
+    width: 100%;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.status-dot.online { background: var(--whatsapp-green); }
+.status-dot.offline { background: var(--whatsapp-gray); }
+.status-dot.scanning { 
+    background: var(--whatsapp-blue); 
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+.last-update {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* ==========================================
+   CARD PRINCIPAL
+========================================== */
+.connection-card {
+    background: white;
+    border-radius: 0 0 20px 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin-bottom: 2rem;
+    border: 1px solid var(--whatsapp-gray-border);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid var(--whatsapp-gray-border);
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.header-section h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--whatsapp-teal);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.header-section h2 i {
+    color: var(--whatsapp-green);
+}
+
+.description {
+    color: var(--whatsapp-gray);
+    margin: 0.5rem 0 0;
+    font-size: 0.9rem;
+}
+
+.ownership-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: white;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--whatsapp-gray-border);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--whatsapp-teal);
+}
+
+.ownership-badge i {
+    color: var(--whatsapp-green);
+}
+
+/* ==========================================
+   PROGRESS STEPS
+========================================== */
+.progress-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: var(--whatsapp-gray-light);
+    position: relative;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+    min-width: 80px;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: white;
+    border: 3px solid var(--whatsapp-gray-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: var(--whatsapp-gray);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.step.active .step-circle {
+    background: var(--whatsapp-green);
+    border-color: var(--whatsapp-green);
+    color: white;
+    box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+}
+
+.step.completed .step-circle {
+    background: var(--whatsapp-teal);
+    border-color: var(--whatsapp-teal);
+    color: white;
+}
+
+.step-label {
+    margin-top: 0.5rem;
+    font-weight: 600;
+    color: var(--whatsapp-gray);
+    font-size: 0.8rem;
+    text-align: center;
+}
+
+.step.active .step-label {
+    color: var(--whatsapp-green);
+}
+
+.step-connector {
+    flex: 1;
+    height: 3px;
+    background: var(--whatsapp-gray-border);
+    margin: 0 1rem;
+    position: relative;
+}
+
+.step-connector::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: var(--whatsapp-green);
+    transition: width 0.3s ease;
+}
+
+.step.completed + .step-connector::after {
+    width: 100%;
+}
+
+/* ==========================================
+   STEP CONTENT
+========================================== */
+.step-content {
+    padding: 1.5rem;
+}
+
+.step-panel {
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+.step-panel.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.panel-header {
+    margin-bottom: 1.5rem;
+}
+
+.panel-header h3 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--whatsapp-teal);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.panel-description {
+    color: var(--whatsapp-gray);
+    margin: 0.5rem 0 0;
+    font-size: 0.9rem;
+}
+
+/* ==========================================
+   FORMULÁRIOS
+========================================== */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--whatsapp-teal);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.input-group {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.input-group input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--whatsapp-gray-border);
+    border-radius: 10px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    background: white;
+    color: #333;
+}
+
+.input-group input:focus {
+    outline: none;
+    border-color: var(--whatsapp-green);
+    box-shadow: 0 0 0 3px rgba(37, 211, 102, 0.1);
+}
+
+.form-hint {
+    font-size: 0.85rem;
+    color: var(--whatsapp-gray);
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* ==========================================
+   BOTÕES
+========================================== */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    text-decoration: none;
+    position: relative;
+    z-index: 10;
+}
+
+.btn-success {
+    background: var(--whatsapp-green);
+    color: white;
+}
+
+.btn-success:hover {
+    background: var(--whatsapp-green-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(37, 211, 102, 0.3);
+}
+
+.btn-primary {
+    background: var(--whatsapp-blue);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2388c5;
+    transform: translateY(-2px);
+}
+
+.btn-outline-secondary {
+    background: transparent;
+    border: 2px solid var(--whatsapp-gray);
+    color: var(--whatsapp-gray);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--whatsapp-gray);
+    color: white;
+}
+
+.btn-outline-danger {
+    background: transparent;
+    border: 2px solid var(--whatsapp-danger);
+    color: var(--whatsapp-danger);
+}
+
+.btn-outline-danger:hover {
+    background: var(--whatsapp-danger);
+    color: white;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* ==========================================
+   INSTANCE INFO
+========================================== */
+.instance-info {
+    background: var(--whatsapp-gray-light);
+    border-radius: 15px;
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid var(--whatsapp-gray-border);
+}
+
+.info-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.info-header h4 {
+    font-size: 1rem;
+    color: var(--whatsapp-teal);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.info-label {
+    color: var(--whatsapp-gray);
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.info-value {
+    color: var(--whatsapp-teal);
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* ==========================================
+   QR CODE SECTION
+========================================== */
+.qr-section {
+    margin: 1.5rem 0;
+}
+
+.qr-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    .qr-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.qr-wrapper {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    border: 2px solid var(--whatsapp-gray-border);
+    text-align: center;
+}
+
+.qr-placeholder {
+    color: var(--whatsapp-gray);
+    padding: 2rem 1rem;
+}
+
+.qr-placeholder i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: var(--whatsapp-gray-light);
+}
+
+.qr-loading {
+    padding: 2rem 1rem;
+    display: none;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--whatsapp-gray-light);
+    border-top-color: var(--whatsapp-green);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.qr-image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+    border: 1px solid var(--whatsapp-gray-border);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    display: none;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.qr-image:hover {
+    transform: scale(1.02);
+}
+
+.qr-instructions {
+    text-align: left;
+}
+
+.qr-instructions h5 {
+    font-size: 1.1rem;
+    color: var(--whatsapp-teal);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.qr-instructions ol {
+    padding-left: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.qr-instructions li {
+    margin-bottom: 0.5rem;
+    color: var(--whatsapp-gray);
+    font-size: 0.9rem;
+}
+
+/* ==========================================
+   CONNECTION CONTROLS
+========================================== */
+.connection-controls {
+    display: flex;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
+}
+
+.connection-controls .btn {
+    flex: 1;
+    min-width: 150px;
+}
+
+/* ==========================================
+   ACTION BUTTONS
+========================================== */
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--whatsapp-gray-border);
+}
+
+/* ==========================================
+   PERMISSIONS INDICATOR
+========================================== */
+.permissions-indicator {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-left: 4px solid var(--whatsapp-green);
+}
+
+.permissions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.permission-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.permission-item i.fa-check {
+    color: var(--whatsapp-green);
+}
+
+.permission-item i.fa-times {
+    color: var(--whatsapp-danger);
+}
+
+/* ==========================================
+   ALERTAS
+========================================== */
+.alert-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    max-width: 400px;
+}
+
+.alert {
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    animation: slideInRight 0.3s ease;
+    border-left: 4px solid transparent;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    background: white;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.alert-success {
+    border-left-color: var(--whatsapp-green);
+    color: var(--whatsapp-green);
+}
+
+.alert-error {
+    border-left-color: var(--whatsapp-danger);
+    color: var(--whatsapp-danger);
+}
+
+.alert-warning {
+    border-left-color: var(--whatsapp-warning);
+    color: #856404;
+}
+
+.alert-info {
+    border-left-color: var(--whatsapp-blue);
+    color: var(--whatsapp-blue);
+}
+
+.alert .btn-close {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ==========================================
+   RESPONSIVIDADE
+========================================== */
+@media (max-width: 768px) {
+    .whatsapp-manager-container {
+        padding: 10px;
+        margin: -16px;
+        margin-top: -70px;
+        padding-top: 80px;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .user-info {
+        text-align: center;
+    }
+    
+    .global-status {
+        margin-top: 1rem;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .connection-controls {
+        flex-direction: column;
+    }
+    
+    .connection-controls .btn {
+        min-width: 100%;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .action-buttons .btn {
+        width: 100%;
+    }
+    
+    .info-grid, .permissions-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .alert-container {
+        left: 20px;
+        right: 20px;
+        max-width: none;
+    }
+}
+</style>
+
+<!-- WhatsApp Manager HTML -->
+<div class="whatsapp-manager-container">
+    <!-- Header -->
+    <div class="whatsapp-header">
+        <div class="header-content">
+            <div class="logo-section">
+                <i class="fab fa-whatsapp"></i>
+                <div>
+                    <h1>WhatsApp Manager</h1>
+                    <p class="subtitle">Gerencie sua conexão com o WhatsApp Business</p>
+                </div>
+            </div>
+            
+            <div class="user-info">
+                <div class="username">
+                    <i class="fas fa-user"></i>
+                    {{ request.user.username }}
+                </div>
+                <div class="user-id">
+                    ID: {{ request.user.id }}
+                </div>
+            </div>
+        </div>
+        
+        <div class="global-status">
+            <div class="status-badge" id="globalStatus">
+                <span class="status-dot offline"></span>
+                <span class="status-text">Carregando...</span>
+            </div>
+            <small class="last-update">Última atualização: <span id="lastUpdate">--:--</span></small>
+        </div>
+    </div>
+
+    <!-- Connection Card -->
+    <div class="connection-card">
+        <!-- Card Header -->
+        <div class="card-header">
+            <div class="header-section">
+                <h2>
+                    <i class="fas fa-link"></i>
+                    Conexão WhatsApp
+                </h2>
+                <p class="description">Gerencie sua conexão do WhatsApp Business com segurança</p>
+            </div>
+            <div class="ownership-badge" id="ownershipBadge">
+                <i class="fas fa-user-shield"></i>
+                <span>Controle de Propriedade Ativo</span>
+            </div>
+        </div>
+
+        <!-- Progress Steps -->
+        <div class="progress-steps">
+            <div class="step active" data-step="1">
+                <div class="step-circle">1</div>
+                <div class="step-label">Instância</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step" data-step="2">
+                <div class="step-circle">2</div>
+                <div class="step-label">Conexão</div>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step" data-step="3">
+                <div class="step-circle">3</div>
+                <div class="step-label">Pronto</div>
+            </div>
+        </div>
+
+        <!-- Alert Container (floating) -->
+        <div class="alert-container" id="alertContainer"></div>
+
+        <!-- Step Content -->
+        <div class="step-content">
+            <!-- Step 1: Instance Setup -->
+            <div class="step-panel active" id="step1">
+                <div class="panel-header">
+                    <h3>
+                        <i class="fas fa-server"></i>
+                        Configurar Instância
+                    </h3>
+                    <p class="panel-description">Crie uma instância única para gerenciar sua conexão</p>
+                </div>
+
+                <div class="panel-body">
+                    <!-- Permissions Indicator -->
+                    <div class="permissions-indicator" id="permissionsIndicator">
+                        <strong>Permissões:</strong>
+                        <div class="permissions-grid">
+                            <div class="permission-item">
+                                <i class="fas fa-check"></i>
+                                <span>Criar instância</span>
+                            </div>
+                            <div class="permission-item">
+                                <i class="fas fa-check"></i>
+                                <span>Conectar à instância</span>
+                            </div>
+                            <div class="permission-item">
+                                <i class="fas fa-check"></i>
+                                <span>Desconectar da instância</span>
+                            </div>
+                            <div class="permission-item">
+                                <i class="fas fa-check"></i>
+                                <span>Deletar sua instância</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="instanceName">
+                            <i class="fas fa-tag"></i>
+                            Nome da Instância
+                        </label>
+                        <div class="input-group">
+                            <input 
+                                type="text" 
+                                id="instanceName" 
+                                class="form-control"
+                                placeholder="ex: minha_loja_whatsapp"
+                                maxlength="50"
+                                pattern="[a-zA-Z0-9_]+"
+                                title="Use apenas letras, números e underscore (_)"
+                            >
+                            <button class="btn btn-success" id="createInstanceBtn">
+                                <i class="fas fa-plus-circle"></i>
+                                Criar Instância
+                            </button>
+                        </div>
+                        <div class="form-hint">
+                            <i class="fas fa-info-circle"></i>
+                            Use apenas letras, números e underscore (_)
+                        </div>
+                    </div>
+
+                    <!-- Existing Instance -->
+                    <div class="instance-info" id="existingInstance" style="display: none;">
+                        <div class="info-header">
+                            <h4>
+                                <i class="fas fa-database"></i>
+                                Minha Instância
+                            </h4>
+                            <div>
+                                <button class="btn btn-outline-danger btn-sm" id="removeInstanceBtn">
+                                    <i class="fas fa-trash"></i>
+                                    Remover
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" id="deleteInstanceBtn" style="display: none;">
+                                    <i class="fas fa-trash-alt"></i>
+                                    Deletar Completamente
+                                </button>
+                            </div>
+                        </div>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Nome:</span>
+                                <span class="info-value" id="currentInstanceName">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Status:</span>
+                                <span class="info-value" id="currentInstanceStatus">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Proprietário:</span>
+                                <span class="info-value" id="instanceOwner">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Última verificação:</span>
+                                <span class="info-value" id="instanceLastCheck">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary" id="nextStep1Btn" disabled>
+                            Continuar
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Connection -->
+            <div class="step-panel" id="step2">
+                <div class="panel-header">
+                    <h3>
+                        <i class="fas fa-qrcode"></i>
+                        Conectar WhatsApp
+                    </h3>
+                    <p class="panel-description">Gere o QR Code para parear seu WhatsApp</p>
+                </div>
+
+                <div class="panel-body">
+                    <!-- Connection Status -->
+                    <div class="connection-status-card" id="connectionStatusCard">
+                        <div class="instance-info">
+                            <div class="info-header">
+                                <h4>
+                                    <i class="fas fa-plug"></i>
+                                    Status da Conexão
+                                </h4>
+                                <span class="ownership-badge" id="connectionOwnerBadge">
+                                    <i class="fas fa-user-check"></i>
+                                    Você é o proprietário
+                                </span>
+                            </div>
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <span class="info-label">Instância:</span>
+                                    <span class="info-value" id="connectionInstanceName">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Status:</span>
+                                    <span class="info-value" id="connectionStatus">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">WhatsApp:</span>
+                                    <span class="info-value" id="connectionProfile">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Permissão:</span>
+                                    <span class="info-value" id="connectionPermission">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Controls -->
+                    <div class="connection-controls">
+                        <button class="btn btn-success" id="generateQRBtn">
+                            <i class="fas fa-qrcode"></i>
+                            Gerar QR Code
+                        </button>
+                        <button class="btn btn-outline-danger" id="disconnectBtn">
+                            <i class="fas fa-power-off"></i>
+                            Desconectar
+                        </button>
+                        <button class="btn btn-outline-secondary" id="checkStatusBtn">
+                            <i class="fas fa-sync"></i>
+                            Verificar Status
+                        </button>
+                    </div>
+
+                    <!-- QR Code Section -->
+                    <div class="qr-section" id="qrSection" style="display: none;">
+                        <div class="qr-container">
+                            <div class="qr-wrapper">
+                                <div class="qr-placeholder" id="qrPlaceholder">
+                                    <i class="fas fa-qrcode"></i>
+                                    <p>QR Code será gerado aqui</p>
+                                </div>
+                                <div class="qr-loading" id="qrLoading">
+                                    <div class="spinner"></div>
+                                    <p>Gerando QR Code...</p>
+                                </div>
+                                <img src="" alt="QR Code" class="qr-image" id="qrImage">
+                                <div class="form-hint" style="margin-top: 1rem;">
+                                    <i class="fas fa-download"></i>
+                                    Clique na imagem para baixar
+                                </div>
+                            </div>
+
+                            <div class="qr-instructions">
+                                <h5>
+                                    <i class="fas fa-mobile-alt"></i>
+                                    Como conectar
+                                </h5>
+                                <ol>
+                                    <li>Abra o WhatsApp no seu celular</li>
+                                    <li>Toque em <strong>Menu → Dispositivos conectados</strong></li>
+                                    <li>Selecione <strong>Conectar um dispositivo</strong></li>
+                                    <li>Escaneie o QR Code ao lado</li>
+                                    <li>Clique em "Já Escaneei" abaixo</li>
+                                </ol>
+                                
+                                <div class="action-buttons">
+                                    <button class="btn btn-success" id="confirmScanBtn">
+                                        <i class="fas fa-check-circle"></i>
+                                        Já Escaneei
+                                    </button>
+                                    <button class="btn btn-outline-primary" id="newQRBtn">
+                                        <i class="fas fa-redo"></i>
+                                        Novo QR Code
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-outline-secondary" id="backStep2Btn">
+                            <i class="fas fa-arrow-left"></i>
+                            Voltar
+                        </button>
+                        <button class="btn btn-primary" id="nextStep2Btn" disabled>
+                            Continuar
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Connected -->
+            <div class="step-panel" id="step3">
+                <div class="panel-header">
+                    <h3>
+                        <i class="fas fa-check-circle text-success"></i>
+                        Conexão Estabelecida
+                    </h3>
+                    <p class="panel-description">Seu WhatsApp está conectado e pronto para uso</p>
+                </div>
+
+                <div class="panel-body">
+                    <div class="connected-profile">
+                        <div class="instance-info">
+                            <div class="info-header">
+                                <h4>
+                                    <i class="fas fa-check-circle"></i>
+                                    WhatsApp Conectado com Sucesso!
+                                </h4>
+                                <span class="ownership-badge" style="background: rgba(37, 211, 102, 0.1);">
+                                    <i class="fas fa-shield-alt"></i>
+                                    Conexão Segura
+                                </span>
+                            </div>
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <span class="info-label">Instância:</span>
+                                    <span class="info-value" id="connectedInstanceName">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">WhatsApp:</span>
+                                    <span class="info-value" id="connectedProfileName">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Proprietário:</span>
+                                    <span class="info-value" id="connectedOwner">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Status:</span>
+                                    <span class="info-value text-success" id="connectedStatus">Conectado ✓</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-outline-secondary" id="backStep3Btn">
+                            <i class="fas fa-arrow-left"></i>
+                            Voltar
+                        </button>
+                        <button class="btn btn-success" id="finishBtn">
+                            <i class="fas fa-check"></i>
+                            Concluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- WhatsApp Manager JavaScript -->
+<script>
+// ==========================================
+// CONFIGURAÇÕES
+// ==========================================
+const CONFIG = {
+    endpoint: "{% url 'manage_instance' %}",
+    csrfToken: "{{ csrf_token }}"
+};
+
+// ==========================================
+// ESTADO DA APLICAÇÃO
+// ==========================================
+const STATE = {
+    currentInstance: null,
+    currentStatus: null,
+    userPermissions: {
+        can_create: true,
+        can_connect: false,
+        can_disconnect: false,
+        can_delete: false
+    },
+    qrData: null,
+    currentStep: 1,
+    checkInterval: null,
+    user: {
+        id: "{{ request.user.id }}",
+        username: "{{ request.user.username }}"
+    }
+};
+
+// ==========================================
+// ELEMENTOS DOM
+// ==========================================
+const ELEMENTS = {
+    // Status
+    globalStatus: document.getElementById('globalStatus'),
+    lastUpdate: document.getElementById('lastUpdate'),
+    ownershipBadge: document.getElementById('ownershipBadge'),
+    
+    // Step 1
+    instanceName: document.getElementById('instanceName'),
+   createInstanceBtn : document.getElementById('createInstanceBtn'),
+    removeInstanceBtn: document.getElementById('removeInstanceBtn'),
+    deleteInstanceBtn: document.getElementById('deleteInstanceBtn'),
+    existingInstance: document.getElementById('existingInstance'),
+    currentInstanceName: document.getElementById('currentInstanceName'),
+    currentInstanceStatus: document.getElementById('currentInstanceStatus'),
+    instanceOwner: document.getElementById('instanceOwner'),
+    instanceLastCheck: document.getElementById('instanceLastCheck'),
+    nextStep1Btn: document.getElementById('nextStep1Btn'),
+    permissionsIndicator: document.getElementById('permissionsIndicator'),
+    
+    // Step 2
+    generateQRBtn: document.getElementById('generateQRBtn'),
+    disconnectBtn: document.getElementById('disconnectBtn'),
+    checkStatusBtn: document.getElementById('checkStatusBtn'),
+    qrSection: document.getElementById('qrSection'),
+    qrPlaceholder: document.getElementById('qrPlaceholder'),
+    qrLoading: document.getElementById('qrLoading'),
+    qrImage: document.getElementById('qrImage'),
+    confirmScanBtn: document.getElementById('confirmScanBtn'),
+    newQRBtn: document.getElementById('newQRBtn'),
+    backStep2Btn: document.getElementById('backStep2Btn'),
+    nextStep2Btn: document.getElementById('nextStep2Btn'),
+    connectionInstanceName: document.getElementById('connectionInstanceName'),
+    connectionStatus: document.getElementById('connectionStatus'),
+    connectionProfile: document.getElementById('connectionProfile'),
+    connectionPermission: document.getElementById('connectionPermission'),
+    connectionOwnerBadge: document.getElementById('connectionOwnerBadge'),
+    
+    // Step 3
+    backStep3Btn: document.getElementById('backStep3Btn'),
+    finishBtn: document.getElementById('finishBtn'),
+    connectedInstanceName: document.getElementById('connectedInstanceName'),
+    connectedProfileName: document.getElementById('connectedProfileName'),
+    connectedOwner: document.getElementById('connectedOwner'),
+    connectedStatus: document.getElementById('connectedStatus'),
+    
+    // Alertas
+    alertContainer: document.getElementById('alertContainer')
+};
+
+// ==========================================
+// FUNÇÕES DE UTILIDADE
+// ==========================================
+function showAlert(message, type = 'info', duration = 5000) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
+        <span>${message}</span>
+        <button class="btn-close">&times;</button>
+    `;
+    
+    // Remover alertas antigos se houver muitos
+    const alerts = ELEMENTS.alertContainer.children;
+    if (alerts.length > 3) {
+        alerts[0].remove();
+    }
+    
+    ELEMENTS.alertContainer.appendChild(alert);
+    
+    // Auto-remove
+    setTimeout(() => {
+        alert.style.opacity = '0';
+        alert.style.transform = 'translateX(100%)';
+        setTimeout(() => alert.remove(), 300);
+    }, duration);
+    
+    // Botão de fechar
+    alert.querySelector('.btn-close').addEventListener('click', () => {
+        alert.remove();
+    });
+    
+    console.log(`[${type.toUpperCase()}] ${message}`);
+}
+
+function updateStep(step) {
+    STATE.currentStep = step;
+    
+    // Atualiza os steps visuais
+    document.querySelectorAll('.step').forEach((stepEl, index) => {
+        const stepNum = parseInt(stepEl.dataset.step);
+        stepEl.classList.remove('active', 'completed');
+        
+        if (stepNum < step) {
+            stepEl.classList.add('completed');
+        } else if (stepNum === step) {
+            stepEl.classList.add('active');
+        }
+    });
+    
+    // Mostra o painel ativo
+    document.querySelectorAll('.step-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    
+    const activePanel = document.getElementById(`step${step}`);
+    if (activePanel) {
+        activePanel.classList.add('active');
+    }
+    
+    showAlert(`Passo ${step} ativado`, 'info', 2000);
+}
+
+function updateLastUpdate() {
+    const now = new Date().toLocaleTimeString();
+    ELEMENTS.lastUpdate.textContent = now;
+}
+
+function updateGlobalStatus(status) {
+    const statusDot = ELEMENTS.globalStatus.querySelector('.status-dot');
+    const statusText = ELEMENTS.globalStatus.querySelector('.status-text');
+    
+    // Remover classes anteriores
+    statusDot.classList.remove('online', 'offline', 'scanning');
+    
+    if (status === 'CONNECTED' || status === 'connected') {
+        statusDot.classList.add('online');
+        statusText.textContent = 'Online';
+        ELEMENTS.globalStatus.style.background = 'rgba(37, 211, 102, 0.15)';
+    } else if (status === 'SCANNING' || status === 'scanning_qr') {
+        statusDot.classList.add('scanning');
+        statusText.textContent = 'Aguardando QR';
+        ELEMENTS.globalStatus.style.background = 'rgba(52, 183, 241, 0.15)';
+    } else if (status === 'DISCONNECTED' || status === 'disconnected') {
+        statusDot.classList.add('offline');
+        statusText.textContent = 'Offline';
+        ELEMENTS.globalStatus.style.background = 'rgba(102, 119, 129, 0.15)';
+    } else {
+        statusDot.classList.add('offline');
+        statusText.textContent = 'Sem instância';
+    }
+    
+    updateLastUpdate();
+}
+
+// ==========================================
+// FUNÇÕES DE API
+// ==========================================
+async function apiRequest(action, data = {}) {
+    try {
+        const payload = {
+            action: action,
+            ...data
+        };
+        
+        console.log(`Enviando ${action}:`, payload);
+        
+        const response = await fetch(CONFIG.endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CONFIG.csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log(`Resposta ${action}:`, result);
+        
+        if (result.status === 'ERROR') {
+            throw new Error(result.message);
+        }
+        
+        return result;
+        
+    } catch (error) {
+        console.error(`Erro na requisição ${action}:`, error);
+        throw error;
+    }
+}
+
+async function fetchStatus() {
+    try {
+        const data = await apiRequest('fetch');
+        
+        if (data.status === 'NO_INSTANCE') {
+            // Nenhuma instância
+            STATE.currentInstance = null;
+            STATE.currentStatus = null;
+            
+            ELEMENTS.existingInstance.style.display = 'none';
+            ELEMENTS.nextStep1Btn.disabled = true;
+            ELEMENTS.nextStep2Btn.disabled = true;
+            
+            updateStep(1);
+            updateGlobalStatus('no_instance');
+            
+            STATE.userPermissions.can_connect = false;
+            STATE.userPermissions.can_disconnect = false;
+            STATE.userPermissions.can_delete = false;
+            
+        } else if (data.status === 'SUCCESS') {
+            // Tem instância
+            const instance = data.instance_data;
+            STATE.currentInstance = instance.name;
+            STATE.currentStatus = instance.status;
+            
+            // Atualizar UI Step 1
+            ELEMENTS.existingInstance.style.display = 'block';
+            ELEMENTS.currentInstanceName.textContent = instance.name;
+            ELEMENTS.currentInstanceStatus.textContent = getStatusText(instance.status);
+            ELEMENTS.currentInstanceStatus.style.color = getStatusColor(instance.status);
+            ELEMENTS.instanceOwner.textContent = STATE.user.username;
+            ELEMENTS.instanceLastCheck.textContent = new Date(instance.last_check).toLocaleTimeString();
+            
+            ELEMENTS.nextStep1Btn.disabled = false;
+            
+            // Atualizar permissões
+            STATE.userPermissions.can_connect = instance.can_connect;
+            STATE.userPermissions.can_disconnect = true; // Dono sempre pode desconectar
+            STATE.userPermissions.can_delete = instance.can_delete;
+            
+            // Mostrar/ocultar botão de deletar completamente
+            ELEMENTS.deleteInstanceBtn.style.display = instance.can_delete ? 'inline-block' : 'none';
+            
+            // Atualizar status global
+            updateGlobalStatus(instance.status);
+            
+            // Atualizar Step 2
+            ELEMENTS.connectionInstanceName.textContent = instance.name;
+            ELEMENTS.connectionStatus.textContent = getStatusText(instance.status);
+            ELEMENTS.connectionStatus.style.color = getStatusColor(instance.status);
+            ELEMENTS.connectionProfile.textContent = instance.profile_name || 'Não conectado';
+            ELEMENTS.connectionPermission.textContent = instance.is_owner ? 'Proprietário' : 'Sem permissão';
+            
+            if (instance.is_owner) {
+                ELEMENTS.connectionOwnerBadge.innerHTML = '<i class="fas fa-user-check"></i> Você é o proprietário';
+                ELEMENTS.connectionOwnerBadge.style.background = 'rgba(37, 211, 102, 0.1)';
+            }
+            
+            // Habilitar/desabilitar botões baseado nas permissões
+            ELEMENTS.generateQRBtn.disabled = !instance.can_connect;
+            ELEMENTS.disconnectBtn.disabled = !instance.can_connect;
+            ELEMENTS.nextStep2Btn.disabled = instance.status !== 'connected';
+            
+            // Atualizar Step 3 se conectado
+            if (instance.status === 'connected') {
+                ELEMENTS.connectedInstanceName.textContent = instance.name;
+                ELEMENTS.connectedProfileName.textContent = instance.profile_name;
+                ELEMENTS.connectedOwner.textContent = STATE.user.username;
+                updateStep(3);
+            } else if (instance.status === 'scanning_qr') {
+                updateStep(2);
+            } else {
+                updateStep(2);
+            }
+            
+            // Se scanning, iniciar verificação automática
+            if (instance.status === 'scanning_qr' && !STATE.checkInterval) {
+                startAutoCheck();
+            } else if (instance.status !== 'scanning_qr' && STATE.checkInterval) {
+                stopAutoCheck();
+            }
+        }
+        
+        return data;
+        
+    } catch (error) {
+        showAlert(`Erro ao buscar status: ${error.message}`, 'error');
+        return null;
+    }
+}
+
+function getStatusText(status) {
+    const statusMap = {
+        'created': 'Criada',
+        'scanning_qr': 'Aguardando QR',
+        'connected': 'Conectada',
+        'connected_other': 'Conectada a Outro',
+        'disconnected': 'Desconectada'
+    };
+    return statusMap[status] || status;
+}
+
+function getStatusColor(status) {
+    const colorMap = {
+        'created': '#17a2b8',
+        'scanning_qr': '#ffc107',
+        'connected': '#28a745',
+        'connected_other': '#dc3545',
+        'disconnected': '#6c757d'
+    };
+    return colorMap[status] || '#6c757d';
+}
+
+// ==========================================
+// FUNÇÕES DE UI
+// ==========================================
+function showQRCode(qrData) {
+    if (!qrData) {
+        showAlert('Não foi possível gerar o QR Code', 'error');
+        return;
+    }
+    
+    ELEMENTS.qrSection.style.display = 'block';
+    ELEMENTS.qrPlaceholder.style.display = 'none';
+    ELEMENTS.qrLoading.style.display = 'block';
+    ELEMENTS.qrImage.style.display = 'none';
+    
+    // Simula carregamento
+    setTimeout(() => {
+        ELEMENTS.qrLoading.style.display = 'none';
+        
+        if (qrData.includes('base64')) {
+            ELEMENTS.qrImage.src = qrData;
+        } else if (qrData.includes('data:image')) {
+            ELEMENTS.qrImage.src = qrData;
+        } else {
+            ELEMENTS.qrImage.src = `data:image/png;base64,${qrData}`;
+        }
+        
+        ELEMENTS.qrImage.style.display = 'block';
+        STATE.qrData = qrData;
+        
+        // Habilitar download do QR
+        ELEMENTS.qrImage.onclick = () => {
+            const link = document.createElement('a');
+            link.href = ELEMENTS.qrImage.src;
+            link.download = `whatsapp-qr-${STATE.currentInstance || 'instance'}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showAlert('QR Code baixado!', 'success');
+        };
+        
+    }, 500);
+}
+
+// ==========================================
+// AUTO-CHECK FUNCTIONS
+// ==========================================
+function startAutoCheck() {
+    stopAutoCheck(); // Parar qualquer verificação anterior
+    
+    STATE.checkInterval = setInterval(async () => {
+        console.log('Verificação automática...');
+        await fetchStatus();
+    }, 5000); // Verificar a cada 5 segundos
+}
+
+function stopAutoCheck() {
+    if (STATE.checkInterval) {
+        clearInterval(STATE.checkInterval);
+        STATE.checkInterval = null;
+    }
+}
+
+// ==========================================
+// HANDLERS DOS BOTÕES
+// ==========================================
+async function handleCreateInstance() {
+    const instanceName = ELEMENTS.instanceName.value.trim();
+    
+    if (!instanceName) {
+        showAlert('Digite um nome para a instância', 'warning');
+        return;
+    }
+    
+    if (!/^[a-zA-Z0-9_]+$/.test(instanceName)) {
+        showAlert('Use apenas letras, números e underscore (_)', 'warning');
+        return;
+    }
+    
+    const originalText = ELEMENTS.createInstanceBtn.innerHTML;
+    ELEMENTS.createInstanceBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Criando...';
+    ELEMENTS.createInstanceBtn.disabled = true;
+    
+    try {
+        const data = await apiRequest('save_association', { 
+            instance_name: instanceName 
+        });
+        
+        if (data) {
+            showAlert('Instância criada com sucesso!', 'success');
+            ELEMENTS.instanceName.value = '';
+            await fetchStatus();
+        }
+        
+    } catch (error) {
+        showAlert(error.message, 'error');
+    } finally {
+        ELEMENTS.createInstanceBtn.innerHTML = originalText;
+        ELEMENTS.createInstanceBtn.disabled = false;
+    }
+}
+
+async function handleGenerateQR() {
+    if (!STATE.currentInstance) {
+        showAlert('Configure uma instância primeiro', 'warning');
+        return;
+    }
+    
+    const originalText = ELEMENTS.generateQRBtn.innerHTML;
+    ELEMENTS.generateQRBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando...';
+    ELEMENTS.generateQRBtn.disabled = true;
+    
+    try {
+        const data = await apiRequest('connect');
+        
+        if (data) {
+            if (data.status === 'CONNECTED') {
+                showAlert('Já está conectado!', 'success');
+                await fetchStatus();
+            } else if (data.status === 'CONNECTED_OTHER') {
+                showAlert(data.message, 'warning');
+                await fetchStatus();
+            } else if (data.status === 'SCANNING') {
+                showQRCode(data.qr_base64 || data.qr_code);
+                showAlert('QR Code gerado! Escaneie com o WhatsApp.', 'success');
+                await fetchStatus();
+            }
+        }
+        
+    } catch (error) {
+        showAlert(error.message, 'error');
+    } finally {
+        ELEMENTS.generateQRBtn.innerHTML = originalText;
+        ELEMENTS.generateQRBtn.disabled = false;
+    }
+}
+
+async function handleDisconnect() {
+    if (!confirm('Tem certeza que deseja desconectar?')) {
+        return;
+    }
+    
+    try {
+        const data = await apiRequest('disconnect');
+        
+        if (data) {
+            showAlert('Desconectado com sucesso', 'success');
+            await fetchStatus();
+            ELEMENTS.qrSection.style.display = 'none';
+            ELEMENTS.qrPlaceholder.style.display = 'block';
+        }
+        
+    } catch (error) {
+        showAlert(error.message, 'error');
+    }
+}
+
+async function handleCheckStatus() {
+    const originalText = ELEMENTS.checkStatusBtn.innerHTML;
+    ELEMENTS.checkStatusBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+    ELEMENTS.checkStatusBtn.disabled = true;
+    
+    await fetchStatus();
+    
+    ELEMENTS.checkStatusBtn.innerHTML = originalText;
+    ELEMENTS.checkStatusBtn.disabled = false;
+    showAlert('Status atualizado', 'info');
+}
+
+async function handleConfirmScan() {
+    const originalText = ELEMENTS.confirmScanBtn.innerHTML;
+    ELEMENTS.confirmScanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+    ELEMENTS.confirmScanBtn.disabled = true;
+    
+    await fetchStatus();
+    
+    ELEMENTS.confirmScanBtn.innerHTML = originalText;
+    ELEMENTS.confirmScanBtn.disabled = false;
+}
+
+async function handleNewQR() {
+    if (!confirm('Gerar um novo QR Code? O anterior será invalidado.')) {
+        return;
+    }
+    
+    await handleGenerateQR();
+}
+
+async function handleRemoveInstance() {
+    if (!confirm('Remover esta instância do seu perfil? (Ela permanecerá na API)')) {
+        return;
+    }
+    
+    try {
+        const data = await apiRequest('clear_association');
+        
+        if (data) {
+            showAlert('Instância removida do seu perfil', 'success');
+            await fetchStatus();
+        }
+        
+    } catch (error) {
+        showAlert(error.message, 'error');
+    }
+}
+
+async function handleDeleteInstance() {
+    if (!confirm('⚠️ ATENÇÃO: Esta ação irá DELETAR COMPLETAMENTE a instância da API e do banco de dados. Esta ação é irreversível. Continuar?')) {
+        return;
+    }
+    
+    try {
+        const data = await apiRequest('delete_instance');
+        
+        if (data) {
+            showAlert('Instância deletada completamente', 'success');
+            await fetchStatus();
+        }
+        
+    } catch (error) {
+        showAlert(error.message, 'error');
+    }
+}
+
+// ==========================================
+// EVENT LISTENERS
+// ==========================================
+function addEventListeners() {
+    console.log('Adicionando event listeners...');
+    
+    // Step 1
+    ELEMENTS.createInstanceBtn.addEventListener('click', handleCreateInstance);
+    ELEMENTS.instanceName.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            handleCreateInstance();
+        }
+    });
+    
+    ELEMENTS.removeInstanceBtn.addEventListener('click', handleRemoveInstance);
+    ELEMENTS.deleteInstanceBtn.addEventListener('click', handleDeleteInstance);
+    ELEMENTS.nextStep1Btn.addEventListener('click', () => updateStep(2));
+    
+    // Step 2
+    ELEMENTS.generateQRBtn.addEventListener('click', handleGenerateQR);
+    ELEMENTS.disconnectBtn.addEventListener('click', handleDisconnect);
+    ELEMENTS.checkStatusBtn.addEventListener('click', handleCheckStatus);
+    ELEMENTS.confirmScanBtn.addEventListener('click', handleConfirmScan);
+    ELEMENTS.newQRBtn.addEventListener('click', handleNewQR);
+    ELEMENTS.backStep2Btn.addEventListener('click', () => updateStep(1));
+    ELEMENTS.nextStep2Btn.addEventListener('click', () => updateStep(3));
+    
+    // Step 3
+    ELEMENTS.backStep3Btn.addEventListener('click', () => updateStep(2));
+    ELEMENTS.finishBtn.addEventListener('click', () => {
+        showAlert('Configuração concluída com sucesso!', 'success');
+        window.location.reload(); // Recarregar para limpar estado
+    });
+}
+
+// ==========================================
+// INICIALIZAÇÃO
+// ==========================================
+async function initializeWhatsAppManager() {
+    console.log('=== INICIALIZANDO WHATSAPP MANAGER ===');
+    console.log('Usuário:', STATE.user);
+    console.log('Endpoint:', CONFIG.endpoint);
+    
+    try {
+        // Adicionar event listeners
+        addEventListeners();
+        
+        // Carregar status inicial
+        await fetchStatus();
+        
+        // Atualizar a cada 30 segundos
+        setInterval(async () => {
+            if (STATE.currentInstance) {
+                await fetchStatus();
+            }
+        }, 30000);
+        
+        console.log('WhatsApp Manager inicializado com sucesso!');
+        showAlert('Sistema carregado com controle de propriedade ativo', 'success');
+        
+    } catch (error) {
+        console.error('Erro na inicialização:', error);
+        showAlert('Erro ao inicializar o sistema', 'error');
+    }
+}
+
+// ==========================================
+// INICIAR QUANDO O DOM ESTIVER PRONTO
+// ==========================================
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeWhatsAppManager);
+} else {
+    initializeWhatsAppManager();
+}
+</script>
+
+<!-- Font Awesome para ícones -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+{% endblock %}

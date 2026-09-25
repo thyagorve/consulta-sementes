@@ -1,0 +1,585 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Abastecer Estoque - {{ servico.nome }}{% endblock %}
+
+{% block content %}
+
+<style>
+/* ============================================================
+   ABASTECER ESTOQUE - FULL WIDTH PREMIUM
+   100% compatível com todos os temas | Totalmente responsivo
+============================================================ */
+:root {
+    --ab-primary: var(--primary);
+    --ab-primary-dark: var(--primary-dark);
+    --ab-radius-lg: 20px;
+    --ab-radius: 14px;
+    --ab-radius-sm: 10px;
+    --ab-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --ab-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ab-page {
+    width: 100%;
+    padding: 0;
+    margin: -1.5rem;
+}
+
+/* ===== HEADER ===== */
+.ab-header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    padding: 1.5rem 2rem;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.ab-header h2 {
+    margin: 0;
+    font-size: 1.4rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.ab-header-actions { display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; }
+.ab-header-link {
+    display:inline-flex; align-items:center; gap:.45rem; padding:.48rem .9rem; border-radius:30px;
+    color:#fff; text-decoration:none; font-size:.82rem; font-weight:700;
+    border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.12);
+    transition:transform .15s ease, background .15s ease;
+}
+.ab-header-link:hover { color:#fff; background:rgba(255,255,255,.22); transform:translateY(-1px); }
+.ab-header-badge {
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 30px;
+    padding: 0.45rem 1.2rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+/* ===== CARD PRINCIPAL ===== */
+.ab-card {
+    background: var(--bg-card, #ffffff);
+    padding: 2rem;
+}
+
+/* ===== GRID LAYOUT ===== */
+.ab-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    max-width: 100%;
+}
+
+.ab-col-form {
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: var(--ab-radius-lg);
+    padding: 2rem;
+}
+
+.ab-col-historico {
+    background: var(--bg, #f9fafb);
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: var(--ab-radius-lg);
+    padding: 2rem;
+}
+
+/* ===== SEÇÃO ===== */
+.ab-section-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text, #1e293b);
+    margin: 0 0 1.25rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 2px solid var(--border, #e5e7eb);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.ab-section-title i { color: var(--primary); }
+
+/* ===== FORMULÁRIO ===== */
+.ab-form-group { margin-bottom: 1.25rem; }
+.ab-form-group label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--text, #1e293b);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.ab-form-group input {
+    width: 100%;
+    padding: 0.85rem 1.1rem;
+    border: 2px solid var(--border, #e5e7eb);
+    border-radius: var(--ab-radius-sm);
+    background: var(--bg-card, #ffffff);
+    color: var(--text, #1e293b);
+    font-size: 1rem;
+    font-weight: 500;
+    transition: var(--ab-transition);
+}
+.ab-form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.1);
+}
+
+/* ===== TOTAL BOX ===== */
+.ab-total-box {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+    padding: 1.5rem;
+    border-radius: var(--ab-radius);
+    text-align: center;
+    margin: 1.5rem 0;
+    box-shadow: 0 6px 25px rgba(245,158,11,0.3);
+}
+.ab-total-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.9;
+    margin-bottom: 0.4rem;
+}
+.ab-total-value {
+    font-size: 2rem;
+    font-weight: 800;
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+/* ===== BOTÕES ===== */
+.ab-btn-group { display: flex; gap: 0.75rem; }
+.ab-btn {
+    flex: 1;
+    padding: 1rem 1.5rem;
+    border-radius: var(--ab-radius-sm);
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--ab-transition);
+    text-align: center;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: none;
+}
+.ab-btn-save {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: white;
+}
+.ab-btn-save:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(245,158,11,0.4);
+}
+.ab-btn-cancel {
+    background: var(--bg-card, #ffffff);
+    color: var(--text, #1e293b);
+    border: 2px solid var(--border, #e5e7eb);
+}
+.ab-btn-cancel:hover {
+    background: var(--border, #e5e7eb);
+    border-color: var(--text-light, #94a3b8);
+}
+
+/* ===== TABELA ===== */
+.ab-table-wrap {
+    overflow-x: auto;
+    border-radius: var(--ab-radius);
+    border: 1px solid var(--border, #e5e7eb);
+}
+.ab-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+}
+.ab-table thead th {
+    background: var(--bg-card, #ffffff);
+    padding: 0.8rem 1rem;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-light, #6b7280);
+    border-bottom: 2px solid var(--border, #e5e7eb);
+    white-space: nowrap;
+}
+.ab-table tbody td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border, #f1f5f9);
+    color: var(--text, #1f2937);
+    vertical-align: middle;
+}
+.ab-table tbody tr { transition: var(--ab-transition); }
+.ab-table tbody tr:hover { background: rgba(245,158,11,0.04); }
+.ab-table tbody tr:nth-child(even) { background: rgba(0,0,0,0.01); }
+.ab-table tbody tr:last-child td { border-bottom: none; }
+
+.ab-badge {
+    padding: 0.25rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.ab-badge-success { background: rgba(16,185,129,0.1); color: #10b981; }
+.ab-badge-danger { background: rgba(239,68,68,0.1); color: #ef4444; }
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 1024px) {
+    .ab-grid { grid-template-columns: 1fr; gap: 1.5rem; }
+}
+@media (max-width: 768px) {
+    .ab-header { padding: 1.2rem 1.5rem; }
+    .ab-card { padding: 1.25rem; }
+    .ab-col-form, .ab-col-historico { padding: 1.25rem; }
+    .ab-total-value { font-size: 1.5rem; }
+    .ab-header h2 { font-size: 1.2rem; }
+    .ab-btn-group { flex-direction: column; }
+}
+@media (max-width: 480px) {
+    .ab-header { padding: 1rem; border-radius: 0; }
+    .ab-card { padding: 1rem; }
+    .ab-col-form, .ab-col-historico { padding: 1rem; }
+    .ab-total-value { font-size: 1.3rem; }
+}
+
+/* ==========================================
+   TEMA ESCURO - 100% COMPATÍVEL
+========================================== */
+[data-theme="dark"] .ab-card {
+    background: #0f172a !important;
+}
+[data-theme="dark"] .ab-col-form,
+[data-theme="dark"] .ab-col-historico {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+}
+[data-theme="dark"] .ab-section-title {
+    color: #f1f5f9 !important;
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .ab-form-group label { color: #e2e8f0 !important; }
+[data-theme="dark"] .ab-form-group input {
+    background: #0f172a !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .ab-form-group input:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 4px rgba(245,158,11,0.15) !important;
+}
+[data-theme="dark"] .ab-btn-cancel {
+    background: #1e293b !important;
+    border-color: #334155 !important;
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .ab-btn-cancel:hover {
+    background: #334155 !important;
+}
+[data-theme="dark"] .ab-table thead th {
+    background: #0f172a !important;
+    color: #94a3b8 !important;
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .ab-table tbody td {
+    color: #e2e8f0 !important;
+    border-bottom-color: #1e293b !important;
+}
+[data-theme="dark"] .ab-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.02) !important; }
+[data-theme="dark"] .ab-table tbody tr:hover { background: color-mix(in srgb, var(--primary) 6%, transparent) !important; }
+[data-theme="dark"] .ab-table-wrap { border-color: #334155 !important; }
+[data-theme="dark"] .ab-badge-success { background: rgba(52,211,153,0.15) !important; color: #34d399 !important; }
+[data-theme="dark"] .ab-badge-danger { background: rgba(248,113,113,0.15) !important; color: #f87171 !important; }
+
+
+
+/* ===== ACCORDION DE LOTES ===== */
+.ab-lote-card {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: var(--ab-radius);
+    overflow: hidden;
+    transition: var(--ab-transition);
+}
+.ab-lote-card:hover {
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+.ab-lote-card.esgotado {
+    border-left: 3px solid #ef4444;
+}
+
+.ab-lote-header {
+    background: var(--bg, #f9fafb);
+    padding: 0.7rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+.ab-lote-header:hover {
+    background: var(--bg-hover, #f1f5f9);
+}
+.ab-lote-header.active {
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border-bottom: 1px solid var(--border, #e5e7eb);
+}
+.ab-lote-header.active .ab-lote-arrow {
+    transform: rotate(180deg);
+    color: var(--primary) !important;
+}
+
+.ab-lote-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+.ab-lote-stats {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.76rem;
+    flex-wrap: wrap;
+    color: var(--text-light, #6b7280);
+}
+.ab-lote-stats strong {
+    color: var(--text, #1e293b);
+}
+
+.lote-num {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text, #1e293b);
+}
+.lote-data {
+    font-size: 0.73rem;
+    color: var(--text-light, #6b7280);
+}
+
+.ab-lote-body {
+    background: var(--bg-card, #ffffff);
+    border-top: 1px solid var(--border, #e5e7eb);
+}
+
+/* Tabela mini dentro do lote */
+.ab-table-mini {
+    font-size: 0.72rem;
+}
+.ab-table-mini thead th {
+    font-size: 0.62rem;
+    padding: 0.45rem 0.6rem;
+}
+.ab-table-mini tbody td {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.7rem;
+}
+
+/* Tema escuro */
+[data-theme="dark"] .ab-lote-card {
+    border-color: #334155 !important;
+}
+[data-theme="dark"] .ab-lote-header {
+    background: #0f172a !important;
+}
+[data-theme="dark"] .ab-lote-header:hover {
+    background: #1a1f2e !important;
+}
+[data-theme="dark"] .ab-lote-header.active {
+    background: color-mix(in srgb, var(--primary) 8%, transparent) !important;
+    border-bottom-color: #334155 !important;
+}
+[data-theme="dark"] .ab-lote-body {
+    background: #1e293b !important;
+    border-top-color: #334155 !important;
+}
+[data-theme="dark"] .lote-num { color: #f1f5f9 !important; }
+[data-theme="dark"] .lote-data { color: #94a3b8 !important; }
+[data-theme="dark"] .ab-lote-stats { color: #94a3b8 !important; }
+[data-theme="dark"] .ab-lote-stats strong { color: #e2e8f0 !important; }
+
+</style>
+
+<div class="ab-page">
+    <!-- HEADER FULL WIDTH -->
+    <div class="ab-header">
+        <h2><i class="fas fa-boxes"></i> Abastecer Créditos</h2>
+        <div class="ab-header-actions">
+            <div class="ab-header-badge">{{ servico.nome }}</div>
+            <a href="{% url 'configurar_integracao_servico' servico.id %}" class="ab-header-link">
+                <i class="fas fa-plug"></i> Integração
+            </a>
+        </div>
+    </div>
+
+    <!-- A integração do painel fica em uma tela separada. -->
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div class="ab-card">
+        <div class="ab-grid">
+            <!-- COLUNA ESQUERDA - FORMULÁRIO -->
+            <div class="ab-col-form">
+                <div class="ab-section-title"><i class="fas fa-cart-plus"></i> Novo Lote de Créditos</div>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="ab-form-group">
+                        <label>Quantidade de Créditos</label>
+                        <input type="number" name="quantidade" id="qtd" min="1" required value="10" placeholder="Ex: 10">
+                    </div>
+                    <div class="ab-form-group">
+                        <label>Custo Unitário (R$)</label>
+                        <input type="number" name="custo_unitario" id="custo" step="0.01" min="0.01" required value="7.00" placeholder="Ex: 7,00">
+                    </div>
+                    
+                    <div class="ab-total-box">
+                        <div class="ab-total-label">💰 Valor Total do Lote</div>
+                        <div class="ab-total-value">R$ <span id="total">70,00</span></div>
+                    </div>
+                    
+                    <div class="ab-btn-group">
+                        <a href="{% url 'listar_servicos' %}" class="ab-btn ab-btn-cancel">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                        <button type="submit" class="ab-btn ab-btn-save">
+                            <i class="fas fa-cart-plus"></i> Comprar Lote
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- COLUNA DIREITA - HISTÓRICO -->
+<!-- COLUNA DIREITA - HISTÓRICO -->
+<div class="ab-col-historico">
+    <div class="ab-section-title"><i class="fas fa-history"></i> Histórico de Lotes</div>
+    
+    {% if lotes %}
+        {% for lote in lotes %}
+        <!-- CARD DO LOTE -->
+        <div class="ab-lote-card {% if lote.esgotado %}esgotado{% endif %}">
+            <!-- CABEÇALHO CLICÁVEL -->
+            <div class="ab-lote-header" onclick="toggleLote(this)" style="cursor:pointer;">
+                <div class="ab-lote-header-left">
+                    <i class="fas fa-chevron-down ab-lote-arrow" style="transition:transform 0.3s;font-size:0.7rem;margin-right:0.5rem;color:var(--text-light);"></i>
+                    <span class="lote-num">Lote #{{ lote.ordem }}</span>
+                    <span class="lote-data">{{ lote.data_compra|date:"d/m/Y" }}</span>
+                    <span style="margin-left:0.5rem;">
+                        {% if lote.esgotado %}
+                            <span class="ab-badge ab-badge-danger"><i class="fas fa-times-circle"></i> Esgotado</span>
+                        {% else %}
+                            <span class="ab-badge ab-badge-success"><i class="fas fa-check-circle"></i> {{ lote.quantidade_restante }}/{{ lote.quantidade }}</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="ab-lote-stats">
+                    <span>Custo Un.: <strong>R$ {{ lote.custo_unitario|floatformat:2 }}</strong></span>
+                    <span>Total: <strong>R$ {{ lote.valor_total|floatformat:2 }}</strong></span>
+                </div>
+            </div>
+            
+            <!-- CONTEÚDO OCULTO (CONSUMOS) -->
+            <div class="ab-lote-body" style="display:none;">
+                {% if lote.consumos_lista %}
+                <table class="ab-table ab-table-mini" style="margin:0;">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Cliente</th>
+                            <th>Qtd</th>
+                            <th>Custo Un.</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for venda in lote.consumos_lista %}
+                        <tr>
+                            <td>{{ venda.data_venda|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <strong>{{ venda.cliente.nome|default:venda.cliente.username|truncatechars:22 }}</strong>
+                                {% if venda.cliente.whatsapp %}
+                                <br><small style="color:var(--text-light);">{{ venda.cliente.whatsapp }}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ venda.quantidade }}x</td>
+                            <td>R$ {{ venda.custo_unitario_aplicado|floatformat:2 }}</td>
+                            <td style="font-weight:600;">R$ {{ venda.valor_total|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="padding:1rem;text-align:center;color:var(--text-light);font-size:0.78rem;">
+                    <i class="fas fa-info-circle"></i> Nenhum consumo neste lote
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+    <div style="text-align:center;padding:3rem 1rem;color:var(--text-light);">
+        <i class="fas fa-inbox" style="font-size:3rem;opacity:0.2;display:block;margin-bottom:1rem;"></i>
+        Nenhum lote registrado ainda
+    </div>
+    {% endif %}
+</div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+const qtdEl = document.getElementById('qtd');
+const custoEl = document.getElementById('custo');
+const totalEl = document.getElementById('total');
+
+function calcular() {
+    const qtd = parseFloat(qtdEl.value) || 0;
+    const custo = parseFloat(custoEl.value) || 0;
+    const total = (qtd * custo).toFixed(2);
+    totalEl.textContent = total.replace('.', ',');
+}
+
+qtdEl.addEventListener('input', calcular);
+custoEl.addEventListener('input', calcular);
+calcular();
+
+
+// ===== ACCORDION DOS LOTES =====
+function toggleLote(header) {
+    const body = header.nextElementSibling;
+    const arrow = header.querySelector('.ab-lote-arrow');
+    const isOpen = body.style.display === 'block';
+    
+    // Fecha todos os outros
+    document.querySelectorAll('.ab-lote-body').forEach(function(b) {
+        b.style.display = 'none';
+    });
+    document.querySelectorAll('.ab-lote-header').forEach(function(h) {
+        h.classList.remove('active');
+    });
+    
+    // Abre/fecha o clicado
+    if (!isOpen) {
+        body.style.display = 'block';
+        header.classList.add('active');
+    }
+}
+</script>
+
+{% endblock %}

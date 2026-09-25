@@ -41,6 +41,13 @@ from django.db.models import (
 )
 from django.db.models.functions import Trim, Upper
 from django.core.cache import cache
+from django.conf import settings
+from .access_control import (
+    PERMISSION_APP_MAP,
+    first_allowed_url,
+    has_any_direct_permission,
+    has_direct_permission,
+)
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -60,6 +67,33 @@ from .forms import (
     NovaEntradaForm, ConfiguracaoForm, CultivarForm, PeneiraForm, 
     CategoriaForm, TratamentoForm, NovoConferenteUserForm, MudarSenhaForm  
 )
+
+
+SENHA_PADRAO_USUARIO = getattr(settings, 'DEFAULT_NEW_USER_PASSWORD', 'conceito123')
+
+
+def _permissoes_individuais_do_post(post_data):
+    selecionadas = []
+    for codename, app_label in PERMISSION_APP_MAP.items():
+        if post_data.get(codename) != 'on':
+            continue
+        permissao = Permission.objects.filter(
+            codename=codename,
+            content_type__app_label=app_label,
+        ).first()
+        if permissao:
+            selecionadas.append(permissao)
+    return selecionadas
+
+
+def _aplicar_permissoes_individuais(usuario, post_data):
+    """Permissões individuais são a única fonte de acesso dos usuários comuns."""
+    usuario.groups.clear()
+    usuario.user_permissions.clear()
+    permissoes = _permissoes_individuais_do_post(post_data)
+    if permissoes:
+        usuario.user_permissions.add(*permissoes)
+    return [p.codename for p in permissoes]
 
 
 # sapp/views.py - No início do arquivo, adicione:
@@ -3399,15 +3433,12 @@ def configuracoes(request):
         # ====================================
         
         elif acao == 'create_conferente_user':
-            # Verifica permissão para criar usuários
-            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+            if not request.user.is_superuser and not has_direct_permission(request.user, 'sapp.pode_gerenciar_usuarios'):
                 messages.error(request, "❌ Você não tem permissão para criar usuários!")
             else:
                 username = request.POST.get('username', '').strip()
                 first_name = request.POST.get('first_name', '').strip()
-                password = request.POST.get('password', '').strip()
-                
-                # Validações
+
                 if not username or not first_name:
                     messages.error(request, "❌ Nome de usuário e nome completo são obrigatórios!")
                 elif User.objects.filter(username__iexact=username).exists():
@@ -3415,136 +3446,62 @@ def configuracoes(request):
                 else:
                     try:
                         with transaction.atomic():
-                            # Define senha padrão se não for fornecida
-                            if not password:
-                                password = 'conceito123'
-                            elif len(password) < 6:
-                                messages.error(request, "❌ A senha deve ter no mínimo 6 caracteres!")
-                                return redirect(f"{reverse('sapp:configuracoes')}#{active_tab}")
-                            
-                            # Cria o usuário (SEM grupos)
                             user = User.objects.create_user(
                                 username=username,
                                 first_name=first_name,
-                                password=password
+                                password=SENHA_PADRAO_USUARIO,
                             )
-                            
-                            # NÃO ADICIONA GRUPOS - apenas permissões individuais
-                            
-                            # 🔥 Adiciona permissões específicas selecionadas nos checkboxes
-                            permissions_added = []
-                            for key, value in request.POST.items():
-                                if key.startswith('pode_') and value == 'on':
-                                    try:
-                                        # Buscar permissão no app sapp
-                                        permission = Permission.objects.filter(
-                                            codename=key,
-                                            content_type__app_label='sapp'
-                                        ).first()
-                                        
-                                        # Se não encontrar, buscar no almoxarifado
-                                        if not permission:
-                                            permission = Permission.objects.filter(
-                                                codename=key,
-                                                content_type__app_label='almoxarifado'
-                                            ).first()
-                                        
-                                        if permission:
-                                            user.user_permissions.add(permission)
-                                            permissions_added.append(key)
-                                    except Exception as e:
-                                        print(f"Erro ao adicionar permissão {key}: {e}")
-                            
-                            messages.success(request, f"✅ Usuário '{first_name}' criado com sucesso! Senha: {password}")
+                            # Garante primeiro acesso mesmo em bases antigas em que o signal
+                            # ainda não tenha criado/atualizado o perfil.
+                            perfil, _ = PerfilUsuario.objects.get_or_create(usuario=user)
+                            perfil.primeiro_acesso = True
+                            perfil.save(update_fields=['primeiro_acesso'])
+
+                            permissions_added = _aplicar_permissoes_individuais(user, request.POST)
+
+                            messages.success(
+                                request,
+                                f"✅ Usuário '{first_name}' criado. Senha inicial: {SENHA_PADRAO_USUARIO}. "
+                                "No primeiro acesso ele será obrigado a criar uma nova senha."
+                            )
                             if permissions_added:
-                                messages.info(request, f"📋 Permissões adicionadas: {', '.join(permissions_added)}")
-                    
+                                messages.info(request, f"📋 Permissões individuais: {', '.join(permissions_added)}")
+                            else:
+                                messages.warning(request, "⚠️ O usuário foi criado sem permissão de navegação.")
                     except Exception as e:
                         messages.error(request, f"❌ Erro ao criar usuário: {str(e)}")
-        
+
 # sapp/views.py - Substitua a função update_user_permissions
 
         elif acao == 'update_user_permissions':
-            # Verifica permissão para editar permissões
-            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+            if not request.user.is_superuser and not has_direct_permission(request.user, 'sapp.pode_gerenciar_usuarios'):
                 messages.error(request, "❌ Você não tem permissão para editar permissões!")
             else:
                 user_id = request.POST.get('user_id')
-                
-                print(f"\n🔍 [DEBUG] Recebida requisição update_user_permissions")
-                print(f"   user_id: {user_id}")
-                print(f"   POST keys: {list(request.POST.keys())}")
-                
                 try:
                     user = User.objects.get(id=user_id)
-                    
                     if user == request.user and not request.user.is_superuser:
                         messages.error(request, "❌ Você não pode editar suas próprias permissões!")
+                    elif user.is_superuser:
+                        messages.error(request, "❌ Permissões de superusuário não são alteradas por esta tela.")
                     else:
                         with transaction.atomic():
-                            # 🔥 LIMPA TODAS as permissões atuais
-                            user.user_permissions.clear()
-                            print(f"   ✅ Permissões antigas removidas")
-                            
-                            # 🔥 Lista para guardar as permissões adicionadas
-                            permissions_added = []
-                            
-                            # 🔥 Percorre todos os campos do POST
-                            for key, value in request.POST.items():
-                                # Ignora campos que não são permissões
-                                if key in ['csrfmiddlewaretoken', 'acao', 'user_id', 'active_tab', 'group_name']:
-                                    continue
-                                
-                                print(f"   Campo: {key} = {value}")
-                                
-                                # sapp/views.py - Substitua a parte de busca de permissão
-
-                                if value == 'on':  # Checkbox marcado
-                                    permission = None
-                                    
-                                    # 🔥 CORREÇÃO: Buscar em ORDEM CORRETA
-                                    # Primeiro no app almoxarifado (para permissões de almoxarifado)
-                                    if key in ['pode_ver_almoxarifado', 'pode_gerenciar_almoxarifado']:
-                                        permission = Permission.objects.filter(
-                                            codename=key,
-                                            content_type__app_label='almoxarifado'
-                                        ).first()
-                                    
-                                    # Depois no app sapp
-                                    if not permission:
-                                        permission = Permission.objects.filter(
-                                            codename=key,
-                                            content_type__app_label='sapp'
-                                        ).first()
-                                    
-                                    if permission:
-                                        user.user_permissions.add(permission)
-                                        permissions_added.append(key)
-                                        print(f"   ✅ Adicionada permissão: {key} (app: {permission.content_type.app_label})")
-                                    else:
-                                        print(f"   ❌ Permissão não encontrada: {key}")
-                            
-                            # 🔥 Salvar (garantir que foi salvo)
+                            permissions_added = _aplicar_permissoes_individuais(user, request.POST)
                             user.save()
-                            
-                            # 🔥 Verificar se salvou
-                            saved_perms = list(user.user_permissions.values_list('codename', flat=True))
-                            print(f"   📋 Permissões salvas no banco: {saved_perms}")
-                            
                             if permissions_added:
-                                messages.success(request, f"✅ Permissões de '{user.first_name}' atualizadas! ({len(permissions_added)} permissões)")
+                                messages.success(
+                                    request,
+                                    f"✅ Permissões de '{user.first_name}' atualizadas exatamente como selecionadas "
+                                    f"({len(permissions_added)} permissão(ões))."
+                                )
                             else:
                                 messages.success(request, f"✅ Todas as permissões de '{user.first_name}' foram removidas!")
-                            
                 except User.DoesNotExist:
                     messages.error(request, "❌ Usuário não encontrado!")
                 except Exception as e:
-                    print(f"❌ Erro: {str(e)}")
-                    import traceback
-                    traceback.print_exc()
                     messages.error(request, f"❌ Erro ao atualizar permissões: {str(e)}")
         elif acao == 'edit_user_basic':
-            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+            if not request.user.is_superuser and not has_direct_permission(request.user, 'sapp.pode_gerenciar_usuarios'):
                 messages.error(request, '❌ Você não tem permissão para editar usuários!')
             else:
                 try:
@@ -3574,7 +3531,7 @@ def configuracoes(request):
 
         elif acao == 'reset_password':
             # Verifica permissão para resetar senha
-            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+            if not request.user.is_superuser and not has_direct_permission(request.user, 'sapp.pode_gerenciar_usuarios'):
                 messages.error(request, "❌ Você não tem permissão para resetar senhas!")
             else:
                 user_id = request.POST.get('user_id')
@@ -3585,10 +3542,17 @@ def configuracoes(request):
                     if user == request.user and not request.user.is_superuser:
                         messages.error(request, "❌ Você não pode resetar sua própria senha!")
                     else:
-                        new_password = 'conceito123'
+                        new_password = SENHA_PADRAO_USUARIO
                         user.set_password(new_password)
-                        user.save()
-                        messages.success(request, f"✅ Senha de '{user.first_name}' resetada para: {new_password}")
+                        user.save(update_fields=['password'])
+                        perfil, _ = PerfilUsuario.objects.get_or_create(usuario=user)
+                        perfil.primeiro_acesso = True
+                        perfil.save(update_fields=['primeiro_acesso'])
+                        messages.success(
+                            request,
+                            f"✅ Senha de '{user.first_name}' resetada para: {new_password}. "
+                            "A troca será obrigatória no próximo login."
+                        )
                 
                 except User.DoesNotExist:
                     messages.error(request, "❌ Usuário não encontrado!")
@@ -3597,7 +3561,7 @@ def configuracoes(request):
         
         elif acao == 'delete_user':
             # Verifica permissão para excluir usuário
-            if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+            if not request.user.is_superuser and not has_direct_permission(request.user, 'sapp.pode_gerenciar_usuarios'):
                 messages.error(request, "❌ Você não tem permissão para excluir usuários!")
             else:
                 user_id = request.POST.get('user_id')
@@ -3845,7 +3809,7 @@ def api_user_permissions(request, user_id):
     """
     API para buscar as permissões atuais de um usuário
     """
-    if not request.user.is_superuser and not request.user.has_perm('sapp.pode_gerenciar_usuarios'):
+    if not request.user.is_superuser and not has_direct_permission(request.user, 'sapp.pode_gerenciar_usuarios'):
         return JsonResponse({'success': False, 'error': 'Permissão negada'}, status=403)
     
     try:
@@ -4478,29 +4442,27 @@ def mudar_senha(request):
     if request.method == 'POST':
         form = MudarSenhaForm(request.POST)
         if form.is_valid():
+            senha_atual = form.cleaned_data['senha_atual']
             nova_senha = form.cleaned_data['nova_senha']
-            
-            # Impede que o usuário use a senha padrão novamente
-            if nova_senha == 'conceito123':
-                messages.error(request, "❌ Não utilize a senha padrão. Escolha uma senha segura.")
-                return render(request, 'sapp/mudar_senha.html', {'form': form})
-            
-            request.user.set_password(nova_senha)
-            request.user.save()
-            
-            try:
-                perfil = request.user.perfil
+
+            if not request.user.check_password(senha_atual):
+                form.add_error('senha_atual', 'Senha atual incorreta.')
+            elif nova_senha == SENHA_PADRAO_USUARIO:
+                form.add_error('nova_senha', 'Não utilize a senha padrão. Escolha uma senha nova.')
+            elif request.user.check_password(nova_senha):
+                form.add_error('nova_senha', 'A nova senha deve ser diferente da senha atual.')
+            else:
+                request.user.set_password(nova_senha)
+                request.user.save(update_fields=['password'])
+                perfil, _ = PerfilUsuario.objects.get_or_create(usuario=request.user)
                 perfil.primeiro_acesso = False
-                perfil.save()
-            except:
-                pass
-            
-            update_session_auth_hash(request, request.user)
-            messages.success(request, "✅ Senha atualizada com sucesso!")
-            return redirect('sapp:redirecionar')
+                perfil.save(update_fields=['primeiro_acesso'])
+                update_session_auth_hash(request, request.user)
+                messages.success(request, "✅ Senha atualizada com sucesso!")
+                return redirect('sapp:redirecionar')
     else:
         form = MudarSenhaForm()
-    
+
     return render(request, 'sapp/mudar_senha.html', {'form': form})
 
 
@@ -6641,16 +6603,13 @@ from .models import (
 # ================================================================
 
 def is_admin(user):
-    """
-    Considera administrador:
-    - superusuário;
-    - usuário pertencente ao grupo Administradores.
-    """
+    """Administrador funcional sem depender dos grupos legados."""
     return (
         user.is_superuser
-        or user.groups.filter(
-            name='Administradores'
-        ).exists()
+        or (
+            has_direct_permission(user, 'sapp.pode_configuracoes')
+            and has_direct_permission(user, 'sapp.pode_gerenciar_usuarios')
+        )
     )
 
 
@@ -6668,14 +6627,9 @@ def dashboard(request):
     todas as consultas pesadas aqui.
     """
 
-    tem_permissao = (
-        request.user.is_superuser
-        or request.user.has_perm(
-            'sapp.pode_ver_dashboard'
-        )
-        or request.user.has_perm(
-            'sapp.pode_ver_estoque'
-        )
+    tem_permissao = has_direct_permission(
+        request.user,
+        'sapp.pode_ver_dashboard',
     )
 
     if not tem_permissao:
@@ -7359,7 +7313,7 @@ def _dashboard_tipo_inclui_expedicao(tipo_mov):
 
 @login_required
 @permission_required(
-    'sapp.pode_ver_estoque',
+    'sapp.pode_ver_dashboard',
     raise_exception=True,
 )
 def dashboard_data(request):
@@ -10017,65 +9971,16 @@ def api_listar_enderecos(request):
 
 @login_required
 def redirecionar_usuario(request):
-    """
-    Envia o usuário para a primeira tela que ele realmente pode acessar.
+    """Abre a primeira tela explicitamente permitida para o usuário."""
+    destino = first_allowed_url(request.user)
+    if destino:
+        return redirect(destino)
 
-    Importante: o login usa esta view como LOGIN_REDIRECT_URL. Assim um
-    usuário sem Dashboard, mas com Estoque/Solicitações/Almoxarifado, não
-    cai em uma página proibida logo depois de autenticar.
-    """
-    user = request.user
-
-    if user.is_superuser:
-        return redirect('sapp:dashboard')
-
-    # Almoxarifado
-    if (
-        user.has_perm('almoxarifado.pode_ver_almoxarifado')
-        or user.has_perm('almoxarifado.pode_gerenciar_almoxarifado')
-    ):
-        return redirect('almoxarifado:lista_itens')
-
-    # Solicitações / empenho
-    if user.has_perm('sapp.pode_ver_empenhos'):
-        return redirect('sapp:pagina_solicitacoes')
-
-    if user.has_perm('sapp.pode_criar_solicitacao'):
-        return redirect('sapp:criar_solicitacao')
-
-    if (
-        user.has_perm('sapp.pode_empenhar_solicitacao')
-        or user.has_perm('sapp.pode_movimentar_solicitacao')
-        or user.has_perm('sapp.pode_cancelar_solicitacao')
-        or user.has_perm('sapp.pode_criar_empenhos')
-    ):
-        return redirect('sapp:pagina_kanban')
-
-    # Estoque
-    if user.has_perm('sapp.pode_ver_estoque'):
-        return redirect('sapp:lista_estoque')
-
-    if user.has_perm('sapp.pode_movimentar_estoque'):
-        return redirect('sapp:gestao_estoque')
-
-    # Mapa
-    if user.has_perm('sapp.pode_ver_mapa'):
-        return redirect('sapp:mapa_canvas', armazem_numero=1)
-
-    # Dashboard
-    if user.has_perm('sapp.pode_ver_dashboard'):
-        return redirect('sapp:dashboard')
-
-    # Configuração do sistema
-    if user.has_perm('sapp.pode_configuracoes'):
-        return redirect('sapp:configuracoes')
-
-    # Nenhuma permissão de navegação válida.
     from django.contrib.auth import logout
     messages.error(
         request,
-        'Sua conta está ativa, mas ainda não possui permissão de acesso. '
-        'Peça a um administrador para revisar suas permissões.'
+        'Sua conta está ativa, mas não possui nenhuma permissão de acesso. '
+        'Peça ao administrador para revisar as permissões da conta.'
     )
     logout(request)
     return redirect('sapp:login')

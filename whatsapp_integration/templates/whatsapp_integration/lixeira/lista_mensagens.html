@@ -1,0 +1,526 @@
+<!-- templates/integra/lista_mensagens.html -->
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Minhas Mensagens{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-envelope me-2"></i> Minhas Mensagens
+                        </h4>
+                        <div>
+                            <a href="{% url 'integra:envio_massa' %}" class="btn btn-light btn-sm">
+                                <i class="fas fa-plus me-1"></i> Nova Mensagem
+                            </a>
+                            <a href="{% url 'integra:historico' %}" class="btn btn-outline-light btn-sm ms-2">
+                                <i class="fas fa-history me-1"></i> Histórico
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body p-0">
+                    {% if mensagens %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="25%">Título</th>
+                                    <th width="15%">Status</th>
+                                    <th width="10%">Clientes</th>
+                                    <th width="20%">Agendamento</th>
+                                    <th width="15%">Criação</th>
+                                    <th width="15%" class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mensagem in mensagens %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if mensagem.arquivo_midia %}
+                                            <i class="fas fa-paperclip text-primary me-2" title="Com anexo"></i>
+                                            {% endif %}
+                                            <div>
+                                                <strong class="d-block">{{ mensagem.titulo|default:"Sem título" }}</strong>
+                                                <small class="text-muted">
+                                                    {{ mensagem.mensagem|truncatechars:30 }}
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if mensagem.status == 'rascunho' %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-edit me-1"></i> Rascunho
+                                        </span>
+                                        {% elif mensagem.status == 'agendada' %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-clock me-1"></i> Agendada
+                                        </span>
+                                        {% elif mensagem.status == 'enviada' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i> Enviada
+                                        </span>
+                                        {% elif mensagem.status == 'processando' %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-sync-alt me-1"></i> Processando
+                                        </span>
+                                        {% elif mensagem.status == 'falha' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times me-1"></i> Falha
+                                        </span>
+                                        {% elif mensagem.status == 'cancelada' %}
+                                        <span class="badge bg-dark">
+                                            <i class="fas fa-ban me-1"></i> Cancelada
+                                        </span>
+                                        {% endif %}
+                                        
+                                        {% if mensagem.progresso > 0 and mensagem.progresso < 100 %}
+                                        <div class="progress mt-1" style="height: 5px;">
+                                            <div class="progress-bar bg-success" 
+                                                 role="progressbar" 
+                                                 style="width: {{ mensagem.progresso }}%"
+                                                 aria-valuenow="{{ mensagem.progresso }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">{{ mensagem.progresso }}%</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-users text-primary me-2"></i>
+                                            <span>{{ mensagem.total_clientes }}</span>
+                                        </div>
+                                        {% if mensagem.enviados_sucesso > 0 or mensagem.enviados_falha > 0 %}
+                                        <small class="text-muted d-block">
+                                            ✓ {{ mensagem.enviados_sucesso }} 
+                                            ✗ {{ mensagem.enviados_falha }}
+                                        </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if mensagem.data_agendamento %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-calendar-alt text-primary me-2"></i>
+                                            <div>
+                                                <div>{{ mensagem.data_agendamento|date:"d/m/Y" }}</div>
+                                                <small class="text-muted">{{ mensagem.data_agendamento|date:"H:i" }}</small>
+                                            </div>
+                                        </div>
+                                        {% else %}
+                                        <span class="text-muted">
+                                            <i class="fas fa-calendar-times me-1"></i> Não agendada
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-calendar-plus text-primary me-2"></i>
+                                            <div>
+                                                <div>{{ mensagem.data_criacao|date:"d/m/Y" }}</div>
+                                                <small class="text-muted">{{ mensagem.data_criacao|date:"H:i" }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group" role="group">
+                                            <a href="{% url 'integra:detalhe_mensagem' mensagem.id %}" 
+                                               class="btn btn-sm btn-outline-primary"
+                                               title="Ver detalhes">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            
+                                            {% if mensagem.pode_editar %}
+                                            <a href="{% url 'integra:editar_mensagem' mensagem.id %}" 
+                                               class="btn btn-sm btn-outline-warning"
+                                               title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                            
+                                            {% if mensagem.pode_cancelar %}
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-danger cancelar-btn"
+                                                    data-id="{{ mensagem.id }}"
+                                                    data-title="{{ mensagem.titulo }}"
+                                                    title="Cancelar">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                            {% endif %}
+                                            
+                                            {% if mensagem.status != 'enviada' %}
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-outline-danger excluir-btn"
+                                                    data-id="{{ mensagem.id }}"
+                                                    data-title="{{ mensagem.titulo }}"
+                                                    title="Excluir">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Paginação (se necessário) -->
+                    {% if is_paginated %}
+                    <div class="card-footer">
+                        <nav aria-label="Paginação">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a>
+                                </li>
+                                {% endif %}
+                                
+                                {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                </li>
+                                {% endif %}
+                                {% endfor %}
+                                
+                                {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Próxima</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="mb-4">
+                            <i class="fas fa-envelope-open-text fa-4x text-muted"></i>
+                        </div>
+                        <h4 class="text-muted mb-3">Nenhuma mensagem encontrada</h4>
+                        <p class="text-muted mb-4">Comece criando sua primeira mensagem em massa</p>
+                        <a href="{% url 'integra:envio_massa' %}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus me-2"></i> Criar Mensagem
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação para exclusão -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-danger me-2"></i> Confirmar Exclusão
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteModalMessage"></p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    Esta ação não pode ser desfeita.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteAction">
+                    <i class="fas fa-trash me-1"></i> Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação para cancelamento -->
+<div class="modal fade" id="confirmCancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle text-warning me-2"></i> Confirmar Cancelamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="cancelModalMessage"></p>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    A mensagem não será enviada.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Manter
+                </button>
+                <button type="button" class="btn btn-warning" id="confirmCancelAction">
+                    <i class="fas fa-ban me-1"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast para mensagens -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="successToast" class="toast" role="alert">
+        <div class="toast-header bg-success text-white">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong class="me-auto">Sucesso!</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toastMessage"></div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+    
+    // Toast de sucesso
+    function showToast(message, type = 'success') {
+        const toastEl = document.getElementById('successToast');
+        const toastMessage = document.getElementById('toastMessage');
+        
+        toastMessage.textContent = message;
+        
+        // Alterar cor conforme tipo
+        const header = toastEl.querySelector('.toast-header');
+        if (type === 'success') {
+            header.className = 'toast-header bg-success text-white';
+            header.querySelector('i').className = 'fas fa-check-circle me-2';
+        } else if (type === 'error') {
+            header.className = 'toast-header bg-danger text-white';
+            header.querySelector('i').className = 'fas fa-times-circle me-2';
+        } else if (type === 'warning') {
+            header.className = 'toast-header bg-warning text-dark';
+            header.querySelector('i').className = 'fas fa-exclamation-triangle me-2';
+        }
+        
+        const toast = new bootstrap.Toast(toastEl);
+        toast.show();
+    }
+    
+    // Excluir mensagem
+    document.querySelectorAll('.excluir-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const mensagemId = this.dataset.id;
+            const mensagemTitulo = this.dataset.title || 'esta mensagem';
+            
+            // Configurar modal
+            document.getElementById('deleteModalMessage').textContent = 
+                `Tem certeza que deseja excluir "${mensagemTitulo}"?`;
+            
+            const deleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+            
+            // Configurar ação de confirmação
+            document.getElementById('confirmDeleteAction').onclick = function() {
+                // Mostrar loading
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Excluindo...';
+                this.disabled = true;
+                
+                fetch(`/integra/mensagens/${mensagemId}/excluir/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        // Remover linha da tabela
+                        const row = btn.closest('tr');
+                        row.style.transition = 'opacity 0.3s';
+                        row.style.opacity = '0';
+                        setTimeout(() => {
+                            row.remove();
+                            
+                            // Se não houver mais linhas, mostrar mensagem
+                            if (document.querySelectorAll('tbody tr').length === 0) {
+                                location.reload();
+                            }
+                        }, 300);
+                    } else {
+                        showToast(data.message || 'Erro ao excluir mensagem', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    showToast('Erro de conexão ao excluir mensagem', 'error');
+                })
+                .finally(() => {
+                    // Restaurar botão
+                    this.innerHTML = originalText;
+                    this.disabled = false;
+                    deleteModal.hide();
+                });
+            };
+            
+            // Resetar evento ao fechar modal
+            deleteModal._element.addEventListener('hidden.bs.modal', function() {
+                document.getElementById('confirmDeleteAction').onclick = null;
+            });
+            
+            deleteModal.show();
+        });
+    });
+    
+    // Cancelar mensagem
+    document.querySelectorAll('.cancelar-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const mensagemId = this.dataset.id;
+            const mensagemTitulo = this.dataset.title || 'esta mensagem';
+            
+            // Configurar modal
+            document.getElementById('cancelModalMessage').textContent = 
+                `Tem certeza que deseja cancelar "${mensagemTitulo}"?`;
+            
+            const cancelModal = new bootstrap.Modal(document.getElementById('confirmCancelModal'));
+            
+            // Configurar ação de confirmação
+            document.getElementById('confirmCancelAction').onclick = function() {
+                // Mostrar loading
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Cancelando...';
+                this.disabled = true;
+                
+                fetch(`/integra/mensagens/${mensagemId}/cancelar/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        showToast(data.message, 'success');
+                        // Atualizar página após 1 segundo
+                        setTimeout(() => {
+                            window.location.href = data.redirect_url || window.location.href;
+                        }, 1000);
+                    } else {
+                        showToast(data.message || 'Erro ao cancelar mensagem', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    showToast('Erro de conexão ao cancelar mensagem', 'error');
+                })
+                .finally(() => {
+                    // Restaurar botão
+                    this.innerHTML = originalText;
+                    this.disabled = false;
+                    cancelModal.hide();
+                });
+            };
+            
+            // Resetar evento ao fechar modal
+            cancelModal._element.addEventListener('hidden.bs.modal', function() {
+                document.getElementById('confirmCancelAction').onclick = null;
+            });
+            
+            cancelModal.show();
+        });
+    });
+    
+    // Auto-refresh para mensagens em processamento
+    function checkProcessingMessages() {
+        const processingRows = document.querySelectorAll('tr td .badge.bg-info');
+        if (processingRows.length > 0) {
+            // Recarregar a página após 30 segundos se houver mensagens processando
+            setTimeout(() => {
+                location.reload();
+            }, 30000);
+        }
+    }
+    
+    // Iniciar verificação
+    checkProcessingMessages();
+});
+</script>
+
+<style>
+.card {
+    border-radius: 10px;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+    background-color: #f8f9fa;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.4em 0.8em;
+}
+
+.btn-group .btn {
+    border-radius: 5px !important;
+    margin: 0 2px;
+}
+
+.progress {
+    width: 80px;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.toast {
+    min-width: 300px;
+}
+</style>
+{% endblock %}

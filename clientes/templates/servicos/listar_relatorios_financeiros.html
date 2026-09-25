@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% load relatorio_filters %}  <!-- Carregando os filtros customizados -->
+
+{% block title %}Relatório Financeiro{% endblock %}
+
+{% block content %}
+<h1>Relatório Financeiro2</h1>
+
+    <!-- Mostrar o total pago e os valores por servidor -->
+    <div class="finance-summary">
+        <h3>Total Pago: {{ relatorios|sum_total_pago }}</h3> <!-- Filtro customizado para o total -->
+        <h4>Valores por Servidor:</h4>
+        <ul>
+            {% for servidor, valor in valores_por_servidor.items %}
+                <li>{{ servidor }}: {{ valor }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <table class="relatorio-table">
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Servidor</th> <!-- Coluna para o servidor -->
+                <th>Valor Pago</th>
+                <th>Valor do Serviço</th>
+                <th>Lucro Líquido</th>
+                <th>Data</th>
+                <th>Ações</th> <!-- Adicionando a coluna de ações -->
+            </tr>
+        </thead>
+        <tbody>
+            {% for relatorio in relatorios %}
+            <tr>
+                <td>{{ relatorio.cliente.nome }}</td>
+                <td>{{ relatorio.servidor }}</td> <!-- Exibindo o servidor -->
+                <td>{{ relatorio.valor_pago }}</td>
+                <td>{{ relatorio.valor_servico }}</td>
+                <td>{{ relatorio.valor_liquido }}</td>
+                <td>{{ relatorio.data_geracao|date:"d/m/Y H:i" }}</td>
+                <td>
+                    <!-- Botão para excluir faturas -->
+                    <form action="{% url 'excluir_relatorio' relatorio.pk %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-excluir">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7">Nenhum relatório financeiro encontrado.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="3"><strong>Subtotal</strong></td>
+                <td colspan="4">{{ relatorios|sum_liquido }}</td> <!-- Exibindo o subtotal -->
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Estilo personalizado -->
+    <style>
+
+
+
+        .finance-summary {
+            margin-bottom: 20px;
+        }
+
+        .finance-summary h3, .finance-summary h4 {
+            color: #0044cc;
+        }
+
+        .relatorio-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-family: Arial, sans-serif;
+            overflow-x: auto;
+        }
+
+        .relatorio-table th, .relatorio-table td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+
+        .relatorio-table th {
+            background-color: #0044cc;
+            color: white;
+        }
+
+        .relatorio-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        .relatorio-table tr:hover {
+            background-color: #d9edf7;
+        }
+
+        .btn-excluir {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+{% endblock %}

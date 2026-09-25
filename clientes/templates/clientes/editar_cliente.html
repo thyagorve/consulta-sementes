@@ -1,0 +1,965 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Cliente - {{ cliente.nome }}{% endblock %}
+
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<style>
+/* ===== VARIÁVEIS ===== */
+:root {
+    /* Cores de interface herdadas do tema global. */
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --shadow-soft: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 10px 25px rgba(0, 0, 0, 0.1);
+    --radius: 16px;
+    --radius-sm: 10px;
+}
+
+/* ===== CONTAINER ===== */
+.editar-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px;
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== HEADER ===== */
+.editar-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    padding: 20px 24px;
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
+}
+
+.editar-header-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 30%, transparent);
+    flex-shrink: 0;
+}
+
+.editar-header-text h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.editar-header-text p {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin: 4px 0 0;
+}
+
+.editar-header-text p strong {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+/* ===== ALERTAS ===== */
+.alert {
+    padding: 14px 18px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.alert i { margin-top: 2px; flex-shrink: 0; font-size: 1rem; }
+
+.alert-success {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    color: #059669;
+}
+
+.alert-error {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #dc2626;
+}
+
+.alert-warning {
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    color: #d97706;
+}
+
+/* ===== CARD ===== */
+.editar-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-soft);
+}
+
+.editar-card-header {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.editar-card-header h2 {
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editar-card-body {
+    padding: 32px 28px;
+}
+
+/* ===== GRID ===== */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.form-grid .full-width {
+    grid-column: 1 / -1;
+}
+
+/* ===== GRUPOS ===== */
+.form-group {
+    margin-bottom: 4px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group label i {
+    color: var(--primary);
+    width: 16px;
+}
+
+.form-group .required::after {
+    content: ' *';
+    color: var(--danger);
+}
+
+/* ===== INPUTS ===== */
+.form-control {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.form-control::placeholder {
+    color: #9ca3af;
+}
+
+.form-control.alterado {
+    border-color: var(--warning);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12);
+    background: rgba(245, 158, 11, 0.02);
+}
+
+.form-control.money-field {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+select.form-control {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+textarea.form-control {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* ===== HINTS ===== */
+.form-hint {
+    font-size: 0.78rem;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    min-height: 36px;
+}
+
+.form-hint.original {
+    background: rgba(16, 185, 129, 0.05);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.form-hint.alterado {
+    background: rgba(245, 158, 11, 0.08);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    font-weight: 500;
+    animation: pulse 0.5s ease;
+}
+
+.form-hint.info-hint {
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
+    color: var(--primary);
+    border: 1px solid color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.01); }
+    100% { transform: scale(1); }
+}
+
+.form-hint i {
+    font-size: 0.85rem;
+    flex-shrink: 0;
+}
+
+.form-hint span {
+    line-height: 1.4;
+}
+
+.form-hint span strong {
+    font-weight: 700;
+    color: #b45309;
+}
+
+/* ===== INFO DO PLANO ===== */
+#plano-info {
+    font-size: 0.78rem;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
+    color: var(--primary);
+    border: 1px solid color-mix(in srgb, var(--primary) 15%, transparent);
+    min-height: 36px;
+}
+
+/* ===== BOTÕES ===== */
+.form-actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 2px solid var(--border);
+}
+
+.btn {
+    padding: 14px 32px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    letter-spacing: 0.3px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    color: white;
+    flex: 1;
+    justify-content: center;
+    box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.btn-secondary {
+    background: var(--bg-hover);
+    color: var(--text);
+    border: 2px solid var(--border);
+}
+
+.btn-secondary:hover {
+    background: var(--border);
+    border-color: #d1d5db;
+}
+
+/* ===== SELECT2 ===== */
+.select2-container--default .select2-selection--multiple {
+    background: var(--bg-card) !important;
+    border: 2px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    min-height: 48px !important;
+    padding: 6px 10px !important;
+    transition: all 0.3s !important;
+}
+
+.select2-container--default.select2-container--focus .select2-selection--multiple {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent) !important;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background: var(--primary) !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 14px !important;
+    border-radius: 20px !important;
+    font-size: 0.82rem !important;
+    font-weight: 500;
+    margin: 2px 4px 2px 0 !important;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    color: rgba(255, 255, 255, 0.7) !important;
+    margin-right: 6px !important;
+    transition: color 0.2s !important;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: white !important;
+}
+
+.select2-dropdown {
+    background: var(--bg-card) !important;
+    border: 2px solid var(--border) !important;
+    border-radius: var(--radius-sm) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+.select2-container--default .select2-results__option {
+    color: var(--text) !important;
+    padding: 10px 16px !important;
+    transition: all 0.2s !important;
+}
+
+.select2-container--default .select2-results__option--highlighted[aria-selected] {
+    background: var(--primary) !important;
+    color: white !important;
+}
+
+.select2-container--default .select2-search--inline .select2-search__field {
+    color: var(--text) !important;
+    font-size: 0.95rem !important;
+}
+
+.select2-container--default .select2-search--dropdown .select2-search__field {
+    background: var(--bg-card) !important;
+    border: 2px solid var(--border) !important;
+    color: var(--text) !important;
+    border-radius: 8px !important;
+    padding: 10px 14px !important;
+}
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .editar-page {
+        padding: 12px;
+    }
+    
+    .editar-card-body {
+        padding: 20px;
+    }
+    
+    .editar-header {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 16px;
+    }
+}
+
+@media (max-width: 600px) {
+    .editar-page {
+        padding: 8px;
+    }
+    
+    .editar-card-body {
+        padding: 16px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .editar-header-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 1.2rem;
+    }
+    
+    .editar-header-text h1 {
+        font-size: 1.2rem;
+    }
+}
+</style>
+
+<!-- ============================== -->
+<!-- CONTEÚDO PRINCIPAL -->
+<!-- ============================== -->
+<div class="editar-page">
+    
+    <!-- HEADER -->
+    <div class="editar-header">
+        <div class="editar-header-icon">
+            <i class="fas fa-user-edit"></i>
+        </div>
+        <div class="editar-header-text">
+            <h1>Editar Cliente</h1>
+            <p>
+                Editando: <strong>{{ cliente.nome }}</strong> 
+                <span style="font-size: 0.75rem; color: #9ca3af; margin-left: 8px;">
+                    ({{ cliente.get_tipo_usuario_display }})
+                </span>
+            </p>
+        </div>
+    </div>
+
+    <!-- MENSAGENS -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-error{% else %}alert-warning{% endif %}">
+                <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-exclamation-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
+                <span>{{ message }}</span>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- FORMULÁRIO -->
+    <div class="editar-card">
+        <div class="editar-card-header">
+            <h2><i class="fas fa-clipboard-list"></i> Dados do Cliente</h2>
+        </div>
+
+        <div class="editar-card-body">
+            <form method="post" action="{% url 'editar_cliente' cliente.id %}" id="formEditar" novalidate>
+                {% csrf_token %}
+
+                <div class="form-grid">
+                    
+                    <!-- TIPO DE USUÁRIO -->
+                    <div class="form-group">
+                        <label><i class="fas fa-user-shield"></i> Tipo de Usuário</label>
+                        {{ form.tipo_usuario }}
+                    </div>
+
+                    <!-- NOME COMPLETO -->
+                    <div class="form-group">
+                        <label class="required"><i class="fas fa-user"></i> Nome Completo</label>
+                        <input type="text" name="nome" maxlength="100" required 
+                               class="form-control campo-validar" id="id_nome"
+                               value="{{ cliente.nome|default:'' }}"
+                               data-original="{{ cliente.nome|default:'' }}"
+                               placeholder="Nome completo">
+                        <small class="form-hint original hint-nome">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Original: <strong>{{ cliente.nome|default:'-' }}</strong></span>
+                        </small>
+                    </div>
+
+                    <!-- ========================================== -->
+                    <!-- CAMPOS DINÂMICOS CONFORME TIPO DE USUÁRIO -->
+                    <!-- ========================================== -->
+                    
+                    {% if cliente.tipo_usuario == 'revenda' or cliente.tipo_usuario == 'admin' %}
+                        
+                        <!-- USUÁRIO DO SISTEMA (revenda/admin) -->
+                        <div class="form-group">
+                            <label><i class="fas fa-user-shield"></i> Usuário do Sistema</label>
+                            <input type="text" name="username" maxlength="150" 
+                                   class="form-control campo-validar" id="id_username"
+                                   value="{{ cliente.username|default:'' }}"
+                                   data-original="{{ cliente.username|default:'' }}"
+                                   placeholder="Nome de usuário para login">
+                            <small class="form-hint original hint-username">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Original: <strong>{{ cliente.username|default:'-' }}</strong></span>
+                            </small>
+                        </div>
+
+                        <!-- SENHA DO SISTEMA (revenda/admin) -->
+                        <div class="form-group">
+                            <label><i class="fas fa-lock"></i> Senha do Sistema</label>
+                            <input type="password" name="password" 
+                                   class="form-control" id="id_password"
+                                   placeholder="Deixe em branco para manter a senha atual">
+                            <small class="form-hint info-hint">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Preencha apenas se quiser <strong>alterar a senha</strong></span>
+                            </small>
+                        </div>
+
+                    {% else %}
+                        
+                        <!-- LOGIN IPTV (cliente) -->
+                        <div class="form-group">
+                            <label><i class="fas fa-sign-in-alt"></i> Login do Serviço (IPTV)</label>
+                            <input type="text" name="login_externo" maxlength="150" 
+                                   class="form-control campo-validar" id="id_login_externo"
+                                   value="{{ cliente.login_externo|default:'' }}"
+                                   data-original="{{ cliente.login_externo|default:'' }}"
+                                   placeholder="Login de acesso ao serviço">
+                            <small class="form-hint original hint-login_externo">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Original: <strong>{{ cliente.login_externo|default:'Não informado' }}</strong></span>
+                            </small>
+                        </div>
+
+                        <!-- SENHA IPTV (cliente) -->
+                        <div class="form-group">
+                            <label><i class="fas fa-key"></i> Senha do Serviço (IPTV)</label>
+                            <input type="text" name="senha_leitura" 
+                                   class="form-control campo-validar" id="id_senha_leitura"
+                                   value="{{ cliente.senha_leitura|default:'' }}"
+                                   data-original="{{ cliente.senha_leitura|default:'' }}"
+                                   placeholder="Senha de acesso ao serviço">
+                            <small class="form-hint original hint-senha_leitura">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Original: <strong>••••••••</strong></span>
+                            </small>
+                        </div>
+
+                    {% endif %}
+
+                    <!-- DATA DE VENCIMENTO -->
+                    <div class="form-group">
+                        <label><i class="fas fa-calendar-alt"></i> Data de Vencimento</label>
+                        <input type="date" name="data_vencimento" 
+                               class="form-control campo-validar" id="id_data_vencimento"
+                               value="{{ cliente.data_vencimento|date:'Y-m-d' }}"
+                               data-original="{{ cliente.data_vencimento|date:'Y-m-d' }}">
+                        <small class="form-hint original hint-data_vencimento">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Original: <strong>{{ cliente.data_vencimento|date:'d/m/Y'|default:'Não definida' }}</strong></span>
+                        </small>
+                    </div>
+
+                    <!-- PLANO -->
+                    <div class="form-group">
+                        <label><i class="fas fa-box"></i> Plano</label>
+                        <select name="plano" id="id_plano" class="form-control campo-validar"
+                                data-original="{{ cliente.plano.id|default:'' }}">
+                            <option value="">🏷️ Selecione um plano...</option>
+                            {% for plano in form.fields.plano.queryset %}
+                                <option value="{{ plano.id }}"
+                                        data-custos="{{ plano.custos|default:'0' }}"
+                                        data-valor="{{ plano.valor|default:'0' }}"
+                                        {% if cliente.plano and cliente.plano.id == plano.id %}selected{% endif %}>
+                                    {{ plano.nome }} — Custo R$ {{ plano.custos|default:'0'|floatformat:2 }} | Venda R$ {{ plano.valor|default:'0'|floatformat:2 }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small id="plano-info">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Plano atual: <strong>{{ cliente.plano.nome|default:'Nenhum' }}</strong></span>
+                        </small>
+                    </div>
+
+                    <!-- VALOR DO SERVIÇO (CUSTO) -->
+                    <div class="form-group">
+                        <label><i class="fas fa-dollar-sign"></i> Valor do Serviço (Custo)</label>
+                        <input type="text" name="valor_servico" 
+                               class="form-control campo-validar money-field" id="id_valor_servico"
+                               value="{{ valor_servico_original|floatformat:2 }}"
+                               data-original="{{ valor_servico_original|floatformat:2 }}"
+                               placeholder="0.00">
+                        <small class="form-hint original hint-valor_servico">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Original: <strong>R$ {{ valor_servico_original|floatformat:2 }}</strong></span>
+                        </small>
+                    </div>
+
+                    <!-- VALOR A PAGAR -->
+                    <div class="form-group">
+                        <label><i class="fas fa-hand-holding-usd"></i> Valor a Pagar</label>
+                        <input type="text" name="valor_a_pagar" 
+                               class="form-control campo-validar money-field" id="id_valor_a_pagar"
+                               value="{{ valor_a_pagar_original|floatformat:2 }}"
+                               data-original="{{ valor_a_pagar_original|floatformat:2 }}"
+                               placeholder="0.00">
+                        <small class="form-hint original hint-valor_a_pagar">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Original: <strong>R$ {{ valor_a_pagar_original|floatformat:2 }}</strong></span>
+                        </small>
+                    </div>
+
+                    <!-- WHATSAPP -->
+                    <div class="form-group full-width">
+                        <label><i class="fab fa-whatsapp"></i> WhatsApp</label>
+                        <input type="text" name="whatsapp" 
+                               class="form-control campo-validar" id="id_whatsapp"
+                               value="{{ cliente.whatsapp|default:'' }}"
+                               data-original="{{ cliente.whatsapp|default:'' }}"
+                               placeholder="(55) 9 9999-9999">
+                        <small class="form-hint original hint-whatsapp">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Original: <strong>{{ cliente.whatsapp|default:'Não informado' }}</strong></span>
+                        </small>
+                    </div>
+
+                    <!-- TAGS -->
+                    <div class="form-group full-width">
+                        <label><i class="fas fa-tags"></i> Tags</label>
+                        <select name="tags_select" id="id_tags" multiple="multiple" style="width: 100%;"></select>
+                        <small class="form-hint original" style="margin-top: 8px;">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Selecione as tags para organizar seus clientes</span>
+                        </small>
+                    </div>
+
+                    <!-- OBSERVAÇÃO -->
+                    <div class="form-group full-width">
+                        <label><i class="fas fa-sticky-note"></i> Observação</label>
+                        <textarea name="observacao" class="form-control campo-validar" 
+                                  id="id_observacao"
+                                  data-original="{{ cliente.observacao|default:'' }}"
+                                  placeholder="Observações adicionais sobre o cliente...">{{ cliente.observacao|default:'' }}</textarea>
+                        <small class="form-hint original hint-observacao">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Original: <strong>{{ cliente.observacao|default:'Nenhuma' }}</strong></span>
+                        </small>
+                    </div>
+                </div>
+
+                <!-- BOTÕES -->
+                <div class="form-actions">
+                    <a href="{% url 'listar_clientes' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ============================== -->
+<!-- JAVASCRIPT -->
+<!-- ============================== -->
+<script>
+// ============================================
+// CONFIGURAÇÃO INICIAL
+// ============================================
+var clienteTagsIniciais = {{ cliente_tags|default:"[]"|safe }};
+var planoSelect = document.getElementById('id_plano');
+var valorServicoInput = document.getElementById('id_valor_servico');
+var valorPagarInput = document.getElementById('id_valor_a_pagar');
+var planoOriginal = planoSelect ? planoSelect.value : '';
+
+// Controle de edição manual
+var usuarioEditouServico = false;
+var usuarioEditouPagar = false;
+
+// ============================================
+// SELECT2 - TAGS
+// ============================================
+$('#id_tags').select2({
+    placeholder: '🔍 Digite para buscar tags...',
+    language: {
+        noResults: function() { return '🏷️ Nenhuma tag encontrada'; },
+        searching: function() { return '🔍 Buscando...'; }
+    },
+    ajax: {
+        url: '/api/buscar-tags/',
+        dataType: 'json',
+        delay: 250,
+        data: function(params) { return { q: params.term || '' }; },
+        processResults: function(data) {
+            var results = [];
+            if (data.results) {
+                results = data.results.map(function(t) { 
+                    return { id: t.id, text: t.text }; 
+                });
+            }
+            return { results: results };
+        },
+        cache: true
+    },
+    minimumInputLength: 0,
+    allowClear: true,
+    closeOnSelect: true,
+    width: '100%'
+});
+
+// Carrega tags existentes
+if (clienteTagsIniciais && clienteTagsIniciais.length > 0) {
+    $.ajax({
+        url: '/api/buscar-tags/',
+        dataType: 'json',
+        success: function(data) {
+            clienteTagsIniciais.forEach(function(tagId) {
+                var tag = (data.results || []).find(function(t) { 
+                    return String(t.id) === String(tagId); 
+                });
+                if (tag) {
+                    var option = new Option(tag.text, tag.id, true, true);
+                    $('#id_tags').append(option);
+                }
+            });
+            $('#id_tags').trigger('change');
+        }
+    });
+}
+
+// ============================================
+// VALIDAÇÃO VISUAL DE CAMPOS ALTERADOS
+// ============================================
+function verificarAlteracao(campo) {
+    if (!campo) return;
+    
+    var valorAtual = campo.value;
+    var valorOriginal = campo.getAttribute('data-original');
+    var hint = document.querySelector('.hint-' + campo.id);
+    
+    if (!hint) return;
+    
+    var icone = hint.querySelector('i');
+    var texto = hint.querySelector('span');
+    
+    if (valorAtual !== valorOriginal) {
+        campo.classList.add('alterado');
+        hint.classList.remove('original');
+        hint.classList.add('alterado');
+        
+        if (icone) icone.className = 'fas fa-edit';
+        if (texto) {
+            var originalExibido = valorOriginal || '-';
+            var atualExibido = valorAtual || '-';
+            texto.innerHTML = 'Alterado: <strong>' + originalExibido + '</strong> → <strong>' + atualExibido + '</strong>';
+        }
+    } else {
+        campo.classList.remove('alterado');
+        hint.classList.remove('alterado');
+        hint.classList.add('original');
+        
+        if (icone) icone.className = 'fas fa-check-circle';
+        if (texto) {
+            var originalExibido = valorOriginal || '-';
+            texto.innerHTML = 'Original: <strong>' + originalExibido + '</strong>';
+        }
+    }
+}
+
+// Aplica validação em todos os campos
+document.querySelectorAll('.campo-validar').forEach(function(campo) {
+    campo.addEventListener('input', function() {
+        verificarAlteracao(this);
+    });
+    campo.addEventListener('change', function() {
+        verificarAlteracao(this);
+    });
+});
+
+// ============================================
+// MARCA EDIÇÃO MANUAL NOS VALORES
+// ============================================
+if (valorServicoInput) {
+    valorServicoInput.addEventListener('input', function() {
+        usuarioEditouServico = true;
+    });
+}
+
+if (valorPagarInput) {
+    valorPagarInput.addEventListener('input', function() {
+        usuarioEditouPagar = true;
+    });
+}
+
+// ============================================
+// ATUALIZA VALORES AO TROCAR DE PLANO
+// ============================================
+if (planoSelect) {
+    planoSelect.addEventListener('change', function() {
+        var planoNovo = planoSelect.value;
+        var planoInfo = document.getElementById('plano-info');
+        
+        if (planoNovo !== planoOriginal) {
+            
+            if (!planoNovo) {
+                if (!usuarioEditouServico && valorServicoInput) {
+                    valorServicoInput.value = '';
+                    valorServicoInput.setAttribute('data-original', '');
+                }
+                if (!usuarioEditouPagar && valorPagarInput) {
+                    valorPagarInput.value = '';
+                    valorPagarInput.setAttribute('data-original', '');
+                }
+                if (planoInfo) planoInfo.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <span>Nenhum plano selecionado</span>';
+                planoOriginal = planoNovo;
+                if (valorServicoInput) verificarAlteracao(valorServicoInput);
+                if (valorPagarInput) verificarAlteracao(valorPagarInput);
+                verificarAlteracao(planoSelect);
+                return;
+            }
+            
+            usuarioEditouServico = false;
+            usuarioEditouPagar = false;
+            
+            fetch('/get_custo_fifo/' + planoNovo + '/')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        if (valorServicoInput) {
+                            if (data.custo_fifo !== null && data.custo_fifo > 0) {
+                                valorServicoInput.value = data.custo_fifo.toFixed(2);
+                                valorServicoInput.setAttribute('data-original', data.custo_fifo.toFixed(2));
+                                if (planoInfo) planoInfo.innerHTML = '<i class="fas fa-boxes"></i> <span>FIFO (Lote #' + data.lote_ordem + '): <strong>R$ ' + data.custo_fifo.toFixed(2).replace('.', ',') + '</strong></span>';
+                            } else if (data.custo_cadastrado !== null && data.custo_cadastrado > 0) {
+                                valorServicoInput.value = data.custo_cadastrado.toFixed(2);
+                                valorServicoInput.setAttribute('data-original', data.custo_cadastrado.toFixed(2));
+                                if (planoInfo) planoInfo.innerHTML = '<i class="fas fa-tag"></i> <span>Plano cadastrado: <strong>R$ ' + data.custo_cadastrado.toFixed(2).replace('.', ',') + '</strong></span>';
+                            } else {
+                                if (planoInfo) planoInfo.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <span>Sem custo definido no plano</span>';
+                            }
+                            verificarAlteracao(valorServicoInput);
+                        }
+                        
+                        if (valorPagarInput) {
+                            var selectedOption = planoSelect.options[planoSelect.selectedIndex];
+                            var valorPlano = parseFloat(selectedOption.getAttribute('data-valor')) || 0;
+                            if (valorPlano > 0) {
+                                valorPagarInput.value = valorPlano.toFixed(2);
+                                valorPagarInput.setAttribute('data-original', valorPlano.toFixed(2));
+                            }
+                            verificarAlteracao(valorPagarInput);
+                        }
+                    }
+                })
+                .catch(function() {
+                    var selectedOption = planoSelect.options[planoSelect.selectedIndex];
+                    var custos = parseFloat(selectedOption.getAttribute('data-custos')) || 0;
+                    var valor = parseFloat(selectedOption.getAttribute('data-valor')) || 0;
+                    
+                    if (valorServicoInput && custos > 0) {
+                        valorServicoInput.value = custos.toFixed(2);
+                        valorServicoInput.setAttribute('data-original', custos.toFixed(2));
+                    }
+                    if (valorPagarInput && valor > 0) {
+                        valorPagarInput.value = valor.toFixed(2);
+                        valorPagarInput.setAttribute('data-original', valor.toFixed(2));
+                    }
+                    if (planoInfo) planoInfo.innerHTML = '<i class="fas fa-tag"></i> <span>Plano: <strong>' + selectedOption.text.split(' -')[0] + '</strong></span>';
+                    if (valorServicoInput) verificarAlteracao(valorServicoInput);
+                    if (valorPagarInput) verificarAlteracao(valorPagarInput);
+                });
+            
+            planoOriginal = planoNovo;
+        }
+        
+        verificarAlteracao(planoSelect);
+    });
+}
+
+// ============================================
+// INICIALIZAÇÃO
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.campo-validar').forEach(function(campo) {
+        verificarAlteracao(campo);
+    });
+    
+});
+
+// ============================================
+// SUBMIT
+// ============================================
+document.getElementById('formEditar').addEventListener('submit', function(e) {
+    if (valorServicoInput && valorServicoInput.value.includes(',')) {
+        valorServicoInput.value = valorServicoInput.value.replace(',', '.');
+    }
+    if (valorPagarInput && valorPagarInput.value.includes(',')) {
+        valorPagarInput.value = valorPagarInput.value.replace(',', '.');
+    }
+    
+    var tagsSelecionadas = $('#id_tags').val() || [];
+    this.querySelectorAll('input[name="tags"]').forEach(function(el) { el.remove(); });
+    tagsSelecionadas.forEach(function(tagId) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'tags';
+        input.value = tagId;
+        this.appendChild(input);
+    }.bind(this));
+    
+});
+</script>
+
+{% endblock %}

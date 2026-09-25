@@ -1,0 +1,66 @@
+<!-- chat_notification.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat Notification</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</head>
+<body>
+    <!-- Notificação de nova mensagem -->
+    <div id="notification" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #f44336; color: white; padding: 20px; border-radius: 10px;">
+        <p>Nova mensagem de {{ sender }}</p>
+        <button id="see_now">Ver agora</button>
+        <button id="see_later">Ver mais tarde</button>
+    </div>
+
+    <!-- Janela de chat lateral -->
+    <div id="chat_window" style="display: none; position: fixed; right: 0; top: 0; width: 300px; height: 100vh; background: white; box-shadow: -2px 0 5px rgba(0, 0, 0, 0.5); padding: 10px;">
+        <h3>Chat com Admin</h3>
+        <div id="messages"></div>
+        <textarea id="message_content"></textarea>
+        <button id="send_message">Enviar</button>
+    </div>
+
+    <script>
+        function checkForMessages() {
+            $.get("/get_unread_messages/", function(data) {
+                if (data.messages.length > 0) {
+                    $("#notification").show();
+                }
+            });
+        }
+
+        function sendMessage() {
+            const content = $("#message_content").val();
+            $.post("/send_message/", { content: content, receiver_id: "{{ admin_id }}" }, function() {
+                $("#message_content").val("");
+                loadMessages();
+            });
+        }
+
+        function loadMessages() {
+            $.get("/get_messages/", function(data) {
+                $("#messages").html(data.messages.map(msg => `<p>${msg.content}</p>`).join(""));
+            });
+        }
+
+        $("#see_now").click(function() {
+            $("#notification").hide();
+            $("#chat_window").show();
+            loadMessages();
+        });
+
+        $("#see_later").click(function() {
+            $("#notification").hide();
+            setTimeout(checkForMessages, 60000);  // Retorna a notificação em 1 minuto
+        });
+
+        $("#send_message").click(function() {
+            sendMessage();
+        });
+
+        setInterval(checkForMessages, 60000);  // Verifica novas mensagens a cada minuto
+    </script>
+</body>
+</html>

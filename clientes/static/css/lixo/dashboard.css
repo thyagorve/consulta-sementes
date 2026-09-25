@@ -1,0 +1,161 @@
+(function () {
+  function getThemeColors() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    const isDark = theme === 'dark' || theme === 'contrast';
+
+    return {
+      primary: '#667eea',
+      success: '#10b981',
+      warning: '#f59e0b',
+      danger: '#ef4444',
+      text: isDark ? '#f1f5f9' : '#1e293b',
+      textLight: isDark ? '#94a3b8' : '#64748b',
+      grid: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+      bgCard: isDark ? '#1e293b' : '#ffffff'
+    };
+  }
+
+  function parseJsonScript(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    try {
+      return JSON.parse(el.textContent);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function createCharts() {
+    const colors = getThemeColors();
+
+    const statusData = parseJsonScript('status-chart-data') || {};
+    const evolucaoData = parseJsonScript('evolucao-chart-data') || {};
+
+    const statusValues = [
+      statusData.ativos_futuros || 0,
+      statusData.a_vencer_mes || 0,
+      statusData.vencidos || 0,
+      statusData.desativados || 0
+    ];
+
+    const totalStatus = statusValues.reduce((acc, val) => acc + val, 0);
+
+    const statusCanvas = document.getElementById('statusChart');
+    if (statusCanvas) {
+      new Chart(statusCanvas, {
+        type: 'doughnut',
+        data: {
+          labels: totalStatus > 0
+            ? ['Ativos Futuros', 'A Vencer Mês', 'Vencidos', 'Desativados']
+            : ['Sem dados'],
+          datasets: [{
+            data: totalStatus > 0 ? statusValues : [1],
+            backgroundColor: totalStatus > 0
+              ? [colors.primary, colors.warning, colors.danger, '#94a3b8']
+              : ['#e2e8f0'],
+            borderColor: colors.bgCard,
+            borderWidth: 3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '65%',
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                color: colors.text,
+                padding: 12,
+                font: { size: 10 },
+                usePointStyle: true
+              }
+            },
+            tooltip: { enabled: totalStatus > 0 }
+          }
+        }
+      });
+    }
+
+    const labels = evolucaoData.labels || [];
+    const bruto = evolucaoData.bruto || [];
+    const liquido = evolucaoData.liquido || [];
+    const hasData = bruto.some(v => v > 0) || liquido.some(v => v > 0);
+
+    const evolutionCanvas = document.getElementById('evolutionChart');
+    if (evolutionCanvas && hasData) {
+      new Chart(evolutionCanvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Bruto',
+              data: bruto,
+              borderColor: colors.primary,
+              backgroundColor: 'rgba(102,126,234,0.1)',
+              fill: true,
+              tension: 0.4,
+              borderWidth: 2,
+              pointRadius: 2
+            },
+            {
+              label: 'Líquido',
+              data: liquido,
+              borderColor: colors.success,
+              backgroundColor: 'rgba(16,185,129,0.1)',
+              fill: true,
+              tension: 0.4,
+              borderWidth: 2,
+              pointRadius: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                color: colors.text,
+                font: { size: 10 },
+                usePointStyle: true,
+                padding: 15
+              }
+            },
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  return `${ctx.dataset.label}: R$ ${Number(ctx.parsed.y).toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2
+                  })}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: colors.grid },
+              ticks: { color: colors.textLight, font: { size: 9 } }
+            },
+            y: {
+              grid: { color: colors.grid },
+              ticks: {
+                color: colors.textLight,
+                font: { size: 9 },
+                callback: function (v) {
+                  return `R$ ${Number(v).toLocaleString('pt-BR')}`;
+                }
+              },
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', createCharts);
+})();

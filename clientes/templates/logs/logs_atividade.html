@@ -1,0 +1,920 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Cabeçalho Modernizado -->
+    <div class="content-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="breadcrumbs">
+                <a href="{% url 'dashboard' %}" class="breadcrumb-home" title="Dashboard">
+                    <i class="fas fa-home"></i>
+                </a>
+                <i class="fas fa-chevron-right breadcrumb-separator mx-2"></i>
+                <span class="breadcrumb-current fw-bold">Logs de Atividade</span>
+            </div>
+            <div>
+                <button class="btn-refresh" onclick="window.location.reload()">
+                    <i class="fas fa-sync-alt"></i> Atualizar
+                </button>
+            </div>
+        </div>
+        <h1 class="mt-3 mb-0 display-6 fw-bold text-gradient">Logs do Sistema</h1>
+        <p class="text-muted mb-0"></p>
+    </div>
+
+    <!-- Cards Estatísticas Estilizados -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2">Total de Logs</h6>
+                            <h2 class="card-title display-5 fw-bold text-primary">{{ total_logs }}</h2>
+                        </div>
+                        <div class="icon-circle bg-primary-light">
+                            <i class="fas fa-history"></i>
+                        </div>
+                    </div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-primary" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2">Hoje</h6>
+                            <h2 class="card-title display-5 fw-bold text-success">{{ logs_hoje }}</h2>
+                        </div>
+                        <div class="icon-circle bg-success-light">
+                            <i class="fas fa-calendar-day"></i>
+                        </div>
+                    </div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-success" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2">Ontem</h6>
+                            <h2 class="card-title display-5 fw-bold text-info">{{ logs_ontem }}</h2>
+                        </div>
+                        <div class="icon-circle bg-info-light">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                    </div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-info" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2">Taxa Sucesso</h6>
+                            <h2 class="card-title display-5 fw-bold text-warning">
+                                {% if total_logs > 0 %}
+                                    {{ taxa_sucesso|default:"95" }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </h2>
+                        </div>
+                        <div class="icon-circle bg-warning-light">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                    </div>
+                    <div class="progress mt-2">
+                        <div class="progress-bar bg-warning" style="width: {% if total_logs > 0 %}{{ taxa_sucesso|default:"95" }}{% else %}0{% endif %}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Aprimorados -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-filter me-2"></i>Filtros Avançados
+            </h5>
+        </div>
+        <div class="card-body pt-0">
+            <form method="get" class="filter-form">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">
+                            <i class="fas fa-user me-1"></i>Usuário
+                        </label>
+                        <input type="text" class="form-control" name="usuario" 
+                               value="{{ filtro_usuario }}" placeholder="Digite o nome do usuário...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">
+                            <i class="fas fa-tag me-1"></i>Tipo
+                        </label>
+                        <select class="form-select" name="tipo">
+                            <option value="">Todos os Tipos</option>
+                            {% for tipo, nome in tipos_acao %}
+                            <option value="{{ tipo }}" {% if filtro_tipo == tipo %}selected{% endif %}>
+                                {{ nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">
+                            <i class="fas fa-flag me-1"></i>Status
+                        </label>
+                        <select class="form-select" name="status">
+                            <option value="">Todos Status</option>
+                            <option value="sucesso" {% if filtro_status == 'sucesso' %}selected{% endif %}>
+                                <i class="fas fa-check me-1"></i> Sucesso
+                            </option>
+                            <option value="falha" {% if filtro_status == 'falha' %}selected{% endif %}>
+                                <i class="fas fa-exclamation-triangle me-1"></i> Falha
+                            </option>
+                            <option value="erro" {% if filtro_status == 'erro' %}selected{% endif %}>
+                                <i class="fas fa-times me-1"></i> Erro
+                            </option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">
+                            <i class="fas fa-calendar me-1"></i>Data Início
+                        </label>
+                        <input type="date" class="form-control" 
+                               name="data_inicio" value="{{ filtro_data_inicio }}">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold">
+                            <i class="fas fa-calendar-check me-1"></i>Data Fim
+                        </label>
+                        <input type="date" class="form-control" 
+                               name="data_fim" value="{{ filtro_data_fim }}">
+                    </div>
+                    <div class="col-md-1 d-flex align-items-end">
+                        <button type="submit" class="btn-primary w-100">
+                            <i class="fas fa-search me-1"></i> Filtrar
+                        </button>
+                    </div>
+                </div>
+            </form>
+            {% if request.GET %}
+            <div class="active-filters mt-3">
+                <small>
+                    <i class="fas fa-info-circle me-1"></i>
+                    Filtros ativos: 
+                    {% if filtro_usuario %}Usuário: {{ filtro_usuario }} | {% endif %}
+                    {% if filtro_tipo %}Tipo: {{ filtro_tipo }} | {% endif %}
+                    {% if filtro_status %}Status: {{ filtro_status }} | {% endif %}
+                    {% if filtro_data_inicio %}De: {{ filtro_data_inicio }} | {% endif %}
+                    {% if filtro_data_fim %}Até: {{ filtro_data_fim }}{% endif %}
+                </small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tabela de Logs Modernizada -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-list-alt me-2"></i>Registros de Atividade
+                <span class="badge ms-2">{{ page_obj.paginator.count }} registros</span>
+            </h5>
+            <div class="d-flex gap-2">
+                <button class="btn-secondary" onclick="exportLogs()">
+                    <i class="fas fa-download me-1"></i> Exportar
+                </button>
+                <button class="btn-danger" onclick="clearFilters()">
+                    <i class="fas fa-times me-1"></i> Limpar
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>
+                                <i class="fas fa-calendar me-1"></i> Data/Hora
+                            </th>
+                            <th>
+                                <i class="fas fa-user me-1"></i> Usuário
+                            </th>
+                            <th>
+                                <i class="fas fa-bolt me-1"></i> Ação
+                            </th>
+                            <th>
+                                <i class="fas fa-align-left me-1"></i> Descrição
+                            </th>
+                            <th>
+                                <i class="fas fa-flag me-1"></i> Status
+                            </th>
+                            <th>
+                                <i class="fas fa-network-wired me-1"></i> IP
+                            </th>
+                            <th class="text-center">
+                                <i class="fas fa-cogs me-1"></i> Ações
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in page_obj %}
+                        <tr class="log-row">
+                            <td>
+                                <div class="date-small">{{ log.data_hora|date:"d/m/Y" }}</div>
+                                <div class="time-bold">{{ log.data_hora|date:"H:i:s" }}</div>
+                            </td>
+                            <td>
+                                {% if log.usuario %}
+                                <div class="user-info">
+                                    <div class="user-avatar">
+                                        {{ log.usuario.username|first|upper }}
+                                    </div>
+                                    <div>
+                                        <div class="username">{{ log.usuario.username }}</div>
+                                        <small>{{ log.usuario.get_full_name|default:"Sem nome" }}</small>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <span class="badge-system">
+                                    <i class="fas fa-robot me-1"></i> Sistema
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge-action">
+                                    <i class="fas fa-{{ log.get_tipo_acao_display|lower }} me-1"></i>
+                                    {{ log.get_tipo_acao_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="log-description">
+                                    {{ log.descricao|truncatechars:80 }}
+                                </div>
+                                {% if log.modelo_afetado %}
+                                <small>
+                                    <i class="fas fa-database me-1"></i>
+                                    Modelo: {{ log.modelo_afetado }}
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if log.status == 'sucesso' %}
+                                <span class="badge-success">
+                                    <i class="fas fa-check me-1"></i> Sucesso
+                                </span>
+                                {% elif log.status == 'falha' %}
+                                <span class="badge-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i> Falha
+                                </span>
+                                {% else %}
+                                <span class="badge-error">
+                                    <i class="fas fa-times me-1"></i> Erro
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <code>{{ log.ip_address|default:"-" }}</code>
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group">
+                                    <a href="{% url 'log_detalhe' log.id %}" class="btn-view" 
+                                       title="Ver detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    {% if request.user.is_superuser %}
+                                    <button class="btn-retry" title="Re-executar">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="empty-state">
+                                    <i class="fas fa-search fa-3x mb-3"></i>
+                                    <h5>Nenhum log encontrado</h5>
+                                    <p>Tente ajustar os filtros de busca</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paginação Melhorada -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="card mt-4">
+        <div class="card-body">
+            <nav class="pagination-nav">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="pagination-info">
+                        Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ page_obj.paginator.count }} registros
+                    </div>
+                    
+                    <ul class="pagination">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-left"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if num == page_obj.number %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ num }}</span>
+                            </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ num }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                    {{ num }}
+                                </a>
+                            </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                                <i class="fas fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                    
+                    <div class="pagination-info">
+                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+/* ============================================================
+   ESTILOS ESPECÍFICOS PARA PÁGINA DE LOGS
+============================================================ */
+
+/* Cabeçalho */
+.text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.btn-refresh {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-refresh:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
+/* Cards de estatísticas */
+.stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-soft);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-hard);
+    border-color: var(--primary);
+}
+
+.stat-card .card-subtitle {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.icon-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.bg-primary-light { background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.bg-success-light { background: color-mix(in srgb, var(--success) 10%, transparent); }
+.bg-info-light { background: color-mix(in srgb, var(--info) 10%, transparent); }
+.bg-warning-light { background: color-mix(in srgb, var(--warning) 10%, transparent); }
+
+.progress {
+    height: 4px;
+    background: var(--secondary-color);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.progress-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+/* Formulários */
+.filter-form .form-label {
+    color: var(--text-color);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.filter-form .form-control,
+.filter-form .form-select {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 0.75rem;
+    border-radius: var(--border-radius-sm);
+    width: 100%;
+    transition: var(--transition);
+}
+
+.filter-form .form-control:focus,
+.filter-form .form-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.filter-form .btn-primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--border-radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.filter-form .btn-primary:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+}
+
+.active-filters {
+    background: color-mix(in srgb, var(--info) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+    border-radius: var(--border-radius-sm);
+    padding: 0.75rem;
+    color: var(--text-color);
+}
+
+.active-filters small {
+    color: var(--text-light);
+}
+
+/* Tabela */
+.logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card-bg);
+}
+
+.logs-table thead {
+    background: var(--secondary-color);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.logs-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-color);
+    border-bottom: 2px solid var(--border-color);
+}
+
+.logs-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.log-row:hover {
+    background: var(--bg-hover);
+}
+
+/* Informações do usuário */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.username {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.user-info small {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+/* Badges */
+.badge {
+    background: var(--primary);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-system {
+    background: var(--secondary-color);
+    color: var(--text-color);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.badge-action {
+    background: var(--info);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.badge-success {
+    background: var(--success);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.badge-warning {
+    background: var(--warning);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.badge-error {
+    background: var(--danger);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Botões de ação na tabela */
+.btn-group {
+    display: flex;
+    gap: 0.25rem;
+    justify-content: center;
+}
+
+.btn-view,
+.btn-retry {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    width: 32px;
+    height: 32px;
+    border-radius: var(--border-radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-view:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.btn-retry:hover {
+    background: var(--warning);
+    color: white;
+    border-color: var(--warning);
+}
+
+/* Estado vazio */
+.empty-state {
+    padding: 3rem;
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.empty-state i {
+    opacity: 0.5;
+}
+
+.empty-state h5 {
+    margin: 1rem 0 0.5rem;
+    color: var(--text-color);
+}
+
+/* Paginação */
+.pagination-nav {
+    padding: 1rem 0;
+}
+
+.pagination-info {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.pagination {
+    display: flex;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.page-item {
+    display: inline-block;
+}
+
+.page-link {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    text-decoration: none;
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition);
+    min-width: 40px;
+    text-align: center;
+}
+
+.page-link:hover {
+    background: var(--bg-hover);
+    border-color: var(--primary);
+}
+
+.page-item.active .page-link {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Botões de ação */
+.btn-secondary,
+.btn-danger {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-secondary {
+    background: var(--secondary-color);
+    color: var(--text-color);
+}
+
+.btn-secondary:hover {
+    background: var(--border-color);
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: color-mix(in srgb, var(--danger) 90%, black);
+    transform: translateY(-2px);
+}
+
+/* Código */
+code {
+    background: var(--secondary-color);
+    color: var(--text-color);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--border-radius-sm);
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+/* Datas */
+.date-small {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.time-bold {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .stat-card .card-body {
+        padding: 1.5rem !important;
+    }
+    
+    .filter-form .row {
+        gap: 1rem;
+    }
+    
+    .logs-table {
+        display: block;
+        overflow-x: auto;
+    }
+    
+    .logs-table th,
+    .logs-table td {
+        min-width: 150px;
+    }
+    
+    .user-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .pagination-nav .d-flex {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .content-header .d-flex {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start !important;
+    }
+    
+    .card-header .d-flex {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start !important;
+    }
+}
+</style>
+
+<script>
+// Funções para a página de logs
+function exportLogs() {
+    window.AppUI.alert('Funcionalidade de exportação em desenvolvimento');
+}
+
+function clearFilters() {
+    window.location.href = window.location.pathname;
+}
+
+// Inicializar tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    // Tooltips simples
+    document.querySelectorAll('[title]').forEach(element => {
+        element.addEventListener('mouseenter', function(e) {
+            const tooltip = document.createElement('div');
+            tooltip.className = 'custom-tooltip';
+            tooltip.textContent = this.title;
+            document.body.appendChild(tooltip);
+            
+            const rect = this.getBoundingClientRect();
+            tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+            tooltip.style.top = (rect.top - tooltip.offsetHeight - 10) + 'px';
+            
+            this._tooltip = tooltip;
+        });
+        
+        element.addEventListener('mouseleave', function() {
+            if (this._tooltip) {
+                this._tooltip.remove();
+                this._tooltip = null;
+            }
+        });
+    });
+});
+
+// Estilos para tooltips
+const tooltipStyle = document.createElement('style');
+tooltipStyle.textContent = `
+.custom-tooltip {
+    position: fixed;
+    background: var(--text-color);
+    color: var(--card-bg);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.75rem;
+    z-index: 9999;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: var(--shadow);
+    transform: translateY(-5px);
+    opacity: 0;
+    animation: tooltipFadeIn 0.2s ease forwards;
+}
+
+@keyframes tooltipFadeIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+`;
+document.head.appendChild(tooltipStyle);
+</script>
+{% endblock %}

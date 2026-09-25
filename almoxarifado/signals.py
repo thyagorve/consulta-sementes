@@ -23,13 +23,14 @@ def configurar_grupos_almoxarifado(sender, **kwargs):
         perm_ver = Permission.objects.get(codename='pode_ver_almoxarifado', content_type=content_type)
         perm_gerenciar = Permission.objects.get(codename='pode_gerenciar_almoxarifado', content_type=content_type)
         
+        # Grupos são mantidos apenas por compatibilidade histórica. O acesso
+        # do sistema é definido exclusivamente por permissões individuais.
         grupo_almoxarife, _ = Group.objects.get_or_create(name='almoxarife')
-        grupo_almoxarife.permissions.add(perm_ver, perm_gerenciar)
-        
         grupo_operador, _ = Group.objects.get_or_create(name='operador')
-        grupo_operador.permissions.add(perm_ver)
+        grupo_almoxarife.permissions.clear()
+        grupo_operador.permissions.clear()
         
-        print("✅ Grupos configurados!")
+        print("✅ Grupos legados mantidos sem permissões automáticas.")
     except Exception as e:
         print(f"❌ Erro: {e}")
 
