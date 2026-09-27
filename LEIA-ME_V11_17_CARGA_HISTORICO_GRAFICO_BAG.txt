@@ -1,0 +1,57 @@
+INFINITY STOCK V11.17 - CARGA / HISTÓRICO / GRÁFICO BAG
+
+Base:
+- V11.16 (usuários, permissões e offline)
+
+AJUSTES PRINCIPAIS
+
+1) Edição de quantidade de carga acompanha a linha do tempo
+- Ao alterar uma baixa de carga, por exemplo 7 -> 10 BAG, o campo
+  HistoricoMovimentacao.quantidade continua sendo atualizado como antes.
+- Agora a descrição exibida na Linha do Tempo também é regenerada para
+  refletir quantidade, unidade, lote, endereço, AZ, carga, cliente,
+  motorista e placa atuais.
+- A descrição passa a mostrar a unidade real, por exemplo:
+  "Expedido 10 BAG ..." em vez de "Expedido 7 un ...".
+
+2) Correção dos históricos antigos já desalinhados
+- Migration 0046 atualiza textos antigos de expedição que ainda exibem
+  uma quantidade diferente do campo quantidade atual.
+- A migration altera somente o trecho inicial "Expedido X un/BAG/SC" e
+  preserva o restante da descrição.
+
+3) Confirmação do saldo físico após edição
+- A rotina já revertia a saída anterior e aplicava a nova quantidade de
+  forma atômica.
+- Mantida a validação de integridade: saldo >= 0, empenhado >= 0 e
+  empenhado <= saldo físico.
+- O log da correção agora registra saldo físico e saída acumulada antes/depois.
+- Após salvar, a mensagem informa quantidade anterior, nova quantidade e
+  saldo físico final do lote/endereço.
+
+4) Gráfico de carregamentos com unidade selecionável
+- Novo seletor compacto:
+  Eq. SC | BAG | SC físico
+- A troca ocorre no mesmo gráfico, sem recarregar a página.
+- Eixo, rótulos sobre barras/linha, tooltip, total, média e pico acompanham
+  a unidade escolhida.
+- A escolha fica salva no navegador.
+- Títulos e textos do gráfico foram aumentados e simplificados para melhorar
+  leitura em computador e celular.
+
+5) Cache
+- Service Worker alterado para infinity-stock-v11-shell-17.
+
+MIGRATION NOVA
+- sapp/migrations/0046_sincronizar_descricao_expedicoes.py
+
+PÓS DEPLOY
+python manage.py migrate
+python manage.py collectstatic --noinput
+
+Depois, rebuild/restart e Ctrl+F5.
+
+OBSERVAÇÃO
+- Não foram alteradas regras de empenho, transferência ou criação de carga.
+- A mudança física da edição permanece protegida por transaction.atomic e
+  validação de integridade do estoque.

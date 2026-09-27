@@ -12,7 +12,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.core.serializers.json import DjangoJSONEncoder 
 from .models import HistoricoMovimentacao
 from .models import OrigemDestino
-from .models import Estoque, Cultivar, Peneira, Categoria, StatusSistemico
+from .models import Estoque, Cultivar, Peneira, Categoria, StatusSistemico, HistoricoStatusSistemico
 from django.db.models import Q, Sum, Prefetch, F
 # Adicione no topo com os outros imports
 import datetime
@@ -1313,6 +1313,55 @@ def _validar_integridade_estoque(*registros):
     return True
 
 
+def _marcar_destino_transferencia_critico(estoque, usuario=None, observacao=''):
+    """
+    Toda entrada por transferência deve ficar em estado de atenção até nova
+    conferência. Evita herdar o status OK/verde da origem ou preservar um
+    status antigo do endereço de destino.
+    """
+    if not estoque:
+        return None
+
+    critico = StatusSistemico.objects.filter(nome__iexact='Crítico').first()
+    if not critico:
+        StatusSistemico.get_status_padrao()
+        critico = StatusSistemico.objects.filter(nome__iexact='Crítico').first()
+    if not critico:
+        return None
+
+    status_anterior = estoque.status_sistemico
+    texto_obs = (
+        str(observacao or '').strip()
+        or 'Status automático: estoque recebido por transferência, aguardando conferência.'
+    )
+
+    if status_anterior_id := getattr(status_anterior, 'id', None):
+        mesmo_status = status_anterior_id == critico.id
+    else:
+        mesmo_status = False
+
+    if not mesmo_status:
+        HistoricoStatusSistemico.objects.create(
+            estoque=estoque,
+            status_anterior=status_anterior,
+            status_novo=critico,
+            observacao=texto_obs,
+            alterado_por=usuario,
+        )
+
+    Estoque.objects.filter(pk=estoque.pk).update(
+        status_sistemico=critico,
+        status_sistemico_alterado_por=usuario,
+        status_sistemico_alterado_em=timezone.now(),
+        status_sistemico_observacao=texto_obs,
+    )
+    estoque.status_sistemico = critico
+    estoque.status_sistemico_alterado_por = usuario
+    estoque.status_sistemico_alterado_em = timezone.now()
+    estoque.status_sistemico_observacao = texto_obs
+    return critico
+
+
 def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
     """
     Faz a reserva acompanhar o lote numa transferência física avulsa.
@@ -1766,6 +1815,15 @@ def transferir(request, id):
                         )
                         mensagem_tipo = "criado no novo endereço"
                     
+                    _marcar_destino_transferencia_critico(
+                        destino,
+                        request.user,
+                        (
+                            f'Transferência recebida de {origem.endereco or "-"} para '
+                            f'{novo_end or "-"}. Aguardando conferência.'
+                        ),
+                    )
+
                     # Se a transferência avulsa deslocou quantidade que era
                     # necessária para sustentar uma reserva, move internamente a
                     # reserva para o destino SEM consumir o empenho.
@@ -5051,6 +5109,15 @@ def pagina_rascunho(request):
                             
                             origem.saida += qtd
                             origem.save()
+
+                            _marcar_destino_transferencia_critico(
+                                destino,
+                                user,
+                                (
+                                    f'Transferência recebida de {origem.endereco or "-"} para '
+                                    f'{novo_end or "-"}. Aguardando conferência.'
+                                ),
+                            )
                             
                             HistoricoMovimentacao.objects.create(
                                 estoque=origem,
@@ -5470,6 +5537,15 @@ def processar_transferencia_item(request, item, user, MARCA_ORIGEM, obs_global, 
             observacao=f"{MARCA_ORIGEM} {obs_global} {obs_transferencia}".strip()
         )
     
+    _marcar_destino_transferencia_critico(
+        destino,
+        user,
+        (
+            f'Transferência recebida de {origem.endereco or "-"} para '
+            f'{novo_end or "-"}. Aguardando conferência.'
+        ),
+    )
+
     # Atualizar saída da origem
     origem.saida += qtd
     origem.save()
@@ -7233,8 +7309,6 @@ def _normalizar_numero_carga_avulsa(valor):
     texto = ' '.join(texto.split())
     while texto.startswith('CARGA'):
         texto = texto[5:].strip()
-        texto = texto.replace('-', ' ').replace(':', ' ')
-        texto = ' '.join(texto.split())
     if not texto.isdigit():
         return ''
     numero = texto.lstrip('0') or '0'
@@ -7261,19 +7335,15 @@ def _dashboard_normalizar_carga(valor):
     if texto.isdigit():
         numero = texto.lstrip('0') or '0'
         texto = f'CARGA {numero}'
-    elif texto.startswith('CARGA'):
+    else:
         restante = texto
         while restante.startswith('CARGA'):
             restante = restante[5:].strip()
-            restante = restante.replace('-', ' ').replace(':', ' ')
-            restante = ' '.join(restante.split())
         if restante.isdigit():
             numero = restante.lstrip('0') or '0'
             texto = f'CARGA {numero}'
-        elif restante:
+        elif restante and restante != texto:
             texto = f'CARGA {restante}'
-        else:
-            texto = 'CARGA'
 
     return texto, texto
 
@@ -14149,6 +14219,15 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                     # recalcular campos derivados.
                     destino.save()
 
+                    _marcar_destino_transferencia_critico(
+                        destino,
+                        request.user,
+                        (
+                            f'Transferência recebida de {endereco_origem or "-"} para '
+                            f'{novo_endereco or "-"}. Aguardando conferência.'
+                        ),
+                    )
+
                     # Saída da origem.
                     origem.saida = (
                         Decimal(
@@ -15908,9 +15987,6 @@ def api_kanban_dados(request):
                 'motorista': set(),
                 'lotes': set(),
                 'qtd': Decimal('0'),
-                'qtd_bag': Decimal('0'),
-                'qtd_sc': Decimal('0'),
-                'qtd_outros': Decimal('0'),
                 'embalagens': set(),
                 'usuario': mov.usuario,
             })
@@ -15922,24 +15998,8 @@ def api_kanban_dados(request):
             if lote: grupo['lotes'].add(lote)
             emb = str(mov.estoque.embalagem if mov.estoque else '').strip().upper()
             if emb: grupo['embalagens'].add(emb)
-            qtd_mov = Decimal(str(mov.quantidade or 0))
-            if emb == 'BAG':
-                grupo['qtd_bag'] += qtd_mov
-            elif emb == 'SC':
-                grupo['qtd_sc'] += qtd_mov
-            else:
-                grupo['qtd_outros'] += qtd_mov
 
         for chave, grupo in grupos_avulsos.items():
-            partes_volume = []
-            if grupo['qtd_bag'] > 0:
-                partes_volume.append(f"{int(grupo['qtd_bag']) if grupo['qtd_bag'] == int(grupo['qtd_bag']) else grupo['qtd_bag']} BAG")
-            if grupo['qtd_sc'] > 0:
-                partes_volume.append(f"{int(grupo['qtd_sc']) if grupo['qtd_sc'] == int(grupo['qtd_sc']) else grupo['qtd_sc']} SC")
-            if grupo['qtd_outros'] > 0:
-                partes_volume.append(f"{int(grupo['qtd_outros']) if grupo['qtd_outros'] == int(grupo['qtd_outros']) else grupo['qtd_outros']} UN")
-            volume_fisico = ' + '.join(partes_volume) or '0'
-            equivalente_sc = (grupo['qtd_bag'] * Decimal('25')) + grupo['qtd_sc']
             card = {
                 'id': chave,
                 'synthetic_avulsa': True,
@@ -15967,10 +16027,6 @@ def api_kanban_dados(request):
                 'quantidade_empenhada': float(grupo['qtd']),
                 'quantidade_empenhada_display': float(grupo['qtd']),
                 'quantidade_movimentada': float(grupo['qtd']),
-                'volume_fisico': volume_fisico,
-                'qtd_bag': float(grupo['qtd_bag']),
-                'qtd_sc': float(grupo['qtd_sc']),
-                'equivalente_sc': float(equivalente_sc),
                 'percentual_empenhado': 100.0,
                 'percentual_movimentado': 100.0,
                 'prioridade': 'MEDIA',
@@ -16030,8 +16086,6 @@ def api_impressao_carga_avulsa(request):
     if not nome and not numero and not placa:
         return JsonResponse({'success': False, 'error': 'Carga avulsa não informada.'}, status=400)
 
-    numero_canonico = ''
-
     qs = (
         _expedicoes_ativas_qs()
         .filter(origem_carga='AVULSA')
@@ -16073,9 +16127,6 @@ def api_impressao_carga_avulsa(request):
     motoristas = set()
     embalagens = set()
     total = Decimal('0')
-    total_bag = Decimal('0')
-    total_sc = Decimal('0')
-    total_outros = Decimal('0')
     peso_total_carga = Decimal('0')
     produto_cache = {}
 
@@ -16097,12 +16148,6 @@ def api_impressao_carga_avulsa(request):
         embalagem = str(estoque.embalagem if estoque else '').strip().upper()
         if embalagem:
             embalagens.add(embalagem)
-        if embalagem == 'BAG':
-            total_bag += qtd
-        elif embalagem == 'SC':
-            total_sc += qtd
-        else:
-            total_outros += qtd
 
         codigo = str(estoque.produto if estoque else '').strip()
         chave_codigo = codigo.upper()
@@ -16144,30 +16189,24 @@ def api_impressao_carga_avulsa(request):
 
     primeiro = movimentos[0]
     ultimo = movimentos[-1]
+    numero_canonico = _normalizar_numero_carga_avulsa(numero) if numero else ''
+    nome_canonico = _normalizar_numero_carga_avulsa(nome) if nome else ''
     if numero_canonico:
         titulo = numero_canonico
+    elif nome_canonico:
+        titulo = nome_canonico
     elif placa:
         titulo = f'CARGA {placa}'
     elif nome:
-        resto_nome = str(nome or '').strip()
-        while resto_nome.upper().startswith('CARGA'):
-            resto_nome = resto_nome[5:].lstrip(' -:').strip()
-        titulo = f'CARGA {resto_nome}' if resto_nome else 'CARGA'
+        titulo_limpo = ' '.join(str(nome or '').strip().upper().split())
+        while titulo_limpo.startswith('CARGA CARGA'):
+            titulo_limpo = titulo_limpo[6:].strip()
+        titulo = titulo_limpo or 'CARGA AVULSA'
     else:
         titulo = 'CARGA AVULSA'
-    unidade = 'BAG + SC'
+    unidade = 'BAGS/SC'
     if len(embalagens) == 1:
         unidade = next(iter(embalagens))
-
-    partes_volume = []
-    if total_bag > 0:
-        partes_volume.append(f'{int(total_bag) if total_bag == int(total_bag) else total_bag} BAG')
-    if total_sc > 0:
-        partes_volume.append(f'{int(total_sc) if total_sc == int(total_sc) else total_sc} SC')
-    if total_outros > 0:
-        partes_volume.append(f'{int(total_outros) if total_outros == int(total_outros) else total_outros} UN')
-    volume_fisico = ' + '.join(partes_volume) or '0'
-    equivalente_sc = (total_bag * Decimal('25')) + total_sc
 
     return JsonResponse({
         'success': True,
@@ -16204,11 +16243,6 @@ def api_impressao_carga_avulsa(request):
         'resumo_avulsa': {
             'lotes': len(itens),
             'quantidade': float(total),
-            'bags': float(total_bag),
-            'scs': float(total_sc),
-            'outros': float(total_outros),
-            'volume_fisico': volume_fisico,
-            'equivalente_sc': float(equivalente_sc),
             'peso_total': str(peso_total_carga),
             'unidade': unidade,
         },

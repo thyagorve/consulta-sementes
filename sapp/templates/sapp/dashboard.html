@@ -1371,6 +1371,7 @@
         font-weight: 900;
         white-space: nowrap;
     }
+    .expedition-quantity-plus { display:inline-flex; align-items:center; justify-content:center; margin:0 5px; color:#6d786f; font-weight:900; font-size:.82rem; }
 
     .expedition-equivalent {
         display: inline-flex;
@@ -3424,7 +3425,7 @@
                             <i class="fas fa-chart-column"></i><span id="expedicaoChartTypeLabel">Barras</span>
                         </button>
                         <div class="expedition-unit-switch" role="group" aria-label="Unidade do gráfico de carregamentos">
-                            <button type="button" class="expedition-unit-btn active" data-exp-unit="equivalente" onclick="trocarUnidadeGraficoExpedicao('equivalente')" title="Volume total convertido: 1 BAG = 25 SC">Volume (SC eq.)</button>
+                            <button type="button" class="expedition-unit-btn active" data-exp-unit="equivalente" onclick="trocarUnidadeGraficoExpedicao('equivalente')" title="Mostrar equivalente em sacos">Eq. SC</button>
                             <button type="button" class="expedition-unit-btn" data-exp-unit="bag" onclick="trocarUnidadeGraficoExpedicao('bag')" title="Mostrar quantidade de BAG">BAG</button>
                             <button type="button" class="expedition-unit-btn" data-exp-unit="sc" onclick="trocarUnidadeGraficoExpedicao('sc')" title="Mostrar sacos físicos">SC físico</button>
                         </div>
@@ -3607,7 +3608,7 @@
     let expedicaoGraficoCarregando = false;
     let expedicaoGraficoFonte = {};
     let expedicaoGraficoUnidade = (() => {
-        const salvo = localStorage.getItem('infinityDashboardExpedicaoUnidadeV2');
+        const salvo = localStorage.getItem('infinityDashboardExpedicaoUnidadeV18');
         return ['equivalente', 'bag', 'sc'].includes(salvo) ? salvo : 'equivalente';
     })();
     let expedicaoCargasCache = [];
@@ -4479,13 +4480,6 @@
         atualizarGraficoExpedicoes(expedicaoGraficoPadrao || {});
     }
 
-    function formatarComposicaoExpedicao(detalhe = {}) {
-        const partes = [];
-        if (Number(detalhe.bags || 0) > 0) partes.push(`${formatNumber(detalhe.bags || 0, 0)} BAG`);
-        if (Number(detalhe.scs || 0) > 0) partes.push(`${formatNumber(detalhe.scs || 0, 0)} SC`);
-        return partes.join(' + ') || '0';
-    }
-
     function metaUnidadeGraficoExpedicao(unidade = expedicaoGraficoUnidade) {
         if (unidade === 'bag') {
             return {
@@ -4528,7 +4522,7 @@
     function trocarUnidadeGraficoExpedicao(unidade) {
         if (!['equivalente', 'bag', 'sc'].includes(unidade)) return;
         expedicaoGraficoUnidade = unidade;
-        localStorage.setItem('infinityDashboardExpedicaoUnidadeV2', unidade);
+        localStorage.setItem('infinityDashboardExpedicaoUnidadeV18', unidade);
         atualizarBotoesUnidadeGraficoExpedicao();
         atualizarGraficoExpedicoes(expedicaoGraficoFonte || expedicaoGraficoPadrao || {}, false);
     }
@@ -4604,7 +4598,8 @@
             const partesFisicas = [];
             if (Number(resumo.bags || 0) > 0) partesFisicas.push(`${formatNumber(resumo.bags || 0, 0)} BAG`);
             if (Number(resumo.scs || 0) > 0) partesFisicas.push(`${formatNumber(resumo.scs || 0, 0)} SC`);
-            const fisico = partesFisicas.join(' + ') || '0';
+            if (Number(resumo.outros || 0) > 0) partesFisicas.push(`${formatNumber(resumo.outros || 0, 0)} UN`);
+            const fisico = partesFisicas.length ? partesFisicas.join(' + ') : '0';
             breakdownEl.textContent = `${fisico} = ${formatNumber(resumo.equivalente_sc || 0, 0)} SC eq.`;
         }
         if (cargasEl) cargasEl.textContent = formatNumber(resumo.cargas || 0, 0);
@@ -4665,7 +4660,10 @@
                 } else if (expedicaoGraficoUnidade === 'sc') {
                     linhaVolume = `${formatNumber(detalhe.scs || 0, 0)} SC físico`;
                 } else {
-                    linhaVolume = formatarComposicaoExpedicao(detalhe);
+                    const volume = [];
+                    if (Number(detalhe.bags || 0) > 0) volume.push(`${formatNumber(detalhe.bags || 0, 0)} BAG`);
+                    if (Number(detalhe.scs || 0) > 0) volume.push(`${formatNumber(detalhe.scs || 0, 0)} SC`);
+                    linhaVolume = volume.join(' + ');
                 }
                 return linhaVolume
                     ? [String(label), linhaVolume]
@@ -4856,7 +4854,7 @@
                 );
             }
             const quantidadeHtml = quantidadePartes.length
-                ? quantidadePartes.join('')
+                ? quantidadePartes.join('<span class="expedition-quantity-plus">+</span>')
                 : '<span class="text-muted">0</span>';
 
             return `
@@ -4881,7 +4879,7 @@
                     <td>
                         <span class="expedition-equivalent">
                             <i class="fas fa-equals"></i>
-                            ${formatNumber(carga.equivalente_sc || 0, 0)} SC eq.
+                            ${formatNumber(carga.equivalente_sc || 0, 0)} SC
                         </span>
                     </td>
                 </tr>
@@ -5865,13 +5863,12 @@
                                     const index = items[0].dataIndex;
                                     const detalhe = expedicaoGraficoDetalhes[index] || {};
                                     const linhas = [];
-                                    const composicao = formatarComposicaoExpedicao(detalhe);
                                     if (expedicaoGraficoModo === 'cargas') {
-                                        if (composicao !== '0') {
-                                            linhas.push(`Volume físico: ${composicao}`);
+                                        if (Number(detalhe.bags || 0) > 0) {
+                                            linhas.push(`BAG: ${formatNumber(detalhe.bags || 0, 0)}`);
                                         }
-                                        if (Number(detalhe.equivalente_sc || 0) > 0) {
-                                            linhas.push(`Conversão: ${composicao} = ${formatNumber(detalhe.equivalente_sc || 0, 0)} SC eq.`);
+                                        if (Number(detalhe.scs || 0) > 0) {
+                                            linhas.push(`SC físicos: ${formatNumber(detalhe.scs || 0, 0)}`);
                                         }
                                         if (detalhe.placa && detalhe.placa !== '--') {
                                             linhas.push(`Placa: ${detalhe.placa}`);
@@ -5881,11 +5878,11 @@
                                         }
                                     } else {
                                         linhas.push(`Cargas: ${formatNumber(detalhe.cargas || 0, 0)}`);
-                                        if (composicao !== '0') {
-                                            linhas.push(`Volume físico: ${composicao}`);
+                                        if (Number(detalhe.bags || 0) > 0) {
+                                            linhas.push(`BAG: ${formatNumber(detalhe.bags || 0, 0)}`);
                                         }
-                                        if (Number(detalhe.equivalente_sc || 0) > 0) {
-                                            linhas.push(`Equivalente: ${formatNumber(detalhe.equivalente_sc || 0, 0)} SC eq.`);
+                                        if (Number(detalhe.scs || 0) > 0) {
+                                            linhas.push(`SC físicos: ${formatNumber(detalhe.scs || 0, 0)}`);
                                         }
                                     }
                                     return linhas;

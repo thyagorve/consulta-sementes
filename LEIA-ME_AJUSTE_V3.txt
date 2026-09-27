@@ -1,0 +1,48 @@
+REVISÃO V3 - CONFIGURAÇÕES, FILTROS, MOVIMENTAR E SEGURANÇA DE MOVIMENTAÇÕES
+Data: 31/08/2026
+
+1. CONFIGURAÇÕES
+- Produto e Endereço mantêm edição no formulário lateral.
+- Armazém, Cultivar, Peneira, Espécie, Categoria, Tratamento e Origem/Destino agora também editam no formulário lateral, sem prompt do navegador.
+- Contas também editam Login, Nome e senha opcional pelo formulário lateral; permissões continuam no botão de cadeado.
+- Nenhum prompt() permanece na tela de Configurações.
+- Mantidas mensagens de dependência ao tentar excluir cadastros em uso.
+
+2. GESTÃO DE ESTOQUE - FILTROS
+- A rota /api/estoque/opcoes-filtro/ usa a API completa para todas as colunas.
+- Status e filtros de texto aceitam seleção encadeada e vazio.
+- Cliente e demais textos são aplicados sem diferenciar maiúsculas/minúsculas.
+- Saldo, Empenhado, Disponível, Peso Unitário e Peso Total usam mínimo/máximo.
+- Observação está incluída.
+
+3. GESTÃO DE ESTOQUE - COLUNAS
+- Retirada a edição de largura em px do gerenciador de colunas.
+- A largura continua sendo alterada arrastando a divisória do cabeçalho.
+- No gerenciador, as colunas podem ser arrastadas para frente/trás e a ordem fica salva no navegador.
+
+4. MOVIMENTAR
+- Coluna Última movimentação adicionada/garantida e visível por padrão.
+- Filtro de Data por período (De/Até).
+- Status e Cliente usam valores de filtro explícitos.
+- Todas as colunas continuam filtráveis.
+- Organizador permite arrastar/reordenar colunas e salva a ordem.
+
+5. EXPEDIÇÃO AVULSA
+- Visual reorganizado no padrão da Transferência: Saldo físico, Empenhado e Disponível avulso.
+- Removido texto antigo "Máx. avulso...".
+- Primeiro clique em Confirmar Expedição bloqueia o botão e mostra "Processando expedição...".
+- Backend bloqueia o lote com SELECT FOR UPDATE e usa token idempotente; requisição repetida do mesmo formulário não baixa estoque novamente.
+- Corrigido salvamento de foto: FotoMovimentacao não recebe mais o campo inexistente legenda.
+
+6. TRANSFERÊNCIA E MOVIMENTAÇÃO POR CARD
+- Transferência também ganhou token idempotente no backend e bloqueio de linha de estoque.
+- Movimentação por card mantém o bloqueio de botão e locks de banco já existentes.
+
+7. BANCO DE DADOS
+- Nenhuma migration nova neste ajuste.
+- Permanecem as migrations 0038, 0039 e 0040 existentes.
+
+VALIDAÇÕES REALIZADAS
+- py_compile: views.py, models.py e urls.py: OK.
+- node --check nos JavaScripts das telas alteradas: OK.
+- Conferência estrutural das colunas: Gestão 20/20 e Movimentar 18/18: OK.

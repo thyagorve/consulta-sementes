@@ -1,0 +1,164 @@
+INFINITY STOCK - V11
+OFFLINE PWA + CENTRAL DE SINCRONIZACAO + GESTAO DE CARGAS
+Data: 15/09/2026
+
+IMPORTANTE
+==========
+Esta versao parte da V10.2.
+Antes do deploy, faca backup do banco.
+
+PASSOS DE DEPLOY
+================
+1. Atualize os arquivos do projeto.
+2. Ative o ambiente virtual.
+3. Instale/atualize dependencias:
+
+   pip install -r requirements.txt
+
+4. Rode a migration:
+
+   python manage.py migrate
+
+5. Em producao, atualize os arquivos estaticos:
+
+   python manage.py collectstatic --noinput
+
+6. Reinicie o servico Django/Gunicorn.
+7. O PWA exige HTTPS em producao.
+
+PRINCIPAIS RECURSOS DA V11
+==========================
+
+1) PWA OFFLINE / INDEXEDDB
+--------------------------
+- Banco local separado por user_id.
+- device_id persistente por aparelho.
+- JWT de 5 horas para operacao offline.
+- Login online continua obrigatorio.
+- Fila local com UUID por operacao para impedir aplicacao duplicada.
+- Sync automatico ao voltar online, ao retornar para a aba e a cada 30 segundos.
+- Referencia local com TTL e aviso quando o saldo/cache pode estar desatualizado.
+- Logout nao apaga pendencias. Depois do logout, novo trabalho offline fica bloqueado ate novo login online.
+- Sessao expirada bloqueia a interface, mas preserva a fila.
+
+2) BOLINHA / CENTRAL DE SINCRONIZACAO
+-------------------------------------
+- Verde: online e sem itens para tratar.
+- Amarelo: online com pendencias/conflitos/rejeicoes.
+- Vermelho: offline.
+- Preto: sessao expirada.
+- Spinner aparece apenas durante sincronizacao.
+- Abas: Pendentes, Conflitos, Rejeitadas e Sincronizadas.
+- Pendencia com mais de 30 min recebe alerta.
+- Pendencia com mais de 2 h recebe alerta critico.
+- 50+ itens na fila gera aviso; 200+ gera aviso critico, sem apagar ou bloquear silenciosamente.
+
+3) CONFLITO POR LOTE
+--------------------
+A regra e propositalmente rigorosa:
+- se OUTRO usuario alterou o mesmo lote depois da versao que o aparelho conhecia, ja existe conflito;
+- isso acontece mesmo que o saldo final ainda seja suficiente;
+- operacoes do proprio usuario nao entram em conflito entre si;
+- qualquer conferente autenticado pode resolver;
+- a decisao fica auditada com o conferente que resolveu;
+- a autoria original da operacao e preservada.
+
+Opcoes de resolucao:
+- aplicar;
+- ajustar quantidade nas operacoes simples;
+- cancelar.
+Operacoes compostas de solicitacao/empenho devem ser aplicadas ou canceladas/refeitas, em vez de receber ajuste simples de quantidade.
+
+4) OPERACOES OFFLINE DA PRIMEIRA ETAPA
+--------------------------------------
+Integradas a fila offline:
+- Transferencia de estoque;
+- Beneficiamento/saida suportada pelo modal de transferencia;
+- Expedicao/carga avulsa;
+- Criacao de solicitacao/carga;
+- Salvar alteracoes de empenho;
+- Transferir/expedir itens de cards ja empenhados.
+
+A interface salva primeiro no aparelho e deixa a confirmacao final para o servidor.
+O servidor valida novamente saldo e versao do lote antes de aplicar.
+
+5) FUNCOES QUE CONTINUAM SOMENTE ONLINE
+----------------------------------------
+Na primeira etapa, configuracoes/cadastros estruturais continuam online, com aviso explicito quando tentados offline.
+Exemplos:
+- Produto;
+- Peneira;
+- Especie;
+- Endereco;
+- Usuarios/permissoes;
+- Configuracoes administrativas/importacoes.
+
+Fotos e anexos tambem nao entram na fila offline. O sistema avisa o usuario para remover o arquivo ou aguardar conexao.
+
+6) CARGAS AVULSAS
+-----------------
+- Numero, placa, motorista, cliente e nome nao sao obrigatorios para criar a baixa avulsa.
+- Lote e quantidade continuam sendo os dados fisicos necessarios para movimentar estoque.
+- Pode informar "Nome da carga avulsa".
+- Varias baixas com o MESMO nome normalizado sao agrupadas como UMA unica carga avulsa.
+- Numero humano pode coincidir com uma carga gerada sem misturar as duas origens.
+- Cards avulsos concluidos aparecem na faixa EXPEDICAO/CARREGAMENTO do Kanban como consulta.
+- Badge AVULSA diferencia de GERADA.
+
+7) CARGAS GERADAS OFFLINE
+-------------------------
+Ao criar uma carga gerada sem internet, o aparelho guarda a solicitacao localmente sem reservar o proximo numero oficial.
+O numero sequencial e reservado pelo servidor somente na sincronizacao, evitando dois dispositivos offline receberem o mesmo sequencial.
+
+8) GESTAO DE CARGAS
+-------------------
+Nova opcao no menu de Solicitacoes: Gestao de Cargas.
+Permite consultar Geradas, Avulsas e registros legados, com filtros por data/origem/busca.
+Permite corrigir de forma auditada:
+- data;
+- quantidade;
+- lote/endereco;
+- origem GERADA/AVULSA;
+- numero;
+- nome da carga avulsa;
+- cliente;
+- placa;
+- motorista.
+
+Quando quantidade/lote muda, o sistema reverte o efeito fisico anterior e aplica o novo dentro de transacao, validando saldo. Um CargaAjusteLog guarda antes/depois/motivo/usuario.
+Essas correcoes sao somente online.
+
+9) AUDITORIA NOVA
+-----------------
+Novas estruturas:
+- LoteSyncState;
+- LoteSyncEvento;
+- SyncOperation;
+- SyncConflict;
+- SyncLog;
+- CargaAjusteLog.
+
+A migration 0043 tambem inicializa versao 0 para os lotes que ja existem no estoque.
+
+10) CACHE / ATUALIZACAO DO PWA
+------------------------------
+- O Service Worker e servido na raiz e controla o sistema inteiro.
+- APIs e Admin nao sao cacheados como respostas de negocio.
+- Paginas visitadas online ficam disponiveis como shell offline.
+- Enquanto houver pendencias/conflitos/rejeicoes, o cache antigo nao e apagado automaticamente.
+- Quando a fila fica limpa, shells antigos podem ser removidos.
+
+VALIDACOES FEITAS NO PACOTE
+===========================
+- Python: py_compile nos arquivos alterados e migration.
+- JavaScript: node --check em offline-sync.js e service-worker.js.
+- JavaScript inline validado nos templates modificados, apos neutralizar sintaxe Django.
+
+LIMITACAO DO AMBIENTE DE GERACAO
+================================
+O container usado para montar este pacote nao possui Django instalado, portanto nao foi possivel executar "python manage.py check" nem teste integrado com banco PostgreSQL neste ambiente. Rode o check no seu servidor/venv apos instalar requirements e antes de liberar para os usuarios:
+
+   python manage.py check
+   python manage.py migrate --plan
+
+Depois do deploy, faca primeiro um teste controlado com dois usuarios/dispositivos em um lote de teste para validar o fluxo de conflito e resolucao antes de liberar o offline para toda a operacao.

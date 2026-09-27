@@ -624,13 +624,26 @@ def _aplicar_operacao(op, user, ignorar_conflito=False):
                 destino.observacao = nova_obs
             destino.save()
 
+        from .views import (
+            _marcar_destino_transferencia_critico,
+            _realocar_empenho_apos_transferencia_avulsa,
+            _validar_integridade_estoque,
+        )
+        _marcar_destino_transferencia_critico(
+            destino,
+            user,
+            (
+                f'Transferência offline recebida de {estoque.endereco or "-"} para '
+                f'{destino_endereco or "-"}. Aguardando conferência.'
+            ),
+        )
+
         estoque.saida = int(estoque.saida or 0) + qtd
         estoque.conferente = user
         estoque.save()
 
         # Regra central: os livres saem primeiro; se a transferência ultrapassa
         # o livre, a fração empenhada viaja junto para o novo endereço.
-        from .views import _realocar_empenho_apos_transferencia_avulsa, _validar_integridade_estoque
         reserva_realocada = _realocar_empenho_apos_transferencia_avulsa(estoque, destino)
         _validar_integridade_estoque(estoque, destino)
 

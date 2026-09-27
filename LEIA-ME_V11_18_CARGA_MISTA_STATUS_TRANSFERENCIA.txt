@@ -1,0 +1,44 @@
+INFINITY STOCK V11.18 - CARGA MISTA + STATUS DE TRANSFERÊNCIA
+
+Base:
+- V11.17
+
+AJUSTES
+
+1) Carga avulsa sem nome duplicado
+- Identificadores antigos como "CARGA CARGA 10804" são normalizados para "CARGA 10804".
+- A impressão de carga avulsa não acrescenta novamente a palavra CARGA quando o número já está normalizado.
+- O agrupamento do dashboard também trata prefixos repetidos.
+
+2) BAG + SC no mesmo relatório
+- Cargas concluídas passam a mostrar composição física real, por exemplo:
+  1 BAG + 10 SC
+- A equivalência aparece junto:
+  1 BAG + 10 SC = 35 SC eq.
+- Cada item da tabela passa a mostrar a unidade ao lado da quantidade.
+- O total da carga usa a composição física em vez de somar BAG e SC como se fossem a mesma unidade.
+
+3) Gráfico de cargas
+- SC equivalente continua sendo a unidade padrão do gráfico.
+- Regra mantida: 1 BAG = 25 SC; 1 SC físico = 1 SC equivalente.
+- O resumo mostra a composição física com sinal de + e a equivalência.
+- O seletor Eq. SC | BAG | SC físico continua disponível.
+
+4) Status após transferência
+- Todo estoque que RECEBE transferência passa automaticamente para o status "Crítico" (vermelho), aguardando conferência.
+- Isso vale para:
+  * transferência comum de estoque;
+  * movimentação por card/solicitação;
+  * rotinas legadas ainda ativas;
+  * sincronização da fila offline.
+- O sistema não copia mais silenciosamente o status OK/verde da origem para o destino.
+- A mudança automática fica registrada no histórico de status.
+- Se o destino já estava em Crítico, o status é mantido e apenas a observação/data são atualizadas.
+
+MIGRATION
+- Não há migration nova nesta versão.
+
+PÓS DEPLOY
+python manage.py collectstatic --noinput
+
+Depois faça rebuild/restart e Ctrl+F5.
