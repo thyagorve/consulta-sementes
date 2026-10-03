@@ -7353,51 +7353,46 @@ function gerarImpressaoSolicitacao(id, janelaExistente = null) {
             );
             const qtdEmp = sol.quantidade_empenhada_display ?? sol.quantidade_empenhada ?? 0;
             const totalItens = itens.reduce((s, i) => s + Number(i.quantidade || 0), 0);
+
+            const somarEmbalagens = lista => {
+                const resumo = { bags: 0, scs: 0, outros: 0, equivalenteSc: 0 };
+                (lista || []).forEach(item => {
+                    const qtd = Number(item.quantidade || 0);
+                    const emb = normalizarEmbalagem(item.embalagem);
+                    if (emb === 'BAG') {
+                        resumo.bags += qtd;
+                        resumo.equivalenteSc += qtd * 25;
+                    } else if (emb === 'SC') {
+                        resumo.scs += qtd;
+                        resumo.equivalenteSc += qtd;
+                    } else {
+                        resumo.outros += qtd;
+                    }
+                });
+                return resumo;
+            };
+
+            const formatarMix = resumo => {
+                const partes = [];
+                if (Number(resumo?.bags || 0) > 0) partes.push(`${num(resumo.bags)} BAG`);
+                if (Number(resumo?.scs || 0) > 0) partes.push(`${num(resumo.scs)} SC`);
+                if (Number(resumo?.outros || 0) > 0) partes.push(`${num(resumo.outros)} UN`);
+                return partes.length ? partes.join(' + ') : '0';
+            };
+
+            const resumoFisicoTotal = somarEmbalagens(itens);
+            const resumoFisicoMovimentado = somarEmbalagens(data.itens_processados || []);
+            const temComposicaoFisica = (resumoFisicoTotal.bags + resumoFisicoTotal.scs) > 0;
+            const textoFisicoTotal = formatarMix(resumoFisicoTotal);
+            const textoFisicoMovimentado = formatarMix(resumoFisicoMovimentado);
+            const equivalenteTotalTexto = `${num(resumoFisicoTotal.equivalenteSc)} SC eq.`;
+            const equivalenteMovimentadoTexto = `${num(resumoFisicoMovimentado.equivalenteSc)} SC eq.`;
+
             const destino = sol.destino || '';
             const motorista = sol.motorista || '';
             const placa = sol.placa || '';
             const observacao = sol.observacao || '';
             const isCarga = String(sol.tipo_solicitacao || '').toUpperCase() === 'CARGA';
-            const totaisFisicosCarga = itens.reduce((acc, item) => {
-                const qtd = Number(item.quantidade || 0);
-                const emb = normalizarEmbalagem(item.embalagem);
-                if (emb === 'BAG') acc.bag += qtd;
-                else if (emb === 'SC') acc.sc += qtd;
-                else acc.outros += qtd;
-                return acc;
-            }, {bag: 0, sc: 0, outros: 0});
-
-            const partesFisicasCarga = [];
-            if (totaisFisicosCarga.bag > 0) partesFisicasCarga.push(`${num(totaisFisicosCarga.bag)} BAG`);
-            if (totaisFisicosCarga.sc > 0) partesFisicasCarga.push(`${num(totaisFisicosCarga.sc)} SC`);
-            if (totaisFisicosCarga.outros > 0) partesFisicasCarga.push(`${num(totaisFisicosCarga.outros)} UN`);
-            const resumoFisicoCarga = partesFisicasCarga.join(' + ');
-            const equivalenteCargaSc = (totaisFisicosCarga.bag * 25) + totaisFisicosCarga.sc;
-            const cargaConcluida = isCarga && String(sol.status || '').toUpperCase() === 'CONCLUIDO';
-            const usarResumoFisicoCarga = cargaConcluida && !isKg && Boolean(resumoFisicoCarga);
-            const qtdSolicitadaRelatorio = usarResumoFisicoCarga
-                ? resumoFisicoCarga
-                : `${num(sol.quantidade_solicitada)} ${unidade}`;
-            const qtdEmpenhadaRelatorio = usarResumoFisicoCarga
-                ? resumoFisicoCarga
-                : `${num(qtdEmp)} ${unidade}`;
-            const qtdMovimentadaRelatorio = usarResumoFisicoCarga
-                ? resumoFisicoCarga
-                : `${num(sol.quantidade_movimentada)} ${unidade}`;
-            const equivalenciaRelatorio = (isCarga && !isKg && equivalenteCargaSc > 0)
-                ? `${num(equivalenteCargaSc)} SC eq.`
-                : '';
-
-            const normalizarTituloCargaRelatorio = valor => {
-                let texto = String(valor || '').trim().replace(/\s+/g, ' ');
-                if (!isCarga) return texto || 'Solicitação';
-                let restante = texto;
-                while (/^CARGA(?:\s+|[-:]+\s*)/i.test(restante)) {
-                    restante = restante.replace(/^CARGA(?:\s+|[-:]+\s*)/i, '').trim();
-                }
-                return `CARGA ${restante || 'AVULSA'}`;
-            };
-            const tituloCargaExibicao = normalizarTituloCargaRelatorio(sol.titulo);
             const criteriosSecundarios = [
                 sol.criterios?.armazem ? `Armazém: ${sol.criterios.armazem}` : '',
                 !isCarga && sol.criterios?.produto ? `Produto: ${sol.criterios.produto}` : '',
@@ -7424,9 +7419,10 @@ function gerarImpressaoSolicitacao(id, janelaExistente = null) {
                 const celulaSituacao = isCarga
                     ? ''
                     : `<td class="col-status-print"><span class="badge-situacao ${classe}">${esc(situacao)}</span></td>`;
-                return `<tr>${celulaSituacao}<td class="col-cliente-print">${esc(item.cliente || sol.criterios?.cliente || 'CS')}</td><td class="col-codigo-print"><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td class="col-lote-print">${esc(item.lote || '-')}</td><td class="col-descricao-impressao">${esc(item.descricao || '-')}</td><td class="col-categoria-print">${esc(item.categoria || '-')}</td><td class="col-peneira-print">${esc(item.peneira || '-')}</td><td class="col-az-print">${esc(item.az || item.armazem || '-')}</td><td class="col-endereco-print">${esc(item.endereco || '-')}</td><td class="col-qtd">${num(item.quantidade)} ${esc(normalizarEmbalagem(item.embalagem) || unidade)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`;
+                const unidadeItem = isKg ? 'KG' : (normalizarEmbalagem(item.embalagem) || 'UN');
+                return `<tr>${celulaSituacao}<td class="col-cliente-print">${esc(item.cliente || sol.criterios?.cliente || 'CS')}</td><td class="col-codigo-print"><strong>${esc(item.codigo || item.produto || '-')}</strong></td><td class="col-lote-print">${esc(item.lote || '-')}</td><td class="col-descricao-impressao">${esc(item.descricao || '-')}</td><td class="col-categoria-print">${esc(item.categoria || '-')}</td><td class="col-peneira-print">${esc(item.peneira || '-')}</td><td class="col-az-print">${esc(item.az || item.armazem || '-')}</td><td class="col-endereco-print">${esc(item.endereco || '-')}</td><td class="col-qtd">${num(item.quantidade)} ${esc(unidadeItem)}</td><td class="col-peso">${pesoBr(item.peso_total)} kg</td></tr>`;
               }).join('')}</tbody>
-              <tfoot><tr class="total"><td colspan="${isCarga ? 8 : 9}" style="text-align:right">TOTAL</td><td class="col-qtd">${isCarga && resumoFisicoCarga ? esc(resumoFisicoCarga) : `${num(totalItens)} ${esc(unidade)}`}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
+              <tfoot><tr class="total"><td colspan="${isCarga ? 8 : 9}" style="text-align:right">TOTAL</td><td class="col-qtd">${isCarga && temComposicaoFisica ? esc(textoFisicoTotal) : `${num(totalItens)} ${esc(unidade)}`}</td><td class="col-peso">${pesoBr(totalPesoCarga)} kg</td></tr></tfoot>
             </table>` : '<div style="padding:28px;color:#718078;text-align:center;">Nenhum item registrado.</div>';
 
             win.document.open();
@@ -7491,7 +7487,7 @@ body { padding: 14px; }
 .indicador::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .indicador b { display: block; margin-bottom: 6px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .35px; text-transform: uppercase; }
 .indicador strong { display: block; overflow: hidden; color: #213b2a; font-size: 15px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
-.indicador-equivalente { display:block; margin-top:4px; color:#6a786f; font-size:8px; font-weight:800; letter-spacing:.2px; }
+.indicador small { display:block; margin-top:4px; color:#607067; font-size:8px; font-weight:800; line-height:1.2; }
 .indicador-status { background: linear-gradient(135deg, #f4faf6, #fff); }
 .indicador-status::before { background: var(--verde); }
 .indicador-solicitado { background: linear-gradient(135deg, var(--azul-claro), #fff); }
@@ -7534,7 +7530,7 @@ tr { page-break-inside: avoid; }
 .tabela-solicitacao .col-peneira-print { width: 58px; text-align: center; }
 .tabela-solicitacao .col-az-print { width: 65px; }
 .tabela-solicitacao .col-endereco-print { width: 92px; }
-.tabela-solicitacao .col-qtd { width: 48px; text-align: center; }
+.tabela-solicitacao .col-qtd { width: 82px; text-align: center; white-space: normal; line-height: 1.15; }
 .tabela-solicitacao .col-peso { width: 75px; text-align: right; font-weight: 800; }
 .badge-situacao { display: inline-block; max-width: 100%; padding: 3px 6px; overflow: hidden; border-radius: 999px; font-size: 6.8px; font-weight: 900; white-space: nowrap; text-overflow: ellipsis; }
 .badge-pendente { color: #795900; background: #ffefad; }
@@ -7717,15 +7713,15 @@ tr { page-break-inside: avoid; }
     </div>
     <div class="numero-card">
       <small>ID</small>
-      <strong>${esc(tituloCargaExibicao)}</strong>
+      <strong>${esc(sol.titulo || 'Solicitação')}</strong>
     </div>
   </header>
 
   <section class="resumo">
     <div class="indicador indicador-status"><b>Status</b><strong class="${statusClasse}">${esc(sol.status_display || sol.status || '-')}</strong></div>
-    <div class="indicador indicador-solicitado"><b>Quantidade solicitada</b><strong>${qtdSolicitadaRelatorio}</strong>${equivalenciaRelatorio ? `<small class="indicador-equivalente">${equivalenciaRelatorio}</small>` : ''}</div>
-    <div class="indicador indicador-empenhado"><b>Quantidade empenhada</b><strong>${qtdEmpenhadaRelatorio}</strong>${equivalenciaRelatorio ? `<small class="indicador-equivalente">${equivalenciaRelatorio}</small>` : ''}</div>
-    <div class="indicador indicador-movimentado"><b>Quantidade movimentada</b><strong>${qtdMovimentadaRelatorio}</strong>${equivalenciaRelatorio ? `<small class="indicador-equivalente">${equivalenciaRelatorio}</small>` : ''}</div>
+    <div class="indicador indicador-solicitado"><b>Quantidade solicitada</b><strong>${isCarga && temComposicaoFisica ? esc(textoFisicoTotal) : `${num(sol.quantidade_solicitada)} ${esc(unidade)}`}</strong>${isCarga && temComposicaoFisica ? `<small>${esc(equivalenteTotalTexto)}</small>` : ''}</div>
+    <div class="indicador indicador-empenhado"><b>Quantidade empenhada</b><strong>${isCarga && temComposicaoFisica ? esc(textoFisicoTotal) : `${num(qtdEmp)} ${esc(unidade)}`}</strong>${isCarga && temComposicaoFisica ? `<small>${esc(equivalenteTotalTexto)}</small>` : ''}</div>
+    <div class="indicador indicador-movimentado"><b>Quantidade movimentada</b><strong>${isCarga && (resumoFisicoMovimentado.bags + resumoFisicoMovimentado.scs) > 0 ? esc(textoFisicoMovimentado) : `${num(sol.quantidade_movimentada)} ${esc(unidade)}`}</strong>${isCarga && (resumoFisicoMovimentado.bags + resumoFisicoMovimentado.scs) > 0 ? `<small>${esc(equivalenteMovimentadoTexto)}</small>` : ''}</div>
   </section>
 
   <section class="info-grid">
@@ -7753,7 +7749,7 @@ tr { page-break-inside: avoid; }
 
   <div class="titulo-itens">
     <span>${isCarga ? 'Itens da carga' : 'Itens da solicitação'}</span>
-    <span>${itens.length} registro(s) · Total ${isCarga && resumoFisicoCarga ? esc(resumoFisicoCarga) : `${num(totalItens)} ${esc(unidade)}`}${isCarga && equivalenteCargaSc > 0 ? ` = ${num(equivalenteCargaSc)} SC eq.` : ''}${isCarga ? ` · ${pesoBr(totalPesoCarga)} kg` : ''}</span>
+    <span>${itens.length} registro(s) · Total ${isCarga && temComposicaoFisica ? `${esc(textoFisicoTotal)} = ${esc(equivalenteTotalTexto)}` : `${num(totalItens)} ${esc(unidade)}`}${isCarga ? ` · ${pesoBr(totalPesoCarga)} kg` : ''}</span>
   </div>
 
   <div class="tabela-container">

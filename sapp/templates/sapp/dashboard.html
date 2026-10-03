@@ -1371,7 +1371,6 @@
         font-weight: 900;
         white-space: nowrap;
     }
-    .expedition-quantity-plus { display:inline-flex; align-items:center; justify-content:center; margin:0 5px; color:#6d786f; font-weight:900; font-size:.82rem; }
 
     .expedition-equivalent {
         display: inline-flex;
@@ -3608,7 +3607,7 @@
     let expedicaoGraficoCarregando = false;
     let expedicaoGraficoFonte = {};
     let expedicaoGraficoUnidade = (() => {
-        const salvo = localStorage.getItem('infinityDashboardExpedicaoUnidadeV18');
+        const salvo = localStorage.getItem('infinityDashboardExpedicaoUnidadeV2');
         return ['equivalente', 'bag', 'sc'].includes(salvo) ? salvo : 'equivalente';
     })();
     let expedicaoCargasCache = [];
@@ -4522,7 +4521,7 @@
     function trocarUnidadeGraficoExpedicao(unidade) {
         if (!['equivalente', 'bag', 'sc'].includes(unidade)) return;
         expedicaoGraficoUnidade = unidade;
-        localStorage.setItem('infinityDashboardExpedicaoUnidadeV18', unidade);
+        localStorage.setItem('infinityDashboardExpedicaoUnidadeV2', unidade);
         atualizarBotoesUnidadeGraficoExpedicao();
         atualizarGraficoExpedicoes(expedicaoGraficoFonte || expedicaoGraficoPadrao || {}, false);
     }
@@ -4595,12 +4594,11 @@
             totalEl.textContent = `${formatNumber(totalSelecionado, 0)} ${metaUnidade.sigla}`;
         }
         if (breakdownEl) {
-            const partesFisicas = [];
-            if (Number(resumo.bags || 0) > 0) partesFisicas.push(`${formatNumber(resumo.bags || 0, 0)} BAG`);
-            if (Number(resumo.scs || 0) > 0) partesFisicas.push(`${formatNumber(resumo.scs || 0, 0)} SC`);
-            if (Number(resumo.outros || 0) > 0) partesFisicas.push(`${formatNumber(resumo.outros || 0, 0)} UN`);
-            const fisico = partesFisicas.length ? partesFisicas.join(' + ') : '0';
-            breakdownEl.textContent = `${fisico} = ${formatNumber(resumo.equivalente_sc || 0, 0)} SC eq.`;
+            breakdownEl.textContent = [
+                `${formatNumber(resumo.bags || 0, 0)} BAG`,
+                `${formatNumber(resumo.scs || 0, 0)} SC físicos`,
+                `${formatNumber(resumo.equivalente_sc || 0, 0)} SC eq.`
+            ].join(' · ');
         }
         if (cargasEl) cargasEl.textContent = formatNumber(resumo.cargas || 0, 0);
         if (cargasSubEl) {
@@ -4854,7 +4852,7 @@
                 );
             }
             const quantidadeHtml = quantidadePartes.length
-                ? quantidadePartes.join('<span class="expedition-quantity-plus">+</span>')
+                ? quantidadePartes.join('')
                 : '<span class="text-muted">0</span>';
 
             return `

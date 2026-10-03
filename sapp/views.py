@@ -12,7 +12,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.core.serializers.json import DjangoJSONEncoder 
 from .models import HistoricoMovimentacao
 from .models import OrigemDestino
-from .models import Estoque, Cultivar, Peneira, Categoria, StatusSistemico, HistoricoStatusSistemico
+from .models import Estoque, Cultivar, Peneira, Categoria, StatusSistemico
 from django.db.models import Q, Sum, Prefetch, F
 # Adicione no topo com os outros imports
 import datetime
@@ -1313,55 +1313,6 @@ def _validar_integridade_estoque(*registros):
     return True
 
 
-def _marcar_destino_transferencia_critico(estoque, usuario=None, observacao=''):
-    """
-    Toda entrada por transferência deve ficar em estado de atenção até nova
-    conferência. Evita herdar o status OK/verde da origem ou preservar um
-    status antigo do endereço de destino.
-    """
-    if not estoque:
-        return None
-
-    critico = StatusSistemico.objects.filter(nome__iexact='Crítico').first()
-    if not critico:
-        StatusSistemico.get_status_padrao()
-        critico = StatusSistemico.objects.filter(nome__iexact='Crítico').first()
-    if not critico:
-        return None
-
-    status_anterior = estoque.status_sistemico
-    texto_obs = (
-        str(observacao or '').strip()
-        or 'Status automático: estoque recebido por transferência, aguardando conferência.'
-    )
-
-    if status_anterior_id := getattr(status_anterior, 'id', None):
-        mesmo_status = status_anterior_id == critico.id
-    else:
-        mesmo_status = False
-
-    if not mesmo_status:
-        HistoricoStatusSistemico.objects.create(
-            estoque=estoque,
-            status_anterior=status_anterior,
-            status_novo=critico,
-            observacao=texto_obs,
-            alterado_por=usuario,
-        )
-
-    Estoque.objects.filter(pk=estoque.pk).update(
-        status_sistemico=critico,
-        status_sistemico_alterado_por=usuario,
-        status_sistemico_alterado_em=timezone.now(),
-        status_sistemico_observacao=texto_obs,
-    )
-    estoque.status_sistemico = critico
-    estoque.status_sistemico_alterado_por = usuario
-    estoque.status_sistemico_alterado_em = timezone.now()
-    estoque.status_sistemico_observacao = texto_obs
-    return critico
-
-
 def _realocar_empenho_apos_transferencia_avulsa(origem, destino):
     """
     Faz a reserva acompanhar o lote numa transferência física avulsa.
@@ -1815,15 +1766,6 @@ def transferir(request, id):
                         )
                         mensagem_tipo = "criado no novo endereço"
                     
-                    _marcar_destino_transferencia_critico(
-                        destino,
-                        request.user,
-                        (
-                            f'Transferência recebida de {origem.endereco or "-"} para '
-                            f'{novo_end or "-"}. Aguardando conferência.'
-                        ),
-                    )
-
                     # Se a transferência avulsa deslocou quantidade que era
                     # necessária para sustentar uma reserva, move internamente a
                     # reserva para o destino SEM consumir o empenho.
@@ -3101,6 +3043,90 @@ def baixar_modelo_configuracao(request, tipo):
 def _normalizar_codigo_produto(valor):
     """Normaliza código sem alterar zeros à esquerda."""
     return normalizar_texto_cadastro(valor)
+
+
+def _sigla_embalagem(valor):
+    """Retorna a sigla operacional usada em carga/solicitação."""
+    texto = str(valor or '').strip().upper()
+    if texto in {'SC', 'SACO', 'SACOS'}:
+        return 'SC'
+    if texto in {'BAG', 'BAGS', 'BIG BAG', 'BIGBAG'}:
+        return 'BAG'
+    return texto
+
+
+def _rotulo_tratamento_descricao(valor):
+    """Padroniza tratamento para a descrição automática do lote."""
+    texto = ' '.join(str(valor or '').strip().split())
+    normalizado = normalizar_texto_cadastro(texto)
+    sem_tratamento = {
+        '', 'S/T', 'ST', 'SEM TRATAMENTO', 'SEM TRAT.',
+        'SEM TRAT', 'NAO TRATADO', 'NÃO TRATADO',
+    }
+    if normalizado in {normalizar_texto_cadastro(v) for v in sem_tratamento}:
+        return 'S/T'
+    return texto.upper()
+
+
+def _descricao_lote_automatica(
+    estoque=None,
+    *,
+    especie='',
+    cultivar='',
+    embalagem='',
+    tratamento='',
+):
+    """
+    Monta uma descrição operacional quando não existe descrição de Produto.
+
+    Exemplo:
+        SEM. SOJA 75IX78RSF BAG S/T.
+
+    A função usa somente dados realmente cadastrados no lote. Ela não inventa
+    tamanho/quantidade de sementes da embalagem (ex.: 5M) quando esse dado não
+    existe no Estoque.
+    """
+    if estoque is not None:
+        especie = (
+            estoque.especie.nome
+            if getattr(estoque, 'especie', None)
+            else especie
+        )
+        cultivar = (
+            estoque.cultivar.nome
+            if getattr(estoque, 'cultivar', None)
+            else cultivar
+        )
+        embalagem = getattr(estoque, 'embalagem', '') or embalagem
+        tratamento = (
+            estoque.tratamento.nome
+            if getattr(estoque, 'tratamento', None)
+            else tratamento
+        )
+
+    especie = ' '.join(str(especie or '').strip().split()).upper()
+    cultivar = ' '.join(str(cultivar or '').strip().split()).upper()
+    embalagem = _sigla_embalagem(embalagem)
+    tratamento = _rotulo_tratamento_descricao(tratamento)
+
+    # Sem espécie/cultivar/embalagem não há informação suficiente para uma
+    # descrição útil. Evita gerar somente "SEM. S/T.".
+    if not any((especie, cultivar, embalagem)):
+        return ''
+
+    partes = ['SEM.']
+    if especie:
+        partes.append(especie)
+    if cultivar:
+        partes.append(cultivar)
+    if embalagem:
+        partes.append(embalagem)
+    partes.append(tratamento or 'S/T')
+
+    descricao = ' '.join(partes).strip()
+    if not descricao.endswith('.'):
+        descricao += '.'
+    return descricao
 
 
 def _sincronizar_solicitacoes_carga_produto(produto):
@@ -5109,15 +5135,6 @@ def pagina_rascunho(request):
                             
                             origem.saida += qtd
                             origem.save()
-
-                            _marcar_destino_transferencia_critico(
-                                destino,
-                                user,
-                                (
-                                    f'Transferência recebida de {origem.endereco or "-"} para '
-                                    f'{novo_end or "-"}. Aguardando conferência.'
-                                ),
-                            )
                             
                             HistoricoMovimentacao.objects.create(
                                 estoque=origem,
@@ -5537,15 +5554,6 @@ def processar_transferencia_item(request, item, user, MARCA_ORIGEM, obs_global, 
             observacao=f"{MARCA_ORIGEM} {obs_global} {obs_transferencia}".strip()
         )
     
-    _marcar_destino_transferencia_critico(
-        destino,
-        user,
-        (
-            f'Transferência recebida de {origem.endereco or "-"} para '
-            f'{novo_end or "-"}. Aguardando conferência.'
-        ),
-    )
-
     # Atualizar saída da origem
     origem.saida += qtd
     origem.save()
@@ -7307,7 +7315,7 @@ def _normalizar_numero_carga_avulsa(valor):
         return ''
     texto = texto.replace('-', ' ').replace(':', ' ')
     texto = ' '.join(texto.split())
-    while texto.startswith('CARGA'):
+    if texto.startswith('CARGA'):
         texto = texto[5:].strip()
     if not texto.isdigit():
         return ''
@@ -7335,15 +7343,11 @@ def _dashboard_normalizar_carga(valor):
     if texto.isdigit():
         numero = texto.lstrip('0') or '0'
         texto = f'CARGA {numero}'
-    else:
-        restante = texto
-        while restante.startswith('CARGA'):
-            restante = restante[5:].strip()
+    elif texto.startswith('CARGA'):
+        restante = texto[5:].strip()
         if restante.isdigit():
             numero = restante.lstrip('0') or '0'
             texto = f'CARGA {numero}'
-        elif restante and restante != texto:
-            texto = f'CARGA {restante}'
 
     return texto, texto
 
@@ -12510,9 +12514,9 @@ def api_lotes_disponiveis_para_solicitacao(
             'versao_lote': int(versoes_lote_pagina.get(str(lote.lote or '').strip().upper(), 0)),
             'produto': lote.produto or '',
             'descricao': (
-                item_carga_match.descricao
-                if item_carga_match
-                else descricoes_produtos.get(_normalizar_codigo_produto(lote.produto), '')
+                (item_carga_match.descricao if item_carga_match else '')
+                or descricoes_produtos.get(_normalizar_codigo_produto(lote.produto), '')
+                or _descricao_lote_automatica(lote)
             ),
 
             'cultivar': (
@@ -13174,11 +13178,23 @@ def empenhar_na_solicitacao(
                 # SALVAR ITEM NO EMPENHO DO CARD ATUAL
                 # ------------------------------------------------------
                 descricao_lote_config = _descricao_produto_por_codigo(lote.produto)
+                descricao_lote_automatica = _descricao_lote_automatica(lote)
                 cliente_solicitacao_item = (
                     item_carga.cliente if item_carga else (solicitacao.cliente or 'CS')
                 )
                 codigo_solicitacao_item = item_carga.codigo if item_carga else (lote.produto or '')
-                descricao_solicitacao_item = item_carga.descricao if item_carga else descricao_lote_config
+                descricao_solicitacao_item = (
+                    (item_carga.descricao if item_carga else '')
+                    or descricao_lote_config
+                    or descricao_lote_automatica
+                )
+
+                # Quando a linha da carga foi criada sem código/descrição,
+                # guarda a descrição derivada do lote selecionado. Assim a
+                # própria Solicitação deixa de aparecer como "sem descrição".
+                if item_carga and not str(item_carga.descricao or '').strip() and descricao_solicitacao_item:
+                    item_carga.descricao = descricao_solicitacao_item
+                    item_carga.save(update_fields=['descricao', 'atualizado_em'])
 
                 if item_existente:
                     item_existente.quantidade = quantidade_final
@@ -13261,7 +13277,10 @@ def empenhar_na_solicitacao(
                         quantidade_adicionar
                     )
 
-                    unidade_historico = 'BAG'
+                    unidade_historico = (
+                        _sigla_embalagem(lote.embalagem)
+                        or 'UN'
+                    )
 
                 HistoricoCard.objects.create(
                     solicitacao=solicitacao,
@@ -14218,15 +14237,6 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                     # Salva normalmente para o model.save()
                     # recalcular campos derivados.
                     destino.save()
-
-                    _marcar_destino_transferencia_critico(
-                        destino,
-                        request.user,
-                        (
-                            f'Transferência recebida de {endereco_origem or "-"} para '
-                            f'{novo_endereco or "-"}. Aguardando conferência.'
-                        ),
-                    )
 
                     # Saída da origem.
                     origem.saida = (
@@ -15205,6 +15215,16 @@ def api_dados_impressao_solicitacao(
                 (produto_config.descricao if produto_config else '')
                 or item.descricao_produto_snapshot
                 or (item.item_carga.descricao if item.item_carga else '')
+                or _descricao_lote_automatica(
+                    estoque,
+                    especie=especie_empenho,
+                    cultivar=(
+                        item.cultivar
+                        or (estoque.cultivar.nome if estoque and estoque.cultivar else '')
+                    ),
+                    embalagem=embalagem_empenho,
+                    tratamento=tratamento_empenho,
+                )
                 or ''
             )
             # Categoria e peneira pertencem ao LOTE EMPENHADO.
@@ -15396,6 +15416,12 @@ def api_dados_impressao_solicitacao(
             descricao_impressao = (
                 (produto_config.descricao if produto_config else '')
                 or historico.descricao_produto
+                or _descricao_lote_automatica(
+                    especie=historico.especie,
+                    cultivar=historico.cultivar,
+                    embalagem=historico.embalagem,
+                    tratamento=historico.tratamento,
+                )
                 or ''
             )
             categoria_impressao = historico.categoria or ''
@@ -16127,6 +16153,9 @@ def api_impressao_carga_avulsa(request):
     motoristas = set()
     embalagens = set()
     total = Decimal('0')
+    total_bags = Decimal('0')
+    total_scs = Decimal('0')
+    total_equivalente_sc = Decimal('0')
     peso_total_carga = Decimal('0')
     produto_cache = {}
 
@@ -16145,9 +16174,15 @@ def api_impressao_carga_avulsa(request):
             placas.add(str(mov.placa).strip().upper())
         if mov.motorista:
             motoristas.add(str(mov.motorista).strip())
-        embalagem = str(estoque.embalagem if estoque else '').strip().upper()
+        embalagem = _sigla_embalagem(estoque.embalagem if estoque else '')
         if embalagem:
             embalagens.add(embalagem)
+        if embalagem == 'BAG':
+            total_bags += qtd
+            total_equivalente_sc += qtd * Decimal('25')
+        elif embalagem == 'SC':
+            total_scs += qtd
+            total_equivalente_sc += qtd
 
         codigo = str(estoque.produto if estoque else '').strip()
         chave_codigo = codigo.upper()
@@ -16158,7 +16193,11 @@ def api_impressao_carga_avulsa(request):
             'item_id': mov.id,
             'item_carga_id': None,
             'codigo': codigo,
-            'descricao': (produto_config.descricao if produto_config else '') or '',
+            'descricao': (
+                (produto_config.descricao if produto_config else '')
+                or _descricao_lote_automatica(estoque)
+                or ''
+            ),
             'lote': str(mov.lote_ref or (estoque.lote if estoque else '') or '').strip(),
             'quantidade': float(qtd),
             'saldo_atual': 0,
@@ -16189,21 +16228,19 @@ def api_impressao_carga_avulsa(request):
 
     primeiro = movimentos[0]
     ultimo = movimentos[-1]
-    numero_canonico = _normalizar_numero_carga_avulsa(numero) if numero else ''
-    nome_canonico = _normalizar_numero_carga_avulsa(nome) if nome else ''
-    if numero_canonico:
-        titulo = numero_canonico
-    elif nome_canonico:
-        titulo = nome_canonico
-    elif placa:
-        titulo = f'CARGA {placa}'
-    elif nome:
-        titulo_limpo = ' '.join(str(nome or '').strip().upper().split())
-        while titulo_limpo.startswith('CARGA CARGA'):
-            titulo_limpo = titulo_limpo[6:].strip()
-        titulo = titulo_limpo or 'CARGA AVULSA'
-    else:
-        titulo = 'CARGA AVULSA'
+
+    numero_titulo = _normalizar_numero_carga_avulsa(numero) if numero else ''
+    nome_titulo = ' '.join(str(nome or '').strip().split())
+    if nome_titulo:
+        # Compatibilidade com registros/links antigos que chegaram a guardar
+        # "CARGA CARGA 53". Na impressão nunca repetimos o prefixo.
+        while nome_titulo.upper().startswith('CARGA CARGA '):
+            nome_titulo = nome_titulo[6:].strip()
+    titulo = (
+        numero_titulo
+        or nome_titulo
+        or (f'CARGA {placa}' if placa else 'CARGA AVULSA')
+    )
     unidade = 'BAGS/SC'
     if len(embalagens) == 1:
         unidade = next(iter(embalagens))
@@ -16242,7 +16279,12 @@ def api_impressao_carga_avulsa(request):
         'itens_processados': itens,
         'resumo_avulsa': {
             'lotes': len(itens),
+            # Mantido por compatibilidade com clientes antigos. Em carga mista,
+            # não use este campo como volume comparável; use equivalente_sc.
             'quantidade': float(total),
+            'bags': float(total_bags),
+            'scs': float(total_scs),
+            'equivalente_sc': float(total_equivalente_sc),
             'peso_total': str(peso_total_carga),
             'unidade': unidade,
         },
