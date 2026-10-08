@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block heading %}WhatsApp · {{ client.name }}{% endblock %}
+{% block subtitle %}Envio, recebimento, mídia e agendamento pela Evolution API.{% endblock %}
+{% block content %}
+<div class="wa-page" data-client-id="{{ client.id }}">
+  <section class="wa-chat panel">
+    <header class="wa-head">
+      <div><b>💬 {{ client.name }}</b><small>{{ client.phone }}</small></div>
+      <div class="wa-head-actions">
+        <span class="wa-status {% if evolution_connected %}online{% endif %}">{% if evolution_connected %}● WhatsApp conectado{% elif evolution_ready %}○ Instância {{ evolution_state|default:'offline' }}{% else %}API não configurada{% endif %}</span>
+        {% if request.user.is_staff or request.user.is_superuser %}<form method="post" action="{% url 'evolution_setup_webhook' %}">{% csrf_token %}<button class="icon-action" title="Configurar webhook">⚙️</button></form>{% endif %}
+        <a class="icon-action" href="{% url 'client_detail' client.id %}" title="Voltar">←</a>
+      </div>
+    </header>
+    <div class="wa-messages" id="waMessages">
+      {% for m in wa_messages %}
+      <article class="wa-bubble {% if m.direction == 'out' %}mine{% endif %}" data-id="{{ m.id }}">
+        {% if m.media_type %}
+          {% if m.media_type == 'image' and m.display_media_url %}<a href="{{ m.display_media_url }}" target="_blank"><img src="{{ m.display_media_url }}" class="wa-media" alt="Imagem"></a>
+          {% elif m.media_type == 'video' and m.display_media_url %}<video class="wa-media" controls src="{{ m.display_media_url }}"></video>
+          {% elif m.media_type == 'audio' and m.display_media_url %}<audio controls src="{{ m.display_media_url }}"></audio>
+          {% elif m.display_media_url %}<a class="wa-file" href="{{ m.display_media_url }}" target="_blank">📎 {{ m.file_name|default:'Arquivo' }}</a>{% endif %}
+        {% endif %}
+        {% if m.content %}<div class="wa-text">{{ m.content|linebreaksbr }}</div>{% endif %}
+        <small>{{ m.created_at|date:'d/m/Y H:i' }} · {{ m.get_status_display }}</small>
+      </article>
+      {% empty %}<div class="wa-empty">Nenhuma mensagem registrada ainda.</div>{% endfor %}
+    </div>
+    <form class="wa-compose" action="{% url 'client_whatsapp_send' client.id %}" method="post" enctype="multipart/form-data" id="waForm">
+      {% csrf_token %}
+      <label class="wa-attach" title="Anexar mídia">＋<input type="file" name="media" id="waMedia" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" hidden></label>
+      <textarea name="text" id="waText" rows="1" placeholder="Mensagem para {{ client.name }}"></textarea>
+      <button type="button" class="wa-schedule-btn" id="waScheduleBtn" title="Agendar">◷</button>
+      <button class="btn primary wa-send" type="submit">➤</button>
+      <div class="wa-schedule-pop" id="waSchedulePop" hidden><label>Enviar em</label><input type="datetime-local" name="scheduled_for"><small>Deixe vazio para enviar agora.</small></div>
+      <div class="wa-file-chip" id="waFileChip" hidden></div>
+    </form>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.body.classList.add('wa-chat-screen');
+(()=>{
+ const box=document.getElementById('waMessages'),input=document.getElementById('waText'),media=document.getElementById('waMedia'),chip=document.getElementById('waFileChip'),form=document.getElementById('waForm');
+ const page=document.querySelector('.wa-page'),topbar=document.querySelector('.topbar');
+ if(!box||!input||!form||!page)return;
+ let last=0;box.querySelectorAll('[data-id]').forEach(x=>last=Math.max(last,Number(x.dataset.id)||0));
+ const api="{% url 'client_whatsapp_messages_api' client.id %}";
+ function syncViewport(){
+   if(innerWidth>860){document.documentElement.style.removeProperty('--wa-mobile-top');document.documentElement.style.removeProperty('--wa-mobile-height');return;}
+   const vv=window.visualViewport,vt=vv?vv.offsetTop:0,vh=vv?vv.height:innerHeight;
+   const rect=topbar?topbar.getBoundingClientRect():{bottom:0};const top=Math.max(vt,rect.bottom);const h=Math.max(220,vt+vh-top);
+   document.documentElement.style.setProperty('--wa-mobile-top',`${top}px`);document.documentElement.style.setProperty('--wa-mobile-height',`${h}px`);
+ }
+ const bottom=(smooth=false)=>requestAnimationFrame(()=>requestAnimationFrame(()=>{const t=box.scrollHeight;if(smooth&&box.scrollTo)box.scrollTo({top:t,behavior:'smooth'});else box.scrollTop=t;}));
+ const settle=()=>{syncViewport();bottom(false);setTimeout(()=>{syncViewport();bottom(false)},60);setTimeout(()=>{syncViewport();bottom(false)},220)};
+ input.style.height='46px';input.style.minHeight='46px';input.style.maxHeight='46px';input.style.overflowY='auto';
+ function add(m){if(box.querySelector(`[data-id="${m.id}"]`))return;document.querySelector('.wa-empty')?.remove();const a=document.createElement('article');a.dataset.id=m.id;a.className='wa-bubble'+(m.direction==='out'?' mine':'');let html='';if(m.media_url){if(m.media_type==='image')html+=`<a href="${m.media_url}" target="_blank"><img src="${m.media_url}" class="wa-media"></a>`;else if(m.media_type==='video')html+=`<video class="wa-media" controls src="${m.media_url}"></video>`;else if(m.media_type==='audio')html+=`<audio controls src="${m.media_url}"></audio>`;else html+=`<a class="wa-file" href="${m.media_url}" target="_blank">📎 ${m.file_name||'Arquivo'}</a>`;}if(m.content){const d=document.createElement('div');d.textContent=m.content;html+=`<div class="wa-text">${d.innerHTML.replace(/\n/g,'<br>')}</div>`;}html+=`<small>${m.created_at} · ${m.status}</small>`;a.innerHTML=html;box.appendChild(a);last=Math.max(last,m.id);if(m.direction==='in'&&!document.hidden)window.ImobCRM?.playMessageTone?.('open');bottom(true);}
+ async function poll(){try{const r=await fetch(`${api}?after=${last}`,{cache:'no-store'});if(r.ok){const d=await r.json();d.messages.forEach(add);if(d.messages.length)settle();}}catch(e){}}
+ settle();setInterval(poll,2200);document.addEventListener('visibilitychange',()=>{if(!document.hidden){poll();settle()}});window.addEventListener('resize',settle,{passive:true});window.addEventListener('orientationchange',()=>setTimeout(settle,120),{passive:true});if(window.visualViewport){visualViewport.addEventListener('resize',settle,{passive:true});visualViewport.addEventListener('scroll',settle,{passive:true});}
+ document.getElementById('waScheduleBtn')?.addEventListener('click',()=>{const p=document.getElementById('waSchedulePop');p.hidden=!p.hidden;settle()});media?.addEventListener('change',()=>{if(media.files?.[0]){chip.textContent='📎 '+media.files[0].name;chip.hidden=false}else chip.hidden=true;settle()});
+ form.addEventListener('submit',async(e)=>{const schedule=form.querySelector('[name=scheduled_for]')?.value||'';if(schedule)return;e.preventDefault();const btn=form.querySelector('.wa-send');if(btn)btn.disabled=true;try{const r=await fetch(form.action,{method:'POST',body:new FormData(form),headers:{'X-Requested-With':'XMLHttpRequest'}});if(!r.ok)throw new Error('Falha');input.value='';if(media){media.value='';chip.hidden=true;}await poll();settle();input.focus({preventScroll:true});settle();}catch(err){alert('Não foi possível enviar pelo WhatsApp. Confira a conexão da Evolution API.');}finally{if(btn)btn.disabled=false;}});
+ input.addEventListener('focus',settle);input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});
+})();
+</script>
+{% endblock %}

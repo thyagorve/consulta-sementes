@@ -1432,11 +1432,21 @@
     overflow: hidden !important;
     border-radius: 12px !important;
     box-shadow: 0 18px 44px rgba(20, 56, 35, .25) !important;
+    flex-direction: column !important;
 }
 
 #filterPopupBody {
-    max-height: min(46dvh, 330px) !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     overflow-y: auto !important;
+}
+
+#filterPopup .filter-popup-header,
+#filterPopup .filter-popup-context,
+#filterPopup .filter-popup-footer,
+#filterPopup > .p-2 {
+    flex: 0 0 auto;
 }
 
 .filter-popup-context {
@@ -2280,6 +2290,18 @@ and (orientation: landscape) {
                     </button>
                 </div>
 
+                {% if admin_operacional %}
+                <a
+                    href="{% url 'sapp:admin_operacional_empenhos' %}"
+                    class="btn btn-sm btn-outline-light"
+                    style="border-radius:12px;font-weight:800;"
+                    title="Central administrativa sem travas por status"
+                >
+                    <i class="fas fa-user-shield me-1"></i>
+                    Admin
+                </a>
+                {% endif %}
+
                 <a
                     href="{% url 'sapp:criar_solicitacao' %}"
                     class="btn btn-sm btn-nova-premium"
@@ -2377,6 +2399,7 @@ and (orientation: landscape) {
                 <!-- RESUMO -->
                 <div class="modal-resumo-bar">
                     <div class="modal-resumo-item"><small>Solicitado</small><strong id="rSolicitado">0</strong></div>
+                    <div class="modal-resumo-item"><small>Movimentado</small><strong id="rMovimentado" class="text-success">0</strong></div>
                     <div class="modal-resumo-item"><small>Já Empenhado</small><strong id="rEmpenhado" class="text-warning">0</strong></div>
                     <div class="modal-resumo-item"><small>Selecionado</small><strong id="rSelecionado" class="text-primary">0</strong></div>
                     <div class="modal-resumo-item"><small>Restante</small><strong id="rRestante" class="text-danger">0</strong></div>
@@ -2942,6 +2965,12 @@ and (orientation: landscape) {
 
 <script>
 
+// O usuário normal continua sujeito às travas do fluxo.
+// O administrador operacional pode corrigir o empenho pela própria tela.
+const ADMIN_OPERACIONAL = {{ admin_operacional|yesno:"true,false" }};
+const FILTER_NONE_SENTINEL = '__FILTER_NONE__';
+const FILTER_EMPTY_SENTINEL = '__FILTER_EMPTY__';
+
 if ('Notification' in window && Notification.permission !== 'denied') {
     Notification.requestPermission();
 }
@@ -3109,14 +3138,25 @@ class DataGrid {
         }
         Object.entries(this.activeFilters).forEach(([column, values]) => {
             if (values?.length) {
+                if (values.includes(FILTER_NONE_SENTINEL)) {
+                    data = [];
+                    return;
+                }
+
                 const valoresNormalizados = values.map(
                     normalizarValorFiltro
                 );
 
                 data = data.filter(item => {
-                    const value = normalizarValorFiltro(
-                        valorColunaFiltro(item, column)
+                    let bruto = valorColunaFiltro(item, column);
+                    const vazio = (
+                        bruto === null
+                        || bruto === undefined
+                        || String(bruto).trim() === ''
                     );
+                    const value = vazio
+                        ? normalizarValorFiltro(FILTER_EMPTY_SENTINEL)
+                        : normalizarValorFiltro(bruto);
 
                     return valoresNormalizados.includes(value);
                 });
@@ -3194,6 +3234,11 @@ class DataGrid {
                 continue;
             }
 
+            if (values.includes(FILTER_NONE_SENTINEL)) {
+                data = [];
+                break;
+            }
+
             const permitidos = new Set(
                 values.map(
                     normalizarValorFiltro
@@ -3201,16 +3246,17 @@ class DataGrid {
             );
 
             data = data.filter(item => {
+                const bruto = valorColunaFiltro(item, column);
+                const vazio = (
+                    bruto === null
+                    || bruto === undefined
+                    || String(bruto).trim() === ''
+                );
                 const atual = normalizarValorFiltro(
-                    valorColunaFiltro(
-                        item,
-                        column
-                    )
+                    vazio ? FILTER_EMPTY_SENTINEL : bruto
                 );
 
-                return permitidos.has(
-                    atual
-                );
+                return permitidos.has(atual);
             });
         }
 
@@ -3230,28 +3276,20 @@ class DataGrid {
                 targetColumn
             );
 
-            if (
+            const vazio = (
                 bruto === null
                 || bruto === undefined
-            ) {
-                return;
-            }
-
-            const texto = String(
-                bruto
-            ).trim();
-
-            if (!texto) return;
-
-            const chave = normalizarValorFiltro(
-                texto
+                || String(bruto).trim() === ''
             );
 
+            const texto = vazio
+                ? FILTER_EMPTY_SENTINEL
+                : String(bruto).trim();
+
+            const chave = normalizarValorFiltro(texto);
+
             if (!mapa.has(chave)) {
-                mapa.set(
-                    chave,
-                    texto
-                );
+                mapa.set(chave, texto);
             }
         });
 
@@ -3878,21 +3916,40 @@ function escaparHtml(valor) {
 }
 
 function aplicarBloqueioEmpenho(bloqueado, status = '') {
-    dataGrid.setBloqueado(bloqueado);
+    const bloqueadoServidor = Boolean(bloqueado);
+    const bloqueioEfetivo = bloqueadoServidor && !ADMIN_OPERACIONAL;
+
+    dataGrid.setBloqueado(bloqueioEfetivo);
+
     const btn = document.getElementById('btnConfirmar');
     const todos = document.getElementById('selectAllCheckbox');
+
     if (btn) {
-        btn.disabled = Boolean(bloqueado);
-        btn.title = bloqueado ? 'A movimentação já foi iniciada. O empenho não pode mais ser alterado.' : '';
+        btn.disabled = bloqueioEfetivo;
+        btn.title = bloqueioEfetivo
+            ? 'A movimentação já foi iniciada. O empenho não pode mais ser alterado.'
+            : '';
     }
-    if (todos) todos.disabled = Boolean(bloqueado);
+
+    if (todos) todos.disabled = bloqueioEfetivo;
 
     document.getElementById('avisoEmpenhoBloqueado')?.remove();
-    if (bloqueado) {
+    document.getElementById('avisoEmpenhoAdmin')?.remove();
+
+    if (bloqueioEfetivo) {
         const aviso = document.createElement('div');
         aviso.id = 'avisoEmpenhoBloqueado';
         aviso.className = 'alert alert-warning py-2 px-3 m-2 mb-0 small flex-shrink-0';
         aviso.innerHTML = `<i class="fas fa-lock me-1"></i><strong>Empenho bloqueado.</strong> A movimentação deste card já foi iniciada. <span class="badge bg-secondary ms-1">${escaparHtml(status)}</span>`;
+        document.querySelector('#modalEmpenho .modal-empenho-body')?.prepend(aviso);
+        return;
+    }
+
+    if (ADMIN_OPERACIONAL && ['MOVIMENTACAO_PARCIAL', 'CONCLUIDO', 'CANCELADO'].includes(String(status || '').toUpperCase())) {
+        const aviso = document.createElement('div');
+        aviso.id = 'avisoEmpenhoAdmin';
+        aviso.className = 'alert alert-success py-2 px-3 m-2 mb-0 small flex-shrink-0';
+        aviso.innerHTML = `<i class="fas fa-user-shield me-1"></i><strong>Modo administrador.</strong> Você pode adicionar ou retirar empenhos mesmo com a movimentação iniciada. <span class="badge bg-success ms-1">${escaparHtml(status)}</span>`;
         document.querySelector('#modalEmpenho .modal-empenho-body')?.prepend(aviso);
     }
 }
@@ -4058,8 +4115,21 @@ function calcularMaximoQuantidadeLote(id) {
         )
     );
 
+    // Administrador pode ampliar uma solicitação/concluída ao acrescentar
+    // novo lote. O teto aqui passa a ser apenas o saldo físico disponível.
+    if (ADMIN_OPERACIONAL) {
+        return Math.max(
+            0,
+            Math.floor(disponivel)
+        );
+    }
+
     const solicitado = Number(
         document.getElementById('rSolicitado')?.textContent
+        || 0
+    );
+    const movimentado = Number(
+        document.getElementById('rMovimentado')?.textContent
         || 0
     );
 
@@ -4103,7 +4173,7 @@ function calcularMaximoQuantidadeLote(id) {
 
         const restanteKg = Math.max(
             0,
-            solicitado - jaEmpenhado - outrosSelecionados
+            solicitado - movimentado - jaEmpenhado - outrosSelecionados
         );
 
         return Math.max(
@@ -4136,7 +4206,7 @@ function calcularMaximoQuantidadeLote(id) {
         return Math.max(0, Math.floor(disponivel));
     }
 
-    const restante = Math.max(0, solicitado - jaEmpenhado - outrosSelecionados);
+    const restante = Math.max(0, solicitado - movimentado - jaEmpenhado - outrosSelecionados);
     return Math.max(0, Math.min(disponivel, Math.floor(restante)));
 }
 
@@ -4385,9 +4455,12 @@ function configurarSeletorItemCarga(data) {
     select.innerHTML = cargaItensResumo.map((item, idx) => {
         const solicitado = Number(item.quantidade_solicitada || 0);
         const empenhado = Number(item.quantidade_empenhada || 0);
+        const movimentado = Number(item.quantidade_movimentada || 0);
         const aberta = !!item.quantidade_aberta || solicitado <= 0;
         const restante = Number(item.quantidade_restante || 0);
-        const status = aberta ? `carga aberta · empenhado ${empenhado}` : (item.completo ? '✓ completo' : `resta ${restante}`);
+        const status = aberta
+            ? `carga aberta · mov. ${movimentado} · emp. ${empenhado}`
+            : (item.completo ? `✓ atendido ${movimentado + empenhado}` : `mov. ${movimentado} · emp. ${empenhado} · resta ${restante}`);
         const qtdLabel = aberta ? 'SEM LIMITE' : solicitado;
         return `<option value="${item.id}" ${Number(item.id) === Number(cargaItemAtualId) ? 'selected' : ''}>${idx + 1}. ${escaparHtml(item.cliente || '-')} · ${escaparHtml(item.codigo || '-')} · ${qtdLabel} (${status})</option>`;
     }).join('');
@@ -4395,7 +4468,7 @@ function configurarSeletorItemCarga(data) {
     const atual = cargaItensResumo.find(item => Number(item.id) === Number(cargaItemAtualId));
     if (info) {
         info.innerHTML = atual
-            ? `<strong>${escaparHtml(atual.codigo || '-')}</strong> · ${escaparHtml(atual.descricao || 'Sem descrição')}<br>Cliente: <strong>${escaparHtml(atual.cliente || '-')}</strong> · Empenhado: ${Number(atual.quantidade_empenhada || 0)}${(atual.quantidade_aberta || Number(atual.quantidade_solicitada||0)<=0) ? ' · CARGA ABERTA' : ' / ' + Number(atual.quantidade_solicitada || 0)}`
+            ? `<strong>${escaparHtml(atual.codigo || '-')}</strong> · ${escaparHtml(atual.descricao || 'Sem descrição')}<br>Cliente: <strong>${escaparHtml(atual.cliente || '-')}</strong> · Movimentado: ${Number(atual.quantidade_movimentada || 0)} · Empenhado: ${Number(atual.quantidade_empenhada || 0)}${(atual.quantidade_aberta || Number(atual.quantidade_solicitada||0)<=0) ? ' · CARGA ABERTA' : ' / ' + Number(atual.quantidade_solicitada || 0)}`
             : 'Nenhum item de carga disponível.';
     }
 }
@@ -4436,6 +4509,8 @@ async function carregarLotesInicial(itemCargaId = null) {
         atualizarRotulosUnidadeEmpenho();
 
         document.getElementById('rSolicitado').textContent = data.solicitacao?.quantidade_solicitada_escopo ?? data.solicitacao?.quantidade_solicitada ?? 0;
+        const movResumo = document.getElementById('rMovimentado');
+        if (movResumo) movResumo.textContent = data.solicitacao?.quantidade_movimentada_escopo ?? data.solicitacao?.quantidade_movimentada ?? 0;
 
         configurarSeletorItemCarga(data);
         document.getElementById('modalTitulo').textContent = '📦 ' + (data.solicitacao?.titulo || 'Sem título');
@@ -4913,8 +4988,9 @@ function validarQtd(input) {
     }
 
     const sol = parseFloat(document.getElementById('rSolicitado').textContent) || 0;
+    const mov = parseFloat(document.getElementById('rMovimentado')?.textContent) || 0;
     const emp = parseFloat(document.getElementById('rEmpenhado').textContent) || 0;
-    const maxRestante = sol - emp;
+    const maxRestante = ADMIN_OPERACIONAL ? Number.POSITIVE_INFINITY : Math.max(0, sol - mov - emp);
 
     if (unidadeControle === 'QUILOGRAMA' && pesoUnitario > 0) {
         // Converter restante (KG) em unidades
@@ -4968,6 +5044,7 @@ function validarQtd(input) {
 
 function atualizarResumo() {
     const sol = parseFloat(document.getElementById('rSolicitado').textContent) || 0;
+    const mov = parseFloat(document.getElementById('rMovimentado')?.textContent) || 0;
     let emp = 0, sel = 0, removidos = 0;
     const idsEmp = new Set(dataGrid.empenhadosData.map(i => i.estoque_id));
 
@@ -5018,7 +5095,7 @@ function atualizarResumo() {
     }
 
     // 4. Restante
-    const restante = Math.max(0, sol - emp - sel + removidos);
+    const restante = Math.max(0, sol - mov - emp - sel + removidos);
 
     // 5. Atualizar interface
     if (unidadeControle === 'QUILOGRAMA') {
@@ -5076,7 +5153,7 @@ function selecionarTodos() {
             || 0
         );
 
-        if (restante <= 0) break;
+        if (!ADMIN_OPERACIONAL && restante <= 0) break;
     }
 
     renderTableData();
@@ -5105,25 +5182,19 @@ function abrirFiltro(col, event) {
     ).textContent = (
         'Filtrar: '
         + (def?.label || col)
-        + ' · opções compatíveis'
     );
 
     document.getElementById(
         'filterPopupSearch'
     ).value = '';
 
-    const dadosPossiveis = (
-        dataGrid.getDataForFilterOptions(col)
+    const opcoes = dataGrid.getOpcoesCompativeis(col);
+    const filtroAtual = dataGrid.activeFilters[col];
+    const semFiltroAtual = !Array.isArray(filtroAtual) || filtroAtual.length === 0;
+    const filtroNenhum = Array.isArray(filtroAtual) && filtroAtual.includes(FILTER_NONE_SENTINEL);
+    const selecionados = new Set(
+        (filtroAtual || []).map(String)
     );
-
-    const opcoes = (
-        dataGrid.getOpcoesCompativeis(col)
-    );
-
-    const selecionados = (
-        dataGrid.activeFilters[col]
-        || []
-    ).map(String);
 
     const contexto = document.getElementById(
         'filterPopupContext'
@@ -5140,11 +5211,15 @@ function abrirFiltro(col, event) {
                 && valores.length
             )
         )
-        .map(
-            ([chave, valores]) => (
-                `${chave}: ${valores.join(', ')}`
-            )
-        );
+        .map(([chave, valores]) => {
+            const nome = modalColumnDefs.find(x => x.key === chave)?.label || chave;
+            const rotulos = valores.map(v => {
+                if (v === FILTER_NONE_SENTINEL) return 'nenhum';
+                if (v === FILTER_EMPTY_SENTINEL) return '(vazio)';
+                return v;
+            });
+            return `${nome}: ${rotulos.join(', ')}`;
+        });
 
         contexto.textContent = filtrosAnteriores.length
             ? (
@@ -5160,15 +5235,22 @@ function abrirFiltro(col, event) {
 
     body.innerHTML = opcoes.length
         ? opcoes.map(valor => {
-            const valorSeguro = escaparHtml(valor);
-            const checked = selecionados.includes(
-                String(valor)
-            );
+            const valorString = String(valor);
+            const textoExibido = valorString === FILTER_EMPTY_SENTINEL
+                ? '(vazio)'
+                : valorString;
+            const valorSeguro = escaparHtml(valorString);
+            const textoSeguro = escaparHtml(textoExibido);
+
+            // Sem filtro ativo = Excel-like: todas as opções começam marcadas.
+            const checked = semFiltroAtual
+                ? true
+                : (!filtroNenhum && selecionados.has(valorString));
 
             return `
                 <label
                     class="filter-option"
-                    data-filter-text="${valorSeguro.toLocaleLowerCase?.('pt-BR') || valorSeguro}"
+                    data-filter-text="${escaparHtml(textoExibido.toLocaleLowerCase('pt-BR'))}"
                 >
                     <input
                         type="checkbox"
@@ -5176,7 +5258,7 @@ function abrirFiltro(col, event) {
                         value="${valorSeguro}"
                         ${checked ? 'checked' : ''}
                     >
-                    <span>${valorSeguro}</span>
+                    <span>${textoSeguro}</span>
                 </label>
             `;
         }).join('')
@@ -5186,65 +5268,53 @@ function abrirFiltro(col, event) {
             </div>
         `;
 
-    const popup = document.getElementById(
-        'filterPopup'
-    );
-
+    const popup = document.getElementById('filterPopup');
     popup.style.transform = 'none';
+    popup.style.display = 'flex';
 
     if (th) {
         const rect = th.getBoundingClientRect();
-        const popupWidth = Math.min(
-            350,
-            window.innerWidth - 20
+        const wrapper = document.getElementById('modalTableWrapper');
+        const wrapperRect = wrapper?.getBoundingClientRect?.();
+
+        const popupWidth = Math.max(
+            260,
+            Math.min(
+                360,
+                Math.max(rect.width, 260),
+                window.innerWidth - 20
+            )
+        );
+
+        let left = rect.left;
+        if (left + popupWidth > window.innerWidth - 10) {
+            left = window.innerWidth - popupWidth - 10;
+        }
+        if (left < 10) left = 10;
+
+        // O filtro nasce exatamente abaixo do cabeçalho e cresce só até o
+        // fim visível da tabela. Não salta mais para o topo do modal.
+        const top = Math.max(8, rect.bottom + 2);
+        const limiteTabela = wrapperRect
+            ? Math.min(window.innerHeight - 10, wrapperRect.bottom - 4)
+            : window.innerHeight - 10;
+        const alturaDisponivel = Math.max(
+            170,
+            Math.min(500, limiteTabela - top)
         );
 
         popup.style.width = `${popupWidth}px`;
-
-        let top = rect.bottom + 6;
-        let left = rect.left;
-
-        if (
-            left + popupWidth
-            > window.innerWidth - 10
-        ) {
-            left = (
-                window.innerWidth
-                - popupWidth
-                - 10
-            );
-        }
-
-        if (left < 10) {
-            left = 10;
-        }
-
-        popup.style.display = 'block';
-
-        const altura = Math.min(
-            popup.offsetHeight || 390,
-            window.innerHeight - 20
-        );
-
-        if (
-            top + altura
-            > window.innerHeight - 10
-        ) {
-            top = Math.max(
-                10,
-                rect.top - altura - 6
-            );
-        }
-
-        popup.style.top = `${top}px`;
         popup.style.left = `${left}px`;
+        popup.style.top = `${top}px`;
+        popup.style.height = `${alturaDisponivel}px`;
+        popup.style.maxHeight = `${alturaDisponivel}px`;
     } else {
-        popup.style.display = 'block';
+        popup.style.width = 'min(360px, calc(100vw - 20px))';
+        popup.style.height = 'min(500px, calc(100dvh - 30px))';
+        popup.style.maxHeight = 'min(500px, calc(100dvh - 30px))';
         popup.style.top = '50%';
         popup.style.left = '50%';
-        popup.style.transform = (
-            'translate(-50%, -50%)'
-        );
+        popup.style.transform = 'translate(-50%, -50%)';
     }
 
     setTimeout(() => {
@@ -5253,15 +5323,28 @@ function abrirFiltro(col, event) {
         )?.focus();
     }, 80);
 }
+
 function filtrarPopup() {
-    const s = document.getElementById('filterPopupSearch').value.toLowerCase();
-    document.querySelectorAll('#filterPopupBody .filter-option').forEach(o => {
-        o.style.display = o.textContent.toLowerCase().includes(s) ? '' : 'none';
+    const termo = normalizarValorFiltro(
+        document.getElementById('filterPopupSearch')?.value || ''
+    );
+
+    document.querySelectorAll('#filterPopupBody .filter-option').forEach(option => {
+        const texto = normalizarValorFiltro(
+            option.dataset.filterText || option.textContent || ''
+        );
+        option.style.display = texto.includes(termo) ? '' : 'none';
     });
 }
 
 function toggleAllPopup(checked) {
-    document.querySelectorAll('#filterPopupBody .filter-option:not([style*="display:none"]) input').forEach(cb => cb.checked = checked);
+    // Atua em TODAS as opções, inclusive as escondidas pela busca. Assim:
+    // buscar -> Nenhum -> marcar uma opção -> Aplicar filtra exatamente ela.
+    document.querySelectorAll(
+        '#filterPopupBody input.filter-checkbox'
+    ).forEach(cb => {
+        cb.checked = checked;
+    });
 }
 
 function aplicarFiltro() {
@@ -5273,42 +5356,20 @@ function aplicarFiltro() {
         )
     ];
 
-    const visiveis = checkboxes.filter(cb => {
-        const option = cb.closest(
-            '.filter-option'
-        );
-
-        return (
-            !option
-            || option.style.display !== 'none'
-        );
-    });
-
-    const selecionados = visiveis
+    const selecionados = checkboxes
         .filter(cb => cb.checked)
         .map(cb => cb.value);
 
-    /*
-     * Nenhum marcado = remove filtro da coluna.
-     * Todos os valores compatíveis marcados = também não precisa
-     * manter filtro artificial nessa coluna.
-     */
-    if (
-        selecionados.length === 0
-        || (
-            visiveis.length > 0
-            && selecionados.length === visiveis.length
-        )
-    ) {
-        dataGrid.setFilter(
-            colFiltro,
-            []
-        );
+    if (checkboxes.length === 0) {
+        dataGrid.setFilter(colFiltro, [FILTER_NONE_SENTINEL]);
+    } else if (selecionados.length === checkboxes.length) {
+        // Todas marcadas = sem restrição nessa coluna.
+        dataGrid.setFilter(colFiltro, []);
+    } else if (selecionados.length === 0) {
+        // Nenhuma marcada significa realmente nenhum resultado, não "limpar".
+        dataGrid.setFilter(colFiltro, [FILTER_NONE_SENTINEL]);
     } else {
-        dataGrid.setFilter(
-            colFiltro,
-            selecionados
-        );
+        dataGrid.setFilter(colFiltro, selecionados);
     }
 
     atualizarUIComFiltros();
@@ -5320,62 +5381,88 @@ function atualizarUIComFiltros() {
     const badgesContainer = document.getElementById('filtrosAtivosBadges');
     badgesContainer.innerHTML = '';
     let count = 0;
-    
+
     Object.entries(dataGrid.activeFilters).forEach(([k, values]) => {
         values.forEach(v => {
             count++;
             const badge = document.createElement('span');
             badge.className = 'badge bg-secondary me-1';
             badge.style.cssText = 'cursor:pointer;font-size:0.55rem;';
-            badge.innerHTML = `${k}:${v} <i class="fas fa-times ms-1"></i>`;
+
+            const nomeColuna = modalColumnDefs.find(x => x.key === k)?.label || k;
+            const valorLabel = v === FILTER_NONE_SENTINEL
+                ? 'nenhum'
+                : (v === FILTER_EMPTY_SENTINEL ? '(vazio)' : v);
+
+            badge.innerHTML = `${escaparHtml(nomeColuna)}:${escaparHtml(valorLabel)} <i class="fas fa-times ms-1"></i>`;
             badge.onclick = () => {
                 dataGrid.activeFilters[k] = dataGrid.activeFilters[k].filter(x => x !== v);
                 if (!dataGrid.activeFilters[k].length) delete dataGrid.activeFilters[k];
-                dataGrid.applyAllFilters();  // ← ADICIONE ESTA LINHA
+                dataGrid.applyAllFilters();
                 atualizarUIComFiltros();
                 renderTableData();
             };
             badgesContainer.appendChild(badge);
         });
     });
-    
-    // Botão limpar filtros
+
     const btnLimpar = document.getElementById('btnLimparFiltros');
     if (btnLimpar) btnLimpar.style.display = count > 0 ? 'inline-block' : 'none';
-    
-    // Marcar cabeçalhos e contadores
-    document.querySelectorAll('#modalTable th').forEach(th => {
-        const col = th.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
-        if (col) {
-            th.classList.toggle('filter-active', !!dataGrid.activeFilters[col]);
-            let countBadge = th.querySelector('.filter-count-badge');
-            if (!countBadge) {
-                countBadge = document.createElement('span');
-                countBadge.className = 'filter-count-badge';
-                countBadge.style.cssText = 'background:#ffc107;color:#000;font-size:0.5rem;padding:1px 4px;border-radius:8px;margin-left:4px;display:none;';
-                th.appendChild(countBadge);
-            }
-            if (dataGrid.activeFilters[col] && dataGrid.activeFilters[col].length > 0) {
-                countBadge.textContent = dataGrid.activeFilters[col].length;
-                countBadge.style.display = 'inline';
-            } else {
-                countBadge.style.display = 'none';
-            }
+
+    document.querySelectorAll('#modalTable th[data-col]').forEach(th => {
+        const col = th.dataset.col;
+        if (!col || ['foco', 'acoes'].includes(col)) return;
+
+        const filtro = dataGrid.activeFilters[col];
+        const ativo = Array.isArray(filtro) && filtro.length > 0;
+        th.classList.toggle('filter-active', ativo);
+
+        let countBadge = th.querySelector('.filter-count-badge');
+        if (!countBadge) {
+            countBadge = document.createElement('span');
+            countBadge.className = 'filter-count-badge';
+            th.appendChild(countBadge);
+        }
+
+        if (ativo) {
+            countBadge.textContent = filtro.includes(FILTER_NONE_SENTINEL)
+                ? '0'
+                : filtro.length;
+            countBadge.style.display = 'inline-flex';
+        } else {
+            countBadge.style.display = 'none';
         }
     });
 }
 
 function limparTodosFiltros() {
-    dataGrid.activeFilters = {};
-    dataGrid.applyAllFilters();  // ← ADICIONE ESTA LINHA
+    dataGrid.clearFilters();
     atualizarUIComFiltros();
     renderTableData();
 }
 
 function fecharFiltro() {
-    document.getElementById('filterPopup').style.display = 'none';
+    const popup = document.getElementById('filterPopup');
+    popup.style.display = 'none';
+    popup.style.height = '';
+    popup.style.maxHeight = '';
     colFiltro = null;
 }
+
+// Se a tabela se mover, fecha o popup para ele nunca ficar solto em uma
+// coluna antiga. Ao abrir novamente, ele calcula a posição pelo cabeçalho atual.
+document.getElementById('modalTableWrapper')?.addEventListener(
+    'scroll',
+    () => {
+        const popup = document.getElementById('filterPopup');
+        if (popup && popup.style.display !== 'none') fecharFiltro();
+    },
+    { passive: true }
+);
+window.addEventListener('resize', () => {
+    const popup = document.getElementById('filterPopup');
+    if (popup && popup.style.display !== 'none') fecharFiltro();
+});
 
 // ==================== BUSCA ====================
 function debounceBusca() {
@@ -5481,22 +5568,74 @@ async function removerItemIndividual(estoqueId) {
     }
 
     try {
-        const response = await fetch(
-            `/api/solicitacoes/${solicId}/remover-item/${itemEmpenho.id}/`,
+        const urlRemocao = `/api/solicitacoes/${solicId}/remover-item/${itemEmpenho.id}/`;
+
+        let response = await fetch(
+            urlRemocao,
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie(
-                        'csrftoken'
-                    )
-                }
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    desfazer_movimentacoes: false
+                })
             }
         );
 
-        const data = await response
+        let data = await response
             .json()
             .catch(() => ({}));
+
+        /*
+         * Admin: um lote que já saiu fisicamente não pode simplesmente sumir
+         * do card. O backend exige o caminho inverso real. Confirmando aqui,
+         * ele desfaz transferência/expedição, recompõe o estoque e o empenho
+         * e somente depois exclui a reserva.
+         */
+        if (
+            response.status === 409
+            && data.code === 'MOVIMENTACAO_EXISTENTE'
+            && data.pode_desfazer_e_excluir
+        ) {
+            const confirmarEstorno = await confirmarModal(
+                (
+                    `${data.error || 'Este lote possui movimentação.'}\n\n`
+                    + `Movimentações a desfazer: ${data.movimentacoes || 0}\n`
+                    + `Quantidade já movimentada: ${data.quantidade_movimentada || 0}\n\n`
+                    + 'Continuar fará o caminho inverso no estoque e depois excluirá o lote do empenho.'
+                ),
+                {
+                    titulo: 'Desfazer movimentação e excluir',
+                    tipo: 'warning',
+                    textoOk: 'Desfazer e excluir',
+                    textoCancelar: 'Cancelar'
+                }
+            );
+
+            if (!confirmarEstorno) {
+                return;
+            }
+
+            response = await fetch(
+                urlRemocao,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        desfazer_movimentacoes: true
+                    })
+                }
+            );
+
+            data = await response
+                .json()
+                .catch(() => ({}));
+        }
 
         if (
             !response.ok
@@ -6166,7 +6305,15 @@ function renderCards(sols) {
 }
 function criarCardHTML(s) {
     const qtdEmp = s.quantidade_empenhada_display ?? s.quantidade_empenhada ?? 0;
-    const pct = s.percentual_empenhado ?? 0;
+    // Comportamento original: o número principal é o EMPENHO QUE AINDA ESTÁ PENDENTE.
+    // Ex.: 8 solicitados / 8 empenhados = 8/8 (100%). Ao transferir 1,
+    // o empenho pendente cai para 7 e o card passa a 7/8 (87,5% => 88%).
+    const qtdMov = Number(s.quantidade_movimentada || 0);
+    const qtdSolicitada = Number(s.quantidade_solicitada || 0);
+    const qtdProgresso = Math.max(0, Number(qtdEmp || 0));
+    const pct = qtdSolicitada > 0
+        ? Math.max(0, Math.min(100, (qtdProgresso / qtdSolicitada) * 100))
+        : 0;
     const barColor = pct >= 100 ? '#28a745' : pct >= 50 ? '#ffc107' : '#dc3545';
     const isCarga = String(s.tipo_solicitacao || '').toUpperCase() === 'CARGA';
     const embalagens = [...new Set((s.embalagens || []).map(v => String(v || '').trim().toUpperCase()).filter(Boolean))];
@@ -6175,7 +6322,9 @@ function criarCardHTML(s) {
     const concluido = ['CONCLUIDO','CANCELADO'].includes(s.status);
     const showExcluir = Number(s.quantidade_empenhada || 0) <= 0 && !concluido;
     const temItens = Number(s.quantidade_empenhada || 0) > 0;
-    const qtdFormatada = s.unidade_controle === 'QUILOGRAMA' ? Number(qtdEmp).toFixed(2) : Math.round(qtdEmp);
+    const qtdFormatada = s.unidade_controle === 'QUILOGRAMA' ? Number(qtdProgresso).toFixed(2) : Math.round(qtdProgresso);
+    const qtdMovFormatada = s.unidade_controle === 'QUILOGRAMA' ? Number(s.quantidade_movimentada || 0).toFixed(2) : Math.round(Number(s.quantidade_movimentada || 0));
+    const qtdEmpFormatada = s.unidade_controle === 'QUILOGRAMA' ? Number(qtdEmp).toFixed(2) : Math.round(Number(qtdEmp));
     const pctFormatado = Math.round(pct);
     const operacao = isCarga ? 'expedir' : 'transferir';
     const operacaoIcone = isCarga ? 'fa-truck' : 'fa-exchange-alt';
@@ -6206,13 +6355,14 @@ function criarCardHTML(s) {
         ${s.destino ? `<div class="card-destino-premium"><i class="fas fa-map-marker-alt"></i><span><strong>Destino:</strong> ${escaparHtml(s.destino)}</span></div>` : ''}
         <div class="card-progress-bar"><div class="card-progress-fill" style="width:${Math.min(100,pct)}%;background:${barColor};"></div></div>
         <div class="d-flex justify-content-between small mb-1"><span>${qtdFormatada}/${s.quantidade_solicitada} ${unidade}</span><strong>${pctFormatado}%</strong></div>
+        <div class="small text-muted mb-1">Movimentado: <strong>${qtdMovFormatada}</strong> · Empenhado pendente: <strong>${qtdEmpFormatada}</strong> ${unidade}</div>
         <div class="small text-muted mb-1">👤 ${escaparHtml(s.criador_nome || '')} | 📅 ${escaparHtml(s.data_criacao || '')}</div>
-        ${concluido ? `<button class="btn btn-sm btn-outline-info w-100" onclick="imprimirCard(${s.id})"><i class="fas fa-print"></i> Imprimir</button>` : `
+        ${(concluido && !ADMIN_OPERACIONAL) ? `<button class="btn btn-sm btn-outline-info w-100" onclick="imprimirCard(${s.id})"><i class="fas fa-print"></i> Imprimir</button>` : `
             <button class="btn btn-sm btn-success w-100" onclick="abrirModalEmpenho(${s.id})"><i class="fas fa-boxes me-1"></i> Empenhar</button>
             <div class="d-flex gap-1 mt-1">
                 <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="window.location.href='/solicitacoes/${s.id}/editar/'" title="Editar"><i class="fas fa-pen"></i></button>
                 <button class="btn btn-sm btn-outline-info flex-fill" onclick="imprimirCard(${s.id})" title="Imprimir"><i class="fas fa-print"></i></button>
-                <button class="btn btn-sm ${operacaoClasse} flex-fill" onclick="abrirMovModal(${s.id},'${operacao}')" title="${operacaoTitulo}" ${!temItens ? 'disabled' : ''}><i class="fas ${operacaoIcone}"></i></button>
+                <button class="btn btn-sm ${operacaoClasse} flex-fill" onclick="abrirMovModal(${s.id},'${operacao}')" title="${operacaoTitulo}" ${(!temItens && !ADMIN_OPERACIONAL) ? 'disabled' : ''}><i class="fas ${operacaoIcone}"></i></button>
             </div>`}
     </div>`;
 }
@@ -6512,6 +6662,51 @@ function configurarValidadorEnderecoMov() {
     );
 }
 
+
+window.desfazerMovimentacaoAdminModal = async function(historicoId) {
+    if (!ADMIN_OPERACIONAL) return;
+    if (!historicoId || !movSolId) return;
+
+    const confirmar = window.confirm(
+        `Desfazer a movimentação #${historicoId}?\n\n`
+        + 'O estoque de origem/destino, o empenho e o progresso do card serão restaurados de forma transacional.'
+    );
+    if (!confirmar) return;
+
+    try {
+        const resposta = await fetch(
+            `/admin-operacional/api/solicitacoes/${Number(movSolId)}/movimentacoes/${Number(historicoId)}/desfazer/`,
+            {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }
+        );
+        const dados = await resposta.json().catch(() => ({}));
+        if (!resposta.ok || dados.success === false) {
+            throw new Error(dados.error || `Erro HTTP ${resposta.status}`);
+        }
+
+        await mostrarAviso(
+            dados.message || 'Movimentação desfeita e estoque restaurado.',
+            'success',
+            'Movimentação restaurada'
+        );
+
+        await carregarCards();
+        await abrirMovModal(movSolId, movAcao);
+    } catch (erro) {
+        console.error('Erro ao desfazer movimentação:', erro);
+        await mostrarAviso(
+            erro.message || 'Não foi possível desfazer a movimentação.',
+            'danger',
+            'Falha ao restaurar'
+        );
+    }
+};
+
 window.abrirMovModal = async function(solId, acao) {
     const cardMov = solicitacoesCache.find(
         item => Number(item.id) === Number(solId)
@@ -6520,6 +6715,7 @@ window.abrirMovModal = async function(solId, acao) {
     if (
         cardMov
         && cardMov.status === 'EMPENHO_PARCIAL'
+        && !ADMIN_OPERACIONAL
     ) {
         await mostrarAviso(
             (
@@ -6832,6 +7028,16 @@ window.abrirMovModal = async function(solId, acao) {
                             <span class="badge ${badge}">
                                 ${situacao}
                             </span>
+                            ${ADMIN_OPERACIONAL && !item.podeSelecionar && ['TRANSFERIDO','EXPEDIDO'].includes(situacao) ? `
+                                <button
+                                    type="button"
+                                    class="btn btn-sm btn-outline-danger ms-1 py-0 px-2"
+                                    title="Desfazer esta movimentação e restaurar o estoque"
+                                    onclick="desfazerMovimentacaoAdminModal(${Number(item.item_id || item.id || 0)})"
+                                >
+                                    <i class="fas fa-undo"></i> Desfazer
+                                </button>
+                            ` : ''}
                         </td>
                     </tr>
                 `;

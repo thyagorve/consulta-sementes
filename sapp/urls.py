@@ -1,6 +1,7 @@
 from . import views
 from . import views_inventario
 from . import offline_api
+from . import admin_operacional
 from .forms import CaseInsensitiveAuthenticationForm
 from django.contrib.auth import views as auth_views
 from django.conf import settings
@@ -28,6 +29,20 @@ urlpatterns = [
     path('', views.redirecionar_usuario, name='redirecionar'),
     path('dashboard/', views.dashboard, name='dashboard'),
     path('dashboard-data/', views.dashboard_data, name='dashboard_data'),   
+    # Central administrativa de Solicitações/Empenhos (sem travas operacionais de status)
+    path('admin-operacional/empenhos/', admin_operacional.painel_admin_empenhos, name='admin_operacional_empenhos'),
+    path('admin-operacional/empenhos/<int:solicitacao_id>/', admin_operacional.detalhe_admin_empenho, name='admin_operacional_empenho_detalhe'),
+    path('admin-operacional/api/estoque/', admin_operacional.api_admin_buscar_estoque, name='api_admin_buscar_estoque'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/salvar/', admin_operacional.api_admin_salvar_solicitacao, name='api_admin_salvar_solicitacao'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/empenho/salvar/', admin_operacional.api_admin_salvar_empenho, name='api_admin_salvar_empenho'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/lotes/adicionar/', admin_operacional.api_admin_adicionar_lote, name='api_admin_adicionar_lote'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/itens/<int:item_id>/salvar/', admin_operacional.api_admin_editar_item, name='api_admin_editar_item'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/itens/<int:item_id>/remover/', admin_operacional.api_admin_remover_item, name='api_admin_remover_item'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/itens/<int:item_id>/mover/', admin_operacional.api_admin_mover_item_card, name='api_admin_mover_item_card'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/movimentacoes/<int:historico_id>/desfazer/', admin_operacional.api_admin_desfazer_movimentacao, name='api_admin_desfazer_movimentacao'),
+    path('admin-operacional/api/solicitacoes/<int:solicitacao_id>/movimentacoes/desfazer-ultima/', admin_operacional.api_admin_desfazer_ultima_movimentacao, name='api_admin_desfazer_ultima_movimentacao'),
+    path('admin-operacional/api/restauracao/<int:ponto_id>/restaurar/', admin_operacional.api_admin_restaurar_ponto, name='api_admin_restaurar_ponto'),
+
     path('cargas/', views.gestao_cargas, name='gestao_cargas'),
     path('cargas/grupo/editar/', views.editar_grupo_carga, name='editar_grupo_carga'),
     path('cargas/movimento/<int:historico_id>/editar/', views.editar_movimento_carga, name='editar_movimento_carga'),

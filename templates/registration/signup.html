@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#08111b">
+  <meta name="application-name" content="ImobCRM">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ImobCRM">
+  <link rel="manifest" href="{% static 'pwa/manifest.webmanifest' %}?v=2">
+  <link rel="icon" href="{% static 'pwa/favicon.ico' %}?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'pwa/apple-touch-icon.png' %}?v=2">
+  <script>(()=>{const ua=navigator.userAgent||'';const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);const standalone=window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true;if(ios)document.documentElement.classList.add('pwa-ios');if(standalone)document.documentElement.classList.add('pwa-standalone')})();</script>
+  <title>Criar conta | ImobCRM</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=7.0">
+  <link rel="stylesheet" href="{% static 'css/v7_5.css' %}?v=7.5">
+  <link rel="stylesheet" href="{% static 'css/v7_6.css' %}?v=7.6">
+  <link rel="stylesheet" href="{% static 'css/v7_7_pwa.css' %}?v=7.7">
+  <link rel="stylesheet" href="{% static 'css/v7_14_ios_pwa.css' %}?v=7.14">
+</head>
+<body class="login-page theme-darkglass">
+  <div class="login-card signup-card">
+    <div class="login-logo brand-icon app-brand-icon"><img src="{% static 'pwa/icon-192.png' %}" alt="ImobCRM"></div>
+    <h1>Criar conta de corretor</h1>
+    <p>Cadastre-se para acessar o CRM, a rede de parcerias e as conversas.</p>
+    <form method="post">{% csrf_token %}{% for field in form %}<p><label>{{ field.label }}</label>{{ field }}{% if field.help_text %}<small class="muted">{{ field.help_text|safe }}</small>{% endif %}{% for error in field.errors %}<span class="error">{{ error }}</span>{% endfor %}</p>{% endfor %}<button class="btn primary full">Criar minha conta</button></form>
+    <p class="login-link">Já tem conta? <a class="link" href="{% url 'login' %}">Entrar</a></p>
+  </div>
+<script>
+(()=>{const k='imobcrm.theme',m=localStorage.getItem(k)||'dark',d=m!=='light';document.body.classList.toggle('theme-darkglass',d);document.body.classList.toggle('theme-lightglass',!d)})();
+</script>
+<script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(()=>{}));}</script>
+</body></html>

@@ -85,6 +85,11 @@
                 <i class="fas fa-shield-alt mt-1"></i>
                 <div><strong>Há empenho nesta solicitação.</strong> Tipo e armazém ficam protegidos. Em cargas, somente as linhas que já foram empenhadas ficam bloqueadas; as demais continuam editáveis.</div>
             </div>
+            {% elif admin_operacional and solicitacao %}
+            <div class="info-strip">
+                <i class="fas fa-user-shield mt-1"></i>
+                <div><strong>Modo administrador.</strong> Você pode corrigir a meta e as linhas já utilizadas. O sistema preserva o histórico e não permite reduzir quantidades abaixo do que já está movimentado ou empenhado.</div>
+            </div>
             {% endif %}
 
             <section class="form-section">
@@ -189,22 +194,22 @@
                                     <td><input name="carga_codigo[]" class="form-control carga-codigo" value="{{ item.codigo }}" list="produtosCarga" {% if item.edicao_bloqueada %}readonly{% endif %}></td>
                                     <td>
                                         <div class="product-info"><strong>{{ item.descricao|default:'Sem descrição cadastrada' }}</strong></div>
-                                        {% if item.edicao_bloqueada %}<span class="lock-badge"><i class="fas fa-lock"></i>{{ item.quantidade_empenhada_edicao|stringformat:'g' }} empenhado(s)</span>{% endif %}
+                                        {% if item.edicao_bloqueada %}<span class="lock-badge"><i class="fas fa-lock"></i>{{ item.quantidade_empenhada_edicao|stringformat:'g' }} empenhado(s)</span>{% elif admin_operacional and item.remocao_bloqueada %}<span class="lock-badge"><i class="fas fa-history"></i>Mov.: {{ item.quantidade_movimentada_edicao|stringformat:'g' }} · Emp. pendente: {{ item.quantidade_empenhada_edicao|stringformat:'g' }}</span>{% endif %}
                                     </td>
-                                    <td><input type="number" name="carga_quantidade[]" class="form-control carga-qtd" min="0" step="1" value="{% if item.quantidade_solicitada %}{{ item.quantidade_solicitada|stringformat:'f' }}{% endif %}" {% if item.edicao_bloqueada %}readonly{% endif %}></td>
-                                    <td>{% if not item.edicao_bloqueada %}<button type="button" class="btn-remove-line" title="Remover item"><i class="fas fa-trash"></i></button>{% else %}<span class="text-muted"><i class="fas fa-shield-alt"></i></span>{% endif %}</td>
+                                    <td><input type="number" name="carga_quantidade[]" class="form-control carga-qtd" {% if admin_operacional and item.remocao_bloqueada %}min="{{ item.quantidade_minima_edicao|stringformat:'f' }}"{% else %}min="0"{% endif %} step="1" value="{% if item.quantidade_solicitada %}{{ item.quantidade_solicitada|stringformat:'f' }}{% endif %}" {% if item.edicao_bloqueada %}readonly{% endif %}></td>
+                                    <td>{% if not item.remocao_bloqueada %}<button type="button" class="btn-remove-line" title="Remover item"><i class="fas fa-trash"></i></button>{% else %}<span class="text-muted" title="Linha com histórico: pode editar, mas não excluir"><i class="fas fa-shield-alt"></i></span>{% endif %}</td>
                                 </tr>
                             {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    <div class="load-footer"><span><i class="fas fa-lock me-1"></i>Itens empenhados não podem ter cliente, código ou quantidade alterados. Quantidade em branco = carga aberta, sem limite pré-definido.</span><span class="load-total">Total: <span id="totalCarga">0</span> embalagens</span></div>
+                    <div class="load-footer"><span>{% if admin_operacional %}<i class="fas fa-user-shield me-1"></i>Admin pode corrigir linhas utilizadas, mas a quantidade nunca pode ficar abaixo do total já comprometido (movimentado + empenho pendente). Para reduzir além disso, desfaça primeiro a movimentação ou remova corretamente o empenho. Linhas com histórico não podem ser excluídas.{% else %}<i class="fas fa-lock me-1"></i>Itens empenhados ou já movimentados não podem ter cliente, código ou quantidade alterados.{% endif %} Quantidade em branco = carga aberta, sem limite pré-definido.</span><span class="load-total">Total: <span id="totalCarga">0</span> embalagens</span></div>
                     <datalist id="produtosCarga"></datalist>
                 </div>
             </section>
 
             <section class="form-section">
-                <div class="section-head"><div class="section-icon"><i class="fas fa-flag"></i></div><div><strong>Quantidade e prioridade</strong><small>Para carga, o total é calculado automaticamente pelas linhas.</small></div></div>
+                <div class="section-head"><div class="section-icon"><i class="fas fa-flag"></i></div><div><strong>Quantidade e prioridade</strong><small>{% if admin_operacional and solicitacao %}No modo administrador, o total da carga também pode ser ajustado diretamente.{% else %}Para carga, o total é calculado automaticamente pelas linhas.{% endif %}</small></div></div>
                 <div class="row g-3">
                     <div class="col-md-4 normal-field">
                         <label class="form-label">Unidade de controle *</label>
@@ -213,9 +218,10 @@
                             <option value="QUILOGRAMA" {% if solicitacao.unidade_controle == 'QUILOGRAMA' %}selected{% endif %}>Quilograma</option>
                         </select>
                     </div>
-                    <div class="col-md-4 normal-field">
-                        <label class="form-label">Quantidade solicitada *</label>
-                        <input type="number" id="quantidadeSolicitadaNormal" name="quantidade_solicitada" class="form-control" min="0.01" step="0.01" value="{{ solicitacao.quantidade_solicitada|stringformat:'f'|default:'' }}" {% if edicao_estrutural_bloqueada %}disabled{% endif %} placeholder="0,00" required>
+                    <div class="col-md-4 quantidade-field">
+                        <label class="form-label">{% if admin_operacional and solicitacao and solicitacao.tipo_solicitacao == 'CARGA' %}Quantidade total da carga *{% else %}Quantidade solicitada *{% endif %}</label>
+                        <input type="number" id="quantidadeSolicitadaNormal" name="quantidade_solicitada" class="form-control" {% if admin_operacional and solicitacao %}min="{{ quantidade_minima_admin|stringformat:'f' }}"{% else %}min="0.01"{% endif %} step="0.01" value="{{ solicitacao.quantidade_solicitada|stringformat:'f'|default:'' }}" {% if edicao_estrutural_bloqueada %}disabled{% endif %} placeholder="0,00" required>
+                        {% if admin_operacional and solicitacao %}<div class="field-help"><i class="fas fa-shield-alt me-1"></i>Mínimo permitido: <strong>{{ quantidade_minima_admin|stringformat:'g' }}</strong>, correspondente ao total já comprometido: movimentado + empenho pendente. Para reduzir abaixo disso, desfaça primeiro a movimentação ou remova o empenho.</div>{% endif %}
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Prioridade *</label>
@@ -246,6 +252,7 @@
 const produtosCarga = {{ produtos_carga_json|safe }};
 const tituloCargaAutomatico = "{{ proximo_titulo_carga|escapejs }}";
 const solicitacaoEdicaoTipo = "{{ solicitacao.tipo_solicitacao|default:''|escapejs }}";
+const adminPodeEditarTotalCarga = {% if admin_operacional and solicitacao %}true{% else %}false{% endif %};
 let tituloTransferenciaDigitado = "{{ solicitacao.titulo|default:''|escapejs }}";
 const mapaProdutos = new Map(produtosCarga.map(p => [String(p.codigo || '').trim().toUpperCase(), p]));
 const datalist = document.getElementById('produtosCarga');
@@ -297,13 +304,17 @@ function alternarControlesDoBloco(selector, ativo) {
 function updateTipo() {
     const carga = isCarga();
 
+    const mostrarQuantidade = !carga || adminPodeEditarTotalCarga;
+
     document.querySelectorAll('.carga-field').forEach(el => el.style.display = carga ? '' : 'none');
     document.querySelectorAll('.normal-field').forEach(el => el.style.display = carga ? 'none' : '');
+    document.querySelectorAll('.quantidade-field').forEach(el => el.style.display = mostrarQuantidade ? '' : 'none');
 
     // Além de esconder, desabilita os controles do tipo que não está ativo.
     // Isso impede validação e envio acidental de campos ocultos.
     alternarControlesDoBloco('.carga-field', carga);
     alternarControlesDoBloco('.normal-field', !carga);
+    alternarControlesDoBloco('.quantidade-field', mostrarQuantidade);
 
     const motorista = document.getElementById('motoristaCarga');
     if (motorista) {
@@ -312,7 +323,7 @@ function updateTipo() {
 
     const quantidadeNormal = document.getElementById('quantidadeSolicitadaNormal');
     if (quantidadeNormal) {
-        quantidadeNormal.required = !carga && !quantidadeNormal.disabled;
+        quantidadeNormal.required = mostrarQuantidade && !quantidadeNormal.disabled;
     }
 
     const tituloPedido = document.getElementById('tituloPedido');

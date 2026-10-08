@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block heading %}{{ catalog.title }}{% endblock %}
+{% block subtitle %}Cliente: {{ catalog.client.name }} · {{ catalog.items.count }} imóveis selecionados{% endblock %}
+{% block content %}
+<div class="catalog-detail-actions-top"><a class="btn" href="{% url 'catalog_list' %}">← Catálogos</a><div class="actions"><a class="btn" href="{% url 'catalog_update' catalog.pk %}">Editar seleção</a><form method="post" action="{% url 'catalog_delete' catalog.pk %}" onsubmit="return confirm('Excluir este catálogo? O link do cliente deixará de funcionar.')">{% csrf_token %}<button class="btn danger">Excluir catálogo</button></form></div></div>
+<div class="catalog-summary catalog-summary-v2">
+  <div class="catalog-link-panel panel"><h2>Link do cliente</h2><div class="copy-link"><input id="catalogUrl" readonly value="{{ public_url }}"><button class="btn primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('catalogUrl').value);this.textContent='Copiado ✓'">Copiar link</button></div><p>O cliente abre sem login, vê as fotos em tela grande e responde em cada imóvel.</p><div class="actions"><a class="btn" target="_blank" href="{{ public_url }}">👁 Visualizar como cliente</a><form method="post" action="{% url 'send_catalog_to_client' catalog.pk %}">{% csrf_token %}<button class="btn primary">📲 Enviar pelo WhatsApp</button></form></div></div>
+  <div class="reaction-dashboard"><div><span>❤️ Gostou</span><strong>{{ counts.liked }}</strong></div><div><span>👎 Não curtiu</span><strong>{{ counts.disliked }}</strong></div><div><span>⏳ Aguardando</span><strong>{{ counts.pending }}</strong></div></div>
+</div>
+<section class="catalog-properties-panel">
+  <div class="panel-head catalog-panel-head"><div><h2>Imóveis do catálogo</h2><p>Clique em qualquer foto para ampliar.</p></div><span class="badge">Marca d’água: {{ catalog.watermark_text|default:'ImobCRM' }}</span></div>
+  <div class="catalog-property-admin-grid">
+  {% for item in catalog.items.all %}
+    <article class="catalog-property-admin-card">
+      <div class="catalog-property-photo">
+        {% with img=item.property.images.first %}{% if img %}{% if img.is_video %}<div class="catalog-video-preview"><video src="{{ img.image.url }}" controls playsinline preload="metadata"></video><span class="media-kind-badge">VIDEO</span></div>{% else %}<button type="button" class="catalog-photo-open" data-gallery="gallery-{{ item.pk }}" data-src="{{ img.image.url }}"><img src="{{ img.image.url }}" alt="{{ item.property.title }}" loading="lazy"><span>⛶ Ver fotos</span></button>{% endif %}{% else %}<div class="catalog-preview-empty">⌂</div>{% endif %}{% endwith %}
+        <span class="property-code-chip">{{ item.property.code }}</span>
+        <span class="photo-total-chip">📷 {{ item.property.images.count }}</span>
+      </div>
+      {% for img in item.property.images.all %}<button type="button" class="hidden-gallery-image" data-gallery="gallery-{{ item.pk }}" data-src="{{ img.image.url }}" aria-hidden="true" tabindex="-1"></button>{% endfor %}
+      <div class="catalog-property-info">
+        <div class="catalog-property-title-row"><div><h3>{{ item.property.title }}</h3><p>📍 {{ item.property.neighborhood }} · {{ item.property.city }}/{{ item.property.state }}</p></div><span class="reaction-pill {{ item.reaction }}">{% if item.reaction == 'liked' %}❤️ Gostou{% elif item.reaction == 'disliked' %}👎 Não curtiu{% else %}⏳ Aguardando{% endif %}</span></div>
+        <div class="catalog-property-meta"><span>🛏 {{ item.property.bedrooms }}</span><span>🚿 {{ item.property.bathrooms }}</span><span>🚗 {{ item.property.parking_spaces }}</span>{% if item.property.rent_price %}<b>R$ {{ item.property.rent_price|floatformat:2 }}/mês</b>{% elif item.property.sale_price %}<b>R$ {{ item.property.sale_price|floatformat:2 }}</b>{% endif %}</div>
+        {% if item.client_note %}<div class="catalog-client-note">💬 {{ item.client_note }}</div>{% endif %}
+        <div class="catalog-property-footer"><span>{% if item.reacted_at %}Respondido em {{ item.reacted_at|date:'d/m/Y H:i' }}{% else %}Ainda sem resposta{% endif %}</span><a class="link" href="{% url 'property_detail' item.property.pk %}">Abrir imóvel →</a></div>
+      </div>
+    </article>
+  {% empty %}<div class="empty-card">Nenhum imóvel neste catálogo.</div>{% endfor %}
+  </div>
+</section>
+<div class="catalog-lightbox" id="catalogLightbox" aria-hidden="true"><button type="button" class="catalog-lightbox-close" aria-label="Fechar">×</button><button type="button" class="catalog-lightbox-nav prev" aria-label="Anterior">‹</button><img alt="Foto ampliada"><button type="button" class="catalog-lightbox-nav next" aria-label="Próxima">›</button><div class="catalog-lightbox-count"></div></div>
+<script>
+(()=>{const box=document.getElementById('catalogLightbox');if(!box)return;const img=box.querySelector('img'),count=box.querySelector('.catalog-lightbox-count');let gallery=[],idx=0;function open(g,src){gallery=[...document.querySelectorAll('[data-gallery="'+g+'"]')].map(x=>x.dataset.src).filter((v,i,a)=>v&&a.indexOf(v)===i);idx=Math.max(0,gallery.indexOf(src));show();box.classList.add('open');box.setAttribute('aria-hidden','false');document.body.classList.add('lightbox-open')}function show(){if(!gallery.length)return;img.src=gallery[idx];count.textContent=(idx+1)+' / '+gallery.length}document.addEventListener('click',e=>{const b=e.target.closest('.catalog-photo-open');if(b)open(b.dataset.gallery,b.dataset.src)});box.querySelector('.prev').onclick=()=>{idx=(idx-1+gallery.length)%gallery.length;show()};box.querySelector('.next').onclick=()=>{idx=(idx+1)%gallery.length;show()};function close(){box.classList.remove('open');box.setAttribute('aria-hidden','true');document.body.classList.remove('lightbox-open');img.removeAttribute('src')}box.querySelector('.catalog-lightbox-close').onclick=close;box.addEventListener('click',e=>{if(e.target===box)close()});document.addEventListener('keydown',e=>{if(!box.classList.contains('open'))return;if(e.key==='Escape')close();if(e.key==='ArrowRight')box.querySelector('.next').click();if(e.key==='ArrowLeft')box.querySelector('.prev').click()})})();
+</script>
+{% endblock %}

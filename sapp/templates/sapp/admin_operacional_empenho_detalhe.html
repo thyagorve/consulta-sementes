@@ -1,0 +1,176 @@
+{% extends 'sapp/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<style>
+:root{--adm-green:#237342;--adm-dark:#10291a;--adm-border:#dfe9e2;--adm-muted:#718078}.ao-shell{max-width:1580px;margin:0 auto;padding:14px}.ao-top{background:linear-gradient(135deg,#10291a,#21683d 62%,#319056);color:white;padding:18px 20px;border-radius:20px;box-shadow:0 12px 30px rgba(22,80,44,.17)}.ao-top h4{margin:0;font-weight:850}.ao-top .sub{opacity:.78;margin-top:3px;font-size:.82rem}.ao-chip{display:inline-flex;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.18);font-size:.7rem;font-weight:800}.ao-card{background:#fff;border:1px solid var(--adm-border);border-radius:16px;margin-top:12px;box-shadow:0 5px 18px rgba(20,58,34,.055);overflow:hidden}.ao-card-head{padding:12px 15px;border-bottom:1px solid var(--adm-border);display:flex;align-items:center;justify-content:space-between;gap:10px;background:#f8fbf9}.ao-card-head h6{margin:0;font-weight:850;color:#1d4d2e}.ao-card-body{padding:14px}.form-label{font-size:.69rem;font-weight:800;color:#52675a;margin-bottom:4px}.form-control,.form-select{border-radius:10px;border-color:#d9e5dd}.form-control:focus,.form-select:focus{border-color:#4d9e69;box-shadow:0 0 0 .18rem rgba(47,143,78,.12)}.stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.stat{border:1px solid #e3ece6;background:#fbfdfb;border-radius:13px;padding:10px}.stat small{display:block;color:#75867b;font-weight:700;font-size:.65rem}.stat strong{font-size:1.08rem;color:#163d26}.table-admin{font-size:.8rem;margin:0}.table-admin thead th{background:#f5f9f6;color:#52675a;font-size:.68rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}.table-admin td{vertical-align:middle}.status-admin{font-weight:850}.danger-zone{border-color:#f1cbcf}.danger-zone .ao-card-head{background:#fff7f8}.btn{border-radius:10px}.btn-admin{font-weight:800}.stock-result{border:1px solid #e0e9e3;border-radius:12px;padding:10px;margin-top:7px;display:flex;justify-content:space-between;gap:10px;align-items:center}.stock-result:hover{background:#f7fbf8}.stock-meta{font-size:.7rem;color:#6d7e73}.toast-admin{position:fixed;right:18px;bottom:18px;z-index:1080;min-width:290px;max-width:440px;padding:12px 14px;border-radius:12px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.18);display:none}.toast-ok{background:#1f7a42}.toast-err{background:#b6303c}.inline-lot-search{min-width:160px}.tiny{font-size:.66rem}.mono{font-variant-numeric:tabular-nums}.locked-note{font-size:.68rem;color:#7b897f}.movement-transfer{border-left:3px solid #d49b00}.movement-expedicao{border-left:3px solid #b53842}@media(max-width:900px){.stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ao-shell{padding:8px}.table-responsive{overflow:auto}.table-admin{min-width:920px}}@media(max-width:520px){.stat-grid{grid-template-columns:1fr 1fr}.ao-top{padding:15px}}
+</style>
+
+<div class="ao-shell" id="adminEmpenho" data-id="{{ solicitacao.id }}">
+  <div class="ao-top d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <div>
+      <div class="mb-2"><a href="{% url 'sapp:admin_operacional_empenhos' %}" class="text-white text-decoration-none small"><i class="fas fa-arrow-left me-1"></i>Central administrativa</a></div>
+      <h4>#{{ solicitacao.id }} · {{ solicitacao.titulo }}</h4>
+      <div class="sub">Controle administrativo sem bloqueio por status. As regras do usuário normal permanecem intactas.</div>
+      <div class="d-flex gap-2 flex-wrap mt-2"><span class="ao-chip" id="topStatus">{{ solicitacao.get_status_display }}</span><span class="ao-chip">{{ solicitacao.get_tipo_solicitacao_display }}</span><span class="ao-chip">Criado por {{ solicitacao.criador.get_full_name|default:solicitacao.criador.username }}</span></div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn btn-warning btn-admin" onclick="desfazerUltima()"><i class="fas fa-undo-alt me-1"></i>Desfazer última movimentação</button>
+      <a class="btn btn-light btn-admin" href="{% url 'sapp:pagina_solicitacoes' %}"><i class="fas fa-eye me-1"></i>Visão normal</a>
+    </div>
+  </div>
+
+  <div class="stat-grid mt-3">
+    <div class="stat"><small>Solicitado</small><strong id="statSolicitado">{{ solicitacao.quantidade_solicitada|floatformat:2 }}</strong></div>
+    <div class="stat"><small>Empenhado pendente</small><strong id="statEmpenhado">{{ solicitacao.quantidade_empenhada|floatformat:2 }}</strong></div>
+    <div class="stat"><small>Movimentado</small><strong id="statMovimentado">{{ solicitacao.quantidade_movimentada|floatformat:2 }}</strong></div>
+    <div class="stat"><small>Lotes pendentes</small><strong>{{ itens_pendentes|length }}</strong></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-xl-8">
+      <section class="ao-card">
+        <div class="ao-card-head"><h6><i class="fas fa-edit me-2"></i>Dados da solicitação</h6><span class="locked-note">Admin pode alterar inclusive status e quantidades</span></div>
+        <div class="ao-card-body">
+          <form id="formSolicitacao" class="row g-2">
+            <div class="col-md-6"><label class="form-label">Título</label><input class="form-control" name="titulo" value="{{ solicitacao.titulo }}"></div>
+            <div class="col-md-3"><label class="form-label">Tipo</label><select class="form-select" name="tipo_solicitacao"><option value="TRANSFERENCIA" {% if solicitacao.tipo_solicitacao == 'TRANSFERENCIA' %}selected{% endif %}>Transferência</option><option value="CARGA" {% if solicitacao.tipo_solicitacao == 'CARGA' %}selected{% endif %}>Carga / Expedição</option></select></div>
+            <div class="col-md-3"><label class="form-label">Prioridade</label><select class="form-select" name="prioridade">{% for v,n in prioridade_choices %}<option value="{{ v }}" {% if solicitacao.prioridade == v %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+            <div class="col-md-4"><label class="form-label">Cliente</label><input class="form-control" name="cliente" value="{{ solicitacao.cliente|default:'' }}"></div>
+            <div class="col-md-4"><label class="form-label">Destino</label><input class="form-control" name="destino" value="{{ solicitacao.destino|default:'' }}"></div>
+            <div class="col-md-2"><label class="form-label">Placa</label><input class="form-control" name="placa" value="{{ solicitacao.placa|default:'' }}"></div>
+            <div class="col-md-2"><label class="form-label">Motorista</label><input class="form-control" name="motorista" value="{{ solicitacao.motorista|default:'' }}"></div>
+            <div class="col-md-3"><label class="form-label">Qtd. solicitada</label><input type="number" step="0.01" min="{{ quantidade_minima|stringformat:'f' }}" class="form-control" name="quantidade_solicitada" value="{{ solicitacao.quantidade_solicitada|stringformat:'f' }}"><div class="tiny text-muted mt-1">Mínimo permitido (movimentado + empenho pendente): {{ quantidade_minima|floatformat:2 }}</div></div>
+            <div class="col-md-3"><label class="form-label">Qtd. movimentada</label><input type="number" step="0.01" min="0" class="form-control" name="quantidade_movimentada" value="{{ solicitacao.quantidade_movimentada|stringformat:'f' }}"></div>
+            <div class="col-md-3"><label class="form-label">Unidade</label><select class="form-select" name="unidade_controle">{% for v,n in unidade_choices %}<option value="{{ v }}" {% if solicitacao.unidade_controle == v %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+            <div class="col-md-3"><label class="form-label">Status</label><select class="form-select status-admin" name="status">{% for v,n in status_choices %}<option value="{{ v }}" {% if solicitacao.status == v %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></div>
+            <div class="col-md-4"><label class="form-label">Coluna Kanban</label><select class="form-select" name="coluna_kanban_id"><option value="">Sem coluna</option>{% for c in colunas %}<option value="{{ c.id }}" {% if solicitacao.coluna_kanban_id == c.id %}selected{% endif %}>{{ c.nome }}</option>{% endfor %}</select></div>
+            <div class="col-md-8"><label class="form-label">Observação</label><input class="form-control" name="observacao" value="{{ solicitacao.observacao|default:'' }}"></div>
+            <div class="col-12 text-end mt-3"><button type="button" class="btn btn-success btn-admin" onclick="salvarSolicitacao()"><i class="fas fa-save me-1"></i>Salvar alterações</button></div>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-xl-4">
+      <section class="ao-card h-100">
+        <div class="ao-card-head"><h6><i class="fas fa-layer-group me-2"></i>Dados do empenho</h6></div>
+        <div class="ao-card-body">
+          <form id="formEmpenho" class="row g-2">
+            <div class="col-6"><label class="form-label">Tipo</label><select class="form-select" name="tipo_movimentacao"><option value="EXPEDICAO" {% if empenho.tipo_movimentacao == 'EXPEDICAO' %}selected{% endif %}>Expedição</option><option value="TRANSFERENCIA" {% if empenho.tipo_movimentacao == 'TRANSFERENCIA' %}selected{% endif %}>Transferência</option><option value="EDICAO" {% if empenho.tipo_movimentacao == 'EDICAO' %}selected{% endif %}>Edição</option><option value="ENTRADA" {% if empenho.tipo_movimentacao == 'ENTRADA' %}selected{% endif %}>Entrada</option></select></div>
+            <div class="col-6"><label class="form-label">Status do empenho</label><select class="form-select" name="status_id"><option value="">Automático / atual</option>{% for es in empenho_status %}<option value="{{ es.id }}" {% if empenho and empenho.status_id == es.id %}selected{% endif %}>{{ es.nome }}</option>{% endfor %}</select></div>
+            <div class="col-12"><label class="form-label">Número da carga</label><input class="form-control" name="numero_carga" value="{% if empenho %}{{ empenho.numero_carga|default:'' }}{% endif %}"></div>
+            <div class="col-6"><label class="form-label">Motorista</label><input class="form-control" name="motorista" value="{% if empenho %}{{ empenho.motorista|default:'' }}{% endif %}"></div>
+            <div class="col-6"><label class="form-label">Placa</label><input class="form-control" name="placa" value="{% if empenho %}{{ empenho.placa|default:'' }}{% endif %}"></div>
+            <div class="col-12"><label class="form-label">Cliente</label><input class="form-control" name="cliente" value="{% if empenho %}{{ empenho.cliente|default:'' }}{% endif %}"></div>
+            <div class="col-12"><label class="form-label">Ordem de entrega</label><input class="form-control" name="ordem_entrega" value="{% if empenho %}{{ empenho.ordem_entrega|default:'' }}{% endif %}"></div>
+            <div class="col-12"><label class="form-label">Observação</label><textarea class="form-control" rows="2" name="observacao">{% if empenho %}{{ empenho.observacao|default:'' }}{% endif %}</textarea></div>
+            <div class="col-12 d-grid mt-2"><button type="button" class="btn btn-outline-success btn-admin" onclick="salvarEmpenho()"><i class="fas fa-save me-1"></i>Salvar empenho</button></div>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <section class="ao-card">
+    <div class="ao-card-head"><h6><i class="fas fa-lock-open me-2"></i>Lotes empenhados / pendentes</h6><span class="badge bg-success">{{ itens_pendentes|length }}</span></div>
+    <div class="table-responsive">
+      <table class="table table-hover table-admin">
+        <thead><tr><th>ID</th><th>Lote</th><th>Endereço</th><th>Saldo físico</th><th>Empenhado total</th><th>Disponível</th><th style="width:110px">Qtd. neste card</th><th>Trocar lote</th><th>Ações</th></tr></thead>
+        <tbody>
+        {% for item in itens_pendentes %}
+          <tr id="itemRow{{ item.id }}">
+            <td>#{{ item.id }}</td>
+            <td><strong>{{ item.lote }}</strong><div class="tiny text-muted">{{ item.produto_snapshot|default:item.estoque.produto }}</div></td>
+            <td>{{ item.estoque.endereco }}<div class="tiny text-muted">AZ {{ item.estoque.az|default:'-' }}</div></td>
+            <td class="mono">{{ item.estoque.saldo }}</td><td class="mono">{{ item.estoque.empenhado }}</td><td class="mono">{{ item.estoque.disponivel }}</td>
+            <td><input class="form-control form-control-sm" type="number" min="1" step="1" id="qtdItem{{ item.id }}" value="{{ item.quantidade }}"></td>
+            <td><div class="input-group input-group-sm inline-lot-search"><input class="form-control" id="novoLote{{ item.id }}" placeholder="ID do estoque" value="{{ item.estoque_id }}"><button class="btn btn-outline-secondary" type="button" onclick="abrirBuscaTroca({{ item.id }})"><i class="fas fa-search"></i></button></div></td>
+            <td class="text-nowrap"><button class="btn btn-sm btn-success" onclick="salvarItem({{ item.id }})"><i class="fas fa-save"></i></button> <button class="btn btn-sm btn-outline-primary" onclick="abrirMover({{ item.id }}, '{{ item.lote|escapejs }}')"><i class="fas fa-exchange-alt"></i></button> <button class="btn btn-sm btn-outline-danger" onclick="removerItem({{ item.id }}, '{{ item.lote|escapejs }}')"><i class="fas fa-trash"></i></button></td>
+          </tr>
+        {% empty %}<tr><td colspan="9" class="text-center text-muted py-4">Nenhum lote pendente. Você pode adicionar um novo lote abaixo.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="ao-card">
+    <div class="ao-card-head"><h6><i class="fas fa-plus-circle me-2"></i>Adicionar mais lote ao empenho</h6><span class="locked-note">Se ultrapassar a meta, a quantidade solicitada é ampliada sem apagar o histórico anterior</span></div>
+    <div class="ao-card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-lg-5"><label class="form-label">Buscar lote / produto / endereço / cliente</label><div class="input-group"><input class="form-control" id="buscaEstoque" placeholder="Ex.: final 55, R03, cultivar..."><button class="btn btn-outline-success" onclick="buscarEstoque()"><i class="fas fa-search"></i></button></div></div>
+        <div class="col-lg-2"><label class="form-label">Quantidade</label><input type="number" min="1" step="1" class="form-control" id="qtdAdicionar" value="1"></div>
+        <div class="col-lg-5"><label class="form-label">Linha da carga (opcional)</label><select class="form-select" id="itemCargaAdicionar"><option value="">Sem vínculo específico</option>{% for ic in itens_carga %}<option value="{{ ic.id }}">#{{ ic.id }} · {{ ic.cliente }} · {{ ic.codigo }} · {{ ic.quantidade_solicitada }}</option>{% endfor %}</select></div>
+      </div>
+      <div id="resultadosEstoque" class="mt-2"></div>
+    </div>
+  </section>
+
+  <section class="ao-card danger-zone">
+    <div class="ao-card-head"><h6 class="text-danger"><i class="fas fa-history me-2"></i>Movimentações processadas</h6><span class="locked-note">Cada linha pode ser estornada individualmente, sem considerar o status atual do card</span></div>
+    <div class="table-responsive">
+      <table class="table table-hover table-admin">
+        <thead><tr><th>ID</th><th>Tipo</th><th>Lote</th><th>Quantidade</th><th>Origem</th><th>Destino</th><th>Processado em</th><th>Usuário</th><th></th></tr></thead>
+        <tbody>
+        {% for h in movimentacoes %}
+          <tr class="movement-{{ h.tipo }}"><td>#{{ h.id }}</td><td><strong>{{ h.get_tipo_display }}</strong></td><td>{{ h.lote }}</td><td>{{ h.quantidade }}</td><td>{{ h.endereco_origem|default:'-' }}</td><td>{{ h.endereco_destino|default:'-' }}</td><td>{{ h.processado_em|date:'d/m/Y H:i:s' }}</td><td>{{ h.processado_por.get_full_name|default:h.processado_por.username }}</td><td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="desfazerMovimentacao({{ h.id }}, '{{ h.lote|escapejs }}')"><i class="fas fa-undo me-1"></i>Desfazer</button></td></tr>
+        {% empty %}<tr><td colspan="9" class="text-center text-muted py-4">Nenhuma movimentação processada.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="ao-card">
+    <div class="ao-card-head"><h6><i class="fas fa-life-ring me-2"></i>Pontos de restauração</h6><span class="locked-note">Criados automaticamente em toda transferência/expedição. Somente admin pode restaurar.</span></div>
+    <div class="table-responsive">
+      <table class="table table-hover table-admin">
+        <thead><tr><th>Ponto</th><th>Status</th><th>Tipo</th><th>Lote</th><th>Qtd.</th><th>Origem → Destino</th><th>Criado em</th><th>Por</th><th></th></tr></thead>
+        <tbody>
+        {% for p in pontos_restauracao %}
+          <tr>
+            <td>#{{ p.id }}</td>
+            <td><span class="badge {% if p.status == 'DISPONIVEL' %}bg-success{% elif p.status == 'RESTAURADO' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ p.get_status_display }}</span></td>
+            <td>{{ p.tipo|default:'-' }}</td><td><strong>{{ p.lote|default:'-' }}</strong></td><td>{{ p.quantidade|floatformat:0 }}</td>
+            <td>{{ p.endereco_origem|default:'-' }} → {{ p.endereco_destino|default:'-' }}</td>
+            <td>{{ p.criado_em|date:'d/m/Y H:i:s' }}</td>
+            <td>{% if p.criado_por %}{{ p.criado_por.get_full_name|default:p.criado_por.username }}{% else %}-{% endif %}</td>
+            <td class="text-end">{% if p.status == 'DISPONIVEL' and p.historico_id %}<button class="btn btn-sm btn-outline-warning" onclick="restaurarPonto({{ p.id }}, '{{ p.lote|escapejs }}')"><i class="fas fa-history me-1"></i>Restaurar</button>{% else %}<span class="tiny text-muted">{% if p.restaurado_em %}Restaurado {{ p.restaurado_em|date:'d/m/Y H:i' }}{% else %}Sem ação{% endif %}</span>{% endif %}</td>
+          </tr>
+        {% empty %}<tr><td colspan="9" class="text-center text-muted py-4">Nenhum ponto de restauração registrado ainda.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="modal fade" id="modalMover" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h6 class="modal-title">Mover lote para outro card</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" id="moverItemId"><p class="small text-muted" id="moverDescricao"></p><label class="form-label">Card de destino</label><select class="form-select" id="moverDestino"><option value="">Selecione...</option>{% for d in destinos_cards %}<option value="{{ d.id }}">#{{ d.id }} · {{ d.titulo }} · {{ d.status }}</option>{% endfor %}</select></div><div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" onclick="confirmarMover()">Mover lote</button></div></div></div></div>
+<div class="modal fade" id="modalBuscaTroca" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h6 class="modal-title">Selecionar novo lote</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" id="trocaItemId"><div class="input-group"><input class="form-control" id="buscaTroca" placeholder="Pesquisar lote, endereço, produto..."><button class="btn btn-success" onclick="buscarEstoqueTroca()">Pesquisar</button></div><div id="resultadosTroca" class="mt-2"></div></div></div></div></div>
+<div id="toastAdmin" class="toast-admin"></div>
+
+<script>
+const SOL_ID={{ solicitacao.id }};
+function csrf(){const m=document.cookie.match(/csrftoken=([^;]+)/);return m?decodeURIComponent(m[1]):''}
+function toast(msg,ok=true){const t=document.getElementById('toastAdmin');t.textContent=msg;t.className='toast-admin '+(ok?'toast-ok':'toast-err');t.style.display='block';clearTimeout(window.__toastT);window.__toastT=setTimeout(()=>t.style.display='none',4200)}
+async function postJson(url,data={}){const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf()},body:JSON.stringify(data)});let j={};try{j=await r.json()}catch(e){}if(!r.ok||j.success===false)throw new Error(j.error||'Não foi possível concluir a operação.');return j}
+function formObj(id){return Object.fromEntries(new FormData(document.getElementById(id)).entries())}
+function reloadOk(msg){toast(msg,true);setTimeout(()=>location.reload(),500)}
+async function salvarSolicitacao(){try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/salvar/`,formObj('formSolicitacao'));reloadOk(j.message)}catch(e){toast(e.message,false)}}
+async function salvarEmpenho(){try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/empenho/salvar/`,formObj('formEmpenho'));reloadOk(j.message)}catch(e){toast(e.message,false)}}
+async function removerItem(id,lote){if(!confirm(`Remover o lote ${lote} deste empenho? A reserva será liberada.`))return;try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/itens/${id}/remover/`);reloadOk(j.message)}catch(e){toast(e.message,false)}}
+async function salvarItem(id){const qtd=document.getElementById(`qtdItem${id}`).value;const estoque=document.getElementById(`novoLote${id}`).value;try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/itens/${id}/salvar/`,{quantidade:qtd,estoque_id:estoque});reloadOk(j.message)}catch(e){toast(e.message,false)}}
+async function desfazerUltima(){if(!confirm('Desfazer a última movimentação deste card? O estoque será restaurado e o lote voltará ao empenho.'))return;try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/movimentacoes/desfazer-ultima/`);reloadOk(j.message)}catch(e){toast(e.message,false)}}
+async function desfazerMovimentacao(id,lote){if(!confirm(`Desfazer a movimentação do lote ${lote}? O saldo físico e o empenho serão reconstruídos.`))return;try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/movimentacoes/${id}/desfazer/`);reloadOk(j.message)}catch(e){toast(e.message,false)}}
+async function restaurarPonto(id,lote){if(!confirm(`Restaurar o ponto #${id} do lote ${lote}? O sistema vai desfazer a movimentação e reconstruir o estoque e o empenho.`))return;try{const j=await postJson(`/admin-operacional/api/restauracao/${id}/restaurar/`);reloadOk(j.message)}catch(e){toast(e.message,false)}}
+async function buscarEstoque(){const q=document.getElementById('buscaEstoque').value.trim();const box=document.getElementById('resultadosEstoque');box.innerHTML='<div class="text-muted small">Buscando...</div>';try{const r=await fetch(`/admin-operacional/api/estoque/?q=${encodeURIComponent(q)}`);const j=await r.json();box.innerHTML=j.resultados.length?j.resultados.map(x=>`<div class="stock-result"><div><strong>${esc(x.lote)}</strong> · ${esc(x.produto||'-')}<div class="stock-meta">${esc(x.endereco||'-')} · AZ ${esc(x.az||'-')} · Saldo ${x.saldo} · Empenhado ${x.empenhado} · <b>Disponível ${x.disponivel}</b></div></div><button class="btn btn-sm btn-success" onclick="adicionarEstoque(${x.id},'${jsEsc(x.lote)}')"><i class="fas fa-plus me-1"></i>Adicionar</button></div>`).join(''):'<div class="text-muted small py-3">Nenhum lote encontrado.</div>'}catch(e){box.innerHTML='<div class="text-danger small">Falha na busca.</div>'}}
+async function adicionarEstoque(id,lote){const qtd=document.getElementById('qtdAdicionar').value;const itemCarga=document.getElementById('itemCargaAdicionar').value;if(!confirm(`Adicionar ${qtd} unidade(s) do lote ${lote} a este card?`))return;try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/lotes/adicionar/`,{estoque_id:id,quantidade:qtd,item_carga_id:itemCarga});reloadOk(j.message)}catch(e){toast(e.message,false)}}
+function abrirMover(id,lote){document.getElementById('moverItemId').value=id;document.getElementById('moverDescricao').textContent=`Lote ${lote}. A reserva física permanece e apenas muda de card.`;bootstrap.Modal.getOrCreateInstance(document.getElementById('modalMover')).show()}
+async function confirmarMover(){const id=document.getElementById('moverItemId').value;const destino=document.getElementById('moverDestino').value;if(!destino){toast('Selecione o card de destino.',false);return}try{const j=await postJson(`/admin-operacional/api/solicitacoes/${SOL_ID}/itens/${id}/mover/`,{solicitacao_destino_id:destino});bootstrap.Modal.getInstance(document.getElementById('modalMover'))?.hide();reloadOk(j.message)}catch(e){toast(e.message,false)}}
+function abrirBuscaTroca(id){document.getElementById('trocaItemId').value=id;document.getElementById('buscaTroca').value='';document.getElementById('resultadosTroca').innerHTML='';bootstrap.Modal.getOrCreateInstance(document.getElementById('modalBuscaTroca')).show()}
+async function buscarEstoqueTroca(){const q=document.getElementById('buscaTroca').value.trim();const box=document.getElementById('resultadosTroca');try{const r=await fetch(`/admin-operacional/api/estoque/?q=${encodeURIComponent(q)}`);const j=await r.json();box.innerHTML=j.resultados.map(x=>`<div class="stock-result"><div><strong>${esc(x.lote)}</strong><div class="stock-meta">${esc(x.endereco||'-')} · ${esc(x.produto||'-')} · disponível ${x.disponivel}</div></div><button class="btn btn-sm btn-outline-success" onclick="selecionarTroca(${x.id},'${jsEsc(x.lote)}')">Selecionar</button></div>`).join('')||'<div class="text-muted small py-3">Nenhum lote encontrado.</div>'}catch(e){toast('Falha na busca.',false)}}
+function selecionarTroca(estoqueId,lote){const itemId=document.getElementById('trocaItemId').value;document.getElementById(`novoLote${itemId}`).value=estoqueId;bootstrap.Modal.getInstance(document.getElementById('modalBuscaTroca'))?.hide();toast(`Novo lote selecionado: ${lote}. Clique em salvar na linha para aplicar.`)}
+function esc(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function jsEsc(s){return String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+document.getElementById('buscaEstoque')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();buscarEstoque()}});
+document.getElementById('buscaTroca')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();buscarEstoqueTroca()}});
+</script>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends 'sapp/base.html' %}
+{% load humanize %}
+
+{% block content %}
+<style>
+.admin-shell{max-width:1600px;margin:0 auto;padding:18px}.admin-hero{background:linear-gradient(135deg,#10271a,#23633c 58%,#2f8f4e);color:#fff;border-radius:22px;padding:22px 24px;box-shadow:0 14px 38px rgba(24,85,48,.18);position:relative;overflow:hidden}.admin-hero:after{content:"";position:absolute;width:280px;height:280px;border-radius:50%;background:rgba(255,255,255,.06);right:-80px;top:-150px}.admin-hero h3{font-weight:800;margin:0}.admin-hero p{margin:5px 0 0;opacity:.82}.hero-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.glass-btn{background:rgba(255,255,255,.13);border:1px solid rgba(255,255,255,.24);color:#fff;border-radius:12px;padding:9px 13px;text-decoration:none;font-weight:700}.glass-btn:hover{color:#fff;background:rgba(255,255,255,.2)}.filter-card{background:#fff;border:1px solid #e7eee9;border-radius:17px;padding:14px;margin-top:14px;box-shadow:0 5px 20px rgba(18,53,31,.06)}.admin-table-wrap{margin-top:14px;background:#fff;border:1px solid #e6ece8;border-radius:18px;overflow:hidden;box-shadow:0 7px 24px rgba(18,53,31,.07)}.admin-table{margin:0;font-size:.84rem}.admin-table thead th{background:#f4f8f5;color:#365244;border-bottom:1px solid #dae6dd;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}.admin-table td{vertical-align:middle}.title-cell strong{display:block;color:#163d26}.title-cell small{color:#7a8b80}.status-pill{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:.67rem;font-weight:800;white-space:nowrap}.s-AGUARDANDO_EMPENHO{background:#fff4ce;color:#835e00}.s-EMPENHO_PARCIAL{background:#e1efff;color:#155b9b}.s-EMPENHO_COMPLETO{background:#dcf5e5;color:#166534}.s-MOVIMENTACAO_PARCIAL{background:#dff4f6;color:#0f6674}.s-CONCLUIDO{background:#e7ebee;color:#44515b}.s-CANCELADO{background:#fde4e6;color:#a32632}.metric{font-weight:800;color:#173f27}.metric small{font-weight:500;color:#7b8b81}.btn-open{border-radius:10px;font-weight:750}.empty-box{padding:56px 20px;text-align:center;color:#708077}.empty-box i{font-size:2rem;margin-bottom:10px;color:#9db0a3}@media(max-width:768px){.admin-shell{padding:10px}.admin-hero{padding:18px}.admin-table-wrap{overflow:auto}.admin-table{min-width:980px}}
+</style>
+
+<div class="admin-shell">
+  <section class="admin-hero d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <div>
+      <h3><i class="fas fa-user-shield me-2"></i>Central Administrativa de Empenhos</h3>
+      <p>Edite, reabra, reempenhe, mova lotes e desfaça movimentações sem bloqueio por status.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="glass-btn" href="{% url 'sapp:pagina_solicitacoes' %}"><i class="fas fa-arrow-left me-1"></i>Visão normal</a>
+      <a class="glass-btn" href="/admin/" target="_blank"><i class="fas fa-tools me-1"></i>Django Admin</a>
+    </div>
+  </section>
+
+  <form class="filter-card row g-2 align-items-end" method="get">
+    <div class="col-lg-7">
+      <label class="form-label small fw-bold mb-1">Pesquisa</label>
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+        <input class="form-control" name="q" value="{{ q }}" placeholder="Carga, cliente, destino, produto ou lote...">
+      </div>
+    </div>
+    <div class="col-lg-3">
+      <label class="form-label small fw-bold mb-1">Status</label>
+      <select class="form-select" name="status">
+        <option value="">Todos</option>
+        {% for valor, nome in status_choices %}<option value="{{ valor }}" {% if status_filtro == valor %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-lg-2 d-grid"><button class="btn btn-success fw-bold"><i class="fas fa-filter me-1"></i>Filtrar</button></div>
+  </form>
+
+  <div class="admin-table-wrap">
+    {% if solicitacoes %}
+    <div class="table-responsive">
+      <table class="table table-hover admin-table">
+        <thead><tr><th>Solicitação</th><th>Status</th><th>Cliente / destino</th><th>Solicitado</th><th>Empenhado</th><th>Movimentado</th><th>Empenhos</th><th>Atualização</th><th></th></tr></thead>
+        <tbody>
+        {% for s in solicitacoes %}
+          <tr>
+            <td class="title-cell"><strong>#{{ s.id }} · {{ s.titulo }}</strong><small>{{ s.get_tipo_solicitacao_display }} · {{ s.criador.get_full_name|default:s.criador.username }}</small></td>
+            <td><span class="status-pill s-{{ s.status }}">{{ s.get_status_display }}</span></td>
+            <td><strong>{{ s.cliente|default:"-" }}</strong><br><small class="text-muted">{{ s.destino|default:"Sem destino" }}</small></td>
+            <td class="metric">{{ s.quantidade_solicitada|floatformat:2 }} <small>{{ s.get_unidade_controle_display }}</small></td>
+            <td class="metric">{{ s.quantidade_empenhada|floatformat:2 }}</td>
+            <td class="metric">{{ s.quantidade_movimentada|floatformat:2 }}</td>
+            <td><span class="badge bg-light text-dark border">{{ s.empenhos.all|length }} empenho(s)</span></td>
+            <td><small>{{ s.data_atualizacao|date:"d/m/Y H:i" }}</small></td>
+            <td class="text-end"><a class="btn btn-sm btn-success btn-open" href="{% url 'sapp:admin_operacional_empenho_detalhe' s.id %}"><i class="fas fa-sliders-h me-1"></i>Gerenciar</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div class="empty-box"><i class="fas fa-box-open"></i><div class="fw-bold">Nenhuma solicitação encontrada.</div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block heading %}Catálogos{% endblock %}
+{% block subtitle %}Seleções visuais de imóveis para cada cliente, com respostas e galeria de fotos.{% endblock %}
+{% block content %}
+<section class="catalog-command-hero"><div><span class="eyebrow">CATÁLOGOS</span><h2>Apresente imóveis com mais impacto</h2><p>Crie seleções por cliente, acompanhe respostas e mantenha tudo pronto para compartilhar.</p></div><a class="btn primary" href="{% url 'catalog_create' %}">+ Novo catálogo</a></section>
+<div class="toolbar catalog-toolbar"><form><input name="q" value="{{ q }}" placeholder="Buscar cliente, título ou bairro..."><button class="btn">Buscar</button></form></div>
+<div class="catalog-admin-grid catalog-admin-grid-v2">
+{% for c in catalogs %}
+<article class="catalog-admin-card catalog-card-v2">
+  <div class="catalog-card-preview">
+    {% for item in c.items.all|slice:":3" %}
+      {% with img=item.property.images.first %}{% if img %}{% if img.is_video %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video>{% else %}<img src="{{ img.image.url }}" alt="{{ item.property.title }}" loading="lazy">{% endif %}{% else %}<div class="catalog-preview-empty">⌂</div>{% endif %}{% endwith %}
+    {% empty %}<div class="catalog-preview-empty">🏠</div>{% endfor %}
+    <span class="catalog-count-chip">{% if c.items.count == 1 %}1 imóvel{% else %}{{ c.items.count }} imóveis{% endif %}</span>
+  </div>
+  <div class="catalog-card-body">
+    <div class="row">{% if c.active %}<span class="status-on">Ativo</span>{% else %}<span class="status-off">Inativo</span>{% endif %}<span class="catalog-date">{{ c.created_at|date:'d/m/Y' }}</span></div>
+    <h3>{{ c.title }}</h3>
+    <p class="catalog-client"><b>{{ c.client.name }}</b><span>{{ c.client.phone }}</span></p>
+    <div class="catalog-card-actions">
+      <a class="btn small primary" href="{% url 'catalog_detail' c.pk %}">Abrir catálogo</a>
+      <a class="btn small" href="{% url 'catalog_update' c.pk %}">Editar</a>
+      <form method="post" action="{% url 'catalog_delete' c.pk %}" onsubmit="return confirm('Excluir este catálogo? O link do cliente deixará de funcionar.')">{% csrf_token %}<button class="btn small danger" type="submit">Excluir</button></form>
+    </div>
+  </div>
+</article>
+{% empty %}<section class="panel"><p>Nenhum catálogo criado ainda.</p></section>{% endfor %}
+</div>
+{% endblock %}

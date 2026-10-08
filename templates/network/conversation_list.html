@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block heading %}Conversas{% endblock %}{% block subtitle %}Chats privados, grupos e atendimentos da rede, com contador de não lidas.{% endblock %}
+{% block content %}
+<div class="toolbar"><div></div><div class="actions"><a class="btn" href="{% url 'admin_chat' %}">🛟 Falar com admin</a><a class="btn primary" href="{% url 'group_create' %}">👥 Novo grupo</a></div></div>
+<section class="panel"><div class="feed-list">
+{% for c, unread in conversation_rows %}
+<a class="chat-card" href="{% url 'conversation_detail' c.id %}"><div class="opportunity-head"><div><b>{% if c.conversation_type == 'group' %}👥{% elif c.conversation_type == 'admin' %}🛟{% elif c.conversation_type == 'property' %}🏠{% else %}💬{% endif %} {{ c.title|default:'Conversa' }}</b><small class="muted" style="display:block;margin-top:4px">{% for u in c.participants.all %}{{ u.get_full_name|default:u.username }}{% if not forloop.last %}, {% endif %}{% endfor %}</small></div><div class="chat-list-badges">{% if unread %}<span class="unread-pill">{{ unread }}</span>{% endif %}<span class="badge">{{ c.get_conversation_type_display }}</span></div></div></a>
+{% empty %}<p class="muted">Você ainda não tem conversas.</p>{% endfor %}
+</div></section>
+{% endblock %}

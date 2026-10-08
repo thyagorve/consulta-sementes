@@ -391,7 +391,7 @@ class Command(BaseCommand):
 
 ✅ Configuração funcionando corretamente!
 
-📅 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+📅 {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S')}
 🔔 Sistema de notificações do Almoxarifado
 
 📱 Instância: {config.instance_name}

@@ -48,6 +48,7 @@ from .access_control import (
     has_any_direct_permission,
     has_direct_permission,
 )
+from .status_solicitacao import status_automatico, evento_para_status, quantidade_comprometida, quantidade_empenhada_pendente, sincronizar_quantidades_reais
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -4348,7 +4349,7 @@ def historico_geral(request):
     vistos = set()
     unicos = []
     for mov in movimentacoes:
-        data_chave = mov.processado_em.strftime('%Y-%m-%d %H:%M') if mov.processado_em else ''
+        data_chave = timezone.localtime(mov.processado_em).strftime('%Y-%m-%d %H:%M') if mov.processado_em else ''
         chave = (
             str(mov.lote).strip().upper(),
             mov.tipo,
@@ -4572,7 +4573,7 @@ def exportar_excel(request):
             'Tratamento': item.tratamento.nome if item.tratamento else '',
             'Embalagem': item.get_embalagem_display(),
             'Conferente': item.conferente.first_name,
-            'Data Entrada': item.data_entrada.strftime('%d/%m/%Y'),
+            'Data Entrada': timezone.localtime(item.data_entrada).strftime('%d/%m/%Y'),
             'AZ': item.az or '',
             'Origem/Destino': item.origem_destino,
             'Empresa': item.empresa,
@@ -5014,7 +5015,9 @@ def pagina_rascunho(request):
                     try:
                         empenho = (
                             Empenho.objects
-                            .select_for_update()
+                            # solicitacao é FK anulável. Limitar o lock ao Empenho
+                            # evita FOR UPDATE no lado nulo do LEFT OUTER JOIN no PostgreSQL.
+                            .select_for_update(of=('self',))
                             .select_related('solicitacao')
                             .get(id=empenho_id)
                         )
@@ -5944,7 +5947,7 @@ def exportar_mapa_json(request, armazem_numero):
             for elem in elementos
         ],
         'total_elementos': elementos.count(),
-        'exportado_em': timezone.now().isoformat()
+        'exportado_em': timezone.localtime(timezone.now()).isoformat()
     }
     
     return JsonResponse(dados, json_dumps_params={'indent': 2})
@@ -9002,7 +9005,7 @@ def dashboard_data(request):
             ),
             # Ajuda o frontend a distinguir resposta nova do servidor de um
             # snapshot offline sem depender apenas do relógio do navegador.
-            'server_timestamp': timezone.now().isoformat(),
+            'server_timestamp': timezone.localtime(timezone.now()).isoformat(),
         })
         response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response['Pragma'] = 'no-cache'
@@ -9953,11 +9956,40 @@ def validar_endereco(request):
         })
     
 
-def validar_edicao_empenho_solicitacao(solicitacao):
+def usuario_admin_operacional(user):
+    """Administrador funcional usado também nas telas operacionais normais."""
+    if not getattr(user, 'is_authenticated', False):
+        return False
+
+    if (
+        getattr(user, 'is_superuser', False)
+        or getattr(user, 'is_staff', False)
+    ):
+        return True
+
+    return (
+        has_direct_permission(
+            user,
+            'sapp.pode_configuracoes',
+        )
+        and has_direct_permission(
+            user,
+            'sapp.pode_gerenciar_usuarios',
+        )
+    )
+
+
+def validar_edicao_empenho_solicitacao(solicitacao, usuario=None):
     """
-    Impede criação, alteração ou remoção de empenho
-    depois que a movimentação da solicitação começou.
+    Usuários comuns continuam bloqueados depois que a movimentação começa.
+
+    Administradores operacionais podem corrigir/adicionar/remover empenhos em
+    qualquer status pela própria tela de Solicitações. As validações físicas de
+    estoque continuam valendo para impedir saldo impossível.
     """
+
+    if usuario_admin_operacional(usuario):
+        return
 
     status_bloqueados = {
         'MOVIMENTACAO_PARCIAL',
@@ -10284,7 +10316,7 @@ def exportar_estoque_excel(request):
         ws.row_dimensions[1].height = 30
         
         # Prepara resposta
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = timezone.localtime(timezone.now()).strftime('%Y%m%d_%H%M%S')
         filename = f'estoque_{timestamp}.xlsx'
         
         response = HttpResponse(
@@ -10346,7 +10378,7 @@ def api_versao_cargas(request):
     response = JsonResponse({
         'success': True,
         'version': version,
-        'timestamp': timezone.now().isoformat(),
+        'timestamp': timezone.localtime(timezone.now()).isoformat(),
     })
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response['Pragma'] = 'no-cache'
@@ -10398,7 +10430,7 @@ def api_versao_cards(request):
     response = JsonResponse({
         'success': True,
         'version': version,
-        'timestamp': timezone.now().isoformat(),
+        'timestamp': timezone.localtime(timezone.now()).isoformat(),
     })
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response['Pragma'] = 'no-cache'
@@ -10470,15 +10502,39 @@ def api_html_cards_atualizados(request):
     
     data = []
     for sol in solicitacoes:
+        if sol.unidade_controle == 'QUILOGRAMA':
+            qtd_emp_display = sol.quantidade_empenhada_kg or Decimal('0')
+        else:
+            qtd_emp_display = Decimal(str(sol.quantidade_empenhada or 0))
+        qtd_mov_display = Decimal(str(sol.quantidade_movimentada or 0))
+        qtd_atendida_display = qtd_mov_display + qtd_emp_display
+        qtd_solicitada = Decimal(str(sol.quantidade_solicitada or 0))
+        if qtd_solicitada > 0:
+            pct_atendimento = min(
+                (qtd_atendida_display / qtd_solicitada) * Decimal('100'),
+                Decimal('100'),
+            )
+        elif sol.tipo_solicitacao == 'CARGA' and qtd_atendida_display > 0:
+            pct_atendimento = Decimal('100')
+        else:
+            pct_atendimento = Decimal('0')
+
         data.append({
             'id': sol.id,
             'titulo': sol.titulo,
             'criador_nome': sol.criador.get_full_name() or sol.criador.username,
-            'data_criacao': sol.data_criacao.strftime('%d/%m/%Y %H:%M'),
+            'data_criacao': timezone.localtime(sol.data_criacao).strftime('%d/%m/%Y %H:%M'),
             'status': sol.status,
             'unidade_controle': sol.unidade_controle,
             'quantidade_solicitada': float(sol.quantidade_solicitada),
             'quantidade_empenhada': float(sol.quantidade_empenhada),
+            'quantidade_empenhada_display': float(qtd_emp_display),
+            'quantidade_movimentada': float(sol.quantidade_movimentada or 0),
+            'quantidade_atendida_display': float(qtd_atendida_display),
+            'percentual_atendimento': float(pct_atendimento),
+            # O frontend usa este campo para a barra operacional do card.
+            # Empenho pendente não conta como movimentação concluída.
+            'percentual_movimentado': float(sol.percentual_movimentado),
             'percentual_empenhado': float(sol.percentual_empenhado),
             'coluna_kanban': sol.coluna_kanban.nome if sol.coluna_kanban else 'Início',
             'prioridade': sol.prioridade,
@@ -10493,7 +10549,7 @@ def api_html_cards_atualizados(request):
     return JsonResponse({
         'success': True,
         'cards': data,
-        'timestamp': timezone.now().isoformat(),
+        'timestamp': timezone.localtime(timezone.now()).isoformat(),
     })
 
 
@@ -10895,7 +10951,10 @@ def editar_solicitacao(request, solicitacao_id):
         id=solicitacao_id,
     )
 
-    if solicitacao.status in {'CONCLUIDO', 'CANCELADO'}:
+    if (
+        solicitacao.status in {'CONCLUIDO', 'CANCELADO'}
+        and not usuario_admin_operacional(request.user)
+    ):
         messages.warning(
             request,
             'Solicitações concluídas ou canceladas ficam preservadas para auditoria e não podem ser editadas.'
@@ -11003,13 +11062,19 @@ def _item_carga_tem_empenho(item):
     ).exists()
 
 
-def _quantidade_item_carga_empenhada(item):
+def _quantidade_item_carga_pendente(item):
+    """Quantidade da linha que ainda está reservada no empenho."""
     atual = (
         ItemEmpenho.objects
         .filter(item_carga_id=item.id)
         .aggregate(total=Sum('quantidade'))['total']
         or 0
     )
+    return Decimal(str(atual))
+
+
+def _quantidade_item_carga_movimentada(item):
+    """Quantidade da linha que já foi transferida/expedida e ficou no histórico."""
     historica = (
         HistoricoItemEmpenho.objects
         .filter(
@@ -11019,10 +11084,15 @@ def _quantidade_item_carga_empenhada(item):
         .aggregate(total=Sum('quantidade'))['total']
         or 0
     )
-    return Decimal(str(atual)) + Decimal(str(historica))
+    return Decimal(str(historica))
 
 
-def _sincronizar_itens_carga(solicitacao, itens_post):
+def _quantidade_item_carga_empenhada(item):
+    """Compatibilidade: total atendido da linha = movimentado + empenho pendente."""
+    return _quantidade_item_carga_pendente(item) + _quantidade_item_carga_movimentada(item)
+
+
+def _sincronizar_itens_carga(solicitacao, itens_post, *, admin_operacional=False):
     """
     Atualiza somente linhas que ainda nunca foram empenhadas.
 
@@ -11047,9 +11117,25 @@ def _sincronizar_itens_carga(solicitacao, itens_post):
 
             recebidos.add(item_id)
 
-            # Linha já usada no empenho é imutável em cliente/código/quantidade.
-            if _item_carga_tem_empenho(item):
+            # Usuário normal mantém a proteção original. O admin pode corrigir
+            # cliente/código/quantidade, mas a meta da linha nunca pode ficar
+            # abaixo do que já está comprometido: movimentado + empenho pendente.
+            if _item_carga_tem_empenho(item) and not admin_operacional:
                 continue
+
+            if admin_operacional and _item_carga_tem_empenho(item):
+                minimo_linha = (
+                    _quantidade_item_carga_pendente(item)
+                    + _quantidade_item_carga_movimentada(item)
+                )
+                nova_qtd = Decimal(str(dados.get('quantidade_solicitada') or 0))
+                if nova_qtd < minimo_linha:
+                    raise ValueError(
+                        f'A linha {item.cliente} / {item.codigo} não pode ficar abaixo de '
+                        f'{minimo_linha} embalagem(ns), pois esse total já está comprometido '
+                        '(movimentado + empenho pendente). Para reduzir mais, desfaça primeiro '
+                        'a movimentação ou remova corretamente o empenho.'
+                    )
 
             for campo in (
                 'cliente', 'produto', 'codigo', 'descricao',
@@ -11080,6 +11166,98 @@ def _sincronizar_itens_carga(solicitacao, itens_post):
         raise ValueError('A carga precisa possuir pelo menos um item.')
 
 
+def _ajustar_total_itens_carga_admin(solicitacao, quantidade_total):
+    """
+    Ajusta o total de uma CARGA pelo campo geral usado pelo administrador.
+
+    As linhas continuam sendo a referência comercial do empenho, mas o admin
+    pode alterar o total geral sem precisar fazer a conta manualmente em cada
+    linha. O ajuste nunca reduz uma linha abaixo do que já está comprometido:
+    movimentado no histórico + empenho ainda pendente. Diferenças para cima são
+    colocadas na última linha; diferenças para baixo consomem somente a folga
+    realmente livre, começando pelas últimas linhas.
+    """
+    alvo = Decimal(str(quantidade_total or 0))
+    if alvo < 0:
+        raise ValueError('A quantidade total da carga não pode ser negativa.')
+
+    itens = list(
+        solicitacao.itens_carga
+        .select_for_update()
+        .order_by('ordem', 'id')
+    )
+    if not itens:
+        raise ValueError('A carga precisa possuir pelo menos um item.')
+
+    comprometidos_linha = {
+        item.id: (
+            _quantidade_item_carga_pendente(item)
+            + _quantidade_item_carga_movimentada(item)
+        )
+        for item in itens
+    }
+    minimo_linhas = sum(comprometidos_linha.values(), Decimal('0'))
+    minimo_global = quantidade_comprometida(solicitacao)
+    minimo = max(minimo_linhas, minimo_global)
+
+    if alvo < minimo:
+        raise ValueError(
+            f'A quantidade total da carga não pode ser menor que {minimo}, '
+            'pois esse total já está comprometido (movimentado + empenho pendente). '
+            'Para reduzir mais, desfaça primeiro a movimentação ou remova corretamente o empenho.'
+        )
+
+    # Zero é tratado como carga aberta. Só é permitido quando ainda não há
+    # qualquer quantidade comprometida. Nesse caso todas as linhas voltam a
+    # ficar abertas para que o comportamento continue coerente com o modelo.
+    if alvo == 0:
+        for item in itens:
+            if Decimal(str(item.quantidade_solicitada or 0)) != 0:
+                item.quantidade_solicitada = Decimal('0')
+                item.save(update_fields=['quantidade_solicitada', 'atualizado_em'])
+        return Decimal('0')
+
+    quantidades = {}
+    for item in itens:
+        atual = Decimal(str(item.quantidade_solicitada or 0))
+        quantidades[item.id] = max(atual, comprometidos_linha[item.id])
+
+    total_atual = sum(quantidades.values(), Decimal('0'))
+
+    if total_atual < alvo:
+        # A linha mais recente recebe a diferença. O admin ainda pode editar
+        # as linhas manualmente antes de salvar caso queira outra distribuição.
+        ultimo = itens[-1]
+        quantidades[ultimo.id] += alvo - total_atual
+
+    elif total_atual > alvo:
+        reduzir = total_atual - alvo
+        for item in reversed(itens):
+            minimo_item = comprometidos_linha[item.id]
+            folga = max(Decimal('0'), quantidades[item.id] - minimo_item)
+            if folga <= 0:
+                continue
+            abatimento = min(folga, reduzir)
+            quantidades[item.id] -= abatimento
+            reduzir -= abatimento
+            if reduzir <= 0:
+                break
+
+        if reduzir > 0:
+            raise ValueError(
+                'Não foi possível reduzir a carga até esse total sem atingir '
+                'quantidades já movimentadas ou ainda empenhadas.'
+            )
+
+    for item in itens:
+        nova = quantidades[item.id]
+        if Decimal(str(item.quantidade_solicitada or 0)) != nova:
+            item.quantidade_solicitada = nova
+            item.save(update_fields=['quantidade_solicitada', 'atualizado_em'])
+
+    return alvo
+
+
 def _reservar_titulo_carga():
     """Reserva, com lock, o próximo título CARGA N sem reutilizar números."""
     config = (
@@ -11108,7 +11286,7 @@ def _descricao_produto_por_codigo(codigo):
     return (produto.descricao or '') if produto else ''
 
 
-def _contexto_form_solicitacao(solicitacao=None, edicao_estrutural_bloqueada=False):
+def _contexto_form_solicitacao(solicitacao=None, edicao_estrutural_bloqueada=False, usuario=None):
     produtos = (
         Produto.objects
         .select_related('cultivar')
@@ -11124,12 +11302,26 @@ def _contexto_form_solicitacao(solicitacao=None, edicao_estrutural_bloqueada=Fal
         for p in produtos
     ]
 
+    admin_operacional = usuario_admin_operacional(usuario)
     itens_carga_edicao = []
     if solicitacao:
         for item in solicitacao.itens_carga.all():
-            item.quantidade_empenhada_edicao = _quantidade_item_carga_empenhada(item)
-            item.edicao_bloqueada = item.quantidade_empenhada_edicao > 0
+            item.quantidade_empenhada_edicao = _quantidade_item_carga_pendente(item)
+            item.quantidade_movimentada_edicao = _quantidade_item_carga_movimentada(item)
+            item.quantidade_minima_edicao = (
+                item.quantidade_empenhada_edicao + item.quantidade_movimentada_edicao
+            )
+            item.edicao_bloqueada = (
+                _item_carga_tem_empenho(item) and not admin_operacional
+            )
+            # Mesmo para admin, linha com histórico não deve ser apagada; ela pode
+            # ser corrigida e aumentada, preservando o vínculo histórico antigo.
+            item.remocao_bloqueada = _item_carga_tem_empenho(item)
             itens_carga_edicao.append(item)
+
+    quantidade_minima_admin = Decimal('0')
+    if solicitacao:
+        quantidade_minima_admin = quantidade_comprometida(solicitacao)
 
     return {
         'armazens': Armazem.objects.all().order_by('nome'),
@@ -11141,13 +11333,25 @@ def _contexto_form_solicitacao(solicitacao=None, edicao_estrutural_bloqueada=Fal
         # Bloqueio GLOBAL continua válido para tipo/armazém e solicitação normal.
         # Carga usa item.edicao_bloqueada para bloquear somente a linha já empenhada.
         'edicao_estrutural_bloqueada': edicao_estrutural_bloqueada,
+        'admin_operacional': admin_operacional,
+        'quantidade_minima_admin': quantidade_minima_admin,
     }
 
 
 def _salvar_solicitacao_form(request, solicitacao=None):
     editando = solicitacao is not None
+    admin_operacional = usuario_admin_operacional(request.user)
+
+    if editando:
+        sincronizar_quantidades_reais(
+            solicitacao,
+            atualizar_status=True,
+            persistir=True,
+        )
     edicao_estrutural_bloqueada = bool(
-        editando and (
+        editando
+        and not admin_operacional
+        and (
             Decimal(str(solicitacao.quantidade_empenhada or 0)) > 0
             or Decimal(str(solicitacao.quantidade_movimentada or 0)) > 0
         )
@@ -11200,6 +11404,15 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                 solicitacao.destino = destino
                 solicitacao.observacao = observacao or None
                 solicitacao.prioridade = prioridade
+
+                quantidade_total_carga_admin = None
+                if tipo == 'CARGA' and editando and admin_operacional:
+                    quantidade_total_carga_admin = _parse_decimal_solicitacao(
+                        request.POST.get(
+                            'quantidade_solicitada',
+                            str(solicitacao.quantidade_solicitada or 0),
+                        )
+                    )
 
                 if tipo == 'CARGA':
                     motorista = normalizar_texto_cadastro(request.POST.get('motorista', ''))
@@ -11256,17 +11469,26 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                             for item in itens_carga
                         ])
                     else:
-                        _sincronizar_itens_carga(solicitacao, itens_carga)
+                        _sincronizar_itens_carga(solicitacao, itens_carga, admin_operacional=admin_operacional)
 
-                    tem_linha_aberta = solicitacao.itens_carga.filter(quantidade_solicitada__lte=0).exists()
-                    total_carga = (
-                        solicitacao.itens_carga
-                        .aggregate(total=Sum('quantidade_solicitada'))['total']
-                        or Decimal('0')
-                    )
-                    # Se qualquer linha estiver sem quantidade, a carga é aberta como um todo.
-                    # Linhas que possuem quantidade continuam respeitando seu próprio limite.
-                    solicitacao.quantidade_solicitada = Decimal('0') if tem_linha_aberta else Decimal(str(total_carga))
+                    if editando and admin_operacional and quantidade_total_carga_admin is not None:
+                        # No modo admin o total geral também é editável. A rotina
+                        # redistribui somente a parte ainda livre das linhas, sem
+                        # apagar nem diminuir histórico/empenho já existente.
+                        solicitacao.quantidade_solicitada = _ajustar_total_itens_carga_admin(
+                            solicitacao,
+                            quantidade_total_carga_admin,
+                        )
+                    else:
+                        tem_linha_aberta = solicitacao.itens_carga.filter(quantidade_solicitada__lte=0).exists()
+                        total_carga = (
+                            solicitacao.itens_carga
+                            .aggregate(total=Sum('quantidade_solicitada'))['total']
+                            or Decimal('0')
+                        )
+                        # Se qualquer linha estiver sem quantidade, a carga é aberta como um todo.
+                        # Linhas que possuem quantidade continuam respeitando seu próprio limite.
+                        solicitacao.quantidade_solicitada = Decimal('0') if tem_linha_aberta else Decimal(str(total_carga))
 
                     # Se o total foi corrigido/adicionado, o status acompanha o saldo.
                     if solicitacao.status in {
@@ -11289,6 +11511,29 @@ def _salvar_solicitacao_form(request, solicitacao=None):
                     # Se mudou de uma carga ainda sem empenho para transferência,
                     # remove as linhas antigas porque ainda não possuem histórico físico.
                     solicitacao.itens_carga.all().delete()
+
+                # Administrador pode reabrir/aumentar uma solicitação antiga,
+                # mas nunca reduzir a meta abaixo do que já está comprometido
+                # fisicamente: movimentado válido + empenho ainda pendente.
+                if editando and admin_operacional:
+                    minimo_comprometido = quantidade_comprometida(solicitacao)
+                    solicitado_atual = Decimal(str(solicitacao.quantidade_solicitada or 0))
+                    if solicitado_atual > 0 and solicitado_atual < minimo_comprometido:
+                        raise ValueError(
+                            f'A quantidade solicitada não pode ser menor que {minimo_comprometido}, '
+                            'pois esse total já está comprometido (movimentado + empenho pendente). '
+                            'Para reduzir mais, desfaça primeiro a movimentação ou remova corretamente o empenho.'
+                        )
+
+                    solicitacao.status = status_automatico(solicitacao)
+                    solicitacao.save(update_fields=['status', 'data_atualizacao'])
+
+                    # Sempre sincroniza a coluna do Kanban com o estado final.
+                    # Isso também corrige cards antigos que já estavam na coluna
+                    # errada antes desta edição administrativa.
+                    evento_reabertura = evento_para_status(solicitacao.status)
+                    if evento_reabertura:
+                        avaliar_workflow(solicitacao, evento_reabertura, request.user)
 
                 if is_new:
                     avaliar_workflow(solicitacao, 'CRIACAO', request.user)
@@ -11333,7 +11578,7 @@ def _salvar_solicitacao_form(request, solicitacao=None):
     return render(
         request,
         'sapp/criar_solicitacao.html',
-        _contexto_form_solicitacao(solicitacao, edicao_estrutural_bloqueada),
+        _contexto_form_solicitacao(solicitacao, edicao_estrutural_bloqueada, request.user),
     )
 
 def _data_local_formatada(valor):
@@ -11837,8 +12082,15 @@ def api_dados_impressao_solicitacao(
 @login_required
 @permission_required('sapp.pode_ver_empenhos', raise_exception=True)
 def pagina_solicitacoes(request):
-    """Página principal de solicitações"""
-    return render(request, 'sapp/pagina_solicitacoes.html')
+    """Página principal de solicitações."""
+    admin_operacional = usuario_admin_operacional(
+        request.user
+    )
+    return render(
+        request,
+        'sapp/pagina_solicitacoes.html',
+        {'admin_operacional': admin_operacional},
+    )
 
 
 # ============================================================================
@@ -11882,18 +12134,27 @@ def api_listar_solicitacoes(request):
                 str(sol.quantidade_empenhada)
             )
 
+        quantidade_movimentada_display = Decimal(
+            str(sol.quantidade_movimentada or 0)
+        )
+        quantidade_atendida = quantidade_movimentada_display + qtd_emp
+
         if sol.quantidade_solicitada > 0:
             percentual = (
                 qtd_emp
                 / sol.quantidade_solicitada
             ) * 100
-        elif sol.tipo_solicitacao == 'CARGA' and qtd_emp > 0:
-            # Carga aberta não possui teto pré-definido: qualquer quantidade
-            # empenhada representa 100% do ciclo atual, mas novos empenhos
-            # continuam permitidos até a movimentação começar.
-            percentual = Decimal('100')
+            percentual_atendimento = min(
+                (quantidade_atendida / sol.quantidade_solicitada) * 100,
+                Decimal('100'),
+            )
+        elif sol.tipo_solicitacao == 'CARGA' and quantidade_atendida > 0:
+            # Carga aberta não possui teto pré-definido.
+            percentual = Decimal('100') if qtd_emp > 0 else Decimal('0')
+            percentual_atendimento = Decimal('100')
         else:
             percentual = Decimal('0')
+            percentual_atendimento = Decimal('0')
 
 
         # =====================================================
@@ -12042,6 +12303,11 @@ def api_listar_solicitacoes(request):
                 sol.quantidade_movimentada
             ),
 
+            # Progresso operacional: histórico já movimentado + o que ainda
+            # está reservado. Isso evita um card reaberto parecer voltar a zero.
+            'quantidade_atendida_display': float(quantidade_atendida),
+            'percentual_atendimento': float(percentual_atendimento),
+
             'percentual_empenhado': float(
                 percentual
             ),
@@ -12139,6 +12405,12 @@ def api_lotes_disponiveis_para_solicitacao(
         id=solicitacao_id
     )
 
+    sincronizar_quantidades_reais(
+        solicitacao,
+        atualizar_status=True,
+        persistir=True,
+    )
+
     # Busca exclusivamente o empenho salvo deste card.
     empenho = obter_empenho_da_solicitacao(
         solicitacao=solicitacao,
@@ -12161,6 +12433,7 @@ def api_lotes_disponiveis_para_solicitacao(
             _sincronizar_item_carga_com_produto(item)
 
     totais_empenhados_carga = {}
+    totais_movimentados_carga = {}
     item_carga_ativo = None
 
     if solicitacao.tipo_solicitacao == 'CARGA':
@@ -12173,6 +12446,16 @@ def api_lotes_disponiveis_para_solicitacao(
             .values('item_carga_id')
             .annotate(total=Sum('quantidade'))
             .values_list('item_carga_id', 'total')
+        )
+        totais_movimentados_carga = dict(
+            HistoricoItemEmpenho.objects
+            .filter(
+                empenho__solicitacao_id=solicitacao.id,
+                item_carga_id_original__isnull=False,
+            )
+            .values('item_carga_id_original')
+            .annotate(total=Sum('quantidade'))
+            .values_list('item_carga_id_original', 'total')
         )
 
         item_carga_id_param = request.GET.get('item_carga_id')
@@ -12193,8 +12476,10 @@ def api_lotes_disponiveis_para_solicitacao(
             item_carga_ativo = next(
                 (
                     item for item in itens_carga
-                    if Decimal(str(totais_empenhados_carga.get(item.id, 0) or 0))
-                    < Decimal(str(item.quantidade_solicitada or 0))
+                    if (
+                        Decimal(str(totais_movimentados_carga.get(item.id, 0) or 0))
+                        + Decimal(str(totais_empenhados_carga.get(item.id, 0) or 0))
+                    ) < Decimal(str(item.quantidade_solicitada or 0))
                 ),
                 itens_carga[0] if itens_carga else None,
             )
@@ -12695,13 +12980,20 @@ def api_lotes_disponiveis_para_solicitacao(
         )
     )
 
+    admin_operacional = usuario_admin_operacional(
+        request.user
+    )
+
     empenho_bloqueado = (
-        solicitacao.status in {
-            'MOVIMENTACAO_PARCIAL',
-            'CONCLUIDO',
-            'CANCELADO',
-        }
-        or quantidade_movimentada > 0
+        not admin_operacional
+        and (
+            solicitacao.status in {
+                'MOVIMENTACAO_PARCIAL',
+                'CONCLUIDO',
+                'CANCELADO',
+            }
+            or quantidade_movimentada > 0
+        )
     )
 
     itens_carga_resumo = []
@@ -12712,8 +13004,14 @@ def api_lotes_disponiveis_para_solicitacao(
         for item in itens_carga:
             qtd_item = Decimal(str(item.quantidade_solicitada or 0))
             qtd_emp_item = Decimal(str(totais_empenhados_carga.get(item.id, 0) or 0))
+            qtd_mov_item = Decimal(str(totais_movimentados_carga.get(item.id, 0) or 0))
+            qtd_atendida_item = qtd_mov_item + qtd_emp_item
             ilimitado = qtd_item <= 0
-            restante_item = Decimal('0') if ilimitado else max(Decimal('0'), qtd_item - qtd_emp_item)
+            restante_item = (
+                Decimal('0')
+                if ilimitado
+                else max(Decimal('0'), qtd_item - qtd_atendida_item)
+            )
             itens_carga_resumo.append({
                 'id': item.id,
                 'ordem': item.ordem,
@@ -12724,6 +13022,8 @@ def api_lotes_disponiveis_para_solicitacao(
                 'peneira': item.peneira,
                 'quantidade_solicitada': float(qtd_item),
                 'quantidade_empenhada': float(qtd_emp_item),
+                'quantidade_movimentada': float(qtd_mov_item),
+                'quantidade_atendida': float(qtd_atendida_item),
                 'quantidade_restante': None if ilimitado else float(restante_item),
                 'quantidade_aberta': ilimitado,
                 'completo': False if ilimitado else restante_item <= 0,
@@ -12732,6 +13032,11 @@ def api_lotes_disponiveis_para_solicitacao(
         if item_carga_ativo:
             quantidade_solicitada_escopo = Decimal(str(item_carga_ativo.quantidade_solicitada or 0))
             quantidade_empenhada_escopo = Decimal(str(totais_empenhados_carga.get(item_carga_ativo.id, 0) or 0))
+            quantidade_movimentada_escopo = Decimal(str(totais_movimentados_carga.get(item_carga_ativo.id, 0) or 0))
+        else:
+            quantidade_movimentada_escopo = Decimal('0')
+    else:
+        quantidade_movimentada_escopo = Decimal(str(solicitacao.quantidade_movimentada or 0))
 
     return JsonResponse({
         'success': True,
@@ -12751,6 +13056,7 @@ def api_lotes_disponiveis_para_solicitacao(
             'tipo_solicitacao': solicitacao.tipo_solicitacao,
             'quantidade_solicitada_escopo': float(quantidade_solicitada_escopo),
             'quantidade_empenhada_escopo': float(quantidade_empenhada_escopo),
+            'quantidade_movimentada_escopo': float(quantidade_movimentada_escopo),
 
             'quantidade_solicitada': float(
                 solicitacao.quantidade_solicitada
@@ -12777,6 +13083,7 @@ def api_lotes_disponiveis_para_solicitacao(
             'cliente': solicitacao.cliente or ('CS' if solicitacao.tipo_solicitacao != 'CARGA' else ''),
 
             'empenho_bloqueado': empenho_bloqueado,
+            'admin_operacional': admin_operacional,
         },
 
         'empenho_id': (
@@ -12871,10 +13178,33 @@ def empenhar_na_solicitacao(
                 )
             )
 
-            # Depois que começou a movimentar,
-            # não pode criar nem atualizar empenho.
+            admin_operacional = usuario_admin_operacional(
+                request.user
+            )
+
+            # Reconstrói os contadores a partir do empenho pendente e do
+            # histórico físico antes de tomar qualquer decisão. Corrige cards
+            # legados em que existia EXPEDIDO/TRANSFERIDO, mas o contador do
+            # card havia ficado zerado.
+            sincronizar_quantidades_reais(
+                solicitacao,
+                atualizar_status=True,
+                persistir=True,
+            )
+
+            status_anterior = solicitacao.status
+            quantidade_movimentada_anterior = Decimal(
+                str(
+                    solicitacao.quantidade_movimentada
+                    or 0
+                )
+            )
+
+            # Usuário normal continua congelado após a movimentação.
+            # Administrador operacional pode corrigir o empenho por esta tela.
             validar_edicao_empenho_solicitacao(
-                solicitacao
+                solicitacao,
+                request.user,
             )
 
             status_rascunho, _ = (
@@ -13097,6 +13427,10 @@ def empenhar_na_solicitacao(
                 )
 
                 if item_carga:
+                    # O limite da linha deve considerar tudo que já saiu dela no
+                    # passado + o que continua reservado agora. Sem isso, uma
+                    # linha reaberta após movimentação parece "zerada" e pode
+                    # ultrapassar a meta sem que o histórico seja levado em conta.
                     outros_da_linha = (
                         ItemEmpenho.objects
                         .filter(
@@ -13107,13 +13441,38 @@ def empenhar_na_solicitacao(
                         .aggregate(total=Sum('quantidade'))['total']
                         or 0
                     )
-                    total_linha = Decimal(str(outros_da_linha)) + quantidade_final
+                    historico_da_linha = (
+                        HistoricoItemEmpenho.objects
+                        .filter(
+                            empenho__solicitacao_id=solicitacao.id,
+                            item_carga_id_original=item_carga.id,
+                        )
+                        .aggregate(total=Sum('quantidade'))['total']
+                        or 0
+                    )
+                    total_linha = (
+                        Decimal(str(historico_da_linha))
+                        + Decimal(str(outros_da_linha))
+                        + quantidade_final
+                    )
                     limite_linha = Decimal(str(item_carga.quantidade_solicitada or 0))
                     if limite_linha > 0 and total_linha > limite_linha:
-                        raise ValueError(
-                            f'A linha da carga {item_carga.cliente} / {item_carga.codigo} permite no máximo '
-                            f'{limite_linha} embalagem(ns). Já ficaria com {total_linha}.'
-                        )
+                        if admin_operacional:
+                            # Admin pode ampliar a linha, mas nunca apaga o que já
+                            # foi movimentado. A nova meta passa a incluir o total
+                            # histórico + pendente.
+                            item_carga.quantidade_solicitada = total_linha
+                            item_carga.save(
+                                update_fields=[
+                                    'quantidade_solicitada',
+                                    'atualizado_em',
+                                ]
+                            )
+                        else:
+                            raise ValueError(
+                                f'A linha da carga {item_carga.cliente} / {item_carga.codigo} permite no máximo '
+                                f'{limite_linha} embalagem(ns). Já ficaria com {total_linha} contando o histórico.'
+                            )
 
                 if (
                     quantidade_final
@@ -13163,16 +13522,28 @@ def empenhar_na_solicitacao(
                     )
 
                     if (
-                        total_kg_empenhado
+                        quantidade_solicitada > 0
+                        and total_kg_empenhado
                         > quantidade_solicitada
                     ):
-                        raise ValueError(
-                            f'O total de '
-                            f'{total_kg_empenhado:.2f} KG '
-                            f'excede os '
-                            f'{quantidade_solicitada:.2f} KG '
-                            f'solicitados.'
-                        )
+                        if admin_operacional:
+                            nova_meta_kg = max(
+                                quantidade_solicitada,
+                                quantidade_movimentada_anterior
+                                + total_kg_empenhado,
+                            )
+                            solicitacao.quantidade_solicitada = (
+                                nova_meta_kg
+                            )
+                            quantidade_solicitada = nova_meta_kg
+                        else:
+                            raise ValueError(
+                                f'O total de '
+                                f'{total_kg_empenhado:.2f} KG '
+                                f'excede os '
+                                f'{quantidade_solicitada:.2f} KG '
+                                f'solicitados.'
+                            )
 
                 # ------------------------------------------------------
                 # SALVAR ITEM NO EMPENHO DO CARD ATUAL
@@ -13201,11 +13572,15 @@ def empenhar_na_solicitacao(
                     item_existente.cliente_solicitacao_snapshot = cliente_solicitacao_item
                     item_existente.codigo_produto_snapshot = codigo_solicitacao_item
                     item_existente.descricao_produto_snapshot = descricao_solicitacao_item
+                    item_existente.endereco_destino = (
+                        solicitacao.destino or ''
+                    )
                     campos_update = [
                         'quantidade',
                         'cliente_solicitacao_snapshot',
                         'codigo_produto_snapshot',
                         'descricao_produto_snapshot',
+                        'endereco_destino',
                     ]
                     if item_carga:
                         item_existente.item_carga = item_carga
@@ -13218,6 +13593,7 @@ def empenhar_na_solicitacao(
                         estoque=lote,
                         item_carga=item_carga,
                         quantidade=quantidade_adicionar,
+                        endereco_destino=(solicitacao.destino or ''),
                         cliente_solicitacao_snapshot=cliente_solicitacao_item,
                         codigo_produto_snapshot=codigo_solicitacao_item,
                         descricao_produto_snapshot=descricao_solicitacao_item,
@@ -13380,7 +13756,34 @@ def empenhar_na_solicitacao(
             # ----------------------------------------------------------
             # ATUALIZAR STATUS
             # ----------------------------------------------------------
-            if quantidade_para_status <= 0:
+            quantidade_movimentada_atual = Decimal(
+                str(
+                    solicitacao.quantidade_movimentada
+                    or 0
+                )
+            )
+
+            # Admin pode reabrir um concluído sem apagar o passado. O estado
+            # passa a ser calculado por: movimentado histórico + empenhado atual
+            # versus a nova meta. Ex.: 10/10 concluído -> meta 12 -> aguardando
+            # empenho; reservou 2 -> movimentação parcial; moveu os 2 -> concluído.
+            if admin_operacional:
+                total_operacional = (
+                    quantidade_movimentada_atual
+                    + quantidade_para_status
+                )
+
+                if (
+                    quantidade_solicitada > 0
+                    and total_operacional > quantidade_solicitada
+                ):
+                    quantidade_solicitada = total_operacional
+                    solicitacao.quantidade_solicitada = quantidade_solicitada
+
+                solicitacao.status = status_automatico(solicitacao)
+                evento = evento_para_status(solicitacao.status)
+
+            elif quantidade_para_status <= 0:
                 solicitacao.status = 'AGUARDANDO_EMPENHO'
                 evento = 'CRIACAO'
 
@@ -13409,6 +13812,7 @@ def empenhar_na_solicitacao(
 
             solicitacao.save(
                 update_fields=[
+                    'quantidade_solicitada',
                     'quantidade_empenhada',
                     'status',
                     'data_atualizacao',
@@ -13522,194 +13926,206 @@ def api_remover_item_empenho(
     item_id
 ):
     """
-    Remove um item exclusivamente do empenho do card atual.
+    Remove um item do empenho do card atual.
 
-    Não permite remoção depois que a movimentação começou.
+    Regra administrativa de segurança:
+    se o MESMO lote/linha já possuir transferência ou expedição válida,
+    a movimentação precisa voltar fisicamente primeiro. A primeira chamada
+    responde com MOVIMENTACAO_EXISTENTE; após confirmação da interface, a
+    segunda chamada desfaz as movimentações, restaura estoque/empenho e só
+    então exclui a reserva inteira.
     """
 
     if request.method != 'POST':
         return JsonResponse(
-            {
-                'success': False,
-                'error': 'Método não permitido.'
-            },
-            status=405
+            {'success': False, 'error': 'Método não permitido.'},
+            status=405,
         )
 
     try:
-        with transaction.atomic():
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        payload = {}
 
+    confirmar_desfazer = bool(
+        payload.get('desfazer_movimentacoes')
+    )
+
+    try:
+        with transaction.atomic():
             solicitacao = (
                 Solicitacao.objects
-                .select_for_update(
-                    of=('self',)
-                )
-                .get(
-                    id=solicitacao_id
-                )
+                .select_for_update(of=('self',))
+                .get(id=solicitacao_id)
+            )
+
+            admin_operacional = usuario_admin_operacional(
+                request.user
+            )
+
+            sincronizar_quantidades_reais(
+                solicitacao,
+                atualizar_status=True,
+                persistir=True,
             )
 
             validar_edicao_empenho_solicitacao(
-                solicitacao
+                solicitacao,
+                request.user,
             )
 
             item = (
                 ItemEmpenho.objects
                 .select_for_update(of=('self',))
-                .select_related('empenho')
+                .select_related('empenho', 'estoque')
                 .get(
                     id=item_id,
                     empenho__solicitacao_id=solicitacao.id,
                     empenho__status__nome='Rascunho',
                 )
             )
-            empenho = item.empenho
-
-            quantidade_removida = Decimal(
-                str(
-                    item.quantidade
-                    or 0
-                )
-            )
-
-            lote_nome = item.lote
 
             estoque_id = item.estoque_id
+            item_carga_id = item.item_carga_id
+            lote_nome = item.lote or item.estoque.lote or ''
 
-            peso_unitario = Decimal('0')
-
-            if estoque_id:
-                estoque = (
-                    Estoque.objects
-                    .select_for_update(
-                        of=('self',)
-                    )
-                    .get(
-                        id=estoque_id
-                    )
+            historicos_relacionados = (
+                HistoricoItemEmpenho.objects
+                # Trava somente HistoricoItemEmpenho. estoque_destino é anulável
+                # e gera LEFT OUTER JOIN; PostgreSQL recusa FOR UPDATE no lado
+                # anulável quando o lock não é limitado ao modelo base.
+                .select_for_update(of=('self',))
+                .select_related(
+                    'empenho',
+                    'estoque_origem',
+                    'estoque_destino',
                 )
-
-                peso_unitario = Decimal(
-                    str(
-                        estoque.peso_unitario
-                        or 0
-                    )
+                .filter(
+                    empenho__solicitacao_id=solicitacao.id,
+                    estoque_origem_id=estoque_id,
                 )
+                .exclude(tipo='removido')
+            )
 
-            # Executa o delete personalizado do item.
-            item.delete()
-
-            # ----------------------------------------------------------
-            # RECALCULAR EMPENHO DO CARD
-            # ----------------------------------------------------------
-            if (
-                solicitacao.unidade_controle
-                == 'QUILOGRAMA'
-            ):
-                total_restante = Decimal('0')
-
-                itens_restantes = (
-                    ItemEmpenho.objects
-                    .filter(empenho__solicitacao_id=solicitacao.id)
-                    .select_related('estoque')
+            if item_carga_id:
+                historicos_relacionados = historicos_relacionados.filter(
+                    item_carga_id_original=item_carga_id
                 )
-
-                for item_restante in itens_restantes:
-                    quantidade = Decimal(
-                        str(
-                            item_restante.quantidade
-                            or 0
-                        )
-                    )
-
-                    peso = Decimal(
-                        str(
-                            item_restante
-                            .estoque
-                            .peso_unitario
-                            or 0
-                        )
-                    )
-
-                    total_restante += (
-                        quantidade
-                        * peso
-                    )
-
-                solicitacao.quantidade_empenhada = (
-                    total_restante
-                )
-
-                quantidade_historico = (
-                    quantidade_removida
-                    * peso_unitario
-                )
-
-                unidade_historico = 'KG'
-
             else:
-                total_restante = (
-                    ItemEmpenho.objects
-                    .filter(empenho__solicitacao_id=solicitacao.id)
-                    .aggregate(total=Sum('quantidade'))['total']
-                    or Decimal('0')
+                historicos_relacionados = historicos_relacionados.filter(
+                    item_carga_id_original__isnull=True
                 )
 
-                solicitacao.quantidade_empenhada = (
-                    Decimal(
-                        str(
-                            total_restante
-                        )
+            historicos_relacionados = list(
+                historicos_relacionados.order_by(
+                    '-processado_em',
+                    '-id',
+                )
+            )
+
+            quantidade_movimentada_relacionada = sum(
+                (Decimal(str(h.quantidade or 0)) for h in historicos_relacionados),
+                Decimal('0'),
+            )
+
+            if historicos_relacionados and admin_operacional and not confirmar_desfazer:
+                return JsonResponse(
+                    {
+                        'success': False,
+                        'code': 'MOVIMENTACAO_EXISTENTE',
+                        'error': (
+                            f'O lote {lote_nome} possui '
+                            f'{quantidade_movimentada_relacionada} unidade(s) já '
+                            'transferida(s)/expedida(s). Para excluir o lote do card, '
+                            'primeiro é necessário desfazer essa movimentação e devolver '
+                            'fisicamente o saldo ao estoque.'
+                        ),
+                        'lote': lote_nome,
+                        'quantidade_movimentada': float(
+                            quantidade_movimentada_relacionada
+                        ),
+                        'movimentacoes': len(historicos_relacionados),
+                        'pode_desfazer_e_excluir': True,
+                    },
+                    status=409,
+                )
+
+            movimentacoes_desfeitas = 0
+            if historicos_relacionados:
+                # Usuário normal nunca chega aqui após movimentação por causa de
+                # validar_edicao_empenho_solicitacao. Para admin, a confirmação
+                # executa o caminho inverso real antes da exclusão.
+                if not admin_operacional:
+                    raise ValueError(
+                        'Este lote possui movimentação. Desfaça a movimentação antes de removê-lo.'
                     )
+
+                from .admin_operacional import _desfazer_historico_item
+
+                for historico in historicos_relacionados:
+                    _desfazer_historico_item(
+                        historico,
+                        request.user,
+                    )
+                    movimentacoes_desfeitas += 1
+
+                # O desfazer recria ou incrementa ItemEmpenho. Rebuscamos o item
+                # porque a quantidade agora inclui o que voltou fisicamente.
+                filtro_restaurado = {
+                    'empenho__solicitacao_id': solicitacao.id,
+                    'empenho__status__nome': 'Rascunho',
+                    'estoque_id': estoque_id,
+                }
+                if item_carga_id:
+                    filtro_restaurado['item_carga_id'] = item_carga_id
+                else:
+                    filtro_restaurado['item_carga__isnull'] = True
+
+                item = (
+                    ItemEmpenho.objects
+                    .select_for_update(of=('self',))
+                    .select_related('estoque', 'empenho')
+                    .filter(**filtro_restaurado)
+                    .order_by('-id')
+                    .first()
                 )
 
-                quantidade_historico = (
-                    quantidade_removida
-                )
+                if not item:
+                    raise ValueError(
+                        'A movimentação foi restaurada, mas não foi possível reconstruir '
+                        'o item do empenho para concluir a exclusão.'
+                    )
 
-                unidade_historico = 'BAG'
-
-            quantidade_solicitada = Decimal(
+            quantidade_removida = Decimal(str(item.quantidade or 0))
+            peso_unitario = Decimal(
                 str(
-                    solicitacao.quantidade_solicitada
+                    item.peso_unitario_snapshot
+                    or item.estoque.peso_unitario
                     or 0
                 )
             )
+            empenho = item.empenho
 
-            if (
-                solicitacao.quantidade_empenhada
-                <= 0
-            ):
-                solicitacao.status = (
-                    'AGUARDANDO_EMPENHO'
-                )
+            # Somente agora, com toda movimentação relacionada já revertida,
+            # libera a reserva no Estoque.empenhado.
+            item.delete()
 
-                evento = 'CRIACAO'
-
-            elif (
-                solicitacao.quantidade_empenhada
-                >= quantidade_solicitada
-            ):
-                solicitacao.status = (
-                    'EMPENHO_COMPLETO'
-                )
-
-                evento = 'EMPENHO_COMPLETO'
-
-            else:
-                solicitacao.status = (
-                    'EMPENHO_PARCIAL'
-                )
-
-                evento = 'EMPENHO_PARCIAL'
-
-            solicitacao.save(
-                update_fields=[
-                    'quantidade_empenhada',
-                    'status',
-                    'data_atualizacao',
-                ]
+            sincronizar_quantidades_reais(
+                solicitacao,
+                atualizar_status=True,
+                persistir=True,
             )
+
+            if solicitacao.unidade_controle == 'QUILOGRAMA':
+                quantidade_historico = quantidade_removida * peso_unitario
+                unidade_historico = 'KG'
+            else:
+                quantidade_historico = quantidade_removida
+                unidade_historico = (
+                    _sigla_embalagem(item.estoque.embalagem)
+                    if getattr(item, 'estoque', None)
+                    else 'UN'
+                ) or 'UN'
 
             HistoricoCard.objects.create(
                 solicitacao=solicitacao,
@@ -13719,99 +14135,84 @@ def api_remover_item_empenho(
                 quantidade=quantidade_historico,
                 unidade=unidade_historico,
                 observacao=(
-                    f'Item removido do Empenho '
-                    f'#{empenho.id} deste card.'
+                    f'Item removido do Empenho #{empenho.id} deste card.'
+                    + (
+                        f' Antes da exclusão, {movimentacoes_desfeitas} movimentação(ões) '
+                        'foram desfeitas e o estoque foi recomposto.'
+                        if movimentacoes_desfeitas
+                        else ''
+                    )
+                ),
+            )
+
+            evento = evento_para_status(solicitacao.status)
+            if evento:
+                avaliar_workflow(
+                    solicitacao,
+                    evento,
+                    request.user,
                 )
-            )
 
-            avaliar_workflow(
-                solicitacao,
-                evento,
-                request.user
-            )
-
-            cache.delete(
-                'cards_version_hash'
-            )
+            cache.delete('cards_version_hash')
 
             return JsonResponse({
                 'success': True,
-
                 'message': (
-                    f'Item do lote {lote_nome} '
-                    f'removido do empenho.'
+                    f'Lote {lote_nome} removido do empenho.'
+                    + (
+                        f' {movimentacoes_desfeitas} movimentação(ões) foram desfeitas '
+                        'antes da exclusão e o estoque foi restaurado.'
+                        if movimentacoes_desfeitas
+                        else ''
+                    )
                 ),
-
                 'item_id': item_id,
                 'estoque_id': estoque_id,
-
+                'movimentacoes_desfeitas': movimentacoes_desfeitas,
                 'total_empenhado': float(
-                    solicitacao.quantidade_empenhada
-                    or 0
+                    solicitacao.quantidade_empenhada or 0
                 ),
-
+                'total_movimentado': float(
+                    solicitacao.quantidade_movimentada or 0
+                ),
                 'status': solicitacao.status,
             })
 
     except Solicitacao.DoesNotExist:
         return JsonResponse(
-            {
-                'success': False,
-                'error': 'Solicitação não encontrada.'
-            },
-            status=404
+            {'success': False, 'error': 'Solicitação não encontrada.'},
+            status=404,
         )
-
     except ItemEmpenho.DoesNotExist:
         return JsonResponse(
             {
                 'success': False,
-                'error': (
-                    'Item não encontrado no empenho '
-                    'deste card.'
-                )
+                'error': 'Item não encontrado no empenho deste card.',
             },
-            status=404
+            status=404,
         )
-
     except Estoque.DoesNotExist:
         return JsonResponse(
-            {
-                'success': False,
-                'error': 'Estoque do item não encontrado.'
-            },
-            status=404
+            {'success': False, 'error': 'Estoque do item não encontrado.'},
+            status=404,
         )
-
     except ValueError as erro:
         return JsonResponse(
-            {
-                'success': False,
-                'error': str(erro)
-            },
-            status=400
+            {'success': False, 'error': str(erro)},
+            status=400,
         )
-
     except Exception as erro:
         logger.exception(
             'Erro ao remover o item %s do card %s',
             item_id,
-            solicitacao_id
+            solicitacao_id,
+        )
+        return JsonResponse(
+            {'success': False, 'error': f'Erro ao remover item: {erro}'},
+            status=500,
         )
 
-        return JsonResponse(
-            {
-                'success': False,
-                'error': str(erro)
-            },
-            status=500
-        )
-# ============================================================================
-# MOVIMENTAR SOLICITAÇÃO (TRANSFERIR / EXPEDIR)
-# ============================================================================
-# ============================================================================
-# MOVIMENTAR (TRANSFERIR / EXPEDIR)
-# ============================================================================
+
 @login_required
 def api_movimentar_solicitacao(request, solicitacao_id):
     """
@@ -13907,17 +14308,26 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                 .get(id=solicitacao_id)
             )
 
+            sincronizar_quantidades_reais(
+                solicitacao,
+                atualizar_status=True,
+                persistir=True,
+            )
+
             # A operação permitida é definida pelo tipo do card.
             if solicitacao.tipo_solicitacao == 'CARGA' and acao != 'expedir':
                 raise ValueError('Solicitação de carga permite somente Expedir.')
             if solicitacao.tipo_solicitacao != 'CARGA' and acao != 'transferir':
                 raise ValueError('Solicitação comum permite somente Transferir.')
 
-            # Impede movimentação em cards finalizados.
-            if solicitacao.status in [
-                'CONCLUIDO',
-                'CANCELADO',
-            ]:
+            # Usuário comum continua protegido contra movimentar cards
+            # finalizados. O administrador operacional pode corrigir qualquer
+            # estado desde que existam itens realmente empenhados.
+            admin_operacional = usuario_admin_operacional(request.user)
+            if (
+                solicitacao.status in ['CONCLUIDO', 'CANCELADO']
+                and not admin_operacional
+            ):
                 raise ValueError(
                     'Este card já está concluído ou cancelado.'
                 )
@@ -14811,48 +15221,34 @@ def api_movimentar_solicitacao(request, solicitacao_id):
             # ================================================================
             # ATUALIZAR STATUS DA SOLICITAÇÃO
             # ================================================================
-            quantidade_solicitada = Decimal(
-                str(
-                    solicitacao.quantidade_solicitada
-                    or 0
-                )
-            )
-
-            quantidade_movimentada = Decimal(
-                str(
-                    solicitacao.quantidade_movimentada
-                    or 0
-                )
-            )
-
+            # Nunca "corta" quantidade_movimentada para caber na meta. O valor
+            # movimentado é histórico real. Para admin, também corrige cards
+            # legados que já tenham movimentado + empenhado acima da meta antiga.
+            total_comprometido_atual = quantidade_comprometida(solicitacao)
+            quantidade_solicitada_atual = Decimal(str(solicitacao.quantidade_solicitada or 0))
             if (
-                quantidade_movimentada
-                >= quantidade_solicitada
+                admin_operacional
+                and quantidade_solicitada_atual > 0
+                and total_comprometido_atual > quantidade_solicitada_atual
             ):
-                solicitacao.quantidade_movimentada = (
-                    quantidade_solicitada
-                )
+                solicitacao.quantidade_solicitada = total_comprometido_atual
 
-                solicitacao.status = 'CONCLUIDO'
+            # O status é derivado de meta solicitada, total movimentado e reserva
+            # ainda pendente. Assim só conclui quando a nova meta estiver movida.
+            solicitacao.status = status_automatico(solicitacao)
 
+            if solicitacao.status == 'CONCLUIDO':
                 evento = (
                     'TRANSFERENCIA_COMPLETA'
                     if acao == 'transferir'
                     else 'EXPEDICAO_COMPLETA'
                 )
-
-            elif quantidade_movimentada > 0:
-                solicitacao.status = (
-                    'MOVIMENTACAO_PARCIAL'
-                )
-
-                evento = 'MOVIMENTACAO_PARCIAL'
-
             else:
-                evento = None
+                evento = evento_para_status(solicitacao.status)
 
             solicitacao.save(
                 update_fields=[
+                    'quantidade_solicitada',
                     'quantidade_movimentada',
                     'quantidade_empenhada',
                     'status',
@@ -15013,6 +15409,14 @@ def api_dados_impressao_solicitacao(
             'especie',
         ),
         id=solicitacao_id
+    )
+
+    # A impressão não confia em contadores possivelmente antigos: reconcilia
+    # o card com os itens pendentes e as movimentações que ainda existem.
+    sincronizar_quantidades_reais(
+        solicitacao,
+        atualizar_status=True,
+        persistir=True,
     )
 
     empenho = (
@@ -15777,12 +16181,22 @@ def _serializar_card(solicitacao):
         str(solicitacao.quantidade_solicitada or 0)
     )
 
+    quantidade_movimentada_display = Decimal(
+        str(solicitacao.quantidade_movimentada or 0)
+    )
+    quantidade_atendida_display = (
+        quantidade_movimentada_display + qtd_empenhada_display
+    )
+
     percentual = (
-        (qtd_empenhada_display / quantidade_solicitada) * 100
+        min(
+            (quantidade_atendida_display / quantidade_solicitada) * 100,
+            Decimal('100'),
+        )
         if quantidade_solicitada > 0
         else (
             Decimal('100')
-            if solicitacao.tipo_solicitacao == 'CARGA' and qtd_empenhada_display > 0
+            if solicitacao.tipo_solicitacao == 'CARGA' and quantidade_atendida_display > 0
             else Decimal('0')
         )
     )
@@ -15859,6 +16273,10 @@ def _serializar_card(solicitacao):
         'quantidade_movimentada': float(
             solicitacao.quantidade_movimentada or 0
         ),
+        'quantidade_atendida_display': float(quantidade_atendida_display),
+        'percentual_atendimento': float(percentual),
+        # Mantido para compatibilidade com clientes antigos; no Kanban o
+        # progresso agora representa atendido (movimentado + pendente).
         'percentual_empenhado': float(percentual),
         'percentual_movimentado': float(
             solicitacao.percentual_movimentado
@@ -16096,7 +16514,7 @@ def api_kanban_dados(request):
                 ativa=True
             ).order_by('ordem', 'nome')
         ],
-        'timestamp': timezone.now().isoformat(),
+        'timestamp': timezone.localtime(timezone.now()).isoformat(),
     })
 
 
@@ -16734,8 +17152,8 @@ def api_atualizacoes_recentes(request):
             'unidade': a.unidade,
             'card_id': a.solicitacao.id,
             'card_titulo': a.solicitacao.titulo,
-            'data': a.data.strftime('%d/%m/%Y %H:%M:%S'),
-            'data_iso': a.data.isoformat(),
+            'data': timezone.localtime(a.data).strftime('%d/%m/%Y %H:%M:%S'),
+            'data_iso': timezone.localtime(a.data).isoformat(),
         })
     
     return JsonResponse({'success': True, 'atualizacoes': data, 'total': len(data)})
@@ -17000,7 +17418,7 @@ def editar_grupo_carga(request):
 
             for hist in movimentos:
                 antes = {
-                    'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                    'data_hora': timezone.localtime(hist.data_hora).isoformat() if hist.data_hora else None,
                     'numero_carga': hist.numero_carga or '',
                     'nome_carga_avulsa': hist.nome_carga_avulsa or '',
                     'origem_carga': hist.origem_carga or '',
@@ -17044,7 +17462,7 @@ def editar_grupo_carga(request):
                     hist.data_hora = nova_local
 
                 depois = {
-                    'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                    'data_hora': timezone.localtime(hist.data_hora).isoformat() if hist.data_hora else None,
                     'numero_carga': hist.numero_carga or '',
                     'nome_carga_avulsa': hist.nome_carga_avulsa or '',
                     'origem_carga': hist.origem_carga or '',
@@ -17169,7 +17587,7 @@ def editar_movimento_carga(request, historico_id):
                 'quantidade': qtd_antiga,
                 'saldo_fisico': int(estoque_antigo.saldo or 0) if estoque_antigo else None,
                 'saida_acumulada': int(estoque_antigo.saida or 0) if estoque_antigo else None,
-                'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                'data_hora': timezone.localtime(hist.data_hora).isoformat() if hist.data_hora else None,
                 'numero_carga': hist.numero_carga or '',
                 'nome_carga_avulsa': hist.nome_carga_avulsa or '',
                 'origem_carga': hist.origem_carga or '',
@@ -17304,7 +17722,7 @@ def editar_movimento_carga(request, historico_id):
                 'quantidade': qtd_nova,
                 'saldo_fisico': int(estoque_novo.saldo or 0),
                 'saida_acumulada': int(estoque_novo.saida or 0),
-                'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                'data_hora': timezone.localtime(hist.data_hora).isoformat() if hist.data_hora else None,
                 'numero_carga': hist.numero_carga or '',
                 'nome_carga_avulsa': hist.nome_carga_avulsa or '',
                 'origem_carga': hist.origem_carga or '',
@@ -17393,7 +17811,7 @@ def remover_movimento_carga(request, historico_id):
                 'estoque_id': hist.estoque_id,
                 'lote': hist.lote_ref,
                 'quantidade': quantidade,
-                'data_hora': hist.data_hora.isoformat() if hist.data_hora else None,
+                'data_hora': timezone.localtime(hist.data_hora).isoformat() if hist.data_hora else None,
                 'numero_carga': hist.numero_carga or '',
                 'nome_carga_avulsa': hist.nome_carga_avulsa or '',
                 'origem_carga': hist.origem_carga or '',

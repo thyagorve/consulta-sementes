@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block heading %}Clientes{% endblock %}
+{% block subtitle %}Leads, interesses, histórico e catálogos em um só lugar.{% endblock %}
+{% block content %}
+<div class="toolbar"><form><input name="q" value="{{ request.GET.q }}" placeholder="Nome, telefone, bairro..."><button class="btn">Buscar</button></form><a class="btn primary" href="{% url 'client_create' %}">+ Novo cliente</a></div>
+<div class="client-grid">
+{% for x in items %}
+  <article class="client-card">
+    <div class="client-card-top"><div class="avatar">{{ x.name|first|upper }}</div><div><h3>{{ x.name }}</h3><p>{{ x.phone }}{% if x.email %} · {{ x.email }}{% endif %}</p></div><span class="badge">{{ x.get_status_display }}</span></div>
+    <div class="client-tags">{% if x.interest_rent %}<span>🏠 Aluguel</span>{% endif %}{% if x.interest_sale %}<span>🔑 Compra</span>{% endif %}{% if x.bedrooms %}<span>🛏 {{ x.bedrooms }} quartos</span>{% endif %}</div>
+    <div class="client-interest"><small>BAIRROS DE INTERESSE</small><b>{{ x.preferred_neighborhoods|default:'Não informado' }}</b></div>
+    <div class="client-budget"><span>Orçamento</span><strong>{% if x.max_budget %}até R$ {{ x.max_budget|floatformat:2 }}{% else %}não informado{% endif %}</strong></div>
+    <div class="client-card-actions"><a class="btn primary" href="{% url 'client_detail' x.pk %}">Abrir cliente</a><a class="btn" href="{% url 'catalog_create' %}?client={{ x.pk }}">+ Catálogo</a><a class="btn icon-btn" href="{% url 'client_update' x.pk %}" title="Editar">✏️</a><a class="btn icon-btn danger-soft" href="{% url 'client_delete' x.pk %}" title="Excluir cliente">🗑️</a></div>
+  </article>
+{% empty %}<section class="panel empty-state"><h2>Nenhum cliente encontrado</h2><p>Cadastre o primeiro atendimento para começar o funil.</p></section>{% endfor %}
+</div>
+{% endblock %}

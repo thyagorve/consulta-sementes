@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block heading %}Novo grupo de corretores{% endblock %}
+{% block subtitle %}Crie uma sala privada para uma equipe ou rede de parceiros.{% endblock %}
+{% block content %}
+<form method="post" class="panel smart-form">{% csrf_token %}
+  <div class="form-section">
+    <div class="form-section-head"><span>1</span><div><h2>Identificação do grupo</h2><p>Use um nome curto para encontrar a conversa rapidamente.</p></div></div>
+    <div class="field"><label>{{ form.title.label }}</label>{{ form.title }}{% for error in form.title.errors %}<div class="error">{{ error }}</div>{% endfor %}</div>
+  </div>
+  <div class="form-section group-checks">
+    <div class="form-section-head"><span>2</span><div><h2>{{ form.participants.label }}</h2><p>Selecione os corretores que farão parte da sala.</p></div></div>
+    <div class="group-member-grid">
+      {% for choice in form.participants %}
+        <label class="group-member-option">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+      {% empty %}
+        <div class="empty-state">Nenhum corretor disponível para adicionar.</div>
+      {% endfor %}
+    </div>
+    {% for error in form.participants.errors %}<div class="error">{{ error }}</div>{% endfor %}
+  </div>
+  <div class="form-section"><div class="actions"><button class="btn primary">Criar grupo</button><a class="btn" href="{% url 'conversation_list' %}">Cancelar</a></div></div>
+</form>
+{% endblock %}

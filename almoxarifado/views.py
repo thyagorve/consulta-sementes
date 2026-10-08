@@ -11,6 +11,7 @@ from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q, Sum, F, OuterRef, Subquery, Case, When, Value, IntegerField
 from django.contrib import messages
+from django.utils import timezone
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
@@ -54,7 +55,7 @@ def lista_itens(request):
     ordenar = request.GET.get('ordenar', 'vencimento')  # padrão vencimento
 
     itens = Item.objects.filter(ativo=True)
-    hoje = date.today()
+    hoje = timezone.localdate()
 
     # Anotar dados de validade
     validade_subquery = DadosValidadeItem.objects.filter(item=OuterRef('id'))
@@ -171,7 +172,7 @@ def buscar_itens_ajax(request):
     filtro_status = request.GET.get('status', '')
 
     itens = Item.objects.filter(ativo=True)
-    hoje = date.today()
+    hoje = timezone.localdate()
 
     validade_subquery = DadosValidadeItem.objects.filter(item=OuterRef('id'))
     itens = itens.annotate(
@@ -471,8 +472,8 @@ def dar_baixa(request, pk):
             solicitante=solicitante,
             departamento=data.get('departamento') or None,
             quantidade=quantidade,
-            data=data.get('data', date.today().isoformat()),
-            hora=data.get('hora', datetime.now().strftime('%H:%M')),
+            data=data.get('data', timezone.localdate().isoformat()),
+            hora=data.get('hora', timezone.localtime(timezone.now()).strftime('%H:%M')),
             observacao=data.get('observacao', '').strip()
         )
         
@@ -567,8 +568,8 @@ def finalizar_carrinho(request):
         if not solicitante:
             return JsonResponse({'success': False, 'error': 'Solicitante obrigatório!'}, status=400)
         
-        hoje = date.today()
-        agora = datetime.now().strftime('%H:%M')
+        hoje = timezone.localdate()
+        agora = timezone.localtime(timezone.now()).strftime('%H:%M')
         
         for ci in itens_carrinho:
             if ci.quantidade > ci.item.quantidade:
@@ -652,7 +653,7 @@ def exportar_excel(request):
     output.seek(0)
     
     response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename=estoque_{date.today().strftime("%Y%m%d")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename=estoque_{timezone.localdate().strftime("%Y%m%d")}.xlsx'
     return response
 
 
@@ -728,7 +729,7 @@ def exportar_saidas_excel(request):
     output.seek(0)
     
     response = HttpResponse(output.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename=saidas_{date.today().strftime("%Y%m%d")}.xlsx'
+    response['Content-Disposition'] = f'attachment; filename=saidas_{timezone.localdate().strftime("%Y%m%d")}.xlsx'
     return response
 
 

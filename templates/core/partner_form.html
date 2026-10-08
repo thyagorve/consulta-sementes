@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block heading %}{{ title }}{% endblock %}
+{% block subtitle %}Identifique parceiros por e-mail ou ID. O nome é opcional e a parceria pode ser confidencial.{% endblock %}
+{% block content %}
+<form method="post" class="panel smart-form">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="form-section">
+    <div class="form-section-head"><span>1</span><div><h2>Identificação</h2><p>Use e-mail ou um ID combinado. Não é obrigatório cadastrar o nome.</p></div></div>
+    <div class="form-grid">
+      <div class="field"><label>{{ form.email.label }}</label>{{ form.email }}<small>{{ form.email.help_text }}</small></div>
+      <div class="field"><label>{{ form.external_id.label }}</label>{{ form.external_id }}<small>{{ form.external_id.help_text }}</small></div>
+      <div class="field"><label>{{ form.name.label }}</label>{{ form.name }}</div>
+      <div class="field"><label>{{ form.creci.label }}</label>{{ form.creci }}</div>
+      <div class="field"><label>{{ form.phone.label }}</label>{{ form.phone }}</div>
+      <div class="field check-field"><label>{{ form.active }} {{ form.active.label }}</label></div>
+      <div class="field wide privacy-field"><label>{{ form.anonymous }} {{ form.anonymous.label }}</label><small>{{ form.anonymous.help_text }}</small></div>
+      <div class="field wide"><label>{{ form.notes.label }}</label>{{ form.notes }}</div>
+    </div>
+  </div>
+  {% for field in form %}{% for e in field.errors %}<div class="error"><b>{{ field.label }}:</b> {{ e }}</div>{% endfor %}{% endfor %}
+  <div class="actions"><button class="btn primary">Salvar parceiro</button><a class="btn" href="{% url 'partner_list' %}">Cancelar</a></div>
+</form>
+{% endblock %}

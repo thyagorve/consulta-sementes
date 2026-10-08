@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block heading %}Parcerias{% endblock %}
+{% block subtitle %}Parceiros identificados por e-mail/ID e acordos confidenciais quando necessário.{% endblock %}
+{% block content %}
+<div class="toolbar"><form><input name="q" value="{{ request.GET.q }}" placeholder="E-mail, ID, CRECI ou referência"><button class="btn">Buscar</button></form><a class="btn primary" href="{% url 'partner_create' %}">+ Novo parceiro</a></div>
+<section class="panel"><div class="table-wrap"><table><tr><th>ID interno</th><th>Identificação</th><th>Referência</th><th>Privacidade</th><th>Status</th><th></th></tr>
+{% for x in items %}<tr><td><b>{{ x.internal_code|default:'Será gerado' }}</b></td><td>{% if x.anonymous %}<span class="privacy-badge">🔒 Parceiro anônimo</span>{% else %}{{ x.email|default:x.external_id|default:x.name }}{% endif %}<small>{% if not x.anonymous and x.name %}{{ x.name }}{% endif %}</small></td><td>{{ x.external_id|default:'-' }}<small>{{ x.creci|default:'' }}</small></td><td>{% if x.anonymous %}Confidencial{% else %}Normal{% endif %}</td><td><span class="badge">{% if x.active %}Ativo{% else %}Inativo{% endif %}</span></td><td><a class="link" href="{% url 'partner_update' x.pk %}">Editar</a></td></tr>{% empty %}<tr><td colspan="6">Nenhum parceiro cadastrado.</td></tr>{% endfor %}
+</table></div></section>
+{% endblock %}

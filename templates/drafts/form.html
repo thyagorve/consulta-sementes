@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block heading %}{{ title }}{% endblock %}
+{% block subtitle %}Capte o essencial agora. Você completa o imóvel depois, sem perder fotos, rua ou localização.{% endblock %}
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="panel capture-form capture-form-v2" id="draftForm" data-upload-progress="1">{% csrf_token %}
+  <div class="capture-hero">
+    <div><span class="capture-kicker">CAPTAÇÃO RÁPIDA</span><h2>📸 Registrar oportunidade</h2><p>Fotos, rua, bairro, uma observação e GPS. Só isso.</p></div>
+    <button type="button" class="btn location-btn" id="getLocation">📍 Anexar localização</button>
+  </div>
+
+  <div id="locationCard" class="capture-location-card {% if not form.instance.latitude %}is-empty{% endif %}">
+    <span class="location-dot">📍</span>
+    <div><b id="locationTitle">{% if form.instance.latitude %}Localização anexada{% else %}Sem localização{% endif %}</b><small id="locationStatus">{% if form.instance.latitude %}{{ form.instance.latitude }}, {{ form.instance.longitude }}{% else %}Toque em “Anexar localização” para salvar o ponto exato.{% endif %}</small></div>
+  </div>
+
+  <div class="capture-section-title"><b>1. Identificação rápida</b><span>Use o que você consegue ver na rua.</span></div>
+  <div class="form-grid capture-fields">
+    {% for field in form %}
+      <div class="field {% if field.name == 'notes' %}wide{% endif %} {% if field.is_hidden %}hidden-field{% endif %}">
+        {% if not field.is_hidden %}<label>{{ field.label }}</label>{% endif %}
+        {{ field }}
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {{ field.errors }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="capture-section-title"><b>2. Fotos e vídeos</b><span>Selecione várias mídias de uma vez. Você poderá organizar a ordem depois.</span></div>
+  <div class="draft-photo-actions media-upload-actions">
+    <label class="camera-action primary-camera" for="draftCameraInput"><span>📷</span><b>Tirar foto</b><small>Use a câmera e continue adicionando.</small></label>
+    <label class="camera-action" for="draftVideoInput"><span>🎥</span><b>Gravar vídeo</b><small>Vídeo curto do imóvel ou ambiente.</small></label>
+    <label class="camera-action" for="draftGalleryInput"><span>🖼️</span><b>Galeria</b><small>Selecione várias fotos e vídeos de uma vez.</small></label>
+  </div>
+  <div id="draftPhotoInputs" class="file-input-bank">
+    <input id="draftCameraInput" type="file" name="media" accept="image/*" capture="environment">
+    <input id="draftVideoInput" type="file" name="media" accept="video/*" capture="environment">
+    <input id="draftGalleryInput" type="file" name="media" accept="image/*,video/*" multiple>
+  </div>
+  <div class="photo-counter"><b id="photoCount">0</b> mídia(s) pronta(s) para salvar</div>
+  <div id="photoPreview" class="draft-photo-preview" hidden></div>
+
+  <div class="form-actions capture-savebar"><a class="btn" href="{% url 'draft_list' %}">Cancelar</a><button class="btn primary">💾 Salvar rascunho</button></div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script>
+(()=>{
+  const b=document.getElementById('getLocation'),s=document.getElementById('locationStatus'),t=document.getElementById('locationTitle'),card=document.getElementById('locationCard'),lat=document.getElementById('id_latitude'),lng=document.getElementById('id_longitude');
+  const mapLink=document.createElement('a'); mapLink.className='btn small location-map-link'; mapLink.target='_blank'; mapLink.rel='noopener'; mapLink.textContent='🗺️ Abrir no mapa'; mapLink.hidden=true; b?.parentElement?.appendChild(mapLink);
+  function syncMap(){if(lat?.value&&lng?.value){mapLink.href=`https://www.google.com/maps?q=${lat.value},${lng.value}`;mapLink.hidden=false;}}
+  syncMap();
+  b?.addEventListener('click',()=>{
+    if(!navigator.geolocation){s.textContent='GPS não disponível neste aparelho.';return}
+    b.disabled=true;t.textContent='Obtendo localização…';s.textContent='Buscando o ponto mais preciso disponível.';
+    navigator.geolocation.getCurrentPosition(p=>{
+      lat.value=p.coords.latitude.toFixed(7);lng.value=p.coords.longitude.toFixed(7);
+      t.textContent='Localização anexada';s.textContent=`Precisão aprox. ${Math.round(p.coords.accuracy||0)} m • ${lat.value}, ${lng.value}`;card.classList.remove('is-empty');b.textContent='✅ Atualizar GPS';b.disabled=false;syncMap();
+    },err=>{
+      t.textContent='Não foi possível obter o GPS';
+      const secure=location.protocol==='https:'||['localhost','127.0.0.1'].includes(location.hostname);
+      s.textContent=secure?'Confira a permissão de localização do navegador e tente novamente.':'No celular, a localização exige HTTPS. Salve o rascunho e anexe o GPS depois quando estiver no domínio seguro.';b.disabled=false;
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  });
+
+  const bank=document.getElementById('draftPhotoInputs'), preview=document.getElementById('photoPreview'), count=document.getElementById('photoCount');
+  let total=0;
+  function addPreview(files){
+    [...files].forEach(file=>{
+      total++; const item=document.createElement('div'); item.className='draft-preview-item';
+      const url=URL.createObjectURL(file); let media;
+      if(file.type.startsWith('video/')){media=document.createElement('video');media.src=url;media.muted=true;media.playsInline=true;media.preload='metadata';}
+      else{media=document.createElement('img');media.alt=`Mídia ${total}`;media.src=url;}
+      const n=document.createElement('span'); n.textContent=file.type.startsWith('video/')?'🎥 '+total:total; item.append(media,n); preview.append(item);
+    });
+    preview.hidden=total===0; count.textContent=total;
+  }
+  function replaceInput(oldInput,mode){
+    oldInput.removeAttribute('id'); oldInput.classList.add('stored-file-input');
+    const fresh=document.createElement('input'); fresh.type='file'; fresh.name='media';
+    if(mode==='camera'){fresh.id='draftCameraInput';fresh.accept='image/*';fresh.setAttribute('capture','environment');}
+    else if(mode==='video'){fresh.id='draftVideoInput';fresh.accept='video/*';fresh.setAttribute('capture','environment');}
+    else{fresh.id='draftGalleryInput';fresh.accept='image/*,video/*';fresh.multiple=true;}
+    bank.appendChild(fresh); wire(fresh,mode);
+  }
+  function wire(input,mode){input.addEventListener('change',()=>{if(!input.files?.length)return;addPreview(input.files);replaceInput(input,mode);},{once:true});}
+  wire(document.getElementById('draftCameraInput'),'camera');
+  wire(document.getElementById('draftVideoInput'),'video');
+  wire(document.getElementById('draftGalleryInput'),'gallery');
+})();
+</script>
+{% endblock %}

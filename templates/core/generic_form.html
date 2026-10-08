@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<section class="panel form-panel clean-form">
+<form method="post" enctype="multipart/form-data" id="genericModelForm">{% csrf_token %}
+  <div class="form-grid">
+  {% for field in form %}
+    {% if field.field.widget.input_type == 'checkbox' %}
+      <div class="field boolean-field {% if field.name == 'notes' %}wide{% endif %}">
+        <label class="boolean-control">{{ field }}<span>{{ field.label }}</span></label>
+        {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+        {% for e in field.errors %}<div class="error">{{ e }}</div>{% endfor %}
+      </div>
+    {% else %}
+      <div class="field {% if field.name == 'description' or field.name == 'features' or field.name == 'notes' %}wide{% endif %}">
+        <label>{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{% for e in field.errors %}<div class="error">{{ e }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endfor %}
+  </div>
+  <div class="schedule-conflict-banner" id="scheduleConflictBanner" hidden></div>
+  <div class="actions"><button class="btn primary">Salvar</button><a class="btn" href="javascript:history.back()">Cancelar</a></div>
+</form>
+</section>
+{% endblock %}
+
+{% block scripts %}<script>(()=>{const prop=document.getElementById('id_property'),dt=document.getElementById('id_scheduled_at'),confirm=document.getElementById('id_confirm_conflict'),banner=document.getElementById('scheduleConflictBanner');if(!prop||!dt||!confirm||!banner)return;const field=confirm.closest('.boolean-field');if(field&&!confirm.checked)field.style.display='none';async function check(){if(!prop.value||!dt.value){banner.hidden=true;if(field&&!confirm.checked)field.style.display='none';return;}const u=new URL("{% url 'visit_conflicts_api' %}",location.origin);u.searchParams.set('property',prop.value);u.searchParams.set('scheduled_at',dt.value);{% if object and object.pk %}u.searchParams.set('exclude','{{ object.pk }}');{% endif %}try{const r=await fetch(u,{cache:'no-store'}),d=await r.json();if(d.conflicts?.length){const c=d.conflicts[0];banner.innerHTML=`<b>Horário próximo já reservado</b><span>Existe visita em <strong>${c.time}</strong> com ${c.broker}. Você pode continuar, mas confirme abaixo para evitar choque de agenda.</span>`;banner.hidden=false;if(field)field.style.display='block';}else{banner.hidden=true;if(field&&!confirm.checked)field.style.display='none';}}catch(e){}}prop.addEventListener('change',check);dt.addEventListener('change',check);setTimeout(check,100);})();</script>{% endblock %}

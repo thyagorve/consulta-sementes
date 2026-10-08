@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block heading %}{{ property.code }} · {{ property.title }}{% endblock %}
+{% block subtitle %}Parceria de imóvel{% endblock %}
+{% block content %}
+<div class="page-inline-actions"><button class="btn" type="button" onclick="history.back()">← Voltar</button><a class="btn" href="{% url 'partnership_network' %}">Mural</a></div>
+<section class="partnership-detail-premium">
+  <div class="panel partnership-media-panel">
+    {% with cover=property.images.all|first %}
+    <div class="partnership-main-media smart-property-media" data-smart-media>{% if cover %}{% if cover.is_video %}{% if full_access %}<video src="{{ cover.image.url }}" controls playsinline preload="metadata"></video>{% else %}<div class="partner-video-placeholder"><span>🎥</span><b>Vídeo protegido</b><small>Disponível após o aceite da parceria.</small></div>{% endif %}{% else %}<img src="{% url 'partnership_property_image' property.id cover.id %}" alt="{{ property.title }}">{% endif %}{% else %}<span class="property-empty-media">⌂</span>{% endif %}<span class="partner-code">{{ property.code }}</span></div>
+    {% endwith %}
+    {% if property.images.all|length > 1 %}<div class="partnership-thumb-row">{% for img in property.images.all|slice:':5' %}<div class="partnership-thumb smart-property-media" data-smart-media>{% if img.is_video %}{% if full_access %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video>{% else %}<span class="video-thumb-lock">🎥</span>{% endif %}{% else %}<img src="{% url 'partnership_property_image' property.id img.id %}" alt="Foto {{ forloop.counter }}">{% endif %}</div>{% endfor %}</div>{% endif %}
+  </div>
+  <div class="panel partnership-info-panel">
+    <span class="badge">{{ property.code }}</span><h2>{{ property.title }}</h2><p class="partnership-summary-text">{{ property.partnership_summary|default:'Imóvel disponível para parceria.' }}</p>
+    <div class="property-summary-specs partnership-specs"><div><b>{{ property.bedrooms }}</b><span>Quartos</span></div><div><b>{{ property.bathrooms }}</b><span>Banheiros</span></div><div><b>{{ property.parking_spaces }}</b><span>Vagas</span></div></div>
+    <p class="location-line">📍 {{ property.neighborhood|default:property.city }} · {{ property.city }}/{{ property.state }}</p>
+    {% if property.rent_price %}<div class="partnership-big-price"><small>ALUGUEL</small><strong>R$ {{ property.rent_price|floatformat:2 }}<span>/mês</span></strong></div>{% endif %}
+    {% if property.sale_price %}<div class="partnership-big-price"><small>VENDA</small><strong>R$ {{ property.sale_price|floatformat:2 }}</strong></div>{% endif %}
+    {% if full_access %}<div class="partnership-full-details"><h3>Detalhes liberados</h3><p><b>Endereço:</b> {{ property.address }}, {{ property.neighborhood }} · {{ property.city }}/{{ property.state }}</p><p>{{ property.description }}</p>{% if property.features %}<p>{{ property.features }}</p>{% endif %}</div>{% else %}<div class="lock-card">🔒 Endereço completo e dados sensíveis são liberados após o aceite.</div>{% endif %}
+  </div>
+  <aside class="panel partnership-deal-panel"><h2>Parceria</h2>
+    <div class="partnership-money-card"><span>Comissão do imóvel</span><strong>{{ property.get_commission_mode_display }} · {{ property.commission_value }}</strong><span>Parte do parceiro</span><strong>{% if property.partnership_split_mode == 'percentage' %}{{ property.partnership_percentage }}% da comissão{% else %}R$ {{ property.partnership_fixed_amount|floatformat:2 }}{% endif %}</strong>{% if property.partnership_terms %}<small>{{ property.partnership_terms }}</small>{% endif %}</div>
+    {% if partnership_request %}<p><span class="reaction-pill {% if partnership_request.status == 'accepted' %}liked{% elif partnership_request.status == 'declined' %}disliked{% else %}pending{% endif %}">{{ partnership_request.get_status_display }}</span></p>{% if partnership_request.status == 'accepted' %}<div class="partnership-agreement"><b>Acordo registrado</b><span>Comissão base: R$ {{ partnership_request.commission_gross_snapshot|floatformat:2 }}</span><span>Sua parte: R$ {{ partnership_request.partner_amount_snapshot|floatformat:2 }}</span><span>Responsável: R$ {{ partnership_request.owner_amount_snapshot|floatformat:2 }}</span></div>{% endif %}{% if partnership_request.conversation_id %}<a class="btn primary full" href="{% url 'conversation_detail' partnership_request.conversation_id %}">💬 Abrir conversa</a>{% endif %}
+    {% elif not can_manage %}<form method="post" action="{% url 'property_partnership_request' property.id %}">{% csrf_token %}<div class="field"><label>Operação</label>{{ form.operation_type }}</div><div class="field"><label>Mensagem para o corretor responsável</label>{{ form.message }}</div><button class="btn primary full" style="margin-top:10px">Solicitar parceria</button></form>
+    {% else %}<p class="muted">Você é o responsável por este imóvel.</p>{% endif %}
+  </aside>
+</section>
+{% endblock %}

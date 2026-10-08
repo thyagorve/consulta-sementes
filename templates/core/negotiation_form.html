@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block heading %}{{ title }}{% endblock %}
+{% block subtitle %}A negociação é o centro do fluxo: ao fechar, imóvel, cliente e comissão são atualizados automaticamente.{% endblock %}
+{% block content %}
+<form method="post" class="panel smart-form" id="negotiationForm">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="flow-strip"><span>Cliente</span><b>→</b><span>Imóvel</span><b>→</b><span>Negociação</span><b>→</b><span>Fechou?</span><b>→</b><span>Alugado/Vendido + comissão</span></div>
+  <div class="form-section">
+    <div class="form-section-head"><span>1</span><div><h2>Negócio</h2><p>Informe o que está sendo negociado e o estágio atual.</p></div></div>
+    <div class="form-grid">
+      <div class="field"><label>{{ form.client.label }}</label>{{ form.client }}</div>
+      <div class="field"><label>{{ form.property.label }}</label>{{ form.property }}</div>
+      <div class="field"><label>{{ form.operation_type.label }}</label>{{ form.operation_type }}</div>
+      <div class="field"><label>{{ form.status.label }}</label>{{ form.status }}<small>{{ form.status.help_text }}</small></div>
+      <div class="field"><label>{{ form.proposed_value.label }}</label>{{ form.proposed_value }}</div>
+      <div class="field"><label>{{ form.broker.label }}</label>{{ form.broker }}</div>
+      <div class="field wide"><label>{{ form.notes.label }}</label>{{ form.notes }}</div>
+    </div>
+    <div class="logic-note success-note">✅ Ao selecionar <b>Fechada / negócio concluído</b>, uma locação marca o imóvel como <b>Alugado</b>; uma venda marca como <b>Vendido</b>. Se o imóvel tiver regra de comissão, o lançamento financeiro é criado automaticamente.</div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head"><span>2</span><div><h2>Parceria</h2><p>Esta parte só aparece quando existe divisão com outro corretor.</p></div></div>
+    <div class="form-grid">
+      <div class="field"><label>{{ form.partnership_type.label }}</label>{{ form.partnership_type }}<small>{{ form.partnership_type.help_text }}</small></div>
+      <div class="field partner-team"><label>{{ form.partner_user.label }}</label>{{ form.partner_user }}</div>
+      <div class="field partner-external"><label>{{ form.partner_broker.label }}</label>{{ form.partner_broker }}<small>O seletor mostra e-mail/ID, não depende do nome.</small></div>
+      <div class="field split-field"><label>{{ form.partner_split_mode.label }}</label>{{ form.partner_split_mode }}<small>{{ form.partner_split_mode.help_text }}</small></div>
+      <div class="field split-percentage"><label>{{ form.partner_percentage.label }}</label>{{ form.partner_percentage }}</div>
+      <div class="field split-fixed"><label>{{ form.partner_fixed_amount.label }}</label>{{ form.partner_fixed_amount }}</div>
+      <div class="field wide partnership-notes"><label>{{ form.partnership_notes.label }}</label>{{ form.partnership_notes }}</div>
+      <div class="field wide partner-anonymous"><div class="privacy-callout">🔒 <b>Parceria anônima:</b> a identidade não é exibida. Apenas a regra financeira e a observação interna ficam registradas.</div></div>
+    </div>
+  </div>
+  {% for field in form %}{% for e in field.errors %}<div class="error"><b>{{ field.label }}:</b> {{ e }}</div>{% endfor %}{% endfor %}
+  <div class="actions sticky-actions"><button class="btn primary">Salvar negociação</button><a class="btn" href="{% url 'negotiation_list' %}">Cancelar</a></div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+(()=>{const f=document.getElementById('negotiationForm'),pt=f?.querySelector('[name="partnership_type"]'),sm=f?.querySelector('[name="partner_split_mode"]');function show(sel,on){document.querySelectorAll(sel).forEach(x=>x.style.display=on?'block':'none')}function u(){const p=pt?.value||'none',m=sm?.value||'none';show('.partner-team',p==='team');show('.partner-external',p==='external');show('.partner-anonymous',p==='anonymous');show('.split-field',p!=='none');show('.partnership-notes',p!=='none');show('.split-percentage',p!=='none'&&m==='percentage');show('.split-fixed',p!=='none'&&m==='fixed')}pt?.addEventListener('change',u);sm?.addEventListener('change',u);u()})();
+</script>{% endblock %}

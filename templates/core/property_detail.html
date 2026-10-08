@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block heading %}{{ property.code }} · {{ property.title }}{% endblock %}
+{% block subtitle %}{{ property.get_status_display }} · {{ property.get_purpose_display }}{% endblock %}
+{% block content %}
+<div class="property-detail-actions property-detail-topbar">
+  <a class="btn" href="{% url 'property_list' %}">← Voltar</a>
+  <div class="property-detail-action-group">
+    {% if can_manage_property %}
+      <a class="btn" href="{% url 'property_update' property.pk %}">Editar</a>
+      <a class="btn danger ghost-danger" href="{% url 'property_delete' property.pk %}">Excluir</a>
+    {% else %}
+      <span class="badge partnership-access">🤝 Imóvel liberado em parceria</span>
+    {% endif %}
+  </div>
+</div>
+
+<section class="property-hero-layout">
+  <div class="property-hero-media panel">
+    {% with cover=property.images.first %}
+      <button type="button" class="property-hero-cover smart-property-media{% if not cover %} no-cover{% endif %}{% if cover %} js-media-viewer{% endif %}" {% if cover %}data-smart-media data-media-src="{{ cover.image.url }}" data-media-kind="{% if cover.is_video %}video{% else %}image{% endif %}" data-media-group="property-{{ property.id }}" data-media-title="{{ property.title }}"{% endif %}>
+        {% if cover %}{% if cover.is_video %}<video src="{{ cover.image.url }}" muted playsinline preload="metadata"></video>{% else %}<img src="{{ cover.image.url }}" alt="{{ property.title }}">{% endif %}{% else %}<span class="property-empty-media">⌂</span>{% endif %}
+        <span class="property-hero-code">{{ property.code }}</span>
+        {% if cover %}<span class="property-hero-zoom">⛶ Ver mídia</span>{% endif %}
+      </button>
+      {% if property.images.all|length > 1 %}
+      <div class="property-hero-thumbs">
+        {% for img in property.images.all|slice:':6' %}
+          <button type="button" class="property-thumb smart-property-media js-media-viewer" data-media-src="{{ img.image.url }}" data-media-kind="{% if img.is_video %}video{% else %}image{% endif %}" data-media-group="property-{{ property.id }}" data-media-title="{{ img.caption|default:property.title }}" {% if not img.is_video %}data-smart-media{% endif %} aria-label="Abrir mídia {{ forloop.counter }}">{% if img.is_video %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video><span class="media-kind-badge">VIDEO</span>{% else %}<img src="{{ img.image.url }}" alt="Foto {{ forloop.counter }} de {{ property.title }}" loading="lazy">{% endif %}</button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <aside class="property-summary-card panel">
+    <div class="property-summary-head">
+      <div>
+        <span class="eyebrow">{{ property.code }}</span>
+        <h2>{{ property.title }}</h2>
+        <p>📍 {{ property.neighborhood|default:'Bairro não informado' }} · {{ property.city }}/{{ property.state }}</p>
+      </div>
+      <span class="badge">{{ property.get_status_display }}</span>
+    </div>
+
+    <div class="property-summary-price">
+      {% if property.rent_price %}<div><small>ALUGUEL</small><strong>R$ {{ property.rent_price|floatformat:2 }}<span>/mês</span></strong></div>{% endif %}
+      {% if property.sale_price %}<div><small>VENDA</small><strong>R$ {{ property.sale_price|floatformat:2 }}</strong></div>{% endif %}
+    </div>
+
+    <div class="property-summary-specs">
+      <div><b>{{ property.bedrooms }}</b><span>Quartos</span></div>
+      <div><b>{{ property.suites }}</b><span>Suítes</span></div>
+      <div><b>{{ property.bathrooms }}</b><span>Banheiros</span></div>
+      <div><b>{{ property.parking_spaces }}</b><span>Vagas</span></div>
+    </div>
+
+    {% if property.location_url %}<a class="btn full" href="{{ property.location_url }}" target="_blank" rel="noopener">📍 Abrir localização</a>{% endif %}
+
+    <div class="property-summary-meta">
+      <p><span>Finalidade</span><b>{{ property.get_purpose_display }}</b></p>
+      {% if can_manage_property %}<p><span>Proprietário</span><b>{{ property.owner.name }}</b><small>{{ property.owner.phone }}</small></p>{% endif %}
+      <p><span>Comissão</span><b>{{ property.get_commission_mode_display }}{% if property.commission_mode != 'none' %} · {{ property.commission_value|floatformat:2 }}{% endif %}</b></p>
+    </div>
+  </aside>
+</section>
+
+<section class="property-content-grid">
+  <article class="panel property-description-panel">
+    <div class="panel-head"><h2>Sobre o imóvel</h2></div>
+    {% if property.description %}<div class="property-rich-text">{{ property.description|linebreaksbr }}</div>{% else %}<p class="muted">Nenhuma descrição informada.</p>{% endif %}
+    {% if property.features %}<div class="property-features-block"><h3>Diferenciais</h3><div>{{ property.features|linebreaksbr }}</div></div>{% endif %}
+    {% if property.address %}<div class="property-address-box"><small>ENDEREÇO</small><p>{{ property.address }}, {{ property.neighborhood }} · {{ property.city }}/{{ property.state }}</p></div>{% endif %}
+  </article>
+
+  {% if can_manage_property %}
+  <aside class="panel property-quick-edit-panel">
+    <h2>Gestão rápida</h2>
+    <form class="quick-title-form" method="post" action="{% url 'property_update_title' property.pk %}">
+      {% csrf_token %}
+      <label for="property-title"><b>Nome do imóvel</b></label>
+      <div class="quick-title-row"><input id="property-title" name="title" value="{{ property.title }}" maxlength="180" required><button class="btn small" type="submit">Salvar</button></div>
+    </form>
+    <hr>
+    <h3>Adicionar fotos e vídeos</h3>
+    <form method="post" enctype="multipart/form-data" action="{% url 'property_add_image' property.pk %}" class="property-media-upload" data-upload-progress="1">
+      {% csrf_token %}
+      <label class="media-dropzone"><span>＋</span><b>Selecionar mídias</b><small>Escolha várias fotos e vídeos de uma vez.</small><input type="file" name="media" accept="image/*,video/*" multiple required></label>
+      <label class="field"><span>Legenda opcional</span><input type="text" name="caption" maxlength="120" placeholder="Ex.: Sala integrada"></label>
+      <button class="btn primary full" type="submit">Enviar mídias</button>
+    </form>
+  </aside>
+  {% endif %}
+</section>
+
+{% if property.images.all %}
+<section class="panel property-gallery-panel">
+  <div class="panel-head"><div><h2>Galeria</h2><p class="muted">Clique em qualquer imagem para ampliar.</p></div><span class="badge">{{ property.images.all|length }} foto{{ property.images.all|length|pluralize }}</span></div>
+  <div class="property-view-gallery">
+    {% for img in property.images.all %}
+      {% if img.is_video %}<button type="button" class="property-view-photo property-video-card js-media-viewer" data-media-src="{{ img.image.url }}" data-media-kind="video" data-media-group="property-{{ property.id }}" data-media-title="{{ img.caption|default:property.title }}"><video src="{{ img.image.url }}" muted playsinline preload="metadata"></video><span class="media-kind-badge">▶ VÍDEO</span></button>{% else %}<button type="button" class="property-view-photo smart-property-media js-media-viewer" data-smart-media data-media-src="{{ img.image.url }}" data-media-kind="image" data-media-group="property-{{ property.id }}" data-media-title="{{ img.caption|default:property.title }}"><img src="{{ img.image.url }}" alt="{{ img.caption|default:property.title }}" loading="lazy">{% if img.is_cover %}<span class="cover-badge">★ Capa</span>{% endif %}</button>{% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if can_manage_property and property.images.all %}
+<details class="panel property-photo-admin">
+  <summary><span><b>Gerenciar fotos</b><small>Alterar capa ou excluir imagens</small></span><span>⌄</span></summary>
+  <div class="property-photo-manager property-admin-gallery sortable-media-grid" id="propertyMediaGrid" data-reorder-url="{% url 'property_reorder_media' property.pk %}">
+    {% for img in property.images.all %}
+    <article class="property-photo-item{% if img.is_cover %} is-cover{% endif %}" draggable="true" data-media-id="{{ img.id }}">
+      <div class="property-photo-frame smart-property-media" data-smart-media>{% if img.is_video %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video><span class="media-kind-badge">VIDEO</span>{% else %}<img src="{{ img.image.url }}" alt="{{ img.caption|default:property.title }}">{% if img.is_cover %}<span class="cover-badge">★ Capa atual</span>{% endif %}{% endif %}</div>
+      {% if img.caption %}<p class="photo-caption">{{ img.caption }}</p>{% endif %}
+      <div class="photo-actions">
+        <span class="drag-handle" title="Arraste para organizar">⋮⋮</span><span class="media-order-buttons"><button type="button" class="mini-order" data-move="prev" title="Mover antes">←</button><button type="button" class="mini-order" data-move="next" title="Mover depois">→</button></span>
+        {% if not img.is_cover and not img.is_video %}<form method="post" action="{% url 'property_set_cover' property.pk img.pk %}">{% csrf_token %}<button class="btn small" type="submit">☆ Usar como capa</button></form>{% endif %}
+        <form method="post" action="{% url 'property_delete_image' property.pk img.pk %}" onsubmit="return confirm('Excluir esta foto?');">{% csrf_token %}<button class="danger-link" type="submit">Excluir</button></form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+(()=>{
+  const grid=document.getElementById('propertyMediaGrid');let dragged=null;
+  if(grid){grid.querySelectorAll('[draggable="true"]').forEach(card=>{card.addEventListener('dragstart',()=>{dragged=card;card.classList.add('dragging')});card.addEventListener('dragend',()=>{card.classList.remove('dragging');saveOrder()});card.addEventListener('dragover',e=>{e.preventDefault();if(!dragged||dragged===card)return;const r=card.getBoundingClientRect();grid.insertBefore(dragged,e.clientX<r.left+r.width/2?card:card.nextSibling)})});}
+  grid?.addEventListener('click',e=>{const b=e.target.closest('[data-move]');if(!b)return;const card=b.closest('[data-media-id]');if(!card)return;if(b.dataset.move==='prev'&&card.previousElementSibling)grid.insertBefore(card,card.previousElementSibling);if(b.dataset.move==='next'&&card.nextElementSibling)grid.insertBefore(card.nextElementSibling,card);saveOrder();});
+  async function saveOrder(){if(!grid)return;const order=[...grid.querySelectorAll('[data-media-id]')].map(x=>x.dataset.mediaId);const csrf=document.querySelector('[name=csrfmiddlewaretoken]')?.value;try{await fetch(grid.dataset.reorderUrl,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({order})})}catch(e){}}
+})();
+</script>
+{% endblock %}

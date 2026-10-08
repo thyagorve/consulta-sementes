@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block heading %}{{ title }}{% endblock %}
+{% block subtitle %}Cadastro do imóvel{% endblock %}
+{% block content %}
+<form method="post" class="panel smart-form">{% csrf_token %}
+  {% if source_draft %}<div class="draft-convert-banner"><b>📸 Convertendo rascunho #{{ source_draft.id }}</b><span>Rua, bairro, observações e fotos serão aproveitados. Complete proprietário, finalidade, valores e demais dados antes de salvar.</span></div>{% endif %}
+  {% if form.non_field_errors %}<div class="alert error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="form-section">
+    <div class="form-section-head"><span>🏷️</span><div><h2>Identificação</h2></div></div>
+    <div class="form-grid">
+      <div class="field wide"><label>{{ form.title.label }}</label>{{ form.title }}</div>
+      <div class="field"><label>{{ form.property_type.label }}</label>{{ form.property_type }}</div>
+      <div class="field"><label>{{ form.purpose.label }}</label>{{ form.purpose }}</div>
+      <div class="field"><label>{{ form.status.label }}</label>{{ form.status }}</div>
+      <div class="field"><label>{{ form.owner.label }}</label>{{ form.owner }}</div>
+      <div class="field"><label>{{ form.assigned_to.label }}</label>{{ form.assigned_to }}</div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head"><span>💰</span><div><h2>Valores e comissão</h2></div></div>
+    <div class="form-grid">
+      <div class="field"><label>{{ form.rent_price.label }}</label>{{ form.rent_price }}</div>
+      <div class="field"><label>{{ form.sale_price.label }}</label>{{ form.sale_price }}</div>
+      <div class="field"><label>{{ form.condominium.label }}</label>{{ form.condominium }}</div>
+      <div class="field"><label>{{ form.iptu.label }}</label>{{ form.iptu }}</div>
+      <div class="field commission-highlight"><label>⚙️ {{ form.commission_mode.label }}</label>{{ form.commission_mode }}</div>
+      <div class="field commission-highlight"><label>💵 {{ form.commission_value.label }}</label>{{ form.commission_value }}</div>
+      <div class="field"><label>Receber em</label>{{ form.commission_installment_count }}<small>Ex.: 3 para dividir a comissão em três recebimentos.</small></div>
+      <div class="field"><label>Primeiro recebimento</label>{{ form.commission_first_due_date }}</div>
+      <div class="field"><label>Intervalo</label>{{ form.commission_interval_months }}<small>Meses entre cada recebimento.</small></div>
+      <div class="field wide rule-hint"><b>Exemplo:</b> aluguel R$ 2.000, comissão combinada R$ 1.500 em 3 meses → regra “Valor fixo”, valor 1500, 3 recebimentos e intervalo 1 mês.</div>
+    </div>
+  </div>
+
+  <div class="form-section partnership-section">
+    <div class="form-section-head"><span>🤝</span><div><h2>Parceria</h2></div></div>
+    <div class="form-grid">
+      <div class="field toggle-card wide"><label><span class="toggle-icon">🤝</span><span><b>Aceitar parceria</b><small>Exibe este imóvel na rede de corretores.</small></span>{{ form.accepts_partnership }}</label></div>
+      <div class="field wide"><label>📝 Resumo para a rede</label>{{ form.partnership_summary }}</div>
+      <div class="field"><label>💸 Como dividir</label>{{ form.partnership_split_mode }}</div>
+      <div class="field partnership-percentage"><label>📊 Percentual do parceiro</label>{{ form.partnership_percentage }}</div>
+      <div class="field partnership-fixed"><label>💵 Valor fixo do parceiro</label>{{ form.partnership_fixed_amount }}</div>
+      <div class="field wide"><label>📝 Observação da parceria</label>{{ form.partnership_terms }}</div>
+      <div class="field toggle-card"><label><span class="toggle-icon">🙈</span><span><b>Proteger fotos</b><small>Prévia desfocada antes do aceite.</small></span>{{ form.blur_partnership_photos }}</label></div>
+      <div class="field wide partnership-rule-preview"><b>Regra financeira:</b> a comissão bruta vem da seção “Valores e comissão” acima. Aqui você define somente quanto dessa comissão ficará com cada parceiro aceito.</div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head"><span>📍</span><div><h2>Localização</h2></div></div>
+    <div class="form-grid">
+      <div class="field wide"><label>{{ form.address.label }}</label>{{ form.address }}</div>
+      <div class="field"><label>{{ form.neighborhood.label }}</label>{{ form.neighborhood }}</div>
+      <div class="field"><label>{{ form.city.label }}</label>{{ form.city }}</div>
+      <div class="field"><label>{{ form.state.label }}</label>{{ form.state }}</div>
+      {{ form.latitude }}{{ form.longitude }}
+      <div class="field wide property-location-box" id="propertyLocationBox">
+        <div>
+          <b>📍 Localização exata do imóvel</b>
+          <small id="propertyLocationStatus">{% if form.instance.latitude %}GPS salvo: {{ form.instance.latitude }}, {{ form.instance.longitude }}{% else %}Opcional agora. Ficará pronta para enviar a localização ao cliente futuramente.{% endif %}</small>
+        </div>
+        <div class="property-location-actions">
+          <button type="button" class="btn" id="propertyGetLocation">Usar localização atual</button>
+          <a class="btn small{% if not form.instance.latitude %} is-hidden{% endif %}" id="propertyOpenMap" target="_blank" rel="noopener" {% if form.instance.latitude %}href="https://www.google.com/maps?q={{ form.instance.latitude }},{{ form.instance.longitude }}"{% endif %}>Abrir mapa</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <div class="form-section-head"><span>🏠</span><div><h2>Características</h2></div></div>
+    <div class="form-grid">
+      <div class="field"><label>{{ form.bedrooms.label }}</label>{{ form.bedrooms }}</div>
+      <div class="field"><label>{{ form.suites.label }}</label>{{ form.suites }}</div>
+      <div class="field"><label>{{ form.bathrooms.label }}</label>{{ form.bathrooms }}</div>
+      <div class="field"><label>{{ form.parking_spaces.label }}</label>{{ form.parking_spaces }}</div>
+      <div class="field"><label>{{ form.area_m2.label }}</label>{{ form.area_m2 }}</div>
+      <div class="field toggle-card"><label><span class="toggle-icon">🛋️</span><span><b>Mobiliado</b></span>{{ form.furnished }}</label></div>
+      <div class="field wide"><label>{{ form.description.label }}</label>{{ form.description }}</div>
+      <div class="field wide"><label>{{ form.features.label }}</label>{{ form.features }}</div>
+    </div>
+  </div>
+  {% for field in form %}{% for e in field.errors %}<div class="error"><b>{{ field.label }}:</b> {{ e }}</div>{% endfor %}{% endfor %}
+  <div class="actions sticky-actions"><button class="btn primary">Salvar imóvel</button><a class="btn" href="{% url 'property_list' %}">Cancelar</a></div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(()=>{
+  const btn=document.getElementById('propertyGetLocation');
+  const lat=document.getElementById('id_latitude');
+  const lng=document.getElementById('id_longitude');
+  const status=document.getElementById('propertyLocationStatus');
+  const map=document.getElementById('propertyOpenMap');
+  if(!btn||!lat||!lng) return;
+  const updateMap=()=>{
+    if(lat.value&&lng.value){map.href=`https://www.google.com/maps?q=${lat.value},${lng.value}`;map.classList.remove('is-hidden');}
+  };
+  updateMap();
+  btn.addEventListener('click',()=>{
+    if(!navigator.geolocation){status.textContent='Este navegador não oferece localização.';return;}
+    btn.disabled=true; status.textContent='Obtendo localização precisa…';
+    navigator.geolocation.getCurrentPosition(pos=>{
+      lat.value=pos.coords.latitude.toFixed(7); lng.value=pos.coords.longitude.toFixed(7);
+      status.textContent=`GPS salvo • precisão aproximada ${Math.round(pos.coords.accuracy||0)} m • ${lat.value}, ${lng.value}`;
+      updateMap(); btn.textContent='✅ Localização anexada'; btn.disabled=false;
+    },err=>{
+      const secure=location.protocol==='https:'||['localhost','127.0.0.1'].includes(location.hostname);
+      status.textContent=secure?'Não foi possível obter o GPS. Verifique a permissão de localização.':'No celular, o GPS exige HTTPS. Você pode salvar o imóvel agora e anexar a localização depois.';
+      btn.disabled=false;
+    },{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  });
+})();
+(()=>{
+  const mode=document.getElementById('id_partnership_split_mode');
+  const update=()=>{
+    const fixed=mode?.value==='fixed';
+    document.querySelectorAll('.partnership-percentage').forEach(el=>el.style.display=fixed?'none':'block');
+    document.querySelectorAll('.partnership-fixed').forEach(el=>el.style.display=fixed?'block':'none');
+  };
+  mode?.addEventListener('change', update); update();
+})();
+</script>
+{% endblock %}

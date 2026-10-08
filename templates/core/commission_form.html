@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block heading %}{{ title }}{% endblock %}
+{% block subtitle %}Registre a receita da corretagem e deixe explícito quanto fica para cada lado.{% endblock %}
+{% block content %}
+<form method="post" class="panel financial-form" id="commissionForm">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="form-section"><div class="form-section-head"><span>1</span><div><h2>Origem do ganho</h2><p>O que gerou esta comissão ou receita?</p></div></div><div class="form-grid">
+    <div class="field">{{ form.earning_type.label_tag }}{{ form.earning_type }}{% for e in form.earning_type.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field">{{ form.description.label_tag }}{{ form.description }}{% for e in form.description.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field">{{ form.negotiation.label_tag }}{{ form.negotiation }}</div><div class="field">{{ form.contract.label_tag }}{{ form.contract }}</div>
+    <div class="field">{{ form.property.label_tag }}{{ form.property }}</div><div class="field">{{ form.client.label_tag }}{{ form.client }}</div>
+  </div></div>
+  <div class="form-section"><div class="form-section-head"><span>2</span><div><h2>Valor e parceria</h2><p>Informe o bruto e, se houver parceria, como será feita a divisão.</p></div></div><div class="form-grid">
+    <div class="field">{{ form.gross_amount.label_tag }}{{ form.gross_amount }}<small>{{ form.gross_amount.help_text }}</small><div id="commissionSourceHint" class="commission-source-hint"></div>{% for e in form.gross_amount.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field">{{ form.split_mode.label_tag }}{{ form.split_mode }}<small>{{ form.split_mode.help_text }}</small>{% for e in form.split_mode.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field partner-field">{{ form.partner_user.label_tag }}{{ form.partner_user }}{% for e in form.partner_user.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field partner-field">{{ form.partner_broker.label_tag }}{{ form.partner_broker }}{% for e in form.partner_broker.errors %}<div class="error">{{ e }}</div>{% endfor %}</div><div class="field partner-field privacy-field"><label>{{ form.anonymous_partner }} {{ form.anonymous_partner.label }}</label>{% for e in form.anonymous_partner.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field split-percentage">{{ form.partner_percentage.label_tag }}{{ form.partner_percentage }}{% for e in form.partner_percentage.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field split-fixed">{{ form.partner_fixed_amount.label_tag }}{{ form.partner_fixed_amount }}{% for e in form.partner_fixed_amount.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+  </div>
+  <div class="commission-preview"><div><span>Ganho bruto</span><strong id="previewGross">R$ 0,00</strong></div><div><span>Parte do parceiro</span><strong id="previewPartner">R$ 0,00</strong></div><div class="net"><span>Líquido para sua operação</span><strong id="previewNet">R$ 0,00</strong></div></div></div>
+  <div class="form-section"><div class="form-section-head"><span>3</span><div><h2>Quando entra o dinheiro?</h2><p>Isso alimenta a previsão e o realizado do dashboard.</p></div></div><div class="form-grid">
+    <div class="field">{{ form.expected_date.label_tag }}{{ form.expected_date }}<small>{{ form.expected_date.help_text }}</small></div><div class="field">{{ form.installment_count.label_tag }}{{ form.installment_count }}<small>{{ form.installment_count.help_text }}</small></div><div class="field">{{ form.installment_interval_months.label_tag }}{{ form.installment_interval_months }}<small>{{ form.installment_interval_months.help_text }}</small></div><div class="field">{{ form.status.label_tag }}{{ form.status }}<small>{{ form.status.help_text }}</small></div><div class="field">{{ form.received_at.label_tag }}{{ form.received_at }}</div><div class="field wide">{{ form.notes.label_tag }}{{ form.notes }}</div>
+  </div></div>
+  <div class="actions"><button class="btn primary" type="submit">Salvar lançamento</button><a class="btn" href="{% url 'commission_list' %}">Cancelar</a></div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+(()=>{
+ const form=document.getElementById('commissionForm'); if(!form) return;
+ const gross=form.querySelector('[name="gross_amount"]'), mode=form.querySelector('[name="split_mode"]'), pct=form.querySelector('[name="partner_percentage"]'), fixed=form.querySelector('[name="partner_fixed_amount"]'), prop=form.querySelector('[name="property"]'), earning=form.querySelector('[name="earning_type"]');
+ const pg=document.getElementById('previewGross'),pp=document.getElementById('previewPartner'),pn=document.getElementById('previewNet'),hint=document.getElementById('commissionSourceHint');
+ const money=v=>(Number(v)||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); const num=v=>Number(String(v||'0').replace(',','.'))||0;
+ function update(){const g=num(gross.value);let p=0;if(mode.value==='percentage')p=g*num(pct.value)/100;if(mode.value==='fixed')p=num(fixed.value);p=Math.min(p,g);pg.textContent=money(g);pp.textContent=money(p);pn.textContent=money(Math.max(0,g-p));document.querySelectorAll('.split-percentage').forEach(x=>x.style.display=mode.value==='percentage'?'block':'none');document.querySelectorAll('.split-fixed').forEach(x=>x.style.display=mode.value==='fixed'?'block':'none');document.querySelectorAll('.partner-field').forEach(x=>x.style.display=mode.value==='none'?'none':'block')}
+ async function loadPropertyRule(){
+   const id=prop?.value; const e=earning?.value; if(!id||!['rental','sale'].includes(e)){if(hint)hint.textContent='';return;}
+   const operation=e==='sale'?'sale':'rent';
+   try{const r=await fetch(`/api/imoveis/${id}/comissao/?operation=${operation}`,{headers:{'X-Requested-With':'XMLHttpRequest'}}); if(!r.ok)return; const d=await r.json(); gross.value=Number(d.gross||0).toFixed(2);
+     if(hint) hint.textContent=`Origem: ${d.property} · ${d.commission_rule}. O valor é calculado automaticamente pelo cadastro do imóvel.`;
+     if(d.partnership){ mode.value=d.partnership.split_mode; pct.value=d.partnership.partner_percentage||0; fixed.value=d.partnership.partner_fixed_amount||0; if(hint)hint.textContent += ` Parceria aceita: sua divisão já está registrada.`; }
+     update();
+   }catch(e){}
+ }
+ [gross,mode,pct,fixed].forEach(el=>el?.addEventListener('input',update)); mode?.addEventListener('change',update); prop?.addEventListener('change',loadPropertyRule); earning?.addEventListener('change',loadPropertyRule); update(); loadPropertyRule();
+})();
+</script>{% endblock %}

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block heading %}Rascunhos de captação{% endblock %}
+{% block subtitle %}Captações rápidas, organizadas e prontas para virar imóvel.{% endblock %}
+{% block content %}
+<div class="draft-list-head">
+  <div class="draft-tabs"><a class="btn small {% if status == 'active' %}primary{% endif %}" href="?status=active">Ativos</a><a class="btn small {% if status == 'archived' %}primary{% endif %}" href="?status=archived">Arquivados</a><a class="btn small {% if status == 'converted' %}primary{% endif %}" href="?status=converted">Convertidos</a></div>
+  <a class="btn primary" href="{% url 'draft_create' %}">📸 Nova captação</a>
+</div>
+<div class="draft-grid draft-grid-v2">
+{% for d in items %}
+<a class="draft-card draft-card-v2" href="{% url 'draft_detail' d.id %}">
+  <div class="draft-cover">
+    {% with img=d.images.first %}{% if img %}{% if img.is_video %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video><span class="media-kind-badge">VIDEO</span>{% else %}<img src="{{ img.image.url }}" alt="Capa do rascunho" loading="lazy">{% endif %}{% else %}<span>📷</span>{% endif %}{% endwith %}
+    <span class="draft-status">{{ d.get_status_display }}</span>
+    <span class="draft-photo-count">📷 {{ d.photo_count|default:0 }}</span>
+  </div>
+  <div class="draft-body">
+    <div class="draft-idline"><span>RASC #{{ d.pk }}</span>{% if d.created_by_id != request.user.id %}<span class="shared-mini">🤝 Compartilhado</span>{% endif %}</div>
+    <div class="draft-card-title"><b>{{ d.title|default:d.street_name|default:'Captação sem identificação' }}</b></div>
+    <p class="draft-street">📍 {{ d.street_name|default:'Rua não informada' }}</p>
+    <p class="draft-place">{% if d.neighborhood %}{{ d.neighborhood }}{% endif %}{% if d.city %}{% if d.neighborhood %} · {% endif %}{{ d.city }}{% endif %}</p>
+    <div class="draft-meta"><span>Abra para ver {{ d.photo_count|default:0 }} mídia(s)</span>{% if d.latitude %}<span>📌 GPS</span>{% endif %}{% if d.share_count %}<span>↗ {{ d.share_count }}</span>{% endif %}</div>
+  </div>
+</a>
+{% empty %}<div class="empty-card"><b>Nenhum rascunho aqui.</b><p>Quando encontrar uma oportunidade, toque em “Nova captação”.</p></div>{% endfor %}
+</div>
+{% endblock %}

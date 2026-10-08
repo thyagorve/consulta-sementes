@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block heading %}Excluir imóvel{% endblock %}
+{% block subtitle %}Confirmação protegida para evitar exclusão acidental.{% endblock %}
+{% block content %}
+<section class="panel delete-confirm-card">
+  <div class="delete-warning-icon">!</div>
+  <div>
+    <h2>Excluir {{ property.code }}?</h2>
+    <p><b>{{ property.title }}</b></p>
+    <p class="muted">{{ property.address }}{% if property.neighborhood %} · {{ property.neighborhood }}{% endif %} · {{ property.city }}/{{ property.state }}</p>
+    <div class="alert warning">Esta ação é permanente. Fotos e dados vinculados diretamente ao imóvel serão removidos.</div>
+    <form method="post" class="delete-confirm-form">{% csrf_token %}
+      <label for="confirm_code">Para confirmar, digite <b>{{ property.code }}</b></label>
+      <input id="confirm_code" name="confirm_code" autocomplete="off" placeholder="{{ property.code }}" required>
+      <div class="actions">
+        <button class="btn danger" type="submit">Excluir definitivamente</button>
+        <a class="btn" href="{% url 'property_detail' property.pk %}">Cancelar</a>
+        <a class="btn subtle" href="{% url 'property_list' %}">Voltar para imóveis</a>
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -70,8 +70,8 @@ def _token_payload_for_user(user):
         'refresh': str(refresh),
         'user_id': user.pk,
         'username': user.get_username(),
-        'login_em': agora.isoformat(),
-        'expira_em': (agora + timedelta(hours=OFFLINE_SESSION_HOURS)).isoformat(),
+        'login_em': timezone.localtime(agora).isoformat(),
+        'expira_em': timezone.localtime(agora + timedelta(hours=OFFLINE_SESSION_HOURS)).isoformat(),
     }
 
 
@@ -148,8 +148,8 @@ class OfflineReferenceView(APIView):
 
         agora = timezone.now()
         return Response({
-            'gerado_em': agora.isoformat(),
-            'validade_ate': (agora + timedelta(seconds=REFERENCE_TTL_SECONDS)).isoformat(),
+            'gerado_em': timezone.localtime(agora).isoformat(),
+            'validade_ate': timezone.localtime(agora + timedelta(seconds=REFERENCE_TTL_SECONDS)).isoformat(),
             'ttl_segundos': REFERENCE_TTL_SECONDS,
             'estoques': estoques,
             'cadastros': {
@@ -214,7 +214,7 @@ def _contexto_conflito(lote, base_versao, user):
                 'usuario_id': e.usuario_id,
                 'usuario': e.usuario.get_full_name() or e.usuario.username if e.usuario else 'Usuário removido',
                 'tipo': e.tipo,
-                'data': e.criado_em.isoformat(),
+                'data': timezone.localtime(e.criado_em).isoformat(),
                 'quantidade': e.historico.quantidade if e.historico else None,
             }
             for e in eventos
@@ -780,8 +780,8 @@ class SyncCentralView(APIView):
                     'usuario': op.usuario.get_full_name() or op.usuario.username,
                     'usuario_id': op.usuario_id,
                     'status': op.status,
-                    'criado_local_em': op.criado_local_em.isoformat() if op.criado_local_em else None,
-                    'recebido_em': op.recebido_em.isoformat(),
+                    'criado_local_em': timezone.localtime(op.criado_local_em).isoformat() if op.criado_local_em else None,
+                    'recebido_em': timezone.localtime(op.recebido_em).isoformat(),
                     'motivo': op.motivo,
                     'resultado': op.resultado,
                     'conflito_id': getattr(getattr(op, 'conflito', None), 'id', None),

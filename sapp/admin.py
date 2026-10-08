@@ -140,3 +140,30 @@ from .models import CargaAjusteLog
 class CargaAjusteLogAdmin(admin.ModelAdmin):
     list_display = ('id', 'historico', 'usuario', 'criado_em')
     readonly_fields = ('historico', 'usuario', 'criado_em', 'antes', 'depois', 'motivo')
+
+# --- Pontos de restauração de movimentações ---
+from .models import PontoRestauracaoMovimentacao
+
+@admin.register(PontoRestauracaoMovimentacao)
+class PontoRestauracaoMovimentacaoAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'solicitacao', 'tipo', 'lote', 'quantidade',
+        'status', 'criado_por', 'criado_em', 'restaurado_por', 'restaurado_em',
+    )
+    list_filter = ('status', 'tipo', 'criado_em', 'restaurado_em')
+    search_fields = ('lote', 'solicitacao__titulo', 'criado_por__username', 'restaurado_por__username')
+    readonly_fields = (
+        'solicitacao', 'historico', 'historico_id_original', 'criado_por', 'criado_em',
+        'tipo', 'lote', 'quantidade', 'endereco_origem', 'endereco_destino',
+        'descricao', 'estado_solicitacao', 'historicos_gerais_ids', 'status',
+        'restaurado_por', 'restaurado_em', 'observacao_restauracao',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return False

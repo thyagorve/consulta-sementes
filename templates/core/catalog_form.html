@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block heading %}{{ title }}{% endblock %}
+{% block subtitle %}Escolha o cliente e marque exatamente os imóveis que ele deve receber.{% endblock %}
+{% block content %}
+<section class="panel catalog-builder catalog-builder-premium">
+<div class="catalog-builder-hero"><div><span class="eyebrow">CATÁLOGO PERSONALIZADO</span><h2>Monte uma seleção que vende melhor</h2><p>Escolha o cliente, filtre os imóveis e envie uma experiência profissional em um único link.</p></div><div class="catalog-builder-hero-icon">⌂</div></div>
+<form method="post">{% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert error">{{ form.non_field_errors }}</div>{% endif %}
+  <div class="form-grid">
+    <div class="field"><label>{{ form.client.label }}</label>{{ form.client }}{% for e in form.client.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field"><label>{{ form.title.label }}</label>{{ form.title }}{% for e in form.title.errors %}<div class="error">{{ e }}</div>{% endfor %}</div>
+    <div class="field wide"><label>{{ form.message.label }}</label>{{ form.message }}</div>
+    <div class="field"><label>{{ form.watermark_text.label }}</label>{{ form.watermark_text }}<small>Ex.: Nome da imobiliária, corretor ou telefone.</small></div>
+    <div class="field"><label>{{ form.expires_at.label }}</label>{{ form.expires_at }}<small>Opcional. Deixe vazio para o link não expirar.</small></div>
+    <div class="field"><label class="check-row">{{ form.active }} <span>Catálogo ativo</span></label></div>
+  </div>
+
+  <div class="property-selector-head">
+    <div><h2>Selecionar imóveis</h2><p>Use os filtros abaixo e marque todas as opções que deseja enviar.</p></div>
+    <strong id="selectedCount">0 selecionados</strong>
+  </div>
+  <div class="catalog-filters">
+    <input type="search" id="propertySearch" placeholder="Buscar código, título ou bairro...">
+    <select id="neighborhoodFilter"><option value="">Todos os bairros</option></select><button class="btn" type="button" id="selectVisible">✓ Marcar visíveis</button><button class="btn" type="button" id="clearVisible">Limpar visíveis</button>
+  </div>
+  <div class="property-check-grid" id="propertyGrid">
+    {% for choice in form.properties %}
+      {% with p=choice.data.value.instance %}
+      <label class="property-check-card" data-search="{{ p.code|lower }} {{ p.title|lower }} {{ p.neighborhood|lower }}" data-neighborhood="{{ p.neighborhood|lower }}">
+        <div class="select-check">{{ choice.tag }}</div>
+        <div class="property-check-photo">
+          {% with img=p.images.first %}{% if img %}{% if img.is_video %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video><span class="media-kind-badge">VIDEO</span>{% else %}<img src="{{ img.image.url }}" alt="{{ p.title }}" loading="lazy">{% endif %}{% else %}<span>⌂</span>{% endif %}{% endwith %}
+        </div>
+        <div class="property-check-body"><b>{{ p.code }} · {{ p.title }}</b><span>📍 {{ p.neighborhood }} · {{ p.city }}/{{ p.state }}</span><span>🛏 {{ p.bedrooms }} · 🚿 {{ p.bathrooms }} · 🚗 {{ p.parking_spaces }}</span>{% if p.rent_price %}<strong>R$ {{ p.rent_price|floatformat:2 }}/mês</strong>{% endif %}{% if p.sale_price %}<strong>R$ {{ p.sale_price|floatformat:2 }}</strong>{% endif %}</div>
+      </label>
+      {% endwith %}
+    {% endfor %}
+  </div>
+  {% for e in form.properties.errors %}<div class="error">{{ e }}</div>{% endfor %}
+  <div class="actions sticky-actions"><button class="btn primary">Salvar catálogo</button><a class="btn" href="{% url 'catalog_list' %}">Cancelar</a></div>
+</form>
+</section>
+<script>
+(function(){
+ const cards=[...document.querySelectorAll('.property-check-card')], search=document.getElementById('propertySearch'), neighborhood=document.getElementById('neighborhoodFilter'), counter=document.getElementById('selectedCount');
+ [...new Set(cards.map(c=>c.dataset.neighborhood).filter(Boolean))].sort().forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n.replace(/\b\w/g,x=>x.toUpperCase());neighborhood.appendChild(o)});
+ function filter(){const q=search.value.toLowerCase().trim(), n=neighborhood.value;cards.forEach(c=>c.style.display=(!q||c.dataset.search.includes(q))&&(!n||c.dataset.neighborhood===n)?'flex':'none')}
+ function count(){const n=document.querySelectorAll('.property-check-card input:checked').length;counter.textContent=n+' selecionado'+(n===1?'':'s');cards.forEach(c=>c.classList.toggle('selected',!!c.querySelector('input:checked')))}
+ search.addEventListener('input',filter); neighborhood.addEventListener('change',filter); document.getElementById('propertyGrid').addEventListener('change',count); document.getElementById('selectVisible').onclick=()=>{cards.filter(c=>c.style.display!=='none').forEach(c=>{c.querySelector('input').checked=true});count()}; document.getElementById('clearVisible').onclick=()=>{cards.filter(c=>c.style.display!=='none').forEach(c=>{c.querySelector('input').checked=false});count()}; count();
+})();
+</script>
+{% endblock %}

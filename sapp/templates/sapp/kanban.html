@@ -1280,6 +1280,12 @@ function criarCardHTML(card) {
         ?? card.quantidade_empenhada
         ?? 0;
 
+    // Comportamento original: a barra mostra o EMPENHO QUE AINDA ESTÁ PENDENTE.
+    // Ex.: 8/8 empenhados = 100%; depois de transferir 1, 7/8 = 88%.
+    const qtdMov = Number(card.quantidade_movimentada || 0);
+    const qtdSolicitada = Number(card.quantidade_solicitada || 0);
+    const qtdProgresso = Math.max(0, Number(qtdEmp || 0));
+
     const embalagens = [
         ...new Set(
             (card.embalagens || [])
@@ -1316,20 +1322,14 @@ function criarCardHTML(card) {
 
     const qtdFormatada = (
         card.unidade_controle === 'QUILOGRAMA'
-            ? Number(qtdEmp).toFixed(2)
-            : Math.round(qtdEmp)
+            ? Number(qtdProgresso).toFixed(2)
+            : Math.round(qtdProgresso)
     );
 
     const percentual =
-        card.percentual_empenhado ??
-        (
-            card.quantidade_solicitada > 0
-                ? (
-                    card.quantidade_empenhada
-                    / card.quantidade_solicitada
-                ) * 100
-                : 0
-        );
+        qtdSolicitada > 0
+            ? Math.max(0, Math.min(100, (qtdProgresso / qtdSolicitada) * 100))
+            : 0;
     
     const statusColors = {
         'AGUARDANDO_EMPENHO': '#fff3cd',
@@ -1369,6 +1369,7 @@ function criarCardHTML(card) {
             </div>
             <div class="card-details-grid">
                 <span><i class="fas fa-box me-1"></i>${Number(card.quantidade_solicitada || 0) > 0 ? `${qtdFormatada}/${card.quantidade_solicitada} ${unidade}` : `${qtdFormatada} ${unidade} · ABERTA`}</span>
+                <span><i class="fas fa-route me-1"></i>Mov.: ${Number(card.quantidade_movimentada || 0)} · Pend.: ${Number(qtdEmp || 0)}</span>
                 <span><i class="fas fa-user me-1"></i>${card.criador_nome || '-'}</span>
                 <span><i class="far fa-clock me-1"></i>${card.data_criacao || '-'}</span>
                 ${card.data_finalizacao ? `<span><i class="fas fa-check-circle me-1 text-success"></i>${card.data_finalizacao}</span>` : ''}

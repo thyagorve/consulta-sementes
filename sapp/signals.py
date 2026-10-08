@@ -1,6 +1,8 @@
+from datetime import timedelta
 # sapp/signals.py
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
+from django.utils import timezone
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 
@@ -88,3 +90,87 @@ def versionar_lote_apos_movimentacao(sender, instance, created, **kwargs):
             historico=instance,
             tipo=instance.tipo or '',
         )
+
+# ---------------------------------------------------------------------------
+# Ponto de restauração automático para toda movimentação de item empenhado.
+# O ponto é criado independentemente de quem movimentou. A restauração em si
+# é exposta apenas na Central Administrativa.
+# ---------------------------------------------------------------------------
+from sapp.models import HistoricoItemEmpenho, PontoRestauracaoMovimentacao
+
+
+@receiver(post_save, sender=HistoricoItemEmpenho)
+def criar_ponto_restauracao_movimentacao(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    solicitacao = None
+    try:
+        solicitacao = instance.empenho.solicitacao
+    except Exception:
+        solicitacao = None
+
+    estado = {}
+    if solicitacao is not None:
+        estado = {
+            'status': solicitacao.status,
+            'quantidade_solicitada': str(solicitacao.quantidade_solicitada or 0),
+            'quantidade_empenhada': str(solicitacao.quantidade_empenhada or 0),
+            'quantidade_movimentada': str(solicitacao.quantidade_movimentada or 0),
+            'coluna_kanban_id': solicitacao.coluna_kanban_id,
+            'data_finalizacao': (
+                timezone.localtime(solicitacao.data_finalizacao).isoformat()
+                if solicitacao.data_finalizacao else None
+            ),
+        }
+
+    historicos_gerais_ids = []
+    if instance.processado_em:
+        inicio = instance.processado_em - timedelta(seconds=60)
+        fim = instance.processado_em + timedelta(seconds=5)
+        pares = []
+        if instance.tipo == 'transferencia':
+            pares = [
+                (instance.estoque_origem_id, 'Transferência (Saída)'),
+                (instance.estoque_destino_id, 'Transferência (Entrada)'),
+            ]
+        elif instance.tipo == 'expedicao':
+            pares = [(instance.estoque_origem_id, 'Expedição')]
+
+        for estoque_id, tipo_geral in pares:
+            if not estoque_id:
+                continue
+            geral = (
+                HistoricoMovimentacao.objects
+                .filter(
+                    estoque_id=estoque_id,
+                    tipo=tipo_geral,
+                    quantidade=instance.quantidade,
+                    data_hora__gte=inicio,
+                    data_hora__lte=fim,
+                )
+                .order_by('-data_hora', '-id')
+                .first()
+            )
+            if geral:
+                historicos_gerais_ids.append(geral.id)
+
+    PontoRestauracaoMovimentacao.objects.get_or_create(
+        historico=instance,
+        defaults={
+            'historico_id_original': instance.id,
+            'solicitacao': solicitacao,
+            'criado_por': instance.processado_por,
+            'tipo': instance.tipo or '',
+            'lote': instance.lote or '',
+            'quantidade': instance.quantidade or 0,
+            'endereco_origem': instance.endereco_origem or '',
+            'endereco_destino': instance.endereco_destino or '',
+            'descricao': (
+                f'{instance.get_tipo_display()} do lote {instance.lote or "-"} '
+                f'({instance.quantidade or 0})'
+            ),
+            'estado_solicitacao': estado,
+            'historicos_gerais_ids': historicos_gerais_ids,
+        },
+    )

@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block heading %}{% if is_admin %}WhatsApp / Evolution{% else %}Meu WhatsApp{% endif %}{% endblock %}
+{% block subtitle %}{% if is_admin %}Configuração central e conexão das instâncias dos corretores.{% else %}Sua instância é criada automaticamente. Você só precisa conectar seu WhatsApp.{% endif %}{% endblock %}
+{% block content %}
+<div class="evo-grid">
+  <section class="panel evo-card evo-main">
+    <div class="evo-status-row">
+      <div><span class="evo-kicker">SUA INSTÂNCIA</span><h2>{% if evolution_connected %}WhatsApp conectado{% elif evolution_state == 'not_created' %}Ainda não criada{% else %}{{ evolution_state|default:'desconectada'|capfirst }}{% endif %}</h2><p class="muted">ID {{ profile.public_code }} · instância {{ profile.evolution_instance_name|default:'será criada ao conectar' }}</p></div>
+      <span class="evo-light {% if evolution_connected %}ok{% else %}warn{% endif %}"></span>
+    </div>
+    <div class="evo-actions">
+      <form method="post" action="{% url 'evolution_connect' %}">{% csrf_token %}<button class="btn primary" type="submit">{% if evolution_connected %}↻ Atualizar conexão{% else %}▣ Conectar WhatsApp{% endif %}</button></form>
+      {% if is_admin and profile.evolution_instance_name %}<form method="post" action="{% url 'evolution_setup_webhook' %}">{% csrf_token %}<button class="btn" type="submit">⚡ Atualizar webhook</button></form>{% endif %}
+    </div>
+    {% if qr_base64 %}<div class="qr-card"><b>Escaneie no WhatsApp</b><img src="{{ qr_base64 }}" alt="QR Code do WhatsApp"><small>WhatsApp → Aparelhos conectados → Conectar aparelho.</small></div>{% endif %}
+    <div class="evo-fields"><div class="wide"><small>Webhook desta conta</small><code>{{ webhook_url }}</code></div></div>
+  </section>
+
+  {% if is_admin %}
+  <section class="panel evo-card">
+    <span class="evo-kicker">SOMENTE ADMIN</span><h3>Configuração global da API</h3>
+    <form method="post" class="compact-form">{% csrf_token %}<input type="hidden" name="action" value="save_config">{{ config_form.as_p }}<button class="btn primary" type="submit">Salvar configuração</button></form>
+    <p class="muted tiny">Cada corretor recebe uma instância automática no padrão <b>prefixo + ID do corretor</b>. A chave global não aparece para usuários comuns.</p>
+  </section>
+  {% else %}
+  <section class="panel evo-card"><h3>Como funciona</h3><div class="flow-steps"><span>1</span><p>O sistema cria sua instância automaticamente.</p><span>2</span><p>Você escaneia o QR Code.</p><span>3</span><p>Depois conversa com seus clientes dentro do CRM.</p></div></section>
+  {% endif %}
+</div>
+<section class="panel evo-clients"><div class="section-head"><div><h3>Conversar com clientes</h3><p class="muted">Abra o atendimento de um cliente cadastrado.</p></div></div><div class="evo-client-grid">{% for c in recent_clients %}<a class="evo-client" href="{% url 'client_whatsapp' c.id %}"><span class="avatar">{{ c.name|first|upper }}</span><span><b>{{ c.name }}</b><small>{{ c.phone|default:'Sem telefone' }}</small></span><strong>›</strong></a>{% empty %}<p class="muted">Nenhum cliente cadastrado.</p>{% endfor %}</div></section>
+{% endblock %}

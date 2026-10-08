@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block heading %}Editar contrato{% endblock %}
+{% block subtitle %}Revise o conteúdo, salve e gere o arquivo final em PDF ou Word.{% endblock %}
+{% block content %}
+<section class="contract-editor-shell">
+  <form method="post" class="panel contract-document-form contract-document-form-v2">{% csrf_token %}
+    <div class="contract-editor-head">
+      <div><span class="eyebrow">DOCUMENTO</span><h2>{{ doc.title }}</h2><p>O arquivo gerado usa exatamente o conteúdo salvo abaixo.</p></div>
+      <div class="contract-export-actions"><a class="btn" href="{% url 'contract_document_pdf' doc.pk %}">⬇ PDF</a><a class="btn" href="{% url 'contract_document_docx' doc.pk %}">⬇ Word (.docx)</a></div>
+    </div>
+    <div class="form-grid">
+      <div class="field wide"><label>Título</label><input class="form-control" name="title" value="{{ doc.title }}"></div>
+      <div class="field"><label>Status</label><select class="form-control" name="status">{% for value,label in doc.STATUS %}<option value="{{ value }}" {% if doc.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="field wide"><label>Conteúdo do contrato</label><textarea class="form-control contract-document-editor" name="content">{{ doc.content }}</textarea><small>Edite cláusulas, observações e condições antes de gerar o arquivo final.</small></div>
+    </div>
+    <div class="actions contract-editor-actions"><button class="btn primary">Salvar alterações</button><button class="btn" name="print" value="1">Salvar e visualizar impressão</button><a class="btn" href="{% url 'contract_list' %}">Voltar aos contratos</a></div>
+  </form>
+</section>
+{% endblock %}

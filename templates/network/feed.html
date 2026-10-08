@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block heading %}Mural de oportunidades{% endblock %}
+{% block subtitle %}Procure imóveis e veja apenas o que precisa de ação.{% endblock %}
+{% block content %}
+<div class="network-toolbar-clean">
+  <a class="btn primary" href="{% url 'partnership_post_create' %}">＋ Publicar procura</a>
+  <a class="btn" href="{% url 'conversation_list' %}">💬 Conversas</a>
+</div>
+
+{% if received_property_requests %}
+<section class="panel network-pending-clean">
+  <div class="section-title"><div><span class="eyebrow">PENDENTES</span><h2>Solicitações nos seus imóveis</h2></div></div>
+  <div class="request-stack">
+    {% for r in received_property_requests %}
+    <div class="request-row clean-request-row">
+      <div><b>{{ r.property.code }} · {{ r.property.title }}</b><small>{{ r.requester.get_full_name|default:r.requester.username }}{% if r.message %} · {{ r.message|truncatechars:90 }}{% endif %}</small></div>
+      <div class="request-actions">
+        {% if r.conversation_id %}<a class="btn small" href="{% url 'conversation_detail' r.conversation_id %}">💬 Conversa</a>{% endif %}
+        <form method="post" action="{% url 'property_partnership_decide' r.id 'accept' %}">{% csrf_token %}<button class="btn primary small">✓ Aceitar</button></form>
+        <form method="post" action="{% url 'property_partnership_decide' r.id 'decline' %}">{% csrf_token %}<button class="btn small">Recusar</button></form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="network-clean-section">
+  <div class="section-title"><div><span class="eyebrow">PEDIDOS</span><h2>O que os corretores procuram</h2></div></div>
+  <div class="feed-list network-clean-feed">
+    {% for post in posts %}
+    <article class="opportunity-card network-clean-card">
+      <div class="network-clean-card-top">
+        <div><b>{% if post.anonymous and post.author_id != request.user.id %}Corretor confidencial{% else %}{{ post.author.get_full_name|default:post.author.username }}{% endif %}</b><small>{{ post.get_operation_type_display }} · {{ post.created_at|timesince }} atrás</small></div>
+        {% if post.max_value %}<strong>até R$ {{ post.max_value|floatformat:2 }}</strong>{% endif %}
+      </div>
+      <p class="opportunity-text">{{ post.text }}</p>
+      <p class="network-clean-location">📍 {{ post.neighborhood|default:'Região aberta' }}{% if post.city %} · {{ post.city }}{% endif %}</p>
+      <div class="opportunity-actions">
+        {% if post.author_id == request.user.id or request.user.is_staff or request.user.is_superuser %}
+          <a class="btn small" href="{% url 'partnership_post_update' post.id %}">Editar</a>
+          <form method="post" action="{% url 'partnership_post_delete' post.id %}" onsubmit="return confirm('Excluir este anúncio do mural?')">{% csrf_token %}<button class="btn small danger-soft" type="submit">Excluir</button></form>
+        {% else %}
+          <a class="btn primary small" href="{% url 'partnership_post_respond' post.id %}">Tenho interesse</a>
+        {% endif %}
+      </div>
+    </article>
+    {% empty %}<div class="empty-state">Nenhum pedido publicado.</div>{% endfor %}
+  </div>
+</section>
+
+<section class="network-clean-section">
+  <div class="section-title"><div><span class="eyebrow">IMÓVEIS</span><h2>Disponíveis para parceria</h2></div></div>
+  <div class="partnership-property-grid rich-partnership-grid partnership-grid-premium">
+    {% for p in partnership_properties %}
+    <article class="partner-property-card network-property-clean partnership-card-premium">
+      <a class="partner-photo smart-property-media" data-smart-media href="{% url 'property_partnership_detail' p.id %}" aria-label="Ver {{ p.code }} · {{ p.title }}">
+        {% with cover=p.images.all|first %}{% if cover %}{% if cover.is_video %}<div class="partner-video-placeholder"><span>🎥</span><b>Vídeo do imóvel</b><small>Abra o imóvel para visualizar conforme o acesso.</small></div>{% else %}<img src="{% url 'partnership_property_image' p.id cover.id %}" alt="Prévia de {{ p.title }}" loading="lazy">{% endif %}{% else %}<div class="no-photo property-empty-media">⌂</div>{% endif %}{% endwith %}
+        <span class="partner-code">{{ p.code }}</span>
+      </a>
+      <div class="partner-card-body">
+        <h3>{{ p.title }}</h3>
+        <p class="location-line">📍 {{ p.neighborhood|default:p.city }}</p>
+        {% if p.rent_price %}<strong class="partnership-price">R$ {{ p.rent_price|floatformat:2 }}<small>/mês</small></strong>{% endif %}
+        {% if p.sale_price %}<strong class="partnership-price">R$ {{ p.sale_price|floatformat:2 }}</strong>{% endif %}
+        {% if p.partnership_terms %}<p class="network-terms-clean">🤝 {{ p.partnership_terms }}</p>{% endif %}
+        <a class="btn primary full partnership-open-btn" href="{% url 'property_partnership_detail' p.id %}">Ver imóvel</a>
+      </div>
+    </article>
+    {% empty %}<div class="empty-state">Nenhum imóvel aberto para parceria.</div>{% endfor %}
+  </div>
+</section>
+{% endblock %}

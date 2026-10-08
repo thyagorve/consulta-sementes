@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block heading %}Imóveis{% endblock %}
+{% block subtitle %}Identifique o imóvel antes de abrir: código, nome, bairro e status ficam visíveis no card.{% endblock %}
+{% block content %}
+<div class="toolbar property-list-toolbar"><form><input name="q" value="{{ request.GET.q }}" placeholder="Código, título, bairro..."><button class="btn">Buscar</button></form><a class="btn primary" href="{% url 'property_create' %}">+ Novo imóvel</a></div>
+<div class="property-grid property-grid-premium">
+{% for x in items %}
+<article class="property-card property-card-v2 property-card-premium">
+  <a class="property-card-photo smart-property-media" data-smart-media href="{% url 'property_detail' x.pk %}" aria-label="Abrir {{ x.code }} · {{ x.title }}">
+    {% with img=x.images.first %}{% if img %}{% if img.is_video %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video><span class="media-kind-badge">VIDEO</span>{% else %}<img src="{{ img.image.url }}" alt="{{ x.title }}" loading="lazy">{% endif %}{% else %}<span class="property-empty-media">⌂</span>{% endif %}{% endwith %}
+    <div class="property-media-shade"></div>
+    <div class="property-id-overlay"><b>{{ x.code }}</b><span>{{ x.title }}</span></div>
+  </a>
+  <div class="pbody property-card-content">
+    <div class="property-card-badges"><span class="badge">{{ x.get_status_display }}</span>{% if x.id in partnership_property_ids %}<span class="badge partnership-access">🤝 Parceria</span>{% elif x.accepts_partnership %}<span class="badge">🤝 Aceita parceria</span>{% endif %}</div>
+    <p class="property-identification-label">IDENTIFICAÇÃO</p><h3>{{ x.title }}</h3>
+    <p class="property-card-location">📍 {{ x.neighborhood|default:'Bairro não informado' }} · {{ x.city }}/{{ x.state }}</p>
+    <div class="property-spec-row"><span>🛏 {{ x.bedrooms }}</span><span>🚿 {{ x.bathrooms }}</span><span>🚗 {{ x.parking_spaces }}</span></div>
+    <div class="property-card-price">{% if x.rent_price %}<strong>R$ {{ x.rent_price|floatformat:2 }}<small>/mês</small></strong>{% endif %}{% if x.sale_price %}<strong>R$ {{ x.sale_price|floatformat:2 }}</strong>{% endif %}</div>
+    <div class="property-card-actions"><a class="btn small primary" href="{% url 'property_detail' x.pk %}">Ver imóvel</a>{% if x.id not in partnership_property_ids %}<a class="btn small" href="{% url 'property_update' x.pk %}">Editar</a><a class="btn small danger ghost-danger" href="{% url 'property_delete' x.pk %}" title="Excluir {{ x.code }}">Excluir</a>{% endif %}</div>
+  </div>
+</article>
+{% empty %}<div class="empty-state">Nenhum imóvel cadastrado.</div>{% endfor %}
+</div>
+{% endblock %}

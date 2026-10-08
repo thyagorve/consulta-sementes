@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block heading %}{{ draft.title|default:draft.street_name|default:'Rascunho' }}{% endblock %}
+{% block subtitle %}{% if draft.created_by_id == request.user.id %}Sua captação rápida.{% else %}Compartilhado por {{ draft.created_by.get_full_name|default:draft.created_by.username }}.{% endif %}{% endblock %}
+{% block content %}
+<div class="draft-nav-row">
+  <a class="btn" href="{% url 'draft_list' %}">← Todos os rascunhos</a>
+  <div class="draft-nav-nextprev">
+    {% if previous_draft %}<a class="btn small" href="{% url 'draft_detail' previous_draft.pk %}">‹ Mais recente</a>{% endif %}
+    {% if next_draft %}<a class="btn small" href="{% url 'draft_detail' next_draft.pk %}">Mais antigo ›</a>{% endif %}
+  </div>
+</div>
+<div class="draft-summary-card">
+  <div class="draft-summary-main"><span class="badge">{{ draft.get_status_display }}</span><h2>{{ draft.title|default:'Captação sem identificação' }}</h2><div class="draft-address-line">📍 <b>{{ draft.street_name|default:'Rua não informada' }}</b>{% if draft.neighborhood %}<span>• {{ draft.neighborhood }}</span>{% endif %}{% if draft.city %}<span>• {{ draft.city }}</span>{% endif %}</div></div>
+  {% if can_manage %}<a class="btn" href="{% url 'draft_update' draft.id %}">✏️ Editar dados</a>{% else %}<form method="post" action="{% url 'draft_copy_to_mine' draft.id %}">{% csrf_token %}<button class="btn primary">⧉ Salvar cópia nos meus rascunhos</button></form>{% endif %}
+</div>
+
+<div class="draft-detail-grid">
+  <section class="panel">
+    <div class="section-title"><div><h2>Fotos e vídeos</h2><p>{{ draft.images.count }} mídia(s) guardada(s). Arraste para organizar.</p></div></div>
+    <div class="draft-gallery sortable-media-grid" id="draftMediaGrid" data-reorder-url="{% url 'draft_reorder_media' draft.id %}">
+      {% for img in draft.images.all %}
+      <article class="draft-media-card" draggable="{% if can_manage %}true{% else %}false{% endif %}" data-media-id="{{ img.id }}">
+        <a href="{{ img.image.url }}" class="draft-media-open js-media-viewer" data-media-src="{{ img.image.url }}" data-media-kind="{% if img.is_video %}video{% else %}image{% endif %}" data-media-group="draft-{{ draft.id }}" data-media-title="{{ draft.title|default:'Rascunho' }}">{% if img.is_video %}<video src="{{ img.image.url }}" muted playsinline preload="metadata"></video><span class="media-kind-badge">VIDEO</span>{% else %}<img src="{{ img.image.url }}" alt="Foto da captação {{ forloop.counter }}" loading="lazy">{% endif %}</a>
+        {% if can_manage %}<div class="media-sort-footer"><span class="drag-handle" title="Arraste para ordenar">⋮⋮</span><span class="media-order-buttons"><button type="button" class="mini-order" data-move="prev" title="Mover antes">←</button><button type="button" class="mini-order" data-move="next" title="Mover depois">→</button></span><form method="post" action="{% url 'draft_delete_media' draft.id img.id %}" onsubmit="return confirm('Remover esta mídia?')">{% csrf_token %}<button class="danger-link" type="submit">Excluir</button></form></div>{% endif %}
+      </article>
+      {% empty %}<div class="empty-card">Nenhuma mídia ainda.</div>{% endfor %}
+    </div>
+    {% if can_manage %}<form method="post" enctype="multipart/form-data" action="{% url 'draft_add_photos' draft.id %}" class="quick-photo-form media-quick-upload" data-upload-progress="1">{% csrf_token %}<label class="camera-drop compact"><span>＋</span><b>Adicionar fotos ou vídeos</b><small>Selecione vários arquivos de uma vez.</small><input type="file" name="media" accept="image/*,video/*" multiple></label><button class="btn primary" type="submit">Enviar mídias</button></form>{% endif %}
+  </section>
+
+  <aside class="panel draft-info draft-info-v2">
+    <h3>Ficha rápida</h3>
+    <div class="draft-fact"><span>🛣️</span><div><small>Rua / referência</small><b>{{ draft.street_name|default:'Não informado' }}</b></div></div>
+    <div class="draft-fact"><span>📌</span><div><small>Bairro</small><b>{{ draft.neighborhood|default:'Não informado' }}</b></div></div>
+    <div class="draft-fact"><span>🏙️</span><div><small>Cidade</small><b>{{ draft.city|default:'Não informado' }}</b></div></div>
+    {% if draft.notes %}<div class="draft-notes"><small>📝 Anotações</small><p>{{ draft.notes|linebreaksbr }}</p></div>{% endif %}
+    {% if draft.location_url %}<a class="btn location-btn wide-btn" target="_blank" href="{{ draft.location_url }}">📍 Abrir localização no mapa</a>{% else %}<div class="draft-no-gps">📍 GPS não anexado</div>{% endif %}
+
+    {% if can_manage and draft.status != 'converted' %}<div class="stack-actions"><a class="btn primary" href="{% url 'draft_convert' draft.id %}">🏠 Transformar em imóvel</a>{% if draft.status == 'active' %}<form method="post" action="{% url 'draft_action' draft.id 'archive' %}">{% csrf_token %}<button class="btn wide-btn">🗃️ Arquivar</button></form>{% else %}<form method="post" action="{% url 'draft_action' draft.id 'restore' %}">{% csrf_token %}<button class="btn wide-btn">↩️ Restaurar</button></form>{% endif %}<form method="post" action="{% url 'draft_action' draft.id 'delete' %}" onsubmit="return confirm('Excluir este rascunho e as fotos?')">{% csrf_token %}<button class="btn danger wide-btn">🗑️ Excluir</button></form></div>{% endif %}
+    {% if draft.converted_property %}<a class="btn primary wide-btn" href="{% url 'property_detail' draft.converted_property.id %}">Ver imóvel {{ draft.converted_property.code }}</a>{% endif %}
+  </aside>
+</div>
+
+{% if can_manage %}
+<section class="panel draft-share-panel">
+  <div class="section-title"><div><h2>🤝 Compartilhar</h2><p>O corretor receberá rua, bairro, cidade, fotos, GPS e suas anotações exatamente como estão neste rascunho.</p></div></div>
+  <form method="post" action="{% url 'draft_share' draft.id %}" class="share-row share-row-v2">{% csrf_token %}
+    <div><label>{{ share_form.identifier.label }}</label>{{ share_form.identifier }}<small>ID do corretor, e-mail ou WhatsApp.</small></div>
+    <div class="share-message"><label>{{ share_form.message.label }}</label>{{ share_form.message }}</div>
+    <button class="btn primary">📤 Compartilhar</button>
+  </form>
+  {% if draft.shares.all %}<div class="share-history"><b>Compartilhado com</b>{% for sh in draft.shares.all %}<div class="share-person"><span class="avatar">{{ sh.shared_with.first_name|default:sh.shared_with.username|first|upper }}</span><div><b>{{ sh.shared_with.get_full_name|default:sh.shared_with.username }}</b><small>{% if sh.shared_with.broker_profile.public_code %}{{ sh.shared_with.broker_profile.public_code }} · {% endif %}{{ sh.shared_with.email|default:'sem e-mail' }}</small></div><span class="share-date">{{ sh.updated_at|date:'d/m H:i' }}</span></div>{% endfor %}</div>{% endif %}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}<script>
+(()=>{
+ const grid=document.getElementById('draftMediaGrid');if(!grid)return;let dragged=null;
+ grid.querySelectorAll('[draggable="true"]').forEach(card=>{card.addEventListener('dragstart',()=>{dragged=card;card.classList.add('dragging')});card.addEventListener('dragend',()=>{card.classList.remove('dragging');saveOrder()});card.addEventListener('dragover',e=>{e.preventDefault();if(!dragged||dragged===card)return;const r=card.getBoundingClientRect();grid.insertBefore(dragged,e.clientX<r.left+r.width/2?card:card.nextSibling)})});
+ grid.addEventListener('click',e=>{const b=e.target.closest('[data-move]');if(!b)return;const card=b.closest('[data-media-id]');if(!card)return;if(b.dataset.move==='prev'&&card.previousElementSibling)grid.insertBefore(card,card.previousElementSibling);if(b.dataset.move==='next'&&card.nextElementSibling)grid.insertBefore(card.nextElementSibling,card);saveOrder();});
+ async function saveOrder(){const order=[...grid.querySelectorAll('[data-media-id]')].map(x=>x.dataset.mediaId);if(!order.length)return;try{const csrf=document.querySelector('[name=csrfmiddlewaretoken]')?.value;await fetch(grid.dataset.reorderUrl,{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest'},body:JSON.stringify({order})});}catch(e){}}
+})();
+</script>{% endblock %}

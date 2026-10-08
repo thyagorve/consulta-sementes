@@ -18,14 +18,15 @@ class Command(BaseCommand):
         
         # Verificar se está no horário (opcional)
         from datetime import datetime
-        agora = datetime.now().time()
+        agora_local = timezone.localtime(timezone.now())
+        agora = agora_local.time().replace(tzinfo=None)
         
         if config.horario_verificacao:
             # Verificar se passou do horário (considerando margem de 15 minutos)
             from datetime import timedelta
-            inicio = datetime.combine(datetime.today(), config.horario_verificacao)
+            inicio = datetime.combine(agora_local.date(), config.horario_verificacao)
             fim = inicio + timedelta(minutes=15)
-            hora_atual = datetime.combine(datetime.today(), agora)
+            hora_atual = datetime.combine(agora_local.date(), agora)
             
             if not (inicio <= hora_atual <= fim):
                 self.stdout.write(f"⏰ Fora do horário de verificação ({config.horario_verificacao})")

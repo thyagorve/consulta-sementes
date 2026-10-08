@@ -19,8 +19,8 @@ class OfflineTokenObtainPairSerializer(TokenObtainPairSerializer):
         data['access'] = str(refresh.access_token)
         data['user_id'] = self.user.pk
         data['username'] = self.user.get_username()
-        data['login_em'] = agora.isoformat()
-        data['expira_em'] = (agora + timedelta(hours=5)).isoformat()
+        data['login_em'] = timezone.localtime(agora).isoformat()
+        data['expira_em'] = timezone.localtime(agora + timedelta(hours=5)).isoformat()
         return data
 
 

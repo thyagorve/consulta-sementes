@@ -241,12 +241,11 @@ class WhatsAppNotificacaoService:
     
     def testar_conexao(self, numero_teste):
         """Testa a conexão com a API"""
-        from datetime import datetime
         mensagem_teste = f"""🧪 *TESTE DE CONEXÃO*
 
 ✅ Configuração funcionando!
 
-📅 {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+📅 {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S')}
 🔔 Sistema de Almoxarifado"""
         return self.enviar_mensagem(numero_teste, mensagem_teste)
     

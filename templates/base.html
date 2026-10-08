@@ -1,0 +1,512 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1118">
+  <title>{% block title %}ImobCRM{% endblock %}</title>
+  <meta name="application-name" content="ImobCRM">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ImobCRM">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="{% static 'pwa/manifest.webmanifest' %}?v=2">
+  <link rel="icon" type="image/png" sizes="64x64" href="{% static 'pwa/favicon-64.png' %}?v=2">
+  <link rel="icon" href="{% static 'pwa/favicon.ico' %}?v=2">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'pwa/apple-touch-icon.png' %}?v=2">
+  <script>
+  (()=>{
+    const ua=navigator.userAgent||'';
+    const ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+    const standalone=window.matchMedia?.('(display-mode: standalone)').matches||navigator.standalone===true;
+    if(ios) document.documentElement.classList.add('pwa-ios');
+    if(standalone) document.documentElement.classList.add('pwa-standalone');
+  })();
+  </script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=7.0">
+  <link rel="stylesheet" href="{% static 'css/v7_5.css' %}?v=7.5">
+  <link rel="stylesheet" href="{% static 'css/v7_6.css' %}?v=7.6">
+  <link rel="stylesheet" href="{% static 'css/v7_7_pwa.css' %}?v=7.7">
+  <link rel="stylesheet" href="{% static 'css/v7_8_brand_fix.css' %}?v=7.8">
+  <link rel="stylesheet" href="{% static 'css/v7_10_properties.css' %}?v=7.10">
+  <link rel="stylesheet" href="{% static 'css/v7_13.css' %}?v=7.13">
+  <link rel="stylesheet" href="{% static 'css/v7_14_ios_pwa.css' %}?v=7.14">
+  <link rel="stylesheet" href="{% static 'css/v7_15.css' %}?v=7.15">
+</head>
+<body class="theme-darkglass">
+<div class="menu-backdrop" id="menuBackdrop"></div>
+<aside class="sidebar" id="sidebar">
+  <div class="brand-row">
+    <a class="brand" href="{% url 'dashboard' %}"><span class="brand-icon app-brand-icon"><img src="{% static 'pwa/icon-192.png' %}" alt="ImobCRM"></span><span class="brand-text"><b>ImobCRM</b><small>Gestão & Rede</small></span></a>
+    <button class="menu-close" id="menuClose" type="button" aria-label="Fechar menu">×</button>
+  </div>
+
+  <nav class="tree-nav">
+    <a class="nav-home" href="{% url 'dashboard' %}"><span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 10.5V20h13V10.5"/></svg></span><span class="nav-label">Dashboard</span></a>
+
+    <details class="nav-group"><summary><span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h8"/><circle cx="18" cy="12" r="2"/></svg></span><span class="nav-label">Comercial</span><b>⌄</b></summary><div class="nav-children">
+      <a href="{% url 'client_list' %}">Clientes</a><a href="{% url 'catalog_list' %}">Catálogos</a><a href="{% url 'negotiation_list' %}">Negociações</a><a href="{% url 'visit_list' %}">Agenda de visitas</a>
+    </div></details>
+
+    <details class="nav-group"><summary><span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5L12 4l9 7.5"/><path d="M5.5 10.5V20h13V10.5"/><path d="M9 14h6"/></svg></span><span class="nav-label">Imóveis</span><b>⌄</b></summary><div class="nav-children">
+      <a href="{% url 'property_list' %}">Imóveis</a><a href="{% url 'draft_list' %}">Captação / rascunhos</a><a href="{% url 'owner_list' %}">Proprietários</a>
+    </div></details>
+
+
+    <details class="nav-group"><summary><span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M12 4a14 14 0 0 1 0 16"/><path d="M12 4a14 14 0 0 0 0 16"/><path d="M4 12h16"/></svg></span><span class="nav-label">Rede</span><b>⌄</b></summary><div class="nav-children">
+      <a href="{% url 'partnership_network' %}">Oportunidades</a><a href="{% url 'conversation_list' %}" class="nav-chat-link">Conversas <i class="msg-badge global-unread-badge" hidden>0</i></a><a href="{% url 'group_create' %}">Grupos</a><a href="{% url 'forum_list' %}">Fórum / ajuda</a>
+    </div></details>
+
+    <details class="nav-group"><summary><span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18"/><path d="M16.5 7.5c0-1.9-2-3.5-4.5-3.5S7.5 5.6 7.5 7.5 9.3 10 12 10s4.5 1.2 4.5 3.5S14.5 17 12 17s-4.5-1.6-4.5-3.5"/></svg></span><span class="nav-label">Financeiro</span><b>⌄</b></summary><div class="nav-children">
+      <a href="{% url 'finance_receivables' %}">Recebimentos</a><a href="{% url 'finance_repasses' %}">Repasses</a>
+    </div></details>
+
+    <details class="nav-group"><summary><span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10l4 4v14H7z"/><path d="M17 3v5h4"/><path d="M10 12h8"/><path d="M10 16h8"/></svg></span><span class="nav-label">Documentos</span><b>⌄</b></summary><div class="nav-children">
+      <a href="{% url 'contract_list' %}">Contratos</a><a href="{% url 'contract_templates' %}">Modelos</a>
+    </div></details>
+
+    <details class="nav-group"><summary><span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 0 1 0 2.8l-.1.1a2 2 0 0 1-2.8 0l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 0 1-2 2h-.2a2 2 0 0 1-2-2v-.2a1 1 0 0 0-.7-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 0 1-2.8 0l-.1-.1a2 2 0 0 1 0-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 0 1-2-2v-.2a2 2 0 0 1 2-2h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1a2 2 0 0 1 0-2.8l.1-.1a2 2 0 0 1 2.8 0l.1.1a1 1 0 0 0 1.1.2H9a1 1 0 0 0 .6-.9V4a2 2 0 0 1 2-2h.2a2 2 0 0 1 2 2v.2a1 1 0 0 0 .6.9 1 1 0 0 0 1.1-.2l.1-.1a2 2 0 0 1 2.8 0l.1.1a2 2 0 0 1 0 2.8l-.1.1a1 1 0 0 0-.2 1.1V9c0 .4.2.8.6.9h.2A2 2 0 0 1 22 12v.2a2 2 0 0 1-2 2h-.2a1 1 0 0 0-.9.6Z"/></svg></span><span class="nav-label">Conta e sistema</span><b>⌄</b></summary><div class="nav-children">
+      <a href="{% url 'broker_profile' %}">Meu perfil</a><a href="{% url 'evolution_status' %}">{% if request.user.is_staff or request.user.is_superuser %}WhatsApp / Evolution{% else %}Conectar WhatsApp{% endif %}</a><a href="{% url 'help_guides' %}">Tutoriais</a>{% if request.user.is_staff %}<a href="/admin/">Administração</a>{% endif %}
+    </div></details>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <div class="user-chip"><span class="avatar">{{ request.user.first_name|default:request.user.username|first|upper }}</span><span class="user-text"><b>{{ request.user.get_full_name|default:request.user.username|truncatechars:22 }}</b><small>{{ request.user.email|default:"corretor"|truncatechars:24 }}</small></span></div>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button title="Sair"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7V5h9v14h-9v-2"/><path d="M15 12H4"/><path d="M8 8l-4 4 4 4"/></svg></button></form>
+  </div>
+</aside>
+
+<div class="shell" id="shell">
+  <header class="topbar">
+    <div class="topbar-left">
+      <button class="menu-toggle menu-toggle-modern" type="button" id="menuToggle" aria-label="Abrir menu" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg></button>
+      <button class="page-back-btn" type="button" id="pageBackBtn" title="Voltar" aria-label="Voltar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="topbar-copy"><div class="mobile-title-marquee"><h1>{% block heading %}ImobCRM{% endblock %}</h1></div><p>{% block subtitle %}Seu funil imobiliário em ordem.{% endblock %}</p></div>
+    </div>
+    <div class="welcome-box"><a class="quick-capture-top" href="{% url 'draft_create' %}" title="Captação rápida"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span>Captação</span></a><a class="top-network-icon" href="{% url 'partnership_network' %}" title="Rede de corretores"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 16 0"/><path d="M12 4a14 14 0 0 1 0 16"/><path d="M12 4a14 14 0 0 0 0 16"/><path d="M4 12h16"/></svg></a><span>Bem-vindo,</span><b>{{ request.user.first_name|default:request.user.username }}</b><a class="top-chat-icon" href="{% url 'conversation_list' %}" title="Conversas"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><i class="msg-badge global-unread-badge" hidden>0</i></a><button class="theme-toggle" data-theme-toggle type="button" title="Alternar tema"><svg class="theme-icon icon-dark ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="theme-icon icon-light ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.2M12 19.8V22M4.93 4.93l1.56 1.56M17.5 17.5l1.57 1.57M2 12h2.2M19.8 12H22M4.93 19.07l1.56-1.56M17.5 6.5l1.57-1.57"/></svg><span class="theme-label">Tema</span></button><button class="pwa-install-btn theme-toggle" id="pwaInstallBtn" type="button" hidden title="Instalar ImobCRM"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 18h14v3H5z"/></svg><span class="install-label">Instalar</span></button><button class="notification-toggle" id="globalNotifyToggle" type="button" title="Ativar notificações"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 17H5l1.4-1.4A2 2 0 0 0 7 14.2V11a5 5 0 1 1 10 0v3.2c0 .5.2 1 .6 1.4L19 17h-4"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></button></div><div class="topbar-mobile-actions"><a class="quick-capture-mobile" href="{% url 'draft_create' %}" title="Nova captação"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg></a><button class="theme-toggle mobile-theme-toggle" data-theme-toggle type="button" title="Alternar tema"><svg class="theme-icon icon-dark ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg><svg class="theme-icon icon-light ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.2M12 19.8V22M4.93 4.93l1.56 1.56M17.5 17.5l1.57 1.57M2 12h2.2M19.8 12H22M4.93 19.07l1.56-1.56M17.5 6.5l1.57-1.57"/></svg></button><button class="pwa-install-btn mobile-theme-toggle" id="pwaInstallBtnMobile" type="button" hidden title="Instalar ImobCRM"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 18h14v3H5z"/></svg></button><a class="mobile-chat-icon" href="{% url 'conversation_list' %}" title="Conversas"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg><i class="msg-badge global-unread-badge" hidden>0</i></a><a class="topbar-mobile-user" href="{% url 'broker_profile' %}" title="Meu perfil"><span class="avatar">{{ request.user.first_name|default:request.user.username|first|upper }}</span></a></div>
+  </header>
+
+  <main class="main">
+    {% for message in messages %}<div class="alert {{ message.tags }}">{{ message }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+
+<div class="media-theater" id="mediaTheater" aria-hidden="true">
+  <div class="media-theater-backdrop" data-media-close></div>
+  <div class="media-theater-shell">
+    <div class="media-theater-head"><div><b id="mediaTheaterTitle">Mídia</b><span id="mediaTheaterCounter"></span></div><button type="button" class="media-theater-close" data-media-close aria-label="Fechar">×</button></div>
+    <button type="button" class="media-theater-nav prev" data-media-prev aria-label="Anterior">‹</button>
+    <div class="media-theater-stage" id="mediaTheaterStage"></div>
+    <button type="button" class="media-theater-nav next" data-media-next aria-label="Próxima">›</button>
+  </div>
+</div>
+<div class="upload-progress-overlay" id="uploadProgressOverlay" aria-hidden="true">
+  <div class="upload-progress-card"><div class="upload-progress-icon">↑</div><h3>Enviando mídias</h3><p id="uploadProgressText">Preparando upload...</p><div class="upload-progress-track"><span id="uploadProgressBar"></span></div><div class="upload-progress-meta"><b id="uploadProgressPercent">0%</b><span>Não feche esta página</span></div></div>
+</div>
+
+<script>
+(()=>{
+  const THEME_KEY='imobcrm.theme';
+  const metaTheme=document.querySelector('meta[name="theme-color"]');
+  function applyTheme(mode){
+    const dark=mode!=='light';
+    document.body.classList.toggle('theme-darkglass',dark);
+    document.body.classList.toggle('theme-lightglass',!dark);
+    document.body.dataset.theme=dark?'dark':'light';
+    document.querySelectorAll('[data-theme-toggle]').forEach(btn=>{
+      btn.setAttribute('aria-pressed', dark?'false':'true');
+      btn.title = dark ? 'Mudar para tema claro' : 'Mudar para tema escuro';
+      const label=btn.querySelector('.theme-label'); if(label) label.textContent=dark?'Escuro':'Claro';
+    });
+    if(metaTheme) metaTheme.setAttribute('content', dark ? '#091019' : '#eef5f2');
+  }
+  function nextTheme(){ return document.body.classList.contains('theme-lightglass') ? 'dark' : 'light'; }
+  addEventListener('DOMContentLoaded',()=>{
+    applyTheme(localStorage.getItem(THEME_KEY)||'dark');
+    document.querySelectorAll('[data-theme-toggle]').forEach(btn=>btn.addEventListener('click',()=>{
+      const mode=nextTheme(); localStorage.setItem(THEME_KEY,mode); applyTheme(mode);
+    }));
+  });
+})();
+</script>
+<script>
+(()=>{
+  const sidebar=document.getElementById('sidebar');
+  const shell=document.getElementById('shell');
+  const toggle=document.getElementById('menuToggle');
+  const close=document.getElementById('menuClose');
+  const backdrop=document.getElementById('menuBackdrop');
+  const groups=[...document.querySelectorAll('.nav-group')];
+  let flyout=null;
+
+  function mobileOpen(open){
+    sidebar.classList.toggle('open',open);
+    backdrop.classList.toggle('open',open);
+    document.body.classList.toggle('menu-open',open);
+    toggle?.setAttribute('aria-expanded',open?'true':'false');
+    if(!open) closeFlyout();
+  }
+
+  function closeOtherGroups(current){
+    groups.forEach(g=>{ if(g!==current) g.removeAttribute('open'); });
+  }
+
+  function closeFlyout(){
+    if(flyout){ flyout.remove(); flyout=null; }
+    groups.forEach(g=>g.classList.remove('flyout-active'));
+  }
+
+  function openFlyout(group){
+    closeFlyout();
+    const source=group.querySelector('.nav-children');
+    const summary=group.querySelector('summary');
+    if(!source || !summary) return;
+    const r=summary.getBoundingClientRect();
+    const box=document.createElement('div');
+    box.className='nav-flyout';
+    const title=summary.querySelector('.nav-label')?.textContent?.trim() || 'Menu';
+    box.innerHTML=`<div class="nav-flyout-title">${title}</div>${source.innerHTML}`;
+    box.style.top=Math.max(10,Math.min(r.top,window.innerHeight-320))+'px';
+    document.body.appendChild(box);
+    flyout=box;
+    group.classList.add('flyout-active');
+    box.querySelectorAll('a').forEach(a=>a.addEventListener('click',closeFlyout));
+  }
+
+  groups.forEach(group=>{
+    group.addEventListener('toggle',()=>{
+      if(group.open){
+        closeOtherGroups(group);
+        if(sidebar.classList.contains('collapsed') && innerWidth>860){
+          group.removeAttribute('open');
+        }
+      }
+    });
+    const summary=group.querySelector('summary');
+    summary?.addEventListener('click',e=>{
+      if(sidebar.classList.contains('collapsed') && innerWidth>860){
+        e.preventDefault();
+        if(group.classList.contains('flyout-active')) closeFlyout();
+        else openFlyout(group);
+      }
+    });
+  });
+
+  toggle?.addEventListener('click',()=>{
+    if(innerWidth<=860){ mobileOpen(!sidebar.classList.contains('open')); return; }
+    const state=!sidebar.classList.contains('collapsed');
+    sidebar.classList.toggle('collapsed',state);
+    shell.classList.toggle('collapsed',state);
+    closeFlyout(); groups.forEach(g=>g.removeAttribute('open'));
+    localStorage.setItem('imobcrm.sidebarCollapsed',state?'1':'0');
+  });
+  close?.addEventListener('click',()=>mobileOpen(false));
+  backdrop?.addEventListener('click',()=>mobileOpen(false));
+  sidebar?.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{if(innerWidth<=860)mobileOpen(false)}));
+
+  const backBtn=document.getElementById('pageBackBtn');
+  backBtn?.addEventListener('click',()=>{
+    if(history.length>1) history.back();
+    else location.href="{% url 'dashboard' %}";
+  });
+
+  // Realça a rota atual e abre somente o grupo correspondente.
+  const currentPath=(location.pathname.replace(/\/+$/,'')||'/');
+  sidebar?.querySelectorAll('a[href]').forEach(a=>{
+    try{
+      const linkPath=(new URL(a.href,location.origin).pathname.replace(/\/+$/,'')||'/');
+      const isActive=currentPath===linkPath || (linkPath!=='/' && currentPath.startsWith(linkPath+'/'));
+      if(isActive){
+        a.classList.add('active');
+        const parent=a.closest('.nav-group');
+        if(parent){ parent.classList.add('active-parent'); parent.setAttribute('open',''); }
+      }
+    }catch(e){}
+  });
+
+  const saved=localStorage.getItem('imobcrm.sidebarCollapsed')==='1';
+  if(saved && innerWidth>860){sidebar.classList.add('collapsed');shell.classList.add('collapsed')}
+
+
+
+  document.addEventListener('click',e=>{
+    if(flyout && !flyout.contains(e.target) && !e.target.closest('.nav-group summary')) closeFlyout();
+  });
+  window.addEventListener('resize',()=>{
+    closeFlyout();
+    if(innerWidth<=860){sidebar.classList.remove('collapsed');shell.classList.remove('collapsed')}
+    else if(localStorage.getItem('imobcrm.sidebarCollapsed')==='1'){sidebar.classList.add('collapsed');shell.classList.add('collapsed')}
+  });
+  window.addEventListener('scroll',()=>{ if(flyout) closeFlyout(); }, true);
+})();
+</script>
+<script>
+(()=>{
+ const badges=[...document.querySelectorAll('.global-unread-badge')];
+ let first=true,audioCtx=null,audioReady=false;
+ const SOUND_KEY='imobcrm.soundEnabled';
+ const soundEnabled=()=>localStorage.getItem(SOUND_KEY)!=='0';
+
+ function getAudio(){
+   if(audioCtx) return audioCtx;
+   const C=window.AudioContext||window.webkitAudioContext;
+   if(!C) return null;
+   try{audioCtx=new C();}catch(e){return null}
+   return audioCtx;
+ }
+ async function unlockAudio(){
+   const c=getAudio(); if(!c) return false;
+   try{
+     if(c.state==='suspended') await c.resume();
+     if(!audioReady){
+       const o=c.createOscillator(),g=c.createGain();
+       g.gain.value=0.00001;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.015);
+       audioReady=true;
+     }
+     return c.state==='running';
+   }catch(e){return false}
+ }
+ function beep(c,freq,delay,duration,gain,type='sine'){
+   const o=c.createOscillator(),g=c.createGain(),t=c.currentTime+delay;
+   o.type=type;o.frequency.setValueAtTime(freq,t);
+   g.gain.setValueAtTime(0.0001,t);
+   g.gain.exponentialRampToValueAtTime(gain,t+.012);
+   g.gain.exponentialRampToValueAtTime(0.0001,t+duration);
+   o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+duration+.025);
+ }
+ async function playMessageTone(kind='background'){
+   if(!soundEnabled()) return;
+   const ok=await unlockAudio(); if(!ok) return;
+   const c=getAudio(); if(!c) return;
+   if(kind==='open'){
+     // curto e suave quando a conversa já está aberta
+     beep(c,720,0,.085,.025,'sine');
+     beep(c,900,.09,.095,.021,'sine');
+   }else{
+     // mais distinto quando a mensagem chega fora da conversa
+     beep(c,620,0,.10,.05,'sine');
+     beep(c,830,.115,.12,.047,'sine');
+     beep(c,1040,.255,.15,.04,'sine');
+   }
+ }
+ window.ImobCRM=window.ImobCRM||{};
+ window.ImobCRM.playMessageTone=playMessageTone;
+ window.ImobCRM.unlockAudio=unlockAudio;
+
+ // Em Chrome/Safari o áudio só pode ser liberado após uma interação real do usuário.
+ const unlockOnce=()=>{unlockAudio();};
+ addEventListener('pointerdown',unlockOnce,{once:true,passive:true});
+ addEventListener('touchstart',unlockOnce,{once:true,passive:true});
+ addEventListener('keydown',unlockOnce,{once:true});
+
+ function setBadge(n){badges.forEach(b=>{b.textContent=n>99?'99+':n;b.hidden=!n});}
+ function toast(title,body,url){
+   let box=document.getElementById('globalMessageToast');
+   if(!box){box=document.createElement('a');box.id='globalMessageToast';box.className='message-toast';document.body.appendChild(box)}
+   box.href=url;box.innerHTML='';const strong=document.createElement('b');strong.textContent=title;const span=document.createElement('span');span.textContent=body;box.append(strong,span);box.classList.add('show');clearTimeout(box._t);box._t=setTimeout(()=>box.classList.remove('show'),5200);
+ }
+ function openConversationId(){const m=location.pathname.match(/^\/conversas\/(\d+)\/?$/);return m?Number(m[1]):0}
+ async function checkUnread(){
+   try{
+     const r=await fetch("{% url 'chat_unread_api' %}",{cache:'no-store',headers:{'X-Requested-With':'XMLHttpRequest'}});if(!r.ok)return;
+     const d=await r.json();setBadge(d.unread||0);
+     const seen=Number(localStorage.getItem('imobcrm.lastNotifiedMessage')||0);let max=seen;const current=openConversationId();
+     [...(d.messages||[])].reverse().forEach(m=>{
+       max=Math.max(max,m.id);
+       if(!first&&m.id>seen){
+         const visibleHere=current===Number(m.conversation_id)&&!document.hidden;
+         if(visibleHere){playMessageTone('open');return;}
+         playMessageTone('background');
+         const isGroupMention=m.mentioned;
+         const title=(isGroupMention?'Marcaram você · ':'Nova mensagem · ')+m.sender;
+         toast(title,m.body,`/conversas/${m.conversation_id}/`);
+         if(navigator.vibrate)navigator.vibrate([80,50,80]);
+         if('Notification'in window&&Notification.permission==='granted'&&(m.mentioned||m.conversation_type!=='group')){
+           const n=new Notification(title,{body:m.body,tag:'imobcrm-'+m.id,silent:true});
+           n.onclick=()=>{window.focus();location.href=`/conversas/${m.conversation_id}/`};
+         }
+       }
+     });
+     if(max>seen)localStorage.setItem('imobcrm.lastNotifiedMessage',max);
+     first=false;
+   }catch(e){}
+ }
+ setInterval(checkUnread,3000);checkUnread();
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUnread()});
+
+ document.getElementById('globalNotifyToggle')?.addEventListener('click',async()=>{
+   localStorage.setItem(SOUND_KEY,'1');
+   const audioOk=await unlockAudio();
+   if(audioOk) await playMessageTone('open');
+   if(!('Notification'in window)){
+     showSystemToast('Som de mensagens ativado. O navegador não oferece notificações externas neste modo.','success');
+     return;
+   }
+   const p=await Notification.requestPermission();
+   if(p==='granted') showSystemToast('Notificações e sons ativados.','success');
+   else showSystemToast('Som ativado. As notificações externas não foram permitidas pelo navegador.','warning');
+ });
+
+ function showSystemToast(text,type='success'){
+   const el=document.createElement('div');el.className=`alert ${type} transient-alert`;el.textContent=text;
+   document.body.appendChild(el);requestAnimationFrame(()=>el.classList.add('toast-visible'));
+   setTimeout(()=>{el.classList.remove('toast-visible');setTimeout(()=>el.remove(),320)},type==='success'?3200:5200);
+ }
+ window.ImobCRM.showSystemToast=showSystemToast;
+
+ // Mensagens do Django: sucesso some rápido; erros ficam mais tempo para leitura.
+ document.querySelectorAll('.main > .alert').forEach((el,i)=>{
+   el.classList.add('transient-alert','toast-visible');
+   const isError=el.classList.contains('error')||el.classList.contains('warning');
+   const delay=(isError?6200:3400)+(i*180);
+   setTimeout(()=>{el.classList.remove('toast-visible');el.classList.add('toast-hiding');setTimeout(()=>el.remove(),320)},delay);
+ });
+})();
+</script>
+<script>
+(()=>{
+  const wrap=document.querySelector('.mobile-title-marquee');
+  const title=wrap?.querySelector('h1');
+  function fitTitle(){
+    if(!wrap||!title)return;
+    title.classList.remove('is-overflowing');
+    title.style.removeProperty('--ticker-shift');
+    if(innerWidth<=860){
+      const diff=Math.max(0,title.scrollWidth-wrap.clientWidth);
+      if(diff>8){title.style.setProperty('--ticker-shift',`-${diff+18}px`);title.classList.add('is-overflowing');}
+    }
+  }
+  addEventListener('resize',fitTitle); requestAnimationFrame(fitTitle); setTimeout(fitTitle,250);
+})();
+</script>
+
+<script>
+(()=>{
+  let deferredPrompt=null;
+  const buttons=()=>[document.getElementById('pwaInstallBtn'),document.getElementById('pwaInstallBtnMobile')].filter(Boolean);
+  const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true;
+  const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent);
+  function setVisible(show){buttons().forEach(b=>b.hidden=!show)}
+  function toast(message){
+    let box=document.getElementById('pwaInstallToast');
+    if(!box){
+      box=document.createElement('div'); box.id='pwaInstallToast'; box.className='pwa-install-toast';
+      box.innerHTML=`<span class="app-mini-icon"><img src="{% static 'pwa/icon-192.png' %}" alt=""></span><span class="copy"><b>Instalar ImobCRM</b><small></small></span><button class="close-pwa" type="button" aria-label="Fechar">×</button>`;
+      document.body.appendChild(box); box.querySelector('.close-pwa').onclick=()=>box.classList.remove('show');
+    }
+    box.querySelector('small').textContent=message; box.classList.add('show');
+    clearTimeout(box._timer); box._timer=setTimeout(()=>box.classList.remove('show'),7000);
+  }
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if(!isStandalone())setVisible(true)});
+  async function install(){
+    if(isStandalone()){setVisible(false);return}
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      const result=await deferredPrompt.userChoice;
+      deferredPrompt=null; setVisible(false);
+      if(result.outcome==='accepted') toast('Instalação iniciada. O ImobCRM ficará na sua tela inicial como um aplicativo.');
+      return;
+    }
+    if(isIOS()){toast('No iPhone: toque em Compartilhar e depois em “Adicionar à Tela de Início”.');return}
+    toast('No navegador, abra o menu ⋮ e escolha “Instalar app” ou “Adicionar à tela inicial”.');
+  }
+  buttons().forEach(b=>b.addEventListener('click',install));
+  window.addEventListener('appinstalled',()=>{setVisible(false);deferredPrompt=null;toast('ImobCRM instalado com sucesso.');});
+  if(isIOS()&&!isStandalone()) setVisible(true);
+  if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).catch(()=>{}));}
+})();
+</script>
+
+<script>
+(()=>{
+  function classify(img){
+    if(!img || !img.naturalWidth || !img.naturalHeight) return;
+    const ratio=img.naturalWidth/img.naturalHeight;
+    const frame=img.closest('[data-smart-media]');
+    if(!frame) return;
+    frame.classList.toggle('media-contain', ratio < 1.42);
+    frame.classList.toggle('media-cover', ratio >= 1.42);
+  }
+  function wire(){
+    document.querySelectorAll('[data-smart-media] img').forEach(img=>{
+      if(img.complete) classify(img);
+      else img.addEventListener('load',()=>classify(img),{once:true});
+    });
+  }
+  document.addEventListener('DOMContentLoaded',wire);
+  window.ImobCRM=window.ImobCRM||{}; window.ImobCRM.refreshSmartMedia=wire;
+})();
+</script>
+
+<script>
+(()=>{
+  const fallback="{% static 'img/property-placeholder.svg' %}";
+  document.addEventListener('error',(event)=>{
+    const img=event.target;
+    if(!(img instanceof HTMLImageElement) || img.dataset.fallbackApplied==='1') return;
+    const mediaContext=img.closest('.property-card,.property-hero-media,.property-view-gallery,.property-photo-manager,.partner-property-card,.partnership-main-media,.catalog-property-card,.catalog-photo-open,.draft-cover,.draft-gallery');
+    if(!mediaContext) return;
+    img.dataset.fallbackApplied='1';
+    img.alt='Imagem indisponível';
+    img.src=fallback;
+    img.classList.add('image-fallback');
+  },true);
+})();
+</script>
+
+<script>
+(()=>{
+  document.addEventListener('submit',e=>{
+    const form=e.target;if(!(form instanceof HTMLFormElement)||form.dataset.allowMultiSubmit==='1')return;
+    if(form.dataset.submitting==='1'){e.preventDefault();return;}
+    form.dataset.submitting='1';
+    setTimeout(()=>{form.querySelectorAll('button[type="submit"],input[type="submit"]').forEach(btn=>{btn.disabled=true;btn.classList.add('is-busy');if(btn.tagName==='BUTTON'&&!btn.dataset.originalText){btn.dataset.originalText=btn.textContent;btn.textContent='Aguarde…';}})},0);
+    setTimeout(()=>{if(document.visibilityState==='visible'){form.dataset.submitting='0';form.querySelectorAll('.is-busy').forEach(btn=>{btn.disabled=false;btn.classList.remove('is-busy');if(btn.dataset.originalText){btn.textContent=btn.dataset.originalText;delete btn.dataset.originalText;}})}},15000);
+  },true);
+  document.addEventListener('pageshow',()=>{document.querySelectorAll('form[data-submitting="1"]').forEach(form=>{form.dataset.submitting='0';form.querySelectorAll('.is-busy').forEach(btn=>{btn.disabled=false;btn.classList.remove('is-busy');if(btn.dataset.originalText){btn.textContent=btn.dataset.originalText;delete btn.dataset.originalText;}})});});
+})();
+</script>
+<script>
+(()=>{
+  const theater=document.getElementById('mediaTheater'),stage=document.getElementById('mediaTheaterStage'),title=document.getElementById('mediaTheaterTitle'),counter=document.getElementById('mediaTheaterCounter');
+  let group=[],index=0;
+  function collect(el){const name=el.dataset.mediaGroup||'default',seen=new Set();return [...document.querySelectorAll(`.js-media-viewer[data-media-group="${CSS.escape(name)}"]`)].filter(x=>{const key=x.dataset.mediaSrc||x.getAttribute('href');if(!key||seen.has(key))return false;seen.add(key);return true;});}
+  function render(){if(!group.length)return;const el=group[index],src=el.dataset.mediaSrc||el.getAttribute('href'),kind=el.dataset.mediaKind||'image';stage.innerHTML='';let media;if(kind==='video'){media=document.createElement('video');media.controls=true;media.autoplay=true;media.playsInline=true;media.src=src;}else{media=document.createElement('img');media.src=src;media.alt=el.dataset.mediaTitle||'Imagem ampliada';}stage.appendChild(media);title.textContent=el.dataset.mediaTitle||'Galeria';counter.textContent=`${index+1} / ${group.length}`;theater.classList.add('open');theater.setAttribute('aria-hidden','false');document.body.classList.add('media-theater-open');}
+  function open(el){group=collect(el);index=Math.max(0,group.indexOf(el));render()}
+  function close(){theater.classList.remove('open');theater.setAttribute('aria-hidden','true');stage.innerHTML='';document.body.classList.remove('media-theater-open')}
+  document.addEventListener('click',e=>{const el=e.target.closest('.js-media-viewer');if(el){e.preventDefault();open(el)}});
+  theater?.querySelectorAll('[data-media-close]').forEach(x=>x.addEventListener('click',close));
+  theater?.querySelector('[data-media-prev]')?.addEventListener('click',()=>{index=(index-1+group.length)%group.length;render()});
+  theater?.querySelector('[data-media-next]')?.addEventListener('click',()=>{index=(index+1)%group.length;render()});
+  document.addEventListener('keydown',e=>{if(!theater?.classList.contains('open'))return;if(e.key==='Escape')close();if(e.key==='ArrowRight')theater.querySelector('[data-media-next]').click();if(e.key==='ArrowLeft')theater.querySelector('[data-media-prev]').click();});
+})();
+</script>
+<script>
+(()=>{
+ const overlay=document.getElementById('uploadProgressOverlay'),bar=document.getElementById('uploadProgressBar'),pct=document.getElementById('uploadProgressPercent'),txt=document.getElementById('uploadProgressText');
+ document.addEventListener('submit',e=>{
+   const form=e.target;if(!(form instanceof HTMLFormElement)||form.dataset.uploadProgress!=='1'||form.dataset.xhrUploading==='1')return;
+   const files=[...form.querySelectorAll('input[type=file]')].flatMap(i=>[...(i.files||[])]);if(!files.length)return;
+   e.preventDefault();form.dataset.xhrUploading='1';form.dataset.allowMultiSubmit='1';
+   overlay.classList.add('open');overlay.setAttribute('aria-hidden','false');txt.textContent=`${files.length} arquivo${files.length===1?'':'s'} • preparando envio`;bar.style.width='2%';pct.textContent='0%';
+   const xhr=new XMLHttpRequest();xhr.open((form.method||'POST').toUpperCase(),form.action||location.href,true);xhr.setRequestHeader('X-Requested-With','XMLHttpRequest');
+   xhr.upload.onprogress=ev=>{if(!ev.lengthComputable)return;const n=Math.max(1,Math.min(99,Math.round(ev.loaded/ev.total*100)));bar.style.width=n+'%';pct.textContent=n+'%';txt.textContent=`Enviando ${files.length} arquivo${files.length===1?'':'s'}...`;};
+   xhr.onload=()=>{if(xhr.status<200||xhr.status>=400){form.dataset.xhrUploading='0';form.dataset.allowMultiSubmit='0';overlay.classList.remove('open');alert('O servidor não conseguiu processar o upload. Confira o formato/tamanho dos arquivos e tente novamente.');return;}bar.style.width='100%';pct.textContent='100%';txt.textContent='Upload concluído. Finalizando...';setTimeout(()=>{location.href=xhr.responseURL||location.href},250)};
+   xhr.onerror=()=>{form.dataset.xhrUploading='0';form.dataset.allowMultiSubmit='0';overlay.classList.remove('open');alert('Não foi possível concluir o upload. Verifique sua conexão e tente novamente.');};
+   xhr.send(new FormData(form));
+ },true);
+})();
+</script>
+<script>
+(()=>{
+  document.documentElement.classList.add('page-ready');
+  requestAnimationFrame(()=>document.body.classList.add('page-entered'));
+  document.addEventListener('click',e=>{const a=e.target.closest('a[href]');if(!a||e.defaultPrevented||a.target||a.hasAttribute('download')||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;let u;try{u=new URL(a.href,location.href)}catch{return}if(u.origin!==location.origin||u.hash&&u.pathname===location.pathname)return;e.preventDefault();document.body.classList.add('page-leaving');setTimeout(()=>location.href=u.href,130);});
+  addEventListener('pageshow',()=>document.body.classList.remove('page-leaving'));
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body></html>

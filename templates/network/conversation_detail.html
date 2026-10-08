@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block heading %}{{ conversation.title|default:'Conversa' }}{% endblock %}
+{% block subtitle %}Mensagens atualizadas automaticamente. Conversa protegida entre participantes e administração.{% endblock %}
+{% block content %}
+<div class="chat-page" data-conversation-id="{{ conversation.id }}">
+  <div class="chat-window realtime-chat">
+    <div class="chat-messages" id="chatMessages" aria-live="polite">
+      {% for m in chat_messages %}
+      <div class="bubble {% if m.sender_id == request.user.id %}mine{% endif %}" data-message-id="{{ m.id }}">
+        <b>{{ m.sender.get_full_name|default:m.sender.username }}</b>
+        <div class="bubble-body">{{ m.body|urlize|linebreaksbr }}</div>
+        <small>{{ m.created_at|date:'d/m/Y H:i' }}{% if m.sender_id == request.user.id %}<span class="msg-receipt {% if m.receipt_status == 'read' %}read{% endif %}" data-receipt-id="{{ m.id }}" title="{% if m.receipt_status == 'read' %}Lida{% elif m.receipt_status == 'delivered' %}Entregue{% else %}Enviada{% endif %}">{% if m.receipt_status == 'read' %}✓✓{% elif m.receipt_status == 'delivered' %}✓✓{% else %}✓{% endif %}</span>{% endif %}</small>
+      </div>
+      {% empty %}<div class="muted chat-empty" id="chatEmpty">Conversa iniciada. Envie a primeira mensagem.</div>{% endfor %}
+    </div>
+
+    <form method="post" class="chat-compose fixed-compose" id="chatForm" action="{% url 'conversation_send_api' conversation.id %}">
+      {% csrf_token %}
+      {% if conversation.conversation_type == 'group' %}<div class="mention-strip" aria-label="Marcar corretor">{% for u in conversation.participants.all %}{% if u.id != request.user.id %}<button type="button" class="mention-chip" data-mention="@{{ u.username }}">@{{ u.first_name|default:u.username }}</button>{% endif %}{% endfor %}</div>{% endif %}
+      <textarea name="body" id="chatInput" rows="1" placeholder="Digite sua mensagem… Use @usuario ou @COR00001 em grupos" autocomplete="off"></textarea>
+      <button class="btn primary chat-send" type="submit" aria-label="Enviar">➤ <span>Enviar</span></button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.body.classList.add('chat-screen');
+(()=>{
+  const box=document.getElementById('chatMessages');
+  const form=document.getElementById('chatForm');
+  const input=document.getElementById('chatInput');
+  const page=document.querySelector('.chat-page');
+  const topbar=document.querySelector('.topbar');
+  if(!box||!form||!input||!page) return;
+
+  const api="{% url 'conversation_messages_api' conversation.id %}";
+  const sendUrl=form.action;
+  let lastId=0,busy=false;
+  box.querySelectorAll('[data-message-id]').forEach(el=>lastId=Math.max(lastId,Number(el.dataset.messageId)||0));
+
+  function syncViewport(){
+    if(window.innerWidth>860){
+      document.documentElement.style.removeProperty('--chat-mobile-top');
+      document.documentElement.style.removeProperty('--chat-mobile-height');
+      return;
+    }
+    const vv=window.visualViewport;
+    const viewportTop=vv ? vv.offsetTop : 0;
+    const viewportHeight=vv ? vv.height : window.innerHeight;
+    const rect=topbar ? topbar.getBoundingClientRect() : {bottom:0};
+    const top=Math.max(viewportTop, rect.bottom);
+    const bottom=viewportTop + viewportHeight;
+    const height=Math.max(220, bottom-top);
+    document.documentElement.style.setProperty('--chat-mobile-top', `${top}px`);
+    document.documentElement.style.setProperty('--chat-mobile-height', `${height}px`);
+  }
+
+  function bottom(smooth=false){
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const target=box.scrollHeight;
+      if(smooth && box.scrollTo) box.scrollTo({top:target,behavior:'smooth'});
+      else box.scrollTop=target;
+    }));
+  }
+
+  function settle(){
+    syncViewport();
+    bottom(false);
+    setTimeout(()=>{syncViewport();bottom(false)},60);
+    setTimeout(()=>{syncViewport();bottom(false)},220);
+  }
+
+  function appendMessage(m){
+    if(box.querySelector(`[data-message-id="${m.id}"]`)) return;
+    document.getElementById('chatEmpty')?.remove();
+    const el=document.createElement('div');
+    el.className='bubble'+(m.mine?' mine':'')+(m.mentioned?' mentioned':'');
+    el.dataset.messageId=m.id;
+    const who=document.createElement('b'); who.textContent=m.sender; el.appendChild(who);
+    const body=document.createElement('div'); body.className='bubble-body'; body.textContent=m.body; el.appendChild(body);
+    const time=document.createElement('small'); time.textContent=m.created_at;
+    if(m.mine){const receipt=document.createElement('span');receipt.className='msg-receipt';receipt.dataset.receiptId=m.id;receipt.textContent='✓';time.appendChild(receipt);} el.appendChild(time);
+    box.appendChild(el);
+    lastId=Math.max(lastId,m.id);
+    if(!m.mine && !document.hidden) window.ImobCRM?.playMessageTone?.('open');
+    bottom(true);
+  }
+
+  async function poll(){
+    if(busy||document.hidden) return;
+    busy=true;
+    try{
+      const r=await fetch(`${api}?after=${lastId}`,{headers:{'X-Requested-With':'XMLHttpRequest'},cache:'no-store'});
+      if(r.ok){
+        const d=await r.json();
+        d.messages.forEach(appendMessage);
+        (d.receipts||[]).forEach(rc=>{
+          const el=box.querySelector(`[data-receipt-id="${rc.id}"]`); if(!el)return;
+          el.textContent=rc.status==='sent'?'✓':'✓✓';
+          el.classList.toggle('read',rc.status==='read');
+          el.title=rc.status==='read'?'Lida':rc.status==='delivered'?'Entregue':'Enviada';
+        });
+        if(d.messages.length) settle();
+      }
+    }catch(e){}finally{busy=false}
+  }
+
+  input.style.height='46px'; input.style.minHeight='46px'; input.style.maxHeight='46px'; input.style.overflowY='auto';
+  syncViewport(); settle();
+  setInterval(poll,1800);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){poll();settle()}});
+  window.addEventListener('resize',settle,{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(settle,120),{passive:true});
+  if(window.visualViewport){
+    visualViewport.addEventListener('resize',settle,{passive:true});
+    visualViewport.addEventListener('scroll',settle,{passive:true});
+  }
+
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const body=input.value.trim(); if(!body) return;
+    const data=new FormData(form);
+    const btn=form.querySelector('.chat-send'); if(btn) btn.disabled=true;
+    try{
+      const r=await fetch(sendUrl,{method:'POST',body:data,headers:{'X-Requested-With':'XMLHttpRequest'}});
+      if(!r.ok) throw new Error('send');
+      input.value='';
+      await poll();
+      settle();
+      input.focus({preventScroll:true});
+      settle();
+    }catch(e){
+      input.value=body;
+      alert('Não foi possível enviar. Tente novamente.');
+    }finally{if(btn) btn.disabled=false}
+  });
+
+  document.querySelectorAll('.mention-chip').forEach(b=>b.addEventListener('click',()=>{
+    const tag=b.dataset.mention||'';
+    input.value=(input.value?input.value+' ':'')+tag+' ';
+    input.focus({preventScroll:true});
+  }));
+  input.addEventListener('focus',settle);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();form.requestSubmit();}});
+})();
+</script>
+{% endblock %}

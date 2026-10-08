@@ -1212,7 +1212,7 @@ class HistoricoItemEmpenho(models.Model):
 
     def __str__(self):
         data = (
-            self.processado_em.strftime(
+            timezone.localtime(self.processado_em).strftime(
                 '%d/%m/%Y %H:%M'
             )
             if self.processado_em
@@ -1239,6 +1239,85 @@ class HistoricoItemEmpenho(models.Model):
             self.tipo
             == self.TIPO_EXPEDICAO
         )
+
+
+class PontoRestauracaoMovimentacao(models.Model):
+    """
+    Ponto automático criado para cada item efetivamente transferido/expedido.
+
+    O registro é sempre criado, independentemente de quem fez a movimentação.
+    A restauração é exposta somente para administradores operacionais.
+    """
+
+    STATUS_CHOICES = [
+        ('DISPONIVEL', 'Disponível'),
+        ('RESTAURADO', 'Restaurado'),
+        ('INDISPONIVEL', 'Indisponível'),
+    ]
+
+    solicitacao = models.ForeignKey(
+        'Solicitacao',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pontos_restauracao_movimentacao',
+    )
+    historico = models.OneToOneField(
+        'HistoricoItemEmpenho',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ponto_restauracao',
+    )
+    historico_id_original = models.PositiveBigIntegerField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pontos_restauracao_criados',
+    )
+    criado_em = models.DateTimeField(auto_now_add=True, db_index=True)
+    tipo = models.CharField(max_length=20, blank=True, default='')
+    lote = models.CharField(max_length=100, blank=True, default='', db_index=True)
+    quantidade = models.DecimalField(max_digits=14, decimal_places=3, default=0)
+    endereco_origem = models.CharField(max_length=100, blank=True, default='')
+    endereco_destino = models.CharField(max_length=100, blank=True, default='')
+    descricao = models.TextField(blank=True, default='')
+    estado_solicitacao = models.JSONField(default=dict, blank=True)
+    historicos_gerais_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='IDs dos lançamentos gerais correspondentes à movimentação.',
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='DISPONIVEL',
+        db_index=True,
+    )
+    restaurado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pontos_restauracao_executados',
+    )
+    restaurado_em = models.DateTimeField(null=True, blank=True)
+    observacao_restauracao = models.TextField(blank=True, default='')
+
+    class Meta:
+        ordering = ['-criado_em', '-id']
+        verbose_name = 'Ponto de restauração de movimentação'
+        verbose_name_plural = 'Pontos de restauração de movimentações'
+
+    def __str__(self):
+        return f'Ponto #{self.id} - {self.lote or "sem lote"} - {self.get_status_display()}'
+
 
 class Produto(models.Model):
     cultivar = models.ForeignKey(Cultivar, on_delete=models.PROTECT, verbose_name="Cultivar")
@@ -1382,7 +1461,7 @@ class DashboardConfig(models.Model):
         unique_together = ['criado_por']
     
     def __str__(self):
-        return f"Dashboard Config - {self.criado_em.strftime('%d/%m/%Y %H:%M')}"
+        return f"Dashboard Config - {timezone.localtime(self.criado_em).strftime('%d/%m/%Y %H:%M')}"
     
     def get_layout_config(self):
         try:
@@ -1785,10 +1864,9 @@ class Solicitacao(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Registra automaticamente a primeira data em que o card
-        entra no status CONCLUIDO.
-
-        Caso o card seja reaberto, a data original permanece.
+        Registra a finalização do ciclo atual. Ao reabrir o card, limpa a
+        finalização corrente; a conclusão anterior continua preservada nos
+        históricos e uma nova data é gravada quando concluir novamente.
         """
 
         status_anterior = None
@@ -1808,19 +1886,23 @@ class Solicitacao(models.Model):
             self.status == 'CONCLUIDO'
             and status_anterior != 'CONCLUIDO'
         )
+        saiu_de_concluido = (
+            status_anterior == 'CONCLUIDO'
+            and self.status != 'CONCLUIDO'
+        )
 
-        if (
-            entrou_em_concluido
-            and not self.data_finalizacao
-        ):
+        if entrou_em_concluido:
+            # Cada novo ciclo concluído recebe a sua finalização atual.
             self.data_finalizacao = timezone.now()
+        elif saiu_de_concluido:
+            # Ao reabrir, a tela não pode continuar exibindo uma finalização
+            # antiga como se o card ainda estivesse encerrado. O histórico do
+            # ciclo anterior permanece em HistoricoCard/Histórico de movimentos.
+            self.data_finalizacao = None
 
         update_fields = kwargs.get('update_fields')
 
-        if (
-            entrou_em_concluido
-            and update_fields is not None
-        ):
+        if (entrou_em_concluido or saiu_de_concluido) and update_fields is not None:
             campos = set(update_fields)
             campos.add('data_finalizacao')
             kwargs['update_fields'] = list(campos)
@@ -1919,8 +2001,16 @@ class Solicitacao(models.Model):
                 str(self.quantidade_empenhada or 0)
             )
 
+        quantidade_movimentada = Decimal(
+            str(self.quantidade_movimentada or 0)
+        )
+
+        # O que já foi movimentado continua atendendo a solicitação. Ao
+        # aumentar a meta de um card antigo, somente a diferença realmente
+        # nova deve voltar para "aguardando empenho".
         pendente = (
             quantidade_solicitada
+            - quantidade_movimentada
             - quantidade_empenhada
         )
 
