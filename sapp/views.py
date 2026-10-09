@@ -28,6 +28,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from .models import ArmazemLayout, ElementoMapa, Estoque
 import json
+import re
 from django.utils import timezone
 
 from django.db.models import (
@@ -3130,6 +3131,43 @@ def _descricao_lote_automatica(
     return descricao
 
 
+def _descricao_individual_lote(estoque, fallback=''):
+    """Retorna a descrição pertencente ao próprio lote/estoque.
+
+    A linha da carga pode ter descrição genérica ou antiga. Para relatório e
+    snapshot de empenho, o lote selecionado é a fonte principal. Quando existe
+    Produto cadastrado com o mesmo código e cultivar compatível, usamos sua
+    descrição; caso contrário, montamos a descrição pelos atributos do lote.
+    """
+    if estoque is None:
+        return str(fallback or '').strip()
+
+    codigo = _normalizar_codigo_produto(getattr(estoque, 'produto', '') or '')
+    descricao_config = ''
+
+    if codigo:
+        produto = (
+            Produto.objects
+            .filter(codigo__iexact=codigo)
+            .only('descricao', 'cultivar_id')
+            .first()
+        )
+        if produto and str(produto.descricao or '').strip():
+            cultivar_lote_id = getattr(estoque, 'cultivar_id', None)
+            if (
+                not produto.cultivar_id
+                or not cultivar_lote_id
+                or produto.cultivar_id == cultivar_lote_id
+            ):
+                descricao_config = str(produto.descricao or '').strip()
+
+    return (
+        descricao_config
+        or _descricao_lote_automatica(estoque)
+        or str(fallback or '').strip()
+    )
+
+
 def _sincronizar_solicitacoes_carga_produto(produto):
     """
     Vincula pedidos de carga antigos ao Produto quando o código foi
@@ -5169,7 +5207,10 @@ def pagina_rascunho(request):
                                 item_carga_id_original=item.item_carga_id,
                                 cliente_solicitacao=(item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '')),
                                 codigo_produto=(item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '')),
-                                descricao_produto=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
+                                descricao_produto=_descricao_individual_lote(
+                                    origem,
+                                    fallback=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
+                                ),
                                 estoque_origem=origem,
                                 estoque_destino=destino,
                                 lote=origem.lote,
@@ -5241,7 +5282,10 @@ def pagina_rascunho(request):
                                 item_carga_id_original=item.item_carga_id,
                                 cliente_solicitacao=(item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '')),
                                 codigo_produto=(item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '')),
-                                descricao_produto=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
+                                descricao_produto=_descricao_individual_lote(
+                                    origem,
+                                    fallback=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
+                                ),
                                 estoque_origem=origem,
                                 lote=origem.lote,
                                 produto=origem.produto or '',
@@ -7398,6 +7442,95 @@ def _dashboard_tipo_inclui_expedicao(tipo_mov):
 # API DO DASHBOARD
 # ================================================================
 
+def _dashboard_extrair_endereco(texto, padroes):
+    """Extrai um endereço de descrições legadas sem depender de migration."""
+    conteudo = ' '.join(str(texto or '').split())
+    if not conteudo:
+        return ''
+    for padrao in padroes:
+        match = re.search(padrao, conteudo, flags=re.IGNORECASE)
+        if match:
+            valor = ' '.join(str(match.group(1) or '').strip(' .,-').split())
+            if valor:
+                return valor
+    return ''
+
+
+def _dashboard_detalhes_movimentacao_recente(mov):
+    """Normaliza saída, destino e origem operacional para a tabela recente.
+
+    HistoricoMovimentacao é legado e não possui colunas próprias de endereço de
+    origem/destino. As versões atuais gravam essas informações na descrição; por
+    isso fazemos uma leitura defensiva e mantemos fallback para o endereço do
+    Estoque relacionado.
+    """
+    estoque = getattr(mov, 'estoque', None)
+    tipo = str(getattr(mov, 'tipo', '') or '').strip()
+    tipo_norm = normalizar_texto_cadastro(tipo)
+    tipo_norm = tipo_norm.translate(str.maketrans({
+        'Á': 'A', 'À': 'A', 'Â': 'A', 'Ã': 'A',
+        'É': 'E', 'Ê': 'E', 'Í': 'I',
+        'Ó': 'O', 'Ô': 'O', 'Õ': 'O', 'Ú': 'U',
+        'Ç': 'C',
+    }))
+    descricao = str(getattr(mov, 'descricao', '') or '')
+    endereco_estoque = str(getattr(estoque, 'endereco', '') or '').strip()
+
+    saida = ''
+    destino = ''
+
+    if 'TRANSFERENCIA' in tipo_norm:
+        if 'SAIDA' in tipo_norm:
+            saida = endereco_estoque
+            destino = _dashboard_extrair_endereco(
+                descricao,
+                [
+                    r'\bpara\s+(.+?)(?=\s*\(AZ\b|\s*\([^)]*\)\s*-\s*Quantidade|\s*-\s*Quantidade|\s*\||\.|$)',
+                    r'\bpara\s+(.+?)(?=\s*\(|\.|$)',
+                ],
+            )
+        else:
+            destino = endereco_estoque
+            saida = _dashboard_extrair_endereco(
+                descricao,
+                [
+                    r'\bvindo\s+de\s+(.+?)(?=\s*\(AZ\b|\.|$)',
+                    r'\bRecebido(?:\s+\d+(?:[.,]\d+)?\s+\w+)?\s+de\s+(.+?)(?=\s+em\s+|\s*\(|\s*-\s*Quantidade|\.|$)',
+                    r'\bRecebido\s+de\s+(.+?)(?=\s*\(|\s*-\s*Quantidade|\.|$)',
+                ],
+            )
+    elif 'ENTRADA' in tipo_norm:
+        destino = endereco_estoque
+    elif any(chave in tipo_norm for chave in ('SAIDA', 'EXPEDICAO', 'BAIXA')):
+        saida = endereco_estoque
+        if 'EXPEDICAO' in tipo_norm:
+            destino = 'EXPEDIÇÃO'
+    else:
+        saida = endereco_estoque
+
+    origem_operacional = str(getattr(estoque, 'origem_destino', '') or '').strip()
+    if not origem_operacional:
+        if 'TRANSFERENCIA' in tipo_norm:
+            origem_operacional = 'TRANSFERÊNCIA'
+        elif 'ENTRADA' in tipo_norm:
+            origem_operacional = 'ENTRADA'
+        elif 'EXPEDICAO' in tipo_norm:
+            origem_operacional = 'ESTOQUE'
+
+    empresa = str(getattr(estoque, 'empresa', '') or '').strip()
+    cliente = str(getattr(mov, 'cliente', '') or '').strip()
+    if not cliente:
+        cliente = str(getattr(estoque, 'cliente', '') or '').strip()
+
+    return {
+        'saida': saida or '--',
+        'destino': destino or '--',
+        'origem': origem_operacional or '--',
+        'empresa': empresa or '--',
+        'cliente': cliente or '--',
+    }
+
+
 @login_required
 @permission_required(
     'sapp.pode_ver_dashboard',
@@ -7495,6 +7628,15 @@ def dashboard_data(request):
         exp_placa = request.GET.get('exp_placa', '').strip()
         exp_motorista = request.GET.get('exp_motorista', '').strip()
         exp_lote = request.GET.get('exp_lote', '').strip()
+
+        # Quantidade de linhas da tabela "Movimentações recentes". É um
+        # limite de leitura, enquanto os filtros próprios da tabela são
+        # aplicados instantaneamente no navegador.
+        try:
+            recentes_limite = int(request.GET.get('recent_limit', 20) or 20)
+        except (TypeError, ValueError):
+            recentes_limite = 20
+        recentes_limite = max(10, min(recentes_limite, 500))
 
         try:
             periodo_dias = int(
@@ -8933,11 +9075,12 @@ def dashboard_data(request):
             mov_qs_filtrado_tipo
             .order_by(
                 '-data_hora'
-            )[:12]
+            )[:recentes_limite]
         )
 
         for mov in recentes_qs:
             estoque = mov.estoque
+            detalhes_recente = _dashboard_detalhes_movimentacao_recente(mov)
 
             lote = (
                 mov.lote_ref
@@ -8992,6 +9135,12 @@ def dashboard_data(request):
                     )
                 ),
                 'us': usuario,
+                'saida': detalhes_recente['saida'],
+                'destino': detalhes_recente['destino'],
+                'origem': detalhes_recente['origem'],
+                'empresa': detalhes_recente['empresa'],
+                'cliente': detalhes_recente['cliente'],
+                'descricao': mov.descricao or '',
             })
 
         response = JsonResponse({
@@ -9000,6 +9149,10 @@ def dashboard_data(request):
             'graficos': graficos,
             'expedicoes': expedicoes,
             'recentes': movimentacoes,
+            'recentes_meta': {
+                'limite': recentes_limite,
+                'carregados': len(movimentacoes),
+            },
             'opcoes_filtros': (
                 opcoes_filtros
             ),
@@ -12727,9 +12880,14 @@ def api_lotes_disponiveis_para_solicitacao(
         for lote in lotes_qs
         if lote.produto
     }
-    descricoes_produtos = {
-        _normalizar_codigo_produto(produto.codigo): (produto.descricao or '')
-        for produto in Produto.objects.filter(codigo__in=codigos_pagina).only('codigo', 'descricao')
+    produtos_config_pagina = {
+        _normalizar_codigo_produto(produto.codigo): {
+            'descricao': (produto.descricao or ''),
+            'cultivar_id': produto.cultivar_id,
+        }
+        for produto in Produto.objects
+        .filter(codigo__in=codigos_pagina)
+        .only('codigo', 'descricao', 'cultivar_id')
     }
 
     # Mapa dos itens salvos no empenho atual.
@@ -12787,6 +12945,28 @@ def api_lotes_disponiveis_para_solicitacao(
             if (not codigo_linha) or codigo_linha == _normalizar_codigo_produto(lote.produto):
                 item_carga_match = item_carga_ativo
 
+        config_lote = produtos_config_pagina.get(
+            _normalizar_codigo_produto(lote.produto),
+            {},
+        )
+        descricao_config_lote = str(config_lote.get('descricao') or '').strip()
+        cultivar_config_id = config_lote.get('cultivar_id')
+        if (
+            descricao_config_lote
+            and cultivar_config_id
+            and lote.cultivar_id
+            and cultivar_config_id != lote.cultivar_id
+        ):
+            # Código/configuração incompatível com o cultivar físico do lote:
+            # não deixa a descrição de outra linha contaminar este registro.
+            descricao_config_lote = ''
+
+        descricao_lote_individual = (
+            descricao_config_lote
+            or _descricao_lote_automatica(lote)
+            or (item_carga_match.descricao if item_carga_match else '')
+        )
+
         lotes.append({
             'id': lote.id,
             'item_carga_id': item_carga_match.id if item_carga_match else None,
@@ -12798,11 +12978,9 @@ def api_lotes_disponiveis_para_solicitacao(
             'lote': lote.lote,
             'versao_lote': int(versoes_lote_pagina.get(str(lote.lote or '').strip().upper(), 0)),
             'produto': lote.produto or '',
-            'descricao': (
-                (item_carga_match.descricao if item_carga_match else '')
-                or descricoes_produtos.get(_normalizar_codigo_produto(lote.produto), '')
-                or _descricao_lote_automatica(lote)
-            ),
+            # Sempre pertence ao lote desta linha. A descrição da linha da
+            # carga é apenas fallback e nunca sobrescreve outro lote.
+            'descricao': descricao_lote_individual,
 
             'cultivar': (
                 lote.cultivar.nome
@@ -13548,24 +13726,18 @@ def empenhar_na_solicitacao(
                 # ------------------------------------------------------
                 # SALVAR ITEM NO EMPENHO DO CARD ATUAL
                 # ------------------------------------------------------
-                descricao_lote_config = _descricao_produto_por_codigo(lote.produto)
-                descricao_lote_automatica = _descricao_lote_automatica(lote)
                 cliente_solicitacao_item = (
                     item_carga.cliente if item_carga else (solicitacao.cliente or 'CS')
                 )
                 codigo_solicitacao_item = item_carga.codigo if item_carga else (lote.produto or '')
-                descricao_solicitacao_item = (
-                    (item_carga.descricao if item_carga else '')
-                    or descricao_lote_config
-                    or descricao_lote_automatica
-                )
 
-                # Quando a linha da carga foi criada sem código/descrição,
-                # guarda a descrição derivada do lote selecionado. Assim a
-                # própria Solicitação deixa de aparecer como "sem descrição".
-                if item_carga and not str(item_carga.descricao or '').strip() and descricao_solicitacao_item:
-                    item_carga.descricao = descricao_solicitacao_item
-                    item_carga.save(update_fields=['descricao', 'atualizado_em'])
+                # A descrição é snapshot do LOTE realmente escolhido. Uma
+                # descrição previamente gravada na linha da carga não pode
+                # contaminar os demais lotes da mesma carga.
+                descricao_solicitacao_item = _descricao_individual_lote(
+                    lote,
+                    fallback=(item_carga.descricao if item_carga else ''),
+                )
 
                 if item_existente:
                     item_existente.quantidade = quantidade_final
@@ -14701,7 +14873,10 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         item_carga_id_original=item.item_carga_id,
                         cliente_solicitacao=item.cliente_solicitacao_snapshot or '',
                         codigo_produto=item.codigo_produto_snapshot or '',
-                        descricao_produto=item.descricao_produto_snapshot or '',
+                        descricao_produto=_descricao_individual_lote(
+                            origem,
+                            fallback=(item.descricao_produto_snapshot or ''),
+                        ),
                         estoque_origem=origem,
                         estoque_destino=destino,
 
@@ -14923,7 +15098,10 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         item_carga_id_original=item.item_carga_id,
                         cliente_solicitacao=item.cliente_solicitacao_snapshot or '',
                         codigo_produto=item.codigo_produto_snapshot or '',
-                        descricao_produto=item.descricao_produto_snapshot or '',
+                        descricao_produto=_descricao_individual_lote(
+                            origem,
+                            fallback=(item.descricao_produto_snapshot or ''),
+                        ),
                         estoque_origem=origem,
 
                         # SNAPSHOT DO MOMENTO DO EMPENHO.
@@ -15614,13 +15792,10 @@ def api_dados_impressao_solicitacao(
                 or item.codigo_produto_snapshot
                 or produto_empenho
             )
-            produto_config = produto_config_por_codigo(codigo_impressao)
-            descricao_impressao = (
-                (produto_config.descricao if produto_config else '')
-                or item.descricao_produto_snapshot
+            descricao_fallback = (
+                item.descricao_produto_snapshot
                 or (item.item_carga.descricao if item.item_carga else '')
                 or _descricao_lote_automatica(
-                    estoque,
                     especie=especie_empenho,
                     cultivar=(
                         item.cultivar
@@ -15630,6 +15805,10 @@ def api_dados_impressao_solicitacao(
                     tratamento=tratamento_empenho,
                 )
                 or ''
+            )
+            descricao_impressao = _descricao_individual_lote(
+                estoque,
+                fallback=descricao_fallback,
             )
             # Categoria e peneira pertencem ao LOTE EMPENHADO.
             # Configurações é consultada somente para a descrição.
@@ -15816,17 +15995,19 @@ def api_dados_impressao_solicitacao(
             )
 
             codigo_impressao = historico.codigo_produto or historico.produto or ''
-            produto_config = produto_config_por_codigo(codigo_impressao)
-            descricao_impressao = (
-                (produto_config.descricao if produto_config else '')
-                or historico.descricao_produto
-                or _descricao_lote_automatica(
-                    especie=historico.especie,
-                    cultivar=historico.cultivar,
-                    embalagem=historico.embalagem,
-                    tratamento=historico.tratamento,
-                )
-                or ''
+            descricao_historica_lote = _descricao_lote_automatica(
+                especie=historico.especie,
+                cultivar=historico.cultivar,
+                embalagem=historico.embalagem,
+                tratamento=historico.tratamento,
+            )
+            descricao_impressao = _descricao_individual_lote(
+                origem_legada,
+                fallback=(
+                    descricao_historica_lote
+                    or historico.descricao_produto
+                    or ''
+                ),
             )
             categoria_impressao = historico.categoria or ''
             peneira_impressao = historico.peneira or ''
