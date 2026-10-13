@@ -14,21 +14,55 @@ from .access_control import (
 from .models import PerfilUsuario
 
 
+# Endpoints executados automaticamente pela interface. Eles não representam
+# atividade humana e não devem manter a sessão viva nem forçar UPDATE na tabela
+# django_session a cada poucos segundos.
+BACKGROUND_POLL_PATHS = {
+    '/api/cards/versao/',
+    '/api/cargas/versao/',
+    '/api/estoque/estado/',
+    '/api/marcacoes-ultimo-lote/',
+}
+
+
+def _is_background_poll(request):
+    if request.headers.get('X-Infinity-Background') == '1':
+        return True
+    if request.method not in {'GET', 'HEAD', 'OPTIONS'}:
+        return False
+    return request.path in BACKGROUND_POLL_PATHS
+
+
 class AutoLogoutMiddleware:
-    """Desloga o usuário após o tempo de inatividade configurado."""
+    """Desloga após inatividade sem transformar polling em atividade humana."""
 
     def __init__(self, get_response):
         self.get_response = get_response
         self.timeout = getattr(settings, 'AUTO_LOGOUT_DELAY', 1800)
+        self.write_interval = max(15, int(getattr(
+            settings, 'AUTO_LOGOUT_ACTIVITY_WRITE_INTERVAL', 60
+        )))
 
     def __call__(self, request):
         if request.user.is_authenticated:
             now = int(time.time())
-            last_activity = request.session.get('last_activity', now)
+            raw_last_activity = request.session.get('last_activity')
+            try:
+                last_activity = int(raw_last_activity) if raw_last_activity is not None else now
+            except (TypeError, ValueError):
+                last_activity = now
+
             if now - last_activity > self.timeout:
                 auth.logout(request)
                 return redirect('/login/?expired=1')
-            request.session['last_activity'] = now
+
+            # POST/PUT/PATCH/DELETE e navegação/GET reais contam como atividade.
+            # Polling automático não atualiza a sessão e, por isso, não disputa
+            # com logout nem grava no PostgreSQL a cada poucos segundos.
+            if not _is_background_poll(request):
+                if raw_last_activity is None or now - last_activity >= self.write_interval:
+                    request.session['last_activity'] = now
+
         return self.get_response(request)
 
 
@@ -62,8 +96,17 @@ class ForcarTrocaSenhaMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.user.is_authenticated and not request.user.is_superuser:
-            perfil, _ = PerfilUsuario.objects.get_or_create(usuario=request.user)
+        if (
+            request.user.is_authenticated
+            and not request.user.is_superuser
+            and not _is_background_poll(request)
+        ):
+            # O signal de User cria o perfil. get() é o caminho comum;
+            # get_or_create fica apenas como recuperação de cadastros legados.
+            try:
+                perfil = request.user.perfil
+            except PerfilUsuario.DoesNotExist:
+                perfil, _ = PerfilUsuario.objects.get_or_create(usuario=request.user)
             if perfil.primeiro_acesso:
                 current_path = request.path
                 paths_exatos = {

@@ -695,7 +695,7 @@ async function atualizarEstoqueVisivel(idsEspecificos = null) {
     if (!ids.length) return;
     estoqueLiveInFlight = true;
     try {
-        const r = await fetch(`/api/estoque/estado/?ids=${encodeURIComponent(ids.join(','))}`, {cache:'no-store'});
+        const r = await fetch(`/api/estoque/estado/?ids=${encodeURIComponent(ids.join(','))}`, {cache:'no-store', headers:{'X-Infinity-Background':'1'}});
         const data = await r.json();
         if (r.ok && data.success) (data.itens || []).forEach(aplicarEstadoEstoqueLinha);
     } catch (_) {

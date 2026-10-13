@@ -102,6 +102,9 @@ MIDDLEWARE = [
 
 # ========== AUTO LOGOUT ==========
 AUTO_LOGOUT_DELAY = env.int('AUTO_LOGOUT_DELAY', default=18000)  # 5 horas
+# Evita escrever a sessão em cada GET/polling. Atividade real é persistida no
+# máximo uma vez por minuto, mantendo o auto logout sem martelar o PostgreSQL.
+AUTO_LOGOUT_ACTIVITY_WRITE_INTERVAL = env.int('AUTO_LOGOUT_ACTIVITY_WRITE_INTERVAL', default=60)
 
 # ========== URLS E TEMPLATES ==========
 ROOT_URLCONF = 'sementes.urls'
@@ -134,7 +137,10 @@ DATABASES = {
         'PASSWORD': env('DATABASE_PASSWORD', default='brasil10'),
         'HOST': env('DATABASE_HOST', default='localhost'),
         'PORT': env('DATABASE_PORT', default='5433'),
-        'CONN_MAX_AGE': 0,
+        # Reaproveita conexões PostgreSQL entre requests. Reduz bastante o
+        # custo de polling/API sem manter conexões eternamente abertas.
+        'CONN_MAX_AGE': env.int('DATABASE_CONN_MAX_AGE', default=60),
+        'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
             'client_encoding': 'UTF8',
         },
@@ -188,7 +194,17 @@ STATICFILES_DIRS = [
 
 # Otimização de arquivos estáticos com WhiteNoise
 #STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+# Django 5.x usa STORAGES como configuração principal. Mantemos o nome
+# clássico acima por compatibilidade com ambientes antigos do projeto.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
 
 # Arquivos de mídia (uploads)
 MEDIA_URL = '/media/'
@@ -200,17 +216,27 @@ LOGIN_REDIRECT_URL = 'sapp:redirecionar'
 LOGOUT_REDIRECT_URL = 'sapp:login'
 
 
-# Configurações de sessão (usando banco de dados para evitar problemas com Redis)
-SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # IMPORTANTE: Usando DB em vez de cache
+# Sessão com cache + banco: o banco continua sendo a fonte durável e o cache
+# evita SELECT repetido a cada polling. Se o cache reiniciar/falhar, o Django
+# recarrega a sessão do PostgreSQL automaticamente.
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+SESSION_CACHE_ALIAS = 'default'
 SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=1209600)  # 2 semanas
 SESSION_EXPIRE_AT_BROWSER_CLOSE = env.bool('SESSION_EXPIRE_AT_BROWSER_CLOSE', default=False)
 SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=not DEBUG)
 SESSION_COOKIE_HTTPONLY = True
-SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+# A sessão só é salva quando realmente foi alterada. O middleware de inatividade
+# faz atualização controlada e ignora os endpoints de polling.
+SESSION_SAVE_EVERY_REQUEST = False
 
 # Configurações de CSRF
 CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+# Mantém toda a proteção CSRF. No login, uma página/token antigo é recuperado
+# com um novo GET em vez de deixar o operador preso em um 403.
+CSRF_FAILURE_VIEW = 'sapp.security.csrf_failure'
 
 # ========== SEGURANÇA ADICIONAL ==========
 if not DEBUG:
@@ -331,7 +357,7 @@ LOGGING = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Versão da aplicação
-APP_VERSION = '1.0.1'
+APP_VERSION = '1.0.2'
 
 # Configurações específicas do seu app
 MAX_UPLOAD_SIZE = env.int('MAX_UPLOAD_SIZE', default=10485760)  # 10MB
@@ -382,3 +408,10 @@ if EASYPANEL:
             print(f"Redis não configurado: {e}")
             # Mantém configurações locais se Redis falhar
 
+
+
+# DATABASE_URL (Easypanel) substitui o dicionário de conexão. Reaplica as
+# opções de conexão persistente também nesse cenário.
+if DATABASES.get('default', {}).get('ENGINE', '').endswith('postgresql'):
+    DATABASES['default'].setdefault('CONN_MAX_AGE', env.int('DATABASE_CONN_MAX_AGE', default=60))
+    DATABASES['default'].setdefault('CONN_HEALTH_CHECKS', True)

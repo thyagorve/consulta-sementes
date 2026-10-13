@@ -358,6 +358,13 @@
     </div>
 {% endif %}
 
+{% if request.GET.csrf == '1' %}
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-shield-check"></i>
+        <span>A segurança da sessão foi renovada. Informe seus dados novamente.</span>
+    </div>
+{% endif %}
+
 <!-- Exibe mensagens do sistema (ex.: conta sem permissão) -->
 {% if messages %}
     {% for message in messages %}
@@ -391,7 +398,7 @@
     {% endif %}
 {% endif %}
 
-                <form method="post" action="{% url 'sapp:login' %}">
+                <form method="post" action="{% url 'sapp:login' %}" id="loginForm" autocomplete="on">
                     {% csrf_token %}
                     <input type="hidden" name="next" value="{{ next }}">
                     
@@ -442,5 +449,25 @@
             </div>
         </div>
     </div>
+
+<script>
+(function () {
+    function cookie(name) {
+        const prefix = name + '=';
+        for (const part of document.cookie.split(';')) {
+            const value = part.trim();
+            if (value.startsWith(prefix)) return decodeURIComponent(value.slice(prefix.length));
+        }
+        return '';
+    }
+    function refreshCsrfFromCookie() {
+        const token = cookie('csrftoken');
+        const input = document.querySelector('#loginForm input[name="csrfmiddlewaretoken"]');
+        if (token && input) input.value = token;
+    }
+    window.addEventListener('pageshow', refreshCsrfFromCookie);
+    document.getElementById('loginForm')?.addEventListener('submit', refreshCsrfFromCookie);
+})();
+</script>
 </body>
 </html>

@@ -8141,8 +8141,9 @@ function iniciarPolling() {
 }
 
 async function verificarAtualizacoes() {
+    if (document.hidden || !navigator.onLine) return;
     try {
-        const resp = await fetch('/api/cards/versao/');
+        const resp = await fetch('/api/cards/versao/', { headers: { 'X-Infinity-Background': '1' }, cache: 'no-store' });
         const data = await resp.json();
         if (!data.success) return;
 

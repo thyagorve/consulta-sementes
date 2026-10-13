@@ -1,708 +1,829 @@
 {% extends 'sapp/base.html' %}
-{% load static %}
 {% load humanize %}
 
 {% block content %}
-
 <style>
-    :root {
-        --h-primary: #2563eb;
-        --h-primary-dark: #1d4ed8;
-        --h-success: #16a34a;
-        --h-danger: #dc2626;
-        --h-warning: #d97706;
-        --h-purple: #7c3aed;
-        --h-dark: #0f172a;
-        --h-text: #334155;
-        --h-muted: #64748b;
-        --h-bg: #f8fafc;
-        --h-border: #e2e8f0;
-        --h-white: #fff;
-    }
-    .history-page {
-        padding: 24px 16px 40px;
-        background: #f1f5f9;
-        min-height: calc(100vh - 60px);
-    }
-    .history-wrapper {
-        max-width: 1800px;
-        margin: 0 auto;
-    }
-    /* Cabeçalho */
-    .history-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        margin-bottom: 22px;
-    }
-    .history-title {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin: 0;
-        color: var(--h-dark);
-        font-size: 1.75rem;
-        font-weight: 800;
-        letter-spacing: -0.03em;
-    }
-    .history-title-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 46px;
-        height: 46px;
-        border-radius: 13px;
-        background: linear-gradient(135deg, var(--h-primary), var(--h-purple));
-        color: white;
-        box-shadow: 0 8px 20px rgba(37,99,235,0.22);
-    }
-    .history-subtitle {
-        margin: 7px 0 0 58px;
-        color: var(--h-muted);
-        font-size: 0.93rem;
-    }
-    .btn-history-back {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        min-height: 42px;
-        padding: 9px 15px;
-        border: 1px solid var(--h-border);
-        border-radius: 10px;
-        background: white;
-        color: var(--h-text);
-        text-decoration: none;
-        font-weight: 700;
-        font-size: 0.88rem;
-        transition: all 0.2s ease;
-    }
-    .btn-history-back:hover {
-        color: var(--h-primary);
-        border-color: #bfdbfe;
-        background: #eff6ff;
-        transform: translateY(-1px);
-    }
-    /* Cards */
-    .history-cards {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0,1fr));
-        gap: 16px;
-        margin-bottom: 20px;
-    }
-    .history-card {
-        position: relative;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        padding: 19px;
-        border: 1px solid var(--h-border);
-        border-radius: 15px;
-        background: white;
-        box-shadow: 0 4px 15px rgba(15,23,42,0.05);
-        overflow: hidden;
-    }
-    .history-card::after {
-        content: "";
-        position: absolute;
-        top: 0; right: 0;
-        width: 70px; height: 70px;
-        border-radius: 0 0 0 100%;
-        opacity: 0.08;
-    }
-    .history-card.primary::after { background: var(--h-primary); }
-    .history-card.success::after { background: var(--h-success); }
-    .history-card.warning::after { background: var(--h-warning); }
-    .history-card.purple::after { background: var(--h-purple); }
-    .history-card-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 51px; height: 51px;
-        border-radius: 14px;
-        font-size: 1.25rem;
-    }
-    .history-card.primary .history-card-icon { background: #dbeafe; color: var(--h-primary); }
-    .history-card.success .history-card-icon { background: #dcfce7; color: var(--h-success); }
-    .history-card.warning .history-card-icon { background: #fef3c7; color: var(--h-warning); }
-    .history-card.purple .history-card-icon { background: #ede9fe; color: var(--h-purple); }
-    .history-card-value {
-        margin: 0;
-        color: var(--h-dark);
-        font-size: 1.65rem;
-        font-weight: 850;
-        line-height: 1;
-    }
-    .history-card-label {
-        margin-top: 7px;
-        color: var(--h-muted);
-        font-size: 0.77rem;
-        font-weight: 750;
-        text-transform: uppercase;
-        letter-spacing: 0.045em;
-    }
-    /* Filtros */
-    .history-filter-card {
-        margin-bottom: 20px;
-        border: 1px solid var(--h-border);
-        border-radius: 15px;
-        background: white;
-        box-shadow: 0 4px 15px rgba(15,23,42,0.05);
-    }
-    .history-filter-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 16px 18px;
-        border-bottom: 1px solid var(--h-border);
-        background: #fbfdff;
-    }
-    .history-filter-title {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        margin: 0;
-        color: var(--h-dark);
-        font-size: 1rem;
-        font-weight: 800;
-    }
-    .history-filter-toggle {
-        display: none;
-        border: 0;
-        background: transparent;
-        color: var(--h-primary);
-        font-size: 1rem;
-        cursor: pointer;
-    }
-    .history-filter-body { padding: 18px; }
-    .history-filter-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(180px,1fr));
-        gap: 14px;
-    }
-    .history-filter-group.search-wide { grid-column: span 2; }
-    .history-filter-label {
-        display: block;
-        margin-bottom: 6px;
-        color: #475569;
-        font-size: 0.76rem;
-        font-weight: 800;
-        text-transform: uppercase;
-        letter-spacing: 0.035em;
-    }
-    .history-filter-control {
-        width: 100%;
-        min-height: 42px;
-        padding: 9px 11px;
-        border: 1px solid #cbd5e1;
-        border-radius: 9px;
-        background: white;
-        color: var(--h-dark);
-        font-size: 0.88rem;
-        outline: none;
-        transition: all 0.2s ease;
-    }
-    .history-filter-control:focus {
-        border-color: var(--h-primary);
-        box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
-    }
-    .history-filter-actions {
-        display: flex;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 10px;
-        margin-top: 17px;
-        padding-top: 16px;
-        border-top: 1px solid #f1f5f9;
-    }
-    .btn-history {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        min-height: 42px;
-        padding: 9px 16px;
-        border-radius: 9px;
-        border: 1px solid transparent;
-        font-size: 0.86rem;
-        font-weight: 800;
-        text-decoration: none;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .btn-history-primary {
-        color: white;
-        background: var(--h-primary);
-        border-color: var(--h-primary);
-    }
-    .btn-history-primary:hover {
-        background: var(--h-primary-dark);
-        transform: translateY(-1px);
-    }
-    .btn-history-light {
-        color: var(--h-text);
-        background: white;
-        border-color: var(--h-border);
-    }
-    .btn-history-light:hover {
-        color: var(--h-danger);
-        background: #fff7f7;
-        border-color: #fecaca;
-    }
-    /* Tabela */
-    .history-table-card {
-        border: 1px solid var(--h-border);
-        border-radius: 15px;
-        background: white;
-        box-shadow: 0 5px 18px rgba(15,23,42,0.06);
-        overflow: hidden;
-    }
-    .history-table-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 15px 18px;
-        border-bottom: 1px solid var(--h-border);
-        background: #fbfdff;
-    }
-    .history-results-text { color: var(--h-muted); font-size: 0.86rem; }
-    .history-page-size-form { display: flex; align-items: center; gap: 8px; }
-    .history-page-size-label { color: var(--h-muted); font-size: 0.8rem; font-weight: 700; }
-    .history-page-size-select {
-        min-height: 35px;
-        padding: 5px 28px 5px 9px;
-        border: 1px solid var(--h-border);
-        border-radius: 8px;
-        background: white;
-        color: var(--h-text);
-        font-size: 0.82rem;
-        cursor: pointer;
-    }
-    .history-table-responsive { width: 100%; overflow-x: auto; }
-    .history-table {
-        width: 100%;
-        min-width: 1450px;
-        border-collapse: collapse;
-    }
-    .history-table thead th {
-        padding: 13px 11px;
-        border-bottom: 1px solid var(--h-border);
-        background: #f8fafc;
-        color: #475569;
-        font-size: 0.7rem;
-        font-weight: 850;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        white-space: nowrap;
-    }
-    .history-table tbody td {
-        padding: 13px 11px;
-        border-bottom: 1px solid #edf2f7;
-        color: var(--h-text);
-        font-size: 0.82rem;
-        vertical-align: middle;
-    }
-    .history-summary-row { background: white; transition: background 0.15s; }
-    .history-summary-row:hover { background: #f8fbff; }
-    .history-summary-row.is-open { background: #eff6ff; }
-    .history-expand-cell { width: 45px; text-align: center !important; }
-    .history-expand-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 31px; height: 31px;
-        border: 1px solid #bfdbfe;
-        border-radius: 8px;
-        background: #eff6ff;
-        color: var(--h-primary);
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .history-expand-btn:hover { background: var(--h-primary); color: white; border-color: var(--h-primary); }
-    .history-expand-btn i { transition: transform 0.2s; }
-    .history-summary-row.is-open .history-expand-btn i { transform: rotate(90deg); }
-    .history-lote { display: inline-flex; align-items: center; gap: 7px; color: var(--h-dark); font-weight: 850; white-space: nowrap; }
-    .history-product { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
-    .history-client { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .history-empty-value { color: #94a3b8; }
-    .history-count { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 27px; padding: 0 8px; border-radius: 999px; background: #e0e7ff; color: #4338ca; font-size: 0.75rem; font-weight: 850; }
-    .history-quantity { color: var(--h-dark); font-weight: 850; white-space: nowrap; }
-    .history-date strong { color: var(--h-dark); font-size: 0.8rem; }
-    .history-date small { color: var(--h-muted); font-size: 0.72rem; }
-    .history-address { display: block; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .history-user { display: flex; align-items: center; gap: 7px; max-width: 170px; }
-    .history-user-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: #f1f5f9; color: #64748b; }
-    .history-user-name { overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-    /* Badges */
-    .history-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border-radius: 999px; font-size: 0.7rem; font-weight: 850; white-space: nowrap; }
-    .badge-entrada { background: #dcfce7; color: #166534; }
-    .badge-saida { background: #fee2e2; color: #991b1b; }
-    .badge-transferencia { background: #dbeafe; color: #1e40af; }
-    .badge-expedicao { background: #ffedd5; color: #9a3412; }
-    .badge-edicao { background: #fef3c7; color: #92400e; }
-    .badge-exclusao { background: #ffe4e6; color: #9f1239; }
-    .badge-outro { background: #f1f5f9; color: #475569; }
-    .badge-source-old { background: #e0f2fe; color: #075985; }
-    .badge-source-new { background: #ede9fe; color: #5b21b6; }
-    /* Linhas de detalhes */
-    .history-detail-row { display: none; background: #f8fafc; }
-    .history-detail-row.is-visible { display: table-row; }
-    .history-detail-row td { padding: 0 !important; border-bottom: 1px solid #cbd5e1 !important; }
-    .history-detail-container { padding: 17px 18px 19px 60px; border-left: 4px solid var(--h-primary); background: linear-gradient(90deg, rgba(37,99,235,0.04), transparent 35%); }
-    .history-detail-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-    .history-detail-title h4 { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--h-dark); font-size: 0.92rem; font-weight: 850; }
-    .history-detail-total { color: var(--h-muted); font-size: 0.77rem; font-weight: 700; }
-    .history-detail-table-wrapper { width: 100%; overflow-x: auto; border: 1px solid var(--h-border); border-radius: 11px; background: white; }
-    .history-detail-table { width: 100%; min-width: 1750px; border-collapse: collapse; }
-    .history-detail-table thead th { padding: 10px; border-bottom: 1px solid var(--h-border); background: #f1f5f9; color: #475569; font-size: 0.66rem; font-weight: 850; text-transform: uppercase; letter-spacing: 0.035em; white-space: nowrap; }
-    .history-detail-table tbody td { padding: 11px 10px !important; border-bottom: 1px solid #f1f5f9 !important; color: var(--h-text); font-size: 0.76rem; vertical-align: top; }
-    .history-detail-table tbody tr:last-child td { border-bottom: 0 !important; }
-    .history-detail-table tbody tr:hover { background: #fbfdff; }
-    .history-description { display: block; min-width: 250px; max-width: 420px; color: #475569; line-height: 1.45; word-break: break-word; }
-    .history-info-list { display: flex; flex-direction: column; gap: 3px; min-width: 130px; }
-    .history-info-label { color: var(--h-muted); font-weight: 700; }
-    /* Estado vazio */
-    .history-empty { padding: 55px 20px !important; text-align: center; }
-    .history-empty-icon { display: inline-flex; align-items: center; justify-content: center; width: 68px; height: 68px; margin-bottom: 15px; border-radius: 50%; background: #f1f5f9; color: #94a3b8; font-size: 1.7rem; }
-    .history-empty-title { margin: 0 0 6px; color: var(--h-dark); font-size: 1rem; font-weight: 850; }
-    .history-empty-text { margin: 0; color: var(--h-muted); font-size: 0.85rem; }
-    /* Paginação */
-    .history-pagination-wrapper { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-top: 1px solid var(--h-border); background: #fbfdff; }
-    .history-pagination-info { color: var(--h-muted); font-size: 0.8rem; }
-    .history-pagination { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 0; padding: 0; list-style: none; }
-    .history-page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 35px; height: 35px; padding: 0 10px; border: 1px solid var(--h-border); border-radius: 8px; background: white; color: var(--h-text); font-size: 0.78rem; font-weight: 750; text-decoration: none; transition: all 0.18s; }
-    .history-page-link:hover { color: var(--h-primary); border-color: #bfdbfe; background: #eff6ff; }
-    .history-page-link.active { color: white; background: var(--h-primary); border-color: var(--h-primary); }
-    .history-page-link.disabled { color: #cbd5e1; pointer-events: none; background: #f8fafc; }
-    /* Responsivo */
-    @media (max-width:1200px){ .history-cards{grid-template-columns:repeat(2,1fr);} .history-filter-grid{grid-template-columns:repeat(3,1fr);} }
-    @media (max-width:900px){ .history-header{flex-direction:column;align-items:flex-start;} .history-subtitle{margin-left:0;} .history-filter-grid{grid-template-columns:repeat(2,1fr);} .history-filter-group.search-wide{grid-column:span 2;} .history-detail-container{padding-left:18px;} }
-    @media (max-width:650px){ .history-page{padding:14px 8px 28px;} .history-title{font-size:1.38rem;} .history-title-icon{width:40px;height:40px;} .history-cards{grid-template-columns:1fr;gap:10px;} .history-card{min-height:94px;padding:15px;} .history-card-value{font-size:1.4rem;} .history-filter-toggle{display:block;} .history-filter-body.mobile-hidden{display:none;} .history-filter-grid{grid-template-columns:1fr;} .history-filter-group.search-wide{grid-column:span 1;} .history-filter-actions{flex-direction:column;align-items:stretch;} .btn-history{width:100%;} .history-table-toolbar{flex-direction:column;align-items:flex-start;} .history-pagination-wrapper{flex-direction:column;align-items:flex-start;} }
+:root {
+    --hist-green: #198754;
+    --hist-green-dark: #12663f;
+    --hist-green-soft: #eaf7ef;
+    --hist-blue: #2563eb;
+    --hist-amber: #d97706;
+    --hist-red: #dc2626;
+    --hist-purple: #7c3aed;
+    --hist-cyan: #0891b2;
+    --hist-text: #263442;
+    --hist-muted: #667481;
+    --hist-border: #dce5df;
+    --hist-bg: #f4f7f5;
+    --hist-white: #ffffff;
+}
+
+.history-page {
+    min-height: calc(100vh - 60px);
+    padding: 18px 14px 38px;
+    background: var(--hist-bg);
+}
+.history-wrap {
+    width: 100%;
+    max-width: 1920px;
+    margin: 0 auto;
+}
+.history-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+.history-head-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.history-head-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: linear-gradient(135deg, var(--hist-green), #36a766);
+    box-shadow: 0 8px 20px rgba(25,135,84,.22);
+    flex: 0 0 auto;
+}
+.history-title {
+    margin: 0;
+    color: #183226;
+    font-size: 1.55rem;
+    line-height: 1.1;
+    font-weight: 900;
+    letter-spacing: -.025em;
+}
+.history-subtitle {
+    margin: 5px 0 0;
+    color: var(--hist-muted);
+    font-size: .88rem;
+}
+.history-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 14px;
+    border: 1px solid var(--hist-border);
+    border-radius: 10px;
+    color: #365144;
+    background: #fff;
+    text-decoration: none;
+    font-size: .84rem;
+    font-weight: 800;
+    transition: .18s ease;
+}
+.history-back:hover {
+    color: var(--hist-green-dark);
+    background: var(--hist-green-soft);
+    border-color: #b9ddc7;
+    transform: translateY(-1px);
+}
+
+.history-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.history-kpi {
+    position: relative;
+    min-height: 92px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding: 15px 16px;
+    overflow: hidden;
+    border: 1px solid var(--hist-border);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(26, 44, 34, .05);
+}
+.history-kpi:after {
+    content: '';
+    position: absolute;
+    width: 72px;
+    height: 72px;
+    right: -16px;
+    top: -18px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .06;
+}
+.history-kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    flex: 0 0 auto;
+}
+.history-kpi.green { color: var(--hist-green); }
+.history-kpi.green .history-kpi-icon { background: #e4f5ea; }
+.history-kpi.blue { color: var(--hist-blue); }
+.history-kpi.blue .history-kpi-icon { background: #e8efff; }
+.history-kpi.amber { color: var(--hist-amber); }
+.history-kpi.amber .history-kpi-icon { background: #fff2d9; }
+.history-kpi.purple { color: var(--hist-purple); }
+.history-kpi.purple .history-kpi-icon { background: #f0eaff; }
+.history-kpi-value {
+    color: #1d2d24;
+    font-size: 1.45rem;
+    font-weight: 900;
+    line-height: 1;
+}
+.history-kpi-label {
+    margin-top: 6px;
+    color: var(--hist-muted);
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .035em;
+}
+
+.history-filter-card,
+.history-table-card {
+    border: 1px solid var(--hist-border);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(24, 47, 33, .055);
+}
+.history-filter-card { margin-bottom: 14px; }
+.history-filter-top {
+    display: grid;
+    grid-template-columns: minmax(300px, 2fr) repeat(3, minmax(150px, .75fr)) auto;
+    gap: 10px;
+    align-items: end;
+    padding: 14px;
+}
+.hist-field label {
+    display: block;
+    margin: 0 0 5px;
+    color: #53645a;
+    font-size: .69rem;
+    font-weight: 850;
+    text-transform: uppercase;
+    letter-spacing: .035em;
+}
+.hist-control {
+    width: 100%;
+    height: 40px;
+    padding: 7px 10px;
+    border: 1px solid #cedbd3;
+    border-radius: 9px;
+    outline: none;
+    color: var(--hist-text);
+    background: #fff;
+    font-size: .84rem;
+    transition: .16s ease;
+}
+.hist-control:focus {
+    border-color: #6abd8b;
+    box-shadow: 0 0 0 3px rgba(25,135,84,.10);
+}
+.history-filter-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.hist-btn {
+    min-height: 40px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    padding: 8px 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: .8rem;
+    font-weight: 850;
+    white-space: nowrap;
+    transition: .16s ease;
+}
+.hist-btn-primary {
+    color: #fff;
+    background: var(--hist-green);
+    border-color: var(--hist-green);
+}
+.hist-btn-primary:hover { background: var(--hist-green-dark); color: #fff; }
+.hist-btn-light {
+    color: #516158;
+    background: #fff;
+    border-color: var(--hist-border);
+}
+.hist-btn-light:hover { background: #f6faf7; color: #1b5436; }
+.hist-btn-filter.active {
+    color: var(--hist-green-dark);
+    background: var(--hist-green-soft);
+    border-color: #b8dcc6;
+}
+.hist-filter-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: var(--hist-green);
+    font-size: .66rem;
+    font-weight: 900;
+}
+.history-advanced {
+    display: none;
+    padding: 14px;
+    border-top: 1px solid #e9efeb;
+    background: #fbfdfb;
+}
+.history-advanced.open { display: block; }
+.history-advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(150px, 1fr));
+    gap: 10px;
+}
+.history-filter-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-top: 13px;
+    padding-top: 12px;
+    border-top: 1px dashed #dce7df;
+}
+.history-filter-tip {
+    color: var(--hist-muted);
+    font-size: .75rem;
+}
+
+.history-table-card { overflow: hidden; }
+.history-table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--hist-border);
+    background: #fbfdfb;
+}
+.history-results {
+    color: var(--hist-muted);
+    font-size: .82rem;
+}
+.history-results strong { color: #243b2e; }
+.history-page-size {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--hist-muted);
+    font-size: .76rem;
+    font-weight: 750;
+}
+.history-page-size select {
+    height: 34px;
+    min-width: 72px;
+    border: 1px solid var(--hist-border);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--hist-text);
+    font-weight: 800;
+}
+.history-table-wrap {
+    width: 100%;
+    overflow: auto;
+    max-height: calc(100vh - 230px);
+}
+.history-table {
+    width: 100%;
+    min-width: 1680px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.history-table th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 11px 9px;
+    border-bottom: 1px solid #d8e3dc;
+    color: #56675d;
+    background: #f4f8f5;
+    font-size: .67rem;
+    font-weight: 900;
+    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: .035em;
+    white-space: nowrap;
+}
+.history-table td {
+    padding: 10px 9px;
+    border-bottom: 1px solid #e9efeb;
+    color: #33443a;
+    background: #fff;
+    font-size: .78rem;
+    vertical-align: middle;
+}
+.history-main-row:hover td { background: #f9fcfa; }
+.history-date { min-width: 112px; white-space: nowrap; }
+.history-date strong { display: block; color: #263d30; font-size: .77rem; }
+.history-date small { color: #7b897f; font-size: .69rem; }
+.hist-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    border-radius: 999px;
+    font-size: .67rem;
+    font-weight: 900;
+    white-space: nowrap;
+}
+.type-entrada { color: #166534; background: #dcfce7; }
+.type-saida { color: #991b1b; background: #fee2e2; }
+.type-transferencia,
+.type-transferencia-entrada,
+.type-transferencia-saida { color: #8a5a00; background: #fff0bd; }
+.type-expedicao { color: #075985; background: #dff3ff; }
+.type-ajuste { color: #5b21b6; background: #eee8ff; }
+.type-edicao { color: #92400e; background: #fef3c7; }
+.type-exclusao { color: #9f1239; background: #ffe4e6; }
+.type-outro { color: #475569; background: #eef2f5; }
+.history-lote {
+    color: #e11d48;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .76rem;
+    font-weight: 850;
+    white-space: nowrap;
+}
+.history-product-code { color: #283d31; font-weight: 850; white-space: nowrap; }
+.history-subline {
+    display: block;
+    margin-top: 3px;
+    max-width: 250px;
+    overflow: hidden;
+    color: #718078;
+    font-size: .67rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.history-route {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 205px;
+    color: #244334;
+    font-weight: 800;
+}
+.history-route span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.history-origin {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 190px;
+    padding: 4px 7px;
+    border-radius: 8px;
+    color: #28563d;
+    background: #edf7f1;
+    font-size: .67rem;
+    font-weight: 800;
+}
+.history-origin span,
+.history-party strong,
+.history-party small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.history-party {
+    min-width: 150px;
+    max-width: 220px;
+}
+.history-party strong,
+.history-party small { display: block; }
+.history-party strong { color: #2d4035; font-size: .74rem; }
+.history-party small { margin-top: 3px; color: #77847c; font-size: .67rem; }
+.history-qty { color: #183d29; font-size: .86rem; font-weight: 900; white-space: nowrap; }
+.history-load { min-width: 120px; }
+.history-load strong { display: block; color: #2b4135; font-size: .74rem; }
+.load-tag {
+    display: inline-flex;
+    margin-top: 4px;
+    padding: 3px 6px;
+    border-radius: 999px;
+    font-size: .61rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+.load-tag.gerada { color: #075985; background: #e0f2fe; }
+.load-tag.avulsa { color: #7c2d12; background: #ffedd5; }
+.history-transport { min-width: 145px; }
+.history-transport strong { display: block; color: #33483c; font-size: .72rem; }
+.history-transport small { display: block; margin-top: 3px; color: #7a877f; font-size: .66rem; }
+.history-user { white-space: nowrap; font-weight: 750; }
+.history-detail-btn {
+    width: 31px;
+    height: 31px;
+    border: 1px solid #cfe0d5;
+    border-radius: 8px;
+    color: #39704f;
+    background: #f5faf7;
+    cursor: pointer;
+}
+.history-detail-btn:hover { color: #fff; background: var(--hist-green); border-color: var(--hist-green); }
+.history-detail-row { display: none; }
+.history-detail-row.open { display: table-row; }
+.history-detail-row > td {
+    padding: 0 !important;
+    background: #f8fbf9 !important;
+}
+.history-detail-box {
+    padding: 14px 18px 16px;
+    border-left: 4px solid var(--hist-green);
+}
+.history-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(150px, 1fr));
+    gap: 10px;
+}
+.detail-item {
+    min-height: 58px;
+    padding: 9px 10px;
+    border: 1px solid #e1e9e4;
+    border-radius: 9px;
+    background: #fff;
+}
+.detail-item span {
+    display: block;
+    margin-bottom: 5px;
+    color: #7b887f;
+    font-size: .61rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .035em;
+}
+.detail-item strong { color: #33483b; font-size: .73rem; }
+.detail-observation {
+    grid-column: 1 / -1;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.history-empty {
+    padding: 44px 20px !important;
+    text-align: center;
+    color: var(--hist-muted) !important;
+}
+.history-empty i { display: block; margin-bottom: 9px; color: #9eb4a6; font-size: 1.8rem; }
+
+.history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-top: 1px solid var(--hist-border);
+    background: #fbfdfb;
+}
+.history-pagination-info { color: var(--hist-muted); font-size: .77rem; }
+.history-pagination-links { display: flex; align-items: center; gap: 5px; }
+.history-page-link {
+    min-width: 34px;
+    height: 34px;
+    padding: 0 9px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #d6e2da;
+    border-radius: 8px;
+    color: #4e6155;
+    background: #fff;
+    text-decoration: none;
+    font-size: .75rem;
+    font-weight: 850;
+}
+.history-page-link:hover { color: var(--hist-green-dark); background: var(--hist-green-soft); }
+.history-page-link.active { color: #fff; background: var(--hist-green); border-color: var(--hist-green); }
+.history-page-link.disabled { color: #adb7b1; background: #f5f7f6; pointer-events: none; }
+
+@media (max-width: 1400px) {
+    .history-filter-top { grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(140px, 1fr)); }
+    .history-filter-actions { grid-column: 1 / -1; justify-content: flex-end; }
+    .history-advanced-grid { grid-template-columns: repeat(4, minmax(150px, 1fr)); }
+    .history-detail-grid { grid-template-columns: repeat(4, minmax(150px, 1fr)); }
+}
+@media (max-width: 900px) {
+    .history-page { padding: 12px 8px 30px; }
+    .history-head { align-items: flex-start; flex-direction: column; }
+    .history-kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .history-filter-top { grid-template-columns: 1fr 1fr; }
+    .hist-search-field { grid-column: 1 / -1; }
+    .history-filter-actions { justify-content: stretch; flex-wrap: wrap; }
+    .history-filter-actions .hist-btn { flex: 1 1 auto; }
+    .history-advanced-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .history-detail-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .history-pagination { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 560px) {
+    .history-kpis { grid-template-columns: 1fr; }
+    .history-filter-top,
+    .history-advanced-grid,
+    .history-detail-grid { grid-template-columns: 1fr; }
+    .history-filter-top > * { grid-column: 1 / -1; }
+}
 </style>
 
 <div class="history-page">
-<div class="history-wrapper">
+<div class="history-wrap">
 
-<!-- Cabeçalho -->
-<header class="history-header">
-  <div class="history-header-content">
-    <h1 class="history-title">
-      <span class="history-title-icon"><i class="fas fa-clock-rotate-left"></i></span>
-      Histórico geral de movimentações
-    </h1>
-    <p class="history-subtitle">Histórico completo, agrupado por lote, incluindo registros antigos e movimentações de cards.</p>
-  </div>
-  <a href="{% url 'sapp:lista_estoque' %}" class="btn-history-back"><i class="fas fa-arrow-left"></i> Voltar ao estoque</a>
-</header>
-
-<!-- Cards -->
-<section class="history-cards">
-  <article class="history-card primary">
-    <div class="history-card-icon"><i class="fas fa-list-check"></i></div>
-    <div class="history-card-info">
-      <p class="history-card-value">{{ total_movimentacoes|default:0|intcomma }}</p>
-      <div class="history-card-label">Movimentações</div>
-    </div>
-  </article>
-  <article class="history-card success">
-    <div class="history-card-icon"><i class="fas fa-layer-group"></i></div>
-    <div class="history-card-info">
-      <p class="history-card-value">{{ total_lotes|default:0|intcomma }}</p>
-      <div class="history-card-label">Lotes encontrados</div>
-    </div>
-  </article>
-  <article class="history-card warning">
-    <div class="history-card-icon"><i class="fas fa-truck-fast"></i></div>
-    <div class="history-card-info">
-      <p class="history-card-value">{{ total_expedicoes|default:0|intcomma }}</p>
-      <div class="history-card-label">Expedições</div>
-    </div>
-  </article>
-  <article class="history-card purple">
-    <div class="history-card-icon"><i class="fas fa-calendar-day"></i></div>
-    <div class="history-card-info">
-      <p class="history-card-value">{{ movimentacoes_hoje|default:0|intcomma }}</p>
-      <div class="history-card-label">Movimentações hoje</div>
-    </div>
-  </article>
-</section>
-
-<!-- Filtros -->
-<section class="history-filter-card">
-  <div class="history-filter-header">
-    <h2 class="history-filter-title"><i class="fas fa-filter"></i> Filtros do histórico</h2>
-    <button type="button" class="history-filter-toggle" id="historyFilterToggle" aria-label="Mostrar ou ocultar filtros"><i class="fas fa-chevron-up"></i></button>
-  </div>
-  <div class="history-filter-body" id="historyFilterBody">
-    <form method="GET" action="{% url 'sapp:historico_geral' %}">
-      <div class="history-filter-grid">
-        <div class="history-filter-group search-wide">
-          <label for="historySearch" class="history-filter-label">Busca geral</label>
-          <input type="text" name="busca" id="historySearch" class="history-filter-control" value="{{ busca|default:'' }}" placeholder="Lote, produto, cliente, carga, motorista, placa...">
-        </div>
-        <div class="history-filter-group">
-          <label for="historyLote" class="history-filter-label">Lote</label>
-          <select name="lote" id="historyLote" class="history-filter-control">
-            <option value="">Todos os lotes</option>
-            {% for l in opcoes_lotes %}<option value="{{ l }}" {% if filtro_lote == l %}selected{% endif %}>{{ l }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="history-filter-group">
-          <label for="historyProduto" class="history-filter-label">Produto</label>
-          <select name="produto" id="historyProduto" class="history-filter-control">
-            <option value="">Todos os produtos</option>
-            {% for p in opcoes_produtos %}<option value="{{ p }}" {% if filtro_produto == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="history-filter-group">
-          <label for="historyCliente" class="history-filter-label">Cliente</label>
-          <select name="cliente" id="historyCliente" class="history-filter-control">
-            <option value="">Todos os clientes</option>
-            {% for c in opcoes_clientes %}<option value="{{ c }}" {% if filtro_cliente == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="history-filter-group">
-          <label for="historyTipo" class="history-filter-label">Tipo</label>
-          <select name="tipo" id="historyTipo" class="history-filter-control">
-            <option value="">Todos os tipos</option>
-            {% for tv, tn in choices_tipo %}<option value="{{ tv }}" {% if filtro_tipo == tv %}selected{% endif %}>{{ tn }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="history-filter-group">
-          <label for="historyUsuario" class="history-filter-label">Usuário</label>
-          <select name="usuario" id="historyUsuario" class="history-filter-control">
-            <option value="">Todos os usuários</option>
-            {% for u in opcoes_usuarios %}<option value="{{ u.valor }}" {% if filtro_usuario == u.valor %}selected{% endif %}>{{ u.nome }}</option>{% endfor %}
-          </select>
-        </div>
-        <div class="history-filter-group">
-          <label for="historyDataInicial" class="history-filter-label">Data inicial</label>
-          <input type="date" name="data_inicial" id="historyDataInicial" class="history-filter-control" value="{{ data_inicial|default:'' }}">
-        </div>
-        <div class="history-filter-group">
-          <label for="historyDataFinal" class="history-filter-label">Data final</label>
-          <input type="date" name="data_final" id="historyDataFinal" class="history-filter-control" value="{{ data_final|default:'' }}">
-        </div>
-      </div>
-      <input type="hidden" name="page_size" value="{{ page_size|default:25 }}">
-      <div class="history-filter-actions">
-        <a href="{% url 'sapp:historico_geral' %}" class="btn-history btn-history-light"><i class="fas fa-eraser"></i> Limpar filtros</a>
-        <button type="submit" class="btn-history btn-history-primary"><i class="fas fa-search"></i> Aplicar filtros</button>
-      </div>
-    </form>
-  </div>
-</section>
-
-<!-- Tabela principal -->
-<section class="history-table-card">
-  <div class="history-table-toolbar">
-    <p class="history-results-text">
-      {% if lotes.paginator.count %}
-        Exibindo lotes <strong>{{ lotes.start_index }}</strong> até <strong>{{ lotes.end_index }}</strong> de <strong>{{ lotes.paginator.count }}</strong>
-      {% else %}
-        Nenhum lote encontrado
-      {% endif %}
-    </p>
-    <form method="GET" action="{% url 'sapp:historico_geral' %}" class="history-page-size-form">
-      {% if busca %}<input type="hidden" name="busca" value="{{ busca }}">{% endif %}
-      {% if filtro_lote %}<input type="hidden" name="lote" value="{{ filtro_lote }}">{% endif %}
-      {% if filtro_produto %}<input type="hidden" name="produto" value="{{ filtro_produto }}">{% endif %}
-      {% if filtro_cliente %}<input type="hidden" name="cliente" value="{{ filtro_cliente }}">{% endif %}
-      {% if filtro_tipo %}<input type="hidden" name="tipo" value="{{ filtro_tipo }}">{% endif %}
-      {% if filtro_usuario %}<input type="hidden" name="usuario" value="{{ filtro_usuario }}">{% endif %}
-      {% if data_inicial %}<input type="hidden" name="data_inicial" value="{{ data_inicial }}">{% endif %}
-      {% if data_final %}<input type="hidden" name="data_final" value="{{ data_final }}">{% endif %}
-      <label for="historyPageSize" class="history-page-size-label">Por página:</label>
-      <select name="page_size" id="historyPageSize" class="history-page-size-select" onchange="this.form.submit()">
-        {% for s in page_sizes %}<option value="{{ s }}" {% if page_size == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-      </select>
-    </form>
-  </div>
-  <div class="history-table-responsive">
-    <table class="history-table">
-      <thead>
-        <tr>
-          <th class="history-expand-cell"></th>
-          <th>Lote</th><th>Produto</th><th>Cliente</th><th>Movimentos</th><th>Quantidade</th>
-          <th>Último tipo</th><th>Última movimentação</th><th>Origem</th><th>Destino</th><th>Usuário</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for grupo in lotes %}
-          <tr class="history-summary-row" id="summary-{{ grupo.grupo_id }}" data-history-group="{{ grupo.grupo_id }}">
-            <td class="history-expand-cell">
-              <button type="button" class="history-expand-btn" data-history-toggle="{{ grupo.grupo_id }}" aria-label="Visualizar movimentações" aria-expanded="false"><i class="fas fa-chevron-right"></i></button>
-            </td>
-            <td><span class="history-lote" title="{{ grupo.lote_ref }}"><i class="fas fa-box"></i> {{ grupo.lote_ref|default:"Sem lote" }}</span></td>
-            <td>{% if grupo.produto %}<span class="history-product" title="{{ grupo.produto }}">{{ grupo.produto }}</span>{% else %}<span class="history-empty-value">Não informado</span>{% endif %}</td>
-            <td>{% if grupo.cliente %}<span class="history-client" title="{{ grupo.cliente }}">{{ grupo.cliente }}</span>{% else %}<span class="history-empty-value">Sem cliente</span>{% endif %}</td>
-            <td><span class="history-count">{{ grupo.total_mov|default:0 }}</span></td>
-            <td><span class="history-quantity">{{ grupo.quantidade_total|default:0|intcomma }}</span></td>
-            <td>
-              {% with tipo=grupo.ultimo_tipo %}
-                {% if tipo == 'entrada' %}<span class="history-badge badge-entrada"><i class="fas fa-arrow-down"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
-                {% elif tipo == 'saida' %}<span class="history-badge badge-saida"><i class="fas fa-arrow-up"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
-                {% elif tipo == 'transferencia' %}<span class="history-badge badge-transferencia"><i class="fas fa-right-left"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
-                {% elif tipo == 'expedicao' %}<span class="history-badge badge-expedicao"><i class="fas fa-truck-fast"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
-                {% elif tipo == 'edicao' %}<span class="history-badge badge-edicao"><i class="fas fa-pen"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
-                {% elif tipo == 'exclusao' %}<span class="history-badge badge-exclusao"><i class="fas fa-trash"></i> {{ grupo.ultimo_tipo_exibicao }}</span>
-                {% else %}<span class="history-badge badge-outro"><i class="fas fa-circle-info"></i> {{ grupo.ultimo_tipo_exibicao|default:"Outro" }}</span>{% endif %}
-              {% endwith %}
-            </td>
-            <td>{% if grupo.ultima_data %}<div class="history-date"><strong>{{ grupo.ultima_data|date:"d/m/Y" }}</strong><small>{{ grupo.ultima_data|date:"H:i:s" }}</small></div>{% else %}<span class="history-empty-value">Sem data</span>{% endif %}</td>
-            <td>{% if grupo.ultimo_end_origem %}<span class="history-address" title="{{ grupo.ultimo_end_origem }}">{{ grupo.ultimo_end_origem }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
-            <td>{% if grupo.ultimo_end_destino %}<span class="history-address" title="{{ grupo.ultimo_end_destino }}">{{ grupo.ultimo_end_destino }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
-            <td><div class="history-user"><span class="history-user-icon"><i class="fas fa-user"></i></span><span class="history-user-name" title="{{ grupo.ultimo_usuario }}">{{ grupo.ultimo_usuario|default:"Sistema" }}</span></div></td>
-          </tr>
-          <tr class="history-detail-row" id="detail-{{ grupo.grupo_id }}">
-            <td colspan="11">
-              <div class="history-detail-container">
-                <div class="history-detail-title">
-                  <h4><i class="fas fa-timeline"></i> Movimentações do lote {{ grupo.lote_ref }}</h4>
-                  <span class="history-detail-total">{{ grupo.total_mov }} registro{{ grupo.total_mov|pluralize }}</span>
+    <header class="history-head">
+        <div>
+            <div class="history-head-main">
+                <span class="history-head-icon"><i class="fas fa-clock-rotate-left"></i></span>
+                <div>
+                    <h1 class="history-title">Histórico geral de movimentações</h1>
+                    <p class="history-subtitle">Consulta completa do estoque, com filtros avançados e paginação direto no banco.</p>
                 </div>
-                <div class="history-detail-table-wrapper">
-                  <table class="history-detail-table">
-                    <thead>
-                      <tr>
-                        <th>Data e hora</th><th>Tipo</th><th>Quantidade</th><th>Produto</th><th>Cliente / empresa</th>
-                        <th>Origem</th><th>Destino</th><th>Carga / transporte</th><th>Usuário</th><th>Fonte</th><th>Descrição / observação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for mov in grupo.movimentacoes %}
-                        <tr>
-                          <td>{% if mov.processado_em %}<div class="history-date"><strong>{{ mov.processado_em|date:"d/m/Y" }}</strong><small>{{ mov.processado_em|date:"H:i:s" }}</small></div>{% else %}<span class="history-empty-value">Sem data</span>{% endif %}</td>
-                          <td>
-                            {% if mov.tipo == 'entrada' %}<span class="history-badge badge-entrada"><i class="fas fa-arrow-down"></i> {{ mov.tipo_exibicao }}</span>
-                            {% elif mov.tipo == 'saida' %}<span class="history-badge badge-saida"><i class="fas fa-arrow-up"></i> {{ mov.tipo_exibicao }}</span>
-                            {% elif mov.tipo == 'transferencia' %}<span class="history-badge badge-transferencia"><i class="fas fa-right-left"></i> {{ mov.tipo_exibicao }}</span>
-                            {% elif mov.tipo == 'expedicao' %}<span class="history-badge badge-expedicao"><i class="fas fa-truck-fast"></i> {{ mov.tipo_exibicao }}</span>
-                            {% elif mov.tipo == 'edicao' %}<span class="history-badge badge-edicao"><i class="fas fa-pen"></i> {{ mov.tipo_exibicao }}</span>
-                            {% elif mov.tipo == 'exclusao' %}<span class="history-badge badge-exclusao"><i class="fas fa-trash"></i> {{ mov.tipo_exibicao }}</span>
-                            {% else %}<span class="history-badge badge-outro"><i class="fas fa-circle-info"></i> {{ mov.tipo_exibicao|default:"Outro" }}</span>{% endif %}
-                          </td>
-                          <td><span class="history-quantity">{{ mov.quantidade|default:0|intcomma }}</span>{% if mov.embalagem %}<small style="display:block;margin-top:3px;color:#64748b;">{{ mov.embalagem }}</small>{% endif %}</td>
-                          <td>
-                            {% if mov.produto %}<strong>{{ mov.produto }}</strong>{% else %}<span class="history-empty-value">Não informado</span>{% endif %}
-                            {% if mov.cultivar or mov.peneira %}<div style="margin-top:4px;color:#64748b;font-size:0.7rem;">{% if mov.cultivar %}{{ mov.cultivar }}{% endif %}{% if mov.cultivar and mov.peneira %} • {% endif %}{% if mov.peneira %}Peneira {{ mov.peneira }}{% endif %}</div>{% endif %}
-                          </td>
-                          <td>
-                            <div class="history-info-list">
-                              {% if mov.cliente_exibicao %}<span><span class="history-info-label">Cliente:</span> {{ mov.cliente_exibicao }}</span>{% endif %}
-                              {% if mov.empresa %}<span><span class="history-info-label">Empresa:</span> {{ mov.empresa }}</span>{% endif %}
-                              {% if not mov.cliente_exibicao and not mov.empresa %}<span class="history-empty-value">Não informado</span>{% endif %}
-                            </div>
-                          </td>
-                          <td>{% if mov.endereco_origem %}<span class="history-address" title="{{ mov.endereco_origem }}"><i class="fas fa-location-dot" style="color:#dc2626;"></i> {{ mov.endereco_origem }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
-                          <td>{% if mov.endereco_destino %}<span class="history-address" title="{{ mov.endereco_destino }}"><i class="fas fa-location-dot" style="color:#16a34a;"></i> {{ mov.endereco_destino }}</span>{% else %}<span class="history-empty-value">—</span>{% endif %}</td>
-                          <td>
-                            <div class="history-info-list">
-                              {% if mov.numero_carga %}<span><span class="history-info-label">Carga:</span> {{ mov.numero_carga }}</span>{% endif %}
-                              {% if mov.motorista %}<span><span class="history-info-label">Motorista:</span> {{ mov.motorista }}</span>{% endif %}
-                              {% if mov.placa %}<span><span class="history-info-label">Placa:</span> {{ mov.placa }}</span>{% endif %}
-                              {% if mov.ordem_entrega %}<span><span class="history-info-label">Ordem:</span> {{ mov.ordem_entrega }}</span>{% endif %}
-                              {% if not mov.numero_carga and not mov.motorista and not mov.placa and not mov.ordem_entrega %}<span class="history-empty-value">Não informado</span>{% endif %}
-                            </div>
-                          </td>
-                          <td><div class="history-user"><span class="history-user-icon"><i class="fas fa-user"></i></span><span class="history-user-name" title="{{ mov.usuario_exibicao }}">{{ mov.usuario_exibicao|default:"Sistema" }}</span></div></td>
-                          <td>{% if mov.origem_historico == 'Histórico geral' %}<span class="history-badge badge-source-old"><i class="fas fa-database"></i> Histórico geral</span>{% else %}<span class="history-badge badge-source-new"><i class="fas fa-table-columns"></i> Cards e empenhos</span>{% endif %}</td>
-                          <td>{% if mov.observacao %}<span class="history-description" title="{{ mov.observacao }}">{{ mov.observacao|linebreaksbr }}</span>{% else %}<span class="history-empty-value">Sem observação</span>{% endif %}</td>
-                        </tr>
-                      {% empty %}
-                        <tr><td colspan="11" style="text-align:center;">Nenhuma movimentação disponível.</td></tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
+            </div>
+        </div>
+        <a href="{% url 'sapp:dashboard' %}" class="history-back"><i class="fas fa-chart-line"></i> Voltar ao Dashboard</a>
+    </header>
+
+    <section class="history-kpis">
+        <div class="history-kpi green">
+            <span class="history-kpi-icon"><i class="fas fa-list-check"></i></span>
+            <div><div class="history-kpi-value">{{ resumo.total|default:0|intcomma }}</div><div class="history-kpi-label">Registros filtrados</div></div>
+        </div>
+        <div class="history-kpi blue">
+            <span class="history-kpi-icon"><i class="fas fa-calendar-day"></i></span>
+            <div><div class="history-kpi-value">{{ resumo.hoje|default:0|intcomma }}</div><div class="history-kpi-label">Movimentações hoje</div></div>
+        </div>
+        <div class="history-kpi amber">
+            <span class="history-kpi-icon"><i class="fas fa-right-left"></i></span>
+            <div><div class="history-kpi-value">{{ resumo.transferencias|default:0|intcomma }}</div><div class="history-kpi-label">Transferências</div></div>
+        </div>
+        <div class="history-kpi purple">
+            <span class="history-kpi-icon"><i class="fas fa-truck-fast"></i></span>
+            <div><div class="history-kpi-value">{{ resumo.cargas|default:0|intcomma }}</div><div class="history-kpi-label">Cargas encontradas</div></div>
+        </div>
+    </section>
+
+    <section class="history-filter-card">
+        <form method="get" action="{% url 'sapp:historico_geral' %}" id="historyFilterForm">
+            <div class="history-filter-top">
+                <div class="hist-field hist-search-field">
+                    <label for="histBusca">Busca geral</label>
+                    <input id="histBusca" class="hist-control" type="search" name="busca" value="{{ filtros.busca }}" placeholder="Lote, produto, endereço, cliente, carga, placa, usuário..." autocomplete="off">
                 </div>
-              </div>
-            </td>
-          </tr>
-        {% empty %}
-          <tr>
-            <td colspan="11" class="history-empty">
-              <div class="history-empty-icon"><i class="fas fa-magnifying-glass"></i></div>
-              <h3 class="history-empty-title">Nenhum histórico encontrado</h3>
-              <p class="history-empty-text">Não existem movimentações correspondentes aos filtros selecionados.</p>
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+                <div class="hist-field">
+                    <label for="histTipo">Tipo</label>
+                    <select id="histTipo" class="hist-control" name="tipo">
+                        <option value="">Todos</option>
+                        {% for valor, nome in choices_tipo %}
+                            <option value="{{ valor }}" {% if filtros.tipo == valor %}selected{% endif %}>{{ nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="hist-field">
+                    <label for="histDataIni">De</label>
+                    <input id="histDataIni" class="hist-control" type="date" name="data_inicial" value="{{ filtros.data_inicial }}">
+                </div>
+                <div class="hist-field">
+                    <label for="histDataFim">Até</label>
+                    <input id="histDataFim" class="hist-control" type="date" name="data_final" value="{{ filtros.data_final }}">
+                </div>
+                <div class="history-filter-actions">
+                    <button type="button" id="historyAdvancedToggle" class="hist-btn hist-btn-light hist-btn-filter {% if filtros_avancados_abertos %}active{% endif %}">
+                        <i class="fas fa-filter"></i> Mais filtros
+                        {% if filtros_ativos %}<span class="hist-filter-count">{{ filtros_ativos }}</span>{% endif %}
+                        <i class="fas {% if filtros_avancados_abertos %}fa-chevron-up{% else %}fa-chevron-down{% endif %}" id="historyAdvancedChevron"></i>
+                    </button>
+                    <button type="submit" class="hist-btn hist-btn-primary"><i class="fas fa-magnifying-glass"></i> Filtrar</button>
+                </div>
+            </div>
 
-  {% if lotes.paginator.num_pages > 1 %}
-  <div class="history-pagination-wrapper">
-    <div class="history-pagination-info">Página <strong>{{ lotes.number }}</strong> de <strong>{{ lotes.paginator.num_pages }}</strong></div>
-    <nav aria-label="Paginação do histórico">
-      <ul class="history-pagination">
-        {% if lotes.has_previous %}
-          <li><a class="history-page-link" href="?page=1{% if url_params %}&{{ url_params }}{% endif %}" title="Primeira página"><i class="fas fa-angles-left"></i></a></li>
-        {% else %}
-          <li><span class="history-page-link disabled"><i class="fas fa-angles-left"></i></span></li>
-        {% endif %}
-        {% if lotes.has_previous %}
-          <li><a class="history-page-link" href="?page={{ lotes.previous_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" title="Página anterior"><i class="fas fa-chevron-left"></i></a></li>
-        {% else %}
-          <li><span class="history-page-link disabled"><i class="fas fa-chevron-left"></i></span></li>
-        {% endif %}
-        {% for num in lotes.paginator.page_range %}
-          {% if num >= lotes.number|add:"-2" and num <= lotes.number|add:"2" %}
-            <li>
-              {% if num == lotes.number %}
-                <span class="history-page-link active">{{ num }}</span>
-              {% else %}
-                <a class="history-page-link" href="?page={{ num }}{% if url_params %}&{{ url_params }}{% endif %}">{{ num }}</a>
-              {% endif %}
-            </li>
-          {% endif %}
-        {% endfor %}
-        {% if lotes.has_next %}
-          <li><a class="history-page-link" href="?page={{ lotes.next_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" title="Próxima página"><i class="fas fa-chevron-right"></i></a></li>
-        {% else %}
-          <li><span class="history-page-link disabled"><i class="fas fa-chevron-right"></i></span></li>
-        {% endif %}
-        {% if lotes.has_next %}
-          <li><a class="history-page-link" href="?page={{ lotes.paginator.num_pages }}{% if url_params %}&{{ url_params }}{% endif %}" title="Última página"><i class="fas fa-angles-right"></i></a></li>
-        {% else %}
-          <li><span class="history-page-link disabled"><i class="fas fa-angles-right"></i></span></li>
-        {% endif %}
-      </ul>
-    </nav>
-  </div>
-  {% endif %}
-</section>
+            <div id="historyAdvanced" class="history-advanced {% if filtros_avancados_abertos %}open{% endif %}">
+                <div class="history-advanced-grid">
+                    <div class="hist-field"><label>Lote</label><input class="hist-control" name="lote" value="{{ filtros.lote }}" placeholder="Ex.: CS0601..."></div>
+                    <div class="hist-field"><label>Produto / código</label><input class="hist-control" name="produto" value="{{ filtros.produto }}" placeholder="Código do produto"></div>
+                    <div class="hist-field"><label>Cultivar</label><input class="hist-control" name="cultivar" value="{{ filtros.cultivar }}" placeholder="Cultivar"></div>
+                    <div class="hist-field"><label>Categoria</label><input class="hist-control" name="categoria" value="{{ filtros.categoria }}" placeholder="Categoria"></div>
+                    <div class="hist-field"><label>Peneira</label><input class="hist-control" name="peneira" value="{{ filtros.peneira }}" placeholder="Peneira"></div>
+                    <div class="hist-field"><label>Espécie</label><input class="hist-control" name="especie" value="{{ filtros.especie }}" placeholder="Espécie"></div>
 
+                    <div class="hist-field">
+                        <label>Embalagem</label>
+                        <select class="hist-control" name="embalagem">
+                            <option value="">Todas</option>
+                            <option value="BAG" {% if filtros.embalagem == 'BAG' %}selected{% endif %}>BAG</option>
+                            <option value="SC" {% if filtros.embalagem == 'SC' %}selected{% endif %}>SC</option>
+                        </select>
+                    </div>
+                    <div class="hist-field"><label>Endereço</label><input class="hist-control" name="endereco" value="{{ filtros.endereco }}" placeholder="R-A LN01 P01"></div>
+                    <div class="hist-field"><label>AZ</label><input class="hist-control" name="az" value="{{ filtros.az }}" placeholder="AZ"></div>
+                    <div class="hist-field"><label>Origem</label><input class="hist-control" name="origem" value="{{ filtros.origem }}" placeholder="Compra, transferência..."></div>
+                    <div class="hist-field"><label>Empresa</label><input class="hist-control" name="empresa" value="{{ filtros.empresa }}" placeholder="Empresa"></div>
+                    <div class="hist-field"><label>Cliente</label><input class="hist-control" name="cliente" value="{{ filtros.cliente }}" placeholder="Cliente"></div>
+
+                    <div class="hist-field"><label>Carga</label><input class="hist-control" name="carga" value="{{ filtros.carga }}" placeholder="Número ou nome da carga"></div>
+                    <div class="hist-field">
+                        <label>Tipo de carga</label>
+                        <select class="hist-control" name="origem_carga">
+                            <option value="">Todas</option>
+                            <option value="GERADA" {% if filtros.origem_carga == 'GERADA' %}selected{% endif %}>Carga gerada no card</option>
+                            <option value="AVULSA" {% if filtros.origem_carga == 'AVULSA' %}selected{% endif %}>Carga avulsa</option>
+                            <option value="SEM_CARGA" {% if filtros.origem_carga == 'SEM_CARGA' %}selected{% endif %}>Sem vínculo de carga</option>
+                        </select>
+                    </div>
+                    <div class="hist-field"><label>Motorista</label><input class="hist-control" name="motorista" value="{{ filtros.motorista }}" placeholder="Motorista"></div>
+                    <div class="hist-field"><label>Placa</label><input class="hist-control" name="placa" value="{{ filtros.placa }}" placeholder="ABC1D23"></div>
+                    <div class="hist-field"><label>Ordem de entrega</label><input class="hist-control" name="ordem_entrega" value="{{ filtros.ordem_entrega }}" placeholder="O.E."></div>
+                    <div class="hist-field"><label>Usuário</label><input class="hist-control" name="usuario" value="{{ filtros.usuario }}" placeholder="Nome ou usuário"></div>
+                </div>
+                <div class="history-filter-footer">
+                    <span class="history-filter-tip"><i class="fas fa-circle-info"></i> Os filtros são aplicados no servidor antes da paginação.</span>
+                    <a href="{% url 'sapp:historico_geral' %}" class="hist-btn hist-btn-light"><i class="fas fa-eraser"></i> Limpar tudo</a>
+                </div>
+            </div>
+        </form>
+    </section>
+
+    <section class="history-table-card">
+        <div class="history-table-toolbar">
+            <div class="history-results">
+                {% if movimentacoes.paginator.count %}
+                    Exibindo <strong>{{ movimentacoes.start_index }}</strong> a <strong>{{ movimentacoes.end_index }}</strong> de <strong>{{ movimentacoes.paginator.count|intcomma }}</strong> registro(s)
+                {% else %}
+                    Nenhum registro encontrado
+                {% endif %}
+            </div>
+            <label class="history-page-size">Por página
+                <select id="historyPageSize">
+                    {% for tamanho in page_sizes %}<option value="{{ tamanho }}" {% if page_size == tamanho %}selected{% endif %}>{{ tamanho }}</option>{% endfor %}
+                </select>
+            </label>
+        </div>
+
+        <div class="history-table-wrap">
+            <table class="history-table">
+                <thead>
+                    <tr>
+                        <th>Data / hora</th>
+                        <th>Tipo</th>
+                        <th>Lote</th>
+                        <th>Produto</th>
+                        <th>Cultivar / classificação</th>
+                        <th>Endereço</th>
+                        <th>Origem</th>
+                        <th>Empresa / cliente</th>
+                        <th>Emb.</th>
+                        <th>Qtd.</th>
+                        <th>Carga</th>
+                        <th>Transporte</th>
+                        <th>O.E.</th>
+                        <th>Usuário</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mov in movimentacoes %}
+                    <tr class="history-main-row" title="{{ mov.descricao|default:'' }}">
+                        <td class="history-date">
+                            {% if mov.data_hora %}<strong>{{ mov.data_hora|date:'d/m/Y' }}</strong><small>{{ mov.data_hora|date:'H:i:s' }}</small>{% else %}<span>--</span>{% endif %}
+                        </td>
+                        <td><span class="hist-badge type-{{ mov.tipo_css }}"><i class="fas {{ mov.tipo_icone }}"></i> {{ mov.tipo }}</span></td>
+                        <td><span class="history-lote">{{ mov.lote }}</span></td>
+                        <td>
+                            <span class="history-product-code">{{ mov.produto }}</span>
+                            {% if mov.especie %}<span class="history-subline">{{ mov.especie }}</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if mov.cultivar %}<strong>{{ mov.cultivar }}</strong>{% else %}<span>--</span>{% endif %}
+                            <span class="history-subline">{% if mov.categoria %}{{ mov.categoria }}{% endif %}{% if mov.categoria and mov.peneira %} · {% endif %}{% if mov.peneira %}Peneira {{ mov.peneira }}{% endif %}</span>
+                        </td>
+                        <td>
+                            <span class="history-route" title="{{ mov.endereco }}"><i class="fas {{ mov.endereco_icone }}"></i><span>{{ mov.endereco }}</span></span>
+                            <span class="history-subline">AZ: {{ mov.az }}</span>
+                        </td>
+                        <td><span class="history-origin" title="{{ mov.origem }}"><i class="fas fa-box-open"></i><span>{{ mov.origem }}</span></span></td>
+                        <td class="history-party"><strong><i class="fas fa-building"></i> {{ mov.empresa }}</strong><small><i class="fas fa-user-tag"></i> {{ mov.cliente }}</small></td>
+                        <td><strong>{{ mov.embalagem }}</strong></td>
+                        <td><span class="history-qty">{{ mov.quantidade|intcomma }}</span></td>
+                        <td class="history-load">
+                            <strong>{{ mov.carga }}</strong>
+                            {% if mov.origem_carga_exibicao %}<span class="load-tag {{ mov.origem_carga_css }}">{{ mov.origem_carga_exibicao }}</span>{% endif %}
+                        </td>
+                        <td class="history-transport">
+                            {% if mov.motorista %}<strong><i class="fas fa-user-tie"></i> {{ mov.motorista }}</strong>{% else %}<strong>--</strong>{% endif %}
+                            {% if mov.placa %}<small><i class="fas fa-truck"></i> {{ mov.placa }}</small>{% endif %}
+                        </td>
+                        <td>{% if mov.ordem_entrega %}<strong>{{ mov.ordem_entrega }}</strong>{% else %}--{% endif %}</td>
+                        <td><span class="history-user"><i class="fas fa-circle-user"></i> {{ mov.usuario }}</span></td>
+                        <td><button type="button" class="history-detail-btn" data-detail="detail-{{ mov.id }}" aria-label="Ver detalhes"><i class="fas fa-eye"></i></button></td>
+                    </tr>
+                    <tr class="history-detail-row" id="detail-{{ mov.id }}">
+                        <td colspan="15">
+                            <div class="history-detail-box">
+                                <div class="history-detail-grid">
+                                    <div class="detail-item"><span>ID do histórico</span><strong>#{{ mov.id }}</strong></div>
+                                    <div class="detail-item"><span>Espécie</span><strong>{{ mov.especie|default:'--' }}</strong></div>
+                                    <div class="detail-item"><span>Tratamento</span><strong>{{ mov.tratamento|default:'--' }}</strong></div>
+                                    <div class="detail-item"><span>Categoria / peneira</span><strong>{{ mov.categoria|default:'--' }}{% if mov.peneira %} · {{ mov.peneira }}{% endif %}</strong></div>
+                                    <div class="detail-item"><span>Endereço / AZ</span><strong>{{ mov.endereco }} · {{ mov.az }}</strong></div>
+                                    <div class="detail-item"><span>Origem cadastrada</span><strong>{{ mov.origem }}</strong></div>
+                                    <div class="detail-item"><span>Empresa</span><strong>{{ mov.empresa }}</strong></div>
+                                    <div class="detail-item"><span>Cliente</span><strong>{{ mov.cliente }}</strong></div>
+                                    <div class="detail-item"><span>Carga</span><strong>{{ mov.carga }}</strong></div>
+                                    <div class="detail-item"><span>Tipo de carga</span><strong>{{ mov.origem_carga_exibicao|default:'--' }}</strong></div>
+                                    <div class="detail-item"><span>Motorista / placa</span><strong>{{ mov.motorista|default:'--' }}{% if mov.placa %} · {{ mov.placa }}{% endif %}</strong></div>
+                                    <div class="detail-item"><span>Ordem de entrega</span><strong>{{ mov.ordem_entrega|default:'--' }}</strong></div>
+                                    <div class="detail-item detail-observation"><span>Descrição / observação original</span><strong>{{ mov.descricao|default:'Sem observação.' }}</strong></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="15" class="history-empty"><i class="fas fa-magnifying-glass"></i><strong>Nenhuma movimentação encontrada.</strong><br>Altere ou limpe os filtros para consultar outros registros.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if movimentacoes.paginator.num_pages > 1 %}
+        <div class="history-pagination">
+            <div class="history-pagination-info">Página <strong>{{ movimentacoes.number }}</strong> de <strong>{{ movimentacoes.paginator.num_pages }}</strong></div>
+            <nav class="history-pagination-links" aria-label="Paginação do histórico">
+                {% if movimentacoes.has_previous %}
+                    <a class="history-page-link" href="?page=1{% if url_params %}&{{ url_params }}{% endif %}" title="Primeira"><i class="fas fa-angles-left"></i></a>
+                    <a class="history-page-link" href="?page={{ movimentacoes.previous_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" title="Anterior"><i class="fas fa-chevron-left"></i></a>
+                {% else %}
+                    <span class="history-page-link disabled"><i class="fas fa-angles-left"></i></span><span class="history-page-link disabled"><i class="fas fa-chevron-left"></i></span>
+                {% endif %}
+
+                {% if paginas_visiveis.0 > 1 %}<span class="history-page-link disabled">…</span>{% endif %}
+                {% for num in paginas_visiveis %}
+                    {% if num == movimentacoes.number %}<span class="history-page-link active">{{ num }}</span>{% else %}<a class="history-page-link" href="?page={{ num }}{% if url_params %}&{{ url_params }}{% endif %}">{{ num }}</a>{% endif %}
+                {% endfor %}
+                {% if paginas_visiveis|last < movimentacoes.paginator.num_pages %}<span class="history-page-link disabled">…</span>{% endif %}
+
+                {% if movimentacoes.has_next %}
+                    <a class="history-page-link" href="?page={{ movimentacoes.next_page_number }}{% if url_params %}&{{ url_params }}{% endif %}" title="Próxima"><i class="fas fa-chevron-right"></i></a>
+                    <a class="history-page-link" href="?page={{ movimentacoes.paginator.num_pages }}{% if url_params %}&{{ url_params }}{% endif %}" title="Última"><i class="fas fa-angles-right"></i></a>
+                {% else %}
+                    <span class="history-page-link disabled"><i class="fas fa-chevron-right"></i></span><span class="history-page-link disabled"><i class="fas fa-angles-right"></i></span>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+    </section>
 </div>
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("[data-history-toggle]").forEach(btn => {
-        btn.addEventListener("click", function () {
-            const id = this.getAttribute("data-history-toggle");
-            const detail = document.getElementById("detail-" + id);
-            const summary = document.getElementById("summary-" + id);
-            if (!detail || !summary) return;
-            const open = detail.classList.contains("is-visible");
-            detail.classList.toggle("is-visible", !open);
-            summary.classList.toggle("is-open", !open);
-            this.setAttribute("aria-expanded", String(!open));
+document.addEventListener('DOMContentLoaded', function () {
+    const advanced = document.getElementById('historyAdvanced');
+    const toggle = document.getElementById('historyAdvancedToggle');
+    const chevron = document.getElementById('historyAdvancedChevron');
+
+    if (advanced && toggle) {
+        toggle.addEventListener('click', function () {
+            const open = advanced.classList.toggle('open');
+            toggle.classList.toggle('active', open);
+            if (chevron) chevron.className = open ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+        });
+    }
+
+    document.querySelectorAll('.history-detail-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const row = document.getElementById(btn.dataset.detail);
+            if (!row) return;
+            const open = row.classList.toggle('open');
+            const icon = btn.querySelector('i');
+            if (icon) icon.className = open ? 'fas fa-eye-slash' : 'fas fa-eye';
         });
     });
-    const toggle = document.getElementById("historyFilterToggle");
-    const body = document.getElementById("historyFilterBody");
-    if (toggle && body) {
-        toggle.addEventListener("click", () => {
-            const hidden = body.classList.toggle("mobile-hidden");
-            const icon = toggle.querySelector("i");
-            if (icon) {
-                icon.classList.toggle("fa-chevron-down", hidden);
-                icon.classList.toggle("fa-chevron-up", !hidden);
-            }
+
+    const pageSize = document.getElementById('historyPageSize');
+    if (pageSize) {
+        pageSize.addEventListener('change', function () {
+            const url = new URL(window.location.href);
+            url.searchParams.set('page_size', pageSize.value);
+            url.searchParams.delete('page');
+            window.location.href = url.toString();
         });
     }
 });
 </script>
-
 {% endblock %}

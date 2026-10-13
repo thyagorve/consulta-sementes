@@ -14,7 +14,7 @@
   const DB_VERSION = 1;
   const SYNC_INTERVAL = 45000;
   const REFERENCE_REFRESH_MS = 10 * 60 * 1000;
-  const OFFLINE_CACHE_VERSION = '11.16';
+  const OFFLINE_CACHE_VERSION = '13.0';
   let softOffline = false;
   const WARN_QUEUE = 50;
   const CRITICAL_QUEUE = 200;
@@ -73,6 +73,18 @@
     t.objectStore('meta').put({ key, value });
     return new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
   }
+  async function centralHiddenIds() {
+    const ids = await metaGet('sync_central_hidden_ids').catch(() => []);
+    return Array.isArray(ids) ? ids.map(String) : [];
+  }
+  async function hideCentralIds(ids) {
+    const atuais = await centralHiddenIds();
+    const merged = [...new Set([...atuais, ...ids.map(String)])];
+    // Evita crescimento ilimitado do metadado local. Os registros continuam
+    // preservados no servidor para auditoria; aqui guardamos só o que o usuário
+    // escolheu esconder da Central deste dispositivo.
+    await metaSet('sync_central_hidden_ids', merged.slice(-2000));
+  }
   async function queueAll() {
     const db = await openDB();
     const t = db.transaction('queue', 'readonly');
@@ -82,6 +94,12 @@
     const db = await openDB();
     const t = db.transaction('queue', 'readwrite');
     t.objectStore('queue').put(item);
+    return new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
+  }
+  async function queueDelete(id) {
+    const db = await openDB();
+    const t = db.transaction('queue', 'readwrite');
+    t.objectStore('queue').delete(id);
     return new Promise((resolve, reject) => { t.oncomplete = resolve; t.onerror = () => reject(t.error); });
   }
   async function referenceSet(data) {
@@ -222,12 +240,12 @@
       #offlineStaleBanner{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:72px;z-index:2147481900;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;border-radius:10px;padding:7px 12px;font-size:.72rem;font-weight:800;box-shadow:0 7px 22px rgba(0,0,0,.12)}
       #offlineSessionBlock{display:none;position:fixed;inset:0;z-index:2147483000;background:rgba(15,23,42,.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:18px} #offlineSessionBlock.show{display:flex}.offline-session-card{width:min(460px,100%);background:#fff;border-radius:18px;padding:22px;text-align:center;box-shadow:0 26px 80px rgba(0,0,0,.35)}.offline-session-card i{font-size:2rem;color:#111827}.offline-session-card h5{font-weight:900;margin:12px 0 6px}.offline-session-card p{font-size:.78rem;color:#64748b;margin:0}.offline-session-card .offline-session-hint{margin-top:12px;padding:9px;border-radius:10px;background:#f8fafc;font-size:.7rem;font-weight:800;color:#475569}
       #offlineSyncModal{position:fixed;inset:0;z-index:2147482500;background:rgba(15,23,42,.52);display:none;align-items:center;justify-content:center;padding:14px} #offlineSyncModal.show{display:flex}
-      .sync-center{width:min(920px,100%);max-height:min(86vh,780px);overflow:hidden;background:#fff;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column}
-      .sync-center-head{padding:15px 17px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center}.sync-center-head h5{margin:0;font-weight:900}.sync-close{border:0;background:#f3f4f6;border-radius:9px;width:34px;height:34px}
-      .sync-tabs{display:flex;gap:5px;padding:10px 12px;border-bottom:1px solid #eef2f7;overflow:auto}.sync-tab{border:0;border-radius:999px;padding:7px 11px;background:#f3f4f6;font-size:.7rem;font-weight:900;white-space:nowrap}.sync-tab.active{background:#173f2a;color:#fff}
-      .sync-body{overflow:auto;padding:12px}.sync-item{border:1px solid #e5e7eb;border-radius:12px;padding:10px;margin-bottom:8px}.sync-item-top{display:flex;justify-content:space-between;gap:10px}.sync-badge{font-size:.58rem;font-weight:900;border-radius:999px;padding:4px 7px;background:#eef2ff}.sync-meta{font-size:.66rem;color:#64748b;margin-top:5px}.sync-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.sync-actions button{border:0;border-radius:8px;padding:6px 9px;font-size:.65rem;font-weight:900}.sync-apply{background:#dcfce7;color:#166534}.sync-cancel{background:#fee2e2;color:#991b1b}.sync-adjust{background:#fef3c7;color:#92400e}
-      .sync-empty{text-align:center;color:#94a3b8;padding:35px 10px}.sync-warning{padding:8px 10px;margin-bottom:9px;border-radius:9px;background:#fff7ed;color:#9a3412;font-size:.68rem;font-weight:800}
-      @media(max-width:600px){#offlineSyncBubble{right:10px;bottom:10px}.sync-center{max-height:92vh;border-radius:14px}.sync-item-top{flex-direction:column}}
+      .sync-center{width:min(920px,100%);max-height:min(86vh,780px);overflow:hidden;background:#fff;color:#0f172a;border:1px solid #dfe7e2;border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column}
+      .sync-center-head{padding:15px 17px;border-bottom:1px solid #dfe7e2;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;color:#0f172a}.sync-center-head h5{margin:0;font-weight:900;color:#123d27}.sync-head-actions{display:flex;align-items:center;gap:8px}.sync-close{border:0;background:#f3f4f6;color:#111827;border-radius:9px;width:34px;height:34px;font-weight:900}.sync-clear{border:1px solid #fecaca;background:#fff;color:#b91c1c;border-radius:9px;height:34px;padding:0 11px;font-size:.7rem;font-weight:900;display:flex;align-items:center;gap:6px}.sync-clear:hover:not(:disabled){background:#fef2f2}.sync-clear:disabled{opacity:.42;cursor:not-allowed}
+      .sync-tabs{display:flex;gap:5px;padding:10px 12px;border-bottom:1px solid #e4ebe6;overflow:auto;background:#fbfdfb}.sync-tab{border:1px solid #e5e7eb;color:#334155;border-radius:999px;padding:7px 11px;background:#f3f4f6;font-size:.7rem;font-weight:900;white-space:nowrap}.sync-tab.active{background:#173f2a;border-color:#173f2a;color:#fff}.sync-tab span{color:inherit}
+      .sync-body{overflow:auto;padding:12px;background:#f7faf8;color:#0f172a}.sync-item{border:1px solid #dce6df;background:#fff;color:#0f172a;border-radius:12px;padding:11px;margin-bottom:8px;box-shadow:0 2px 8px rgba(15,23,42,.035)}.sync-item-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.sync-item-top strong{color:#173f2a;font-weight:900}.sync-badge{font-size:.58rem;font-weight:900;border-radius:999px;padding:4px 7px;background:#e2e8f0;color:#334155}.sync-badge.status-ACEITA{background:#dcfce7;color:#166534}.sync-badge.status-PENDENTE{background:#fef3c7;color:#92400e}.sync-badge.status-CONFLITO{background:#ffedd5;color:#9a3412}.sync-badge.status-REJEITADA{background:#fee2e2;color:#991b1b}.sync-meta{font-size:.66rem;color:#475569;margin-top:5px;line-height:1.55}.sync-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.sync-actions button{border:0;border-radius:8px;padding:6px 9px;font-size:.65rem;font-weight:900}.sync-apply{background:#dcfce7;color:#166534}.sync-cancel{background:#fee2e2;color:#991b1b}.sync-adjust{background:#fef3c7;color:#92400e}
+      .sync-empty{text-align:center;color:#64748b;padding:35px 10px;font-weight:700}.sync-warning{padding:8px 10px;margin-bottom:9px;border-radius:9px;background:#fff7ed;color:#9a3412;font-size:.68rem;font-weight:800}
+      @media(max-width:600px){#offlineSyncBubble{right:10px;bottom:10px}.sync-center{max-height:92vh;border-radius:14px}.sync-item-top{flex-direction:column}.sync-center-head{align-items:flex-start}.sync-head-actions{flex-shrink:0}.sync-clear{padding:0 9px}.sync-clear .sync-clear-label{display:none}}
     `;
     document.head.appendChild(style);
     document.body.insertAdjacentHTML('beforeend', `
@@ -238,7 +256,7 @@
       </button>
       <div id="offlineSyncModal" role="dialog" aria-modal="true">
         <div class="sync-center">
-          <div class="sync-center-head"><div><h5>Central de Sincronização</h5><div class="small text-muted" id="syncDeviceLabel"></div></div><button class="sync-close" type="button">✕</button></div>
+          <div class="sync-center-head"><div><h5>Central de Sincronização</h5><div class="small text-muted" id="syncDeviceLabel"></div></div><div class="sync-head-actions"><button id="syncClearBtn" class="sync-clear" type="button" disabled title="Limpa da tela apenas registros finalizados desta aba. A auditoria do servidor é preservada.">🗑 <span class="sync-clear-label">Limpar</span></button><button class="sync-close" type="button" aria-label="Fechar">✕</button></div></div>
           <div class="sync-tabs">
             <button class="sync-tab active" data-status="PENDENTE">Pendentes <span data-count="PENDENTE">0</span></button>
             <button class="sync-tab" data-status="CONFLITO">Conflitos <span data-count="CONFLITO">0</span></button>
@@ -249,6 +267,7 @@
         </div>
       </div>`);
     document.getElementById('offlineSyncBubble').addEventListener('click', openCentral);
+    document.getElementById('syncClearBtn')?.addEventListener('click', clearCentralCurrentTab);
     document.querySelector('#offlineSyncModal .sync-close').addEventListener('click', () => document.getElementById('offlineSyncModal').classList.remove('show'));
     document.getElementById('offlineSyncModal').addEventListener('click', e => { if (e.target.id === 'offlineSyncModal') e.currentTarget.classList.remove('show'); });
     document.querySelectorAll('.sync-tab').forEach(btn => btn.addEventListener('click', () => {
@@ -303,7 +322,7 @@
     try {
       const ultimo = Number(await metaGet('reference_refreshed_at') || 0);
       if (!force && ultimo && (Date.now() - ultimo) < REFERENCE_REFRESH_MS) return;
-      const r = await authFetch('/api/referencia/');
+      const r = await authFetch('/api/referencia/', { headers: { 'X-Infinity-Background': '1' } });
       if (!r.ok) return;
       const data = await r.json();
       await referenceSet(data);
@@ -392,7 +411,7 @@
         return clean;
       });
       const body = { device_id: deviceId, operacoes };
-      const r = await authFetch('/api/sync/', { method: 'POST', body: JSON.stringify(body) });
+      const r = await authFetch('/api/sync/', { method: 'POST', headers: { 'X-Infinity-Background': '1' }, body: JSON.stringify(body) });
       if (r.status === 401) { await updateStatus(); return; }
       if (!r.ok) {
         let detalhe = '';
@@ -528,14 +547,18 @@
   async function renderCentral(status = 'PENDENTE') {
     const body = document.getElementById('offlineSyncBody');
     if (!body) return;
+    updateCentralClearButton(status);
     body.innerHTML = '<div class="sync-empty">Carregando...</div>';
-    const [local, server] = await Promise.all([queueAll(), fetchServerCentral()]);
+    const [local, server, hiddenIds] = await Promise.all([queueAll(), fetchServerCentral(), centralHiddenIds()]);
+    const hidden = new Set(hiddenIds.map(String));
     const byId = new Map(local.map(x => [String(x.id), x]));
     for (const x of (server.operacoes || [])) {
       const id = String(x.id);
       byId.set(id, { ...(byId.get(id) || {}), ...x });
     }
-    const all = [...byId.values()].sort((a,b) => String(b.criado_local_em || b.recebido_em || '').localeCompare(String(a.criado_local_em || a.recebido_em || '')));
+    const all = [...byId.values()]
+      .filter(x => !hidden.has(String(x.id)))
+      .sort((a,b) => String(b.criado_local_em || b.recebido_em || '').localeCompare(String(a.criado_local_em || a.recebido_em || '')));
     const counts = {PENDENTE:0,CONFLITO:0,REJEITADA:0,ACEITA:0};
     all.forEach(x => { if (counts[x.status] !== undefined) counts[x.status]++; });
     Object.entries(counts).forEach(([k,v]) => { const el=document.querySelector(`[data-count="${k}"]`); if(el) el.textContent=v; });
@@ -551,12 +574,57 @@
       const warning = x.status === 'CONFLITO' ? '<div class="sync-warning">Outro conferente alterou este lote. Mesmo com saldo disponível, a decisão precisa ser confirmada.</div>' : pendingAgeWarning(x);
       const podeAjustar = !['SOLICITACAO_MOVIMENTAR','SOLICITACAO_EMPENHAR','SOLICITACAO_CRIAR'].includes(String(x.tipo || '').toUpperCase());
       const actions = x.status === 'CONFLITO' && conflitoId ? `<div class="sync-actions"><button class="sync-apply" data-conflict="${conflitoId}" data-action="APLICAR">Aplicar mesmo assim</button>${podeAjustar ? `<button class="sync-adjust" data-conflict="${conflitoId}" data-action="AJUSTAR">Ajustar quantidade</button>` : ''}<button class="sync-cancel" data-conflict="${conflitoId}" data-action="CANCELAR">Cancelar pendência</button></div>` : '';
-      return `<div class="sync-item">${warning}<div class="sync-item-top"><strong>${escapeHtml(x.tipo || 'OPERAÇÃO')} · ${escapeHtml(x.lote || '-')}</strong><span class="sync-badge">${escapeHtml(x.status)}</span></div><div class="sync-meta">Usuário: ${escapeHtml(x.usuario || '')}<br>Criada: ${fmtDate(x.criado_local_em || x.recebido_em)}${x.motivo ? `<br>${escapeHtml(x.motivo)}`:''}</div>${conflitoDetalhes}${actions}</div>`;
+      return `<div class="sync-item">${warning}<div class="sync-item-top"><strong>${escapeHtml(x.tipo || 'OPERAÇÃO')} · ${escapeHtml(x.lote || '-')}</strong><span class="sync-badge status-${escapeHtml(x.status)}">${escapeHtml(x.status)}</span></div><div class="sync-meta">Usuário: ${escapeHtml(x.usuario || '')}<br>Criada: ${fmtDate(x.criado_local_em || x.recebido_em)}${x.motivo ? `<br>${escapeHtml(x.motivo)}`:''}</div>${conflitoDetalhes}${actions}</div>`;
     }).join('');
     body.querySelectorAll('[data-conflict]').forEach(btn => btn.addEventListener('click', resolveConflict));
   }
 
   function escapeHtml(v) { const d=document.createElement('div'); d.textContent=String(v??''); return d.innerHTML; }
+
+  function updateCentralClearButton(status) {
+    const btn = document.getElementById('syncClearBtn');
+    if (!btn) return;
+    const clearable = ['ACEITA', 'REJEITADA'].includes(String(status || '').toUpperCase());
+    btn.disabled = !clearable;
+    btn.title = clearable
+      ? 'Limpa da tela os registros desta aba. O histórico de auditoria permanece no servidor.'
+      : 'Pendências e conflitos não podem ser apagados por este botão.';
+  }
+
+  async function clearCentralCurrentTab() {
+    const status = document.querySelector('.sync-tab.active')?.dataset.status || 'PENDENTE';
+    if (!['ACEITA', 'REJEITADA'].includes(status)) return;
+    const label = status === 'ACEITA' ? 'sincronizados' : 'rejeitados';
+    if (!confirm(`Limpar da tela todos os registros ${label} desta aba?\n\nA auditoria do servidor será preservada.`)) return;
+
+    const btn = document.getElementById('syncClearBtn');
+    if (btn) btn.disabled = true;
+    try {
+      const [local, server, hiddenIds] = await Promise.all([queueAll(), fetchServerCentral(), centralHiddenIds()]);
+      const hidden = new Set(hiddenIds.map(String));
+      const byId = new Map(local.map(x => [String(x.id), x]));
+      for (const x of (server.operacoes || [])) {
+        const id = String(x.id);
+        byId.set(id, { ...(byId.get(id) || {}), ...x });
+      }
+      const rows = [...byId.values()].filter(x => x.status === status && !hidden.has(String(x.id)));
+      if (!rows.length) {
+        await renderCentral(status);
+        return;
+      }
+      await hideCentralIds(rows.map(x => String(x.id)));
+      // Remove somente cópias locais já finalizadas. O registro oficial no
+      // servidor não é apagado, preservando rastreabilidade/auditoria.
+      const localIds = new Set(local.map(x => String(x.id)));
+      for (const row of rows) {
+        if (localIds.has(String(row.id))) await queueDelete(row.id).catch(() => null);
+      }
+      await updateStatus();
+      await renderCentral(status);
+    } finally {
+      updateCentralClearButton(status);
+    }
+  }
 
   async function resolveConflict(e) {
     const btn = e.currentTarget;
@@ -602,16 +670,9 @@
       const readyReg = await navigator.serviceWorker.ready;
       const worker = navigator.serviceWorker.controller || readyReg.active || reg.active || reg.waiting;
 
-      // Offline progressivo: armazena a tela que o operador realmente abriu.
-      // Não faz mais download de dashboard, estoque, kanban, cargas e várias
-      // CDNs em toda navegação.
-      const currentUrl = `${location.pathname}${location.search || ''}`;
-      const pageCacheKey = `page_cached:${OFFLINE_CACHE_VERSION}:${location.pathname}`;
-      const jaSolicitado = await metaGet(pageCacheKey).catch(() => false);
-      if (!jaSolicitado && worker) {
-        worker.postMessage({ type: 'CACHE_URLS', urls: [currentUrl] });
-        await metaSet(pageCacheKey, Date.now()).catch(() => null);
-      }
+      // A própria navegação já passa pelo Service Worker (network-first).
+      // Antes, CACHE_URLS fazia um segundo GET da mesma página após ela abrir,
+      // duplicando trabalho no Django. A V12 remove esse fetch redundante.
       return reg;
     } catch (e) { console.warn('[PWA] Service Worker:', e); }
   }

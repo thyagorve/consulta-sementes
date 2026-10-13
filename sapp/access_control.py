@@ -32,6 +32,21 @@ def split_permission(permission_name):
     return app_label, permission_name
 
 
+def _direct_permissions_set(user):
+    """Carrega permissões individuais uma única vez no objeto User do request."""
+    cache_attr = '_infinity_direct_permissions_cache'
+    cached = getattr(user, cache_attr, None)
+    if cached is None:
+        cached = {
+            f'{app_label}.{codename}'
+            for app_label, codename in user.user_permissions.values_list(
+                'content_type__app_label', 'codename'
+            )
+        }
+        setattr(user, cache_attr, cached)
+    return cached
+
+
 def has_direct_permission(user, permission_name):
     """Checa somente permissões individuais, sem herança de grupos."""
     if not getattr(user, 'is_authenticated', False):
@@ -39,10 +54,7 @@ def has_direct_permission(user, permission_name):
     if getattr(user, 'is_superuser', False):
         return True
     app_label, codename = split_permission(permission_name)
-    return user.user_permissions.filter(
-        content_type__app_label=app_label,
-        codename=codename,
-    ).exists()
+    return f'{app_label}.{codename}' in _direct_permissions_set(user)
 
 
 def has_any_direct_permission(user, *permission_names):
