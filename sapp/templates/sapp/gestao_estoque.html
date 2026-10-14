@@ -1113,6 +1113,49 @@ body.resizing * {
 #estoqueTable tbody td > .badge-obs {
     max-width: 100% !important;
 }
+
+/* V15 - Data de movimentação discreta e filtros leves */
+.date-mov-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .2rem;
+    padding: .2rem .48rem;
+    border-radius: 999px;
+    background: rgba(25, 135, 84, .08);
+    color: #22613d;
+    font-weight: 700;
+    font-size: .76rem;
+}
+.date-filter-presets {
+    display: flex;
+    gap: .35rem;
+    margin: -.15rem 0 .65rem;
+}
+.date-filter-presets button {
+    border: 1px solid #dce9e0;
+    background: #fff;
+    color: #276443;
+    border-radius: 999px;
+    padding: .25rem .6rem;
+    font-size: .7rem;
+    font-weight: 700;
+    transition: .15s ease;
+}
+.date-filter-presets button:hover {
+    background: #eaf6ee;
+    border-color: #9dceb0;
+}
+.date-filter-hint {
+    display: flex;
+    gap: .45rem;
+    align-items: flex-start;
+    padding: .6rem .7rem;
+    border-radius: 10px;
+    background: #f4faf6;
+    color: #50705d;
+    font-size: .74rem;
+    line-height: 1.35;
+}
 </style>
 
 <!-- ===== CONTEÚDO PRINCIPAL ===== -->
@@ -1252,6 +1295,7 @@ body.resizing * {
                     <th data-column="peneira" data-type="select" onclick="showFilter(this, 'peneira', 'select')">Pen <i class="fa-solid fa-filter filter-indicator"></i></th>
                     <th data-column="categoria" data-type="select" onclick="showFilter(this, 'categoria', 'select')">Cat <i class="fa-solid fa-filter filter-indicator"></i></th>
                     <th data-column="endereco" data-type="select" onclick="showFilter(this, 'endereco', 'select')">Endereço <i class="fa-solid fa-filter filter-indicator"></i></th>
+                    <th data-column="data_movimentacao" data-type="date" onclick="showFilter(this, 'data_movimentacao', 'date')" title="Data da última modificação/movimentação do lote">Data mov. <i class="fa-solid fa-filter filter-indicator"></i></th>
                     <th data-column="saldo" data-type="number" onclick="showFilter(this, 'saldo', 'number')">Saldo <i class="fa-solid fa-filter filter-indicator"></i></th>
                     <!-- Após a coluna 'saldo', adicionar: -->
                     <th data-column="empenhado" data-type="number" onclick="showFilter(this, 'empenhado', 'number')">
@@ -1315,6 +1359,7 @@ body.resizing * {
                     <td>{% if item.peneira %}{{ item.peneira.nome }}{% else %}<span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>{% endif %}</td>
                     <td>{% if item.categoria %}{{ item.categoria.nome }}{% else %}<span class="badge-null"><i class="fa-regular fa-circle-xmark"></i>vazio</span>{% endif %}</td>
                     <td><span class="endereco-badge" title="{{ item.endereco }}"><i class="fa-solid fa-location-dot"></i>{{ item.endereco }}</span></td>
+                    <td data-column="data_movimentacao" style="white-space:nowrap" title="Data da última modificação/movimentação deste estoque">{% if item.data_ultima_movimentacao %}<span class="date-mov-badge"><i class="fa-regular fa-calendar me-1"></i>{{ item.data_ultima_movimentacao|date:'d/m/Y' }}</span>{% else %}<span class="badge-null">--</span>{% endif %}</td>
                     <td><span class="badge badge-saldo {% if item.saldo > 21 %}bg-success{% elif item.saldo > 0 %}bg-warning{% else %}bg-danger{% endif %}">{{ item.saldo|intcomma }}</span></td>
                     <!-- ADICIONAR após a célula do saldo -->
                     <td><span class="badge bg-warning text-dark px-2 py-1">{{ item.empenhado|intcomma }}</span></td>
@@ -1340,7 +1385,7 @@ body.resizing * {
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="20" class="text-center py-5">
+                    <td colspan="21" class="text-center py-5">
                         <div class="empty-state">
                             <i class="fa-solid fa-box-open fa-4x mb-3 text-muted opacity-50"></i>
                             <h5 class="text-muted">Nenhum item encontrado</h5>
@@ -1653,6 +1698,7 @@ const columnDefinitions = [
     { key: 'peneira', label: 'Peneira', alwaysVisible: false, defaultWidth: 75, minWidth: 48 },
     { key: 'categoria', label: 'Categoria', alwaysVisible: false, defaultWidth: 85, minWidth: 48 },
     { key: 'endereco', label: 'Endereço', alwaysVisible: false, defaultWidth: 130, minWidth: 65 },
+    { key: 'data_movimentacao', label: 'Data movimentação', alwaysVisible: false, defaultVisible: false, defaultWidth: 112, minWidth: 92 },
     { key: 'saldo', label: 'Saldo', alwaysVisible: false, defaultWidth: 82, minWidth: 55 },
     { key: 'empenhado', label: 'Empenhado', alwaysVisible: false, defaultWidth: 100, minWidth: 60 },
     { key: 'disponivel', label: 'Disponível', alwaysVisible: false, defaultWidth: 90, minWidth: 60 },
@@ -1790,14 +1836,42 @@ function applyColumnOrder(order) {
     requestAnimationFrame(refreshTruncationTitles);
 }
 
+function getDefaultColumnVisibility() {
+    const visibility = {};
+    columnDefinitions.forEach(def => {
+        visibility[def.key] = def.alwaysVisible || def.defaultVisible !== false;
+    });
+    return visibility;
+}
+
 function initColumnVisibility() {
     ensureBodyColumnKeys();
     applyColumnOrder(getColumnOrder());
+
+    const defaults = getDefaultColumnVisibility();
+    let visibility = { ...defaults };
     const savedVisibility = localStorage.getItem('tableColumnVisibility');
+
     if (savedVisibility) {
-        try { applyVisibility(JSON.parse(savedVisibility)); }
-        catch (e) { console.error('Erro ao carregar visibilidade das colunas:', e); }
+        try {
+            const saved = JSON.parse(savedVisibility) || {};
+            visibility = { ...defaults, ...saved };
+        } catch (e) {
+            console.error('Erro ao carregar visibilidade das colunas:', e);
+        }
     }
+
+    // Migração visual V15: a coluna foi criada visível na V14. Escondemos uma
+    // única vez para todos os navegadores; depois disso a escolha do usuário é
+    // respeitada normalmente.
+    const dateDefaultKey = 'tableColumnVisibilityV15DateDefaultApplied';
+    if (!localStorage.getItem(dateDefaultKey)) {
+        visibility.data_movimentacao = false;
+        localStorage.setItem('tableColumnVisibility', JSON.stringify(visibility));
+        localStorage.setItem(dateDefaultKey, '1');
+    }
+
+    applyVisibility(visibility);
     buildColumnManager();
 }
 
@@ -1928,7 +2002,7 @@ function applyColumnVisibility() {
 function applyVisibility(visibility) {
     ensureBodyColumnKeys();
     columnDefinitions.forEach(def => {
-        const isVisible = def.alwaysVisible || (visibility[def.key] !== undefined ? visibility[def.key] : true);
+        const isVisible = def.alwaysVisible || (visibility[def.key] !== undefined ? visibility[def.key] : def.defaultVisible !== false);
         const th = document.querySelector(`th[data-column="${def.key}"]`);
         if (th) th.style.display = isVisible ? '' : 'none';
         const col = document.querySelector(`#estoqueTable col[data-column="${def.key}"]`);
@@ -1939,8 +2013,7 @@ function applyVisibility(visibility) {
 }
 
 function resetColumns() {
-    const visibility = {};
-    columnDefinitions.forEach(def => visibility[def.key] = true);
+    const visibility = getDefaultColumnVisibility();
     localStorage.setItem('tableColumnVisibility', JSON.stringify(visibility));
     localStorage.removeItem(COLUMN_ORDER_STORAGE_KEY);
     applyColumnOrder(columnDefinitions.map(def => def.key));
@@ -2174,6 +2247,12 @@ window.showFilter = function(thElement, columnName, columnType) {
         return;
     }
 
+    if (columnType === 'date') {
+        container.innerHTML = createDateFilterHTML(columnName);
+        container.addEventListener('click', e => e.stopPropagation());
+        return;
+    }
+
     buscarOpcoesFiltro(columnName).then(({opcoes, temNull}) => {
         container.innerHTML = createSelectFilterHTML(columnName, opcoes, temNull);
         container.addEventListener('click', e => e.stopPropagation());
@@ -2294,6 +2373,40 @@ async function buscarOpcoesFiltro(columnName) {
     }
 }
 
+function createDateFilterHTML(col) {
+    const inicio = currentUrlParams.get(`min_${col}`) || '';
+    const fim = currentUrlParams.get(`max_${col}`) || '';
+    return `
+        <div class="filter-header">
+            <strong>Data da movimentação</strong>
+            <small>intervalo de dias</small>
+        </div>
+        <div class="filter-numeric p-3">
+            <div class="mb-3">
+                <small class="text-muted d-block mb-1">De</small>
+                <input type="date" id="${col}-min" class="form-control" value="${inicio}">
+            </div>
+            <div class="mb-3">
+                <small class="text-muted d-block mb-1">Até</small>
+                <input type="date" id="${col}-max" class="form-control" value="${fim}">
+            </div>
+            <div class="date-filter-presets">
+                <button type="button" onclick="setDatePreset('${col}', 0)">Hoje</button>
+                <button type="button" onclick="setDatePreset('${col}', 6)">7 dias</button>
+                <button type="button" onclick="setDatePreset('${col}', 29)">30 dias</button>
+            </div>
+            <div class="date-filter-hint">
+                <i class="fa-regular fa-calendar-check"></i>
+                Filtra pela última data em que o lote foi alterado/movimentado.
+            </div>
+            <div class="d-flex justify-content-between gap-2 mt-3">
+                <button class="btn btn-sm btn-secondary w-50" onclick="clearColumnFilter('${col}')">Limpar</button>
+                <button class="btn btn-sm btn-primary w-50" onclick="applyDateFilter('${col}')">Aplicar</button>
+            </div>
+        </div>
+    `;
+}
+
 function createNumericFilterHTML(col) {
     const min = currentUrlParams.get(`min_${col}`) || '';
     const max = currentUrlParams.get(`max_${col}`) || '';
@@ -2402,6 +2515,42 @@ window.filterOptionsList = function(input) {
     });
 };
 
+window.setDatePreset = function(col, daysBack) {
+    const hoje = new Date();
+    const inicio = new Date(hoje);
+    inicio.setDate(inicio.getDate() - Number(daysBack || 0));
+
+    const toIsoLocal = date => {
+        const ano = date.getFullYear();
+        const mes = String(date.getMonth() + 1).padStart(2, '0');
+        const dia = String(date.getDate()).padStart(2, '0');
+        return `${ano}-${mes}-${dia}`;
+    };
+
+    const inputMin = document.getElementById(`${col}-min`);
+    const inputMax = document.getElementById(`${col}-max`);
+    if (inputMin) inputMin.value = toIsoLocal(inicio);
+    if (inputMax) inputMax.value = toIsoLocal(hoje);
+};
+
+window.applyDateFilter = function(col) {
+    const inicio = document.getElementById(`${col}-min`)?.value || '';
+    const fim = document.getElementById(`${col}-max`)?.value || '';
+
+    if (inicio && fim && inicio > fim) {
+        mostrarNotificacao('A data inicial não pode ser maior que a data final.', 'warning');
+        return;
+    }
+
+    currentUrlParams.delete(`min_${col}`);
+    currentUrlParams.delete(`max_${col}`);
+    if (inicio) currentUrlParams.set(`min_${col}`, inicio);
+    if (fim) currentUrlParams.set(`max_${col}`, fim);
+    currentUrlParams.set('page', '1');
+    fecharFiltro();
+    reloadPage();
+};
+
 window.applyNumericFilter = function(col) {
     const min = document.getElementById(`${col}-min`)?.value;
     const max = document.getElementById(`${col}-max`)?.value;
@@ -2475,7 +2624,12 @@ function updateActiveFiltersUI() {
         count++;
         const vals = currentUrlParams.getAll(key);
         let label = key;
-        if (key.startsWith('min_')) label = `${key.replace('min_', '')} ≥ ${vals[0]}`;
+        if (key === 'min_data_movimentacao' || key === 'max_data_movimentacao') {
+            const [ano, mes, dia] = String(vals[0] || '').split('-');
+            const dataBr = ano && mes && dia ? `${dia}/${mes}/${ano}` : vals[0];
+            label = key.startsWith('min_') ? `Data mov. desde ${dataBr}` : `Data mov. até ${dataBr}`;
+        }
+        else if (key.startsWith('min_')) label = `${key.replace('min_', '')} ≥ ${vals[0]}`;
         else if (key.startsWith('max_')) label = `${key.replace('max_', '')} ≤ ${vals[0]}`;
         else if (key === 'busca') label = `Busca: "${vals[0]}"`;
         else {

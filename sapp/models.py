@@ -177,6 +177,16 @@ class Estoque(models.Model):
     )
     status_sistemico_alterado_em = models.DateTimeField(null=True, blank=True)
     status_sistemico_observacao = models.TextField(blank=True, null=True)
+
+    class Meta:
+        indexes = [
+            # Gestão de Estoque ordena e filtra por esta data. O índice composto
+            # também cobre o desempate por id sem mudar a regra de negócio.
+            models.Index(
+                fields=['-data_ultima_movimentacao', '-id'],
+                name='est_mov_data_id_idx',
+            ),
+        ]
     
     def get_status_display_completo(self):
         """Retorna o status com ícone e cor"""

@@ -696,6 +696,42 @@ def _aplicar_filtro_valores(qs, lookup_in, valores):
     return qs.filter(cond)
 
 
+def _aplicar_filtro_data_movimentacao(qs, request):
+    """Filtra a última movimentação por intervalo de dias usando limites indexáveis.
+
+    Usa >= início do dia e < início do dia seguinte no limite final. Evita o
+    lookup __date, que costuma impedir o PostgreSQL de aproveitar o índice do
+    DateTimeField em tabelas grandes.
+    """
+    inicio_raw = str(request.GET.get('min_data_movimentacao') or '').strip()
+    fim_raw = str(request.GET.get('max_data_movimentacao') or '').strip()
+    tz = timezone.get_current_timezone()
+
+    if inicio_raw:
+        try:
+            # `datetime` neste módulo também é importado como classe mais abaixo.
+            # Use somente APIs da classe aqui para evitar colisão com `import datetime`.
+            dia = datetime.strptime(inicio_raw, '%Y-%m-%d').date()
+            inicio = timezone.make_aware(
+                datetime.combine(dia, datetime.min.time()), tz
+            )
+            qs = qs.filter(data_ultima_movimentacao__gte=inicio)
+        except (ValueError, TypeError):
+            pass
+
+    if fim_raw:
+        try:
+            dia = datetime.strptime(fim_raw, '%Y-%m-%d').date() + timedelta(days=1)
+            fim_exclusivo = timezone.make_aware(
+                datetime.combine(dia, datetime.min.time()), tz
+            )
+            qs = qs.filter(data_ultima_movimentacao__lt=fim_exclusivo)
+        except (ValueError, TypeError):
+            pass
+
+    return qs
+
+
 @login_required
 @permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
 def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
@@ -778,6 +814,10 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     for param, lookup in filter_map.items():
         qs = _aplicar_filtro_valores(qs, lookup, request.GET.getlist(param))
 
+    # Data da última movimentação. O intervalo usa o DateTimeField diretamente
+    # para o PostgreSQL aproveitar o índice, inclusive em históricos grandes.
+    qs = _aplicar_filtro_data_movimentacao(qs, request)
+
     # Filtros numéricos de todas as colunas quantitativas.
     numeric_fields = {
         'saldo': 'saldo',
@@ -800,61 +840,27 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
             except (ValueError, InvalidOperation):
                 pass
 
-    # MÉTRICAS - usando o mesmo queryset filtrado
-    saldo_bags = qs.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
-    saldo_sc = qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
+    # MÉTRICAS - uma única consulta agregada.
+    # Antes cada cartão fazia seu próprio SUM e a página ainda montava todas as
+    # opções dos filtros antecipadamente. Agora os menus carregam sob demanda via
+    # API, reduzindo bastante as queries no carregamento da tabela.
+    metricas = qs.aggregate(
+        saldo_bags=Sum('saldo', filter=Q(embalagem='BAG')),
+        saldo_sc=Sum('saldo', filter=Q(embalagem='SC')),
+        total_pme=Sum('peso_total'),
+        total_empenhado=Sum('empenhado'),
+        total_saldo=Sum('saldo'),
+    )
+    saldo_bags = metricas['saldo_bags'] or 0
+    saldo_sc = metricas['saldo_sc'] or 0
     saldo_total_sc = (saldo_bags * 25) + saldo_sc
-    
-    total_pme = qs.aggregate(s=Sum('peso_total'))['s'] or 0
-    
-    
-    # Opções de Filtro - baseadas no queryset COMPLETO (com saldo > 0)
-    base_options_qs = Estoque.objects.filter(saldo__gt=0)
-    
-    def get_options_list(field_lookup):
-        vals = base_options_qs.values_list(field_lookup, flat=True).distinct().order_by(field_lookup)
-        options = []
-        for v in vals:
-            if v is not None and str(v).strip() != '':
-                options.append(str(v))
-        return options
-    status_ids_em_uso = qs.exclude(
-        status_sistemico__isnull=True
-    ).values_list(
-        'status_sistemico_id',
-        flat=True
-    ).distinct()
+    total_pme = metricas['total_pme'] or 0
+    total_empenhado = metricas['total_empenhado'] or 0
+    total_disponivel = (metricas['total_saldo'] or 0) - total_empenhado
 
-    status_em_uso = StatusSistemico.objects.filter(
-        ativo=True,
-        id__in=status_ids_em_uso
-    ).order_by('ordem', 'nome')
-
-    status_options = [
-        {
-            'value': str(s.id),
-            'label': f"{s.icone or ''} {s.nome}".strip()
-        }
-        for s in status_em_uso
-    ]
-    
-    filter_options = {
-        'status_sistemico': status_options,
-        'az': get_options_list('az'),
-        'lote': get_options_list('lote'),
-        'produto': get_options_list('produto'),
-        'cultivar': get_options_list('cultivar__nome'),
-        'peneira': get_options_list('peneira__nome'),
-        'categoria': get_options_list('categoria__nome'),
-        'endereco': get_options_list('endereco'),
-        'especie': get_options_list('especie__nome'),
-        'tratamento': get_options_list('tratamento__nome'),
-        'embalagem': get_options_list('embalagem'),
-        'cliente': get_options_list('cliente'),
-        'empresa': get_options_list('empresa'),
-        'conferente': get_options_list('conferente__username'),
-        'observacao': get_options_list('observacao')
-    }
+    # As opções são carregadas somente ao abrir um filtro. Isso evita dezenas de
+    # SELECT DISTINCT desnecessários em toda navegação da Gestão de Estoque.
+    filter_options = {}
 
     # Paginação
     page_size = request.GET.get('page_size', 25)
@@ -877,11 +883,10 @@ def gestao_estoque(request, template_name='sapp/gestao_estoque.html'):
     if 'page' in query_params:
         del query_params['page']
     
-    total_itens = qs.count()
+    # Paginator já mantém o COUNT em cache; reaproveitamos em vez de executar
+    # um segundo COUNT(*) igual.
+    total_itens = paginator.count
     clientes_unicos = qs.exclude(cliente__isnull=True).exclude(cliente='').values('cliente').distinct().count()
-
-    total_empenhado = qs.aggregate(e=Sum('empenhado'))['e'] or 0
-    total_disponivel = (qs.aggregate(s=Sum('saldo'))['s'] or 0) - total_empenhado
 
     context = {
         'estoque': page_obj,
@@ -2400,7 +2405,7 @@ def api_opcoes_filtro(request):
         'peso_unitario': 'peso_unitario',
         'peso_total': 'peso_total',
     }
-    colunas_validas = set(campos_texto) | set(campos_numericos) | {'status_sistemico'}
+    colunas_validas = set(campos_texto) | set(campos_numericos) | {'status_sistemico', 'data_movimentacao'}
     if coluna not in colunas_validas:
         return JsonResponse({'success': False, 'error': f'Coluna inválida: {coluna}'}, status=400)
 
@@ -2465,6 +2470,9 @@ def api_opcoes_filtro(request):
             cond |= Q(**{f'{campo}__isnull': True}) | Q(**{campo: ''})
         qs = qs.filter(cond)
 
+    # O filtro de data também participa do encadeamento dos demais menus.
+    qs = _aplicar_filtro_data_movimentacao(qs, request)
+
     # Demais filtros numéricos, exceto a coluna que está sendo aberta.
     for param, campo in campos_numericos.items():
         if param == coluna:
@@ -2482,8 +2490,9 @@ def api_opcoes_filtro(request):
             except (ValueError, InvalidOperation):
                 pass
 
-    # Colunas numéricas usam mínimo/máximo e não precisam de lista de opções.
-    if coluna in campos_numericos:
+    # Colunas numéricas e de data usam inputs próprios e não precisam de
+    # SELECT DISTINCT para montar uma lista de opções.
+    if coluna in campos_numericos or coluna == 'data_movimentacao':
         return JsonResponse({'success': True, 'opcoes': [], 'tem_null': False})
 
     if coluna == 'status_sistemico':
@@ -10417,11 +10426,17 @@ def exportar_estoque_excel(request):
                 Q(conferente__last_name__icontains=busca)
             )
         
+        # Data da última movimentação usa limites indexáveis, igual à tela.
+        queryset = _aplicar_filtro_data_movimentacao(queryset, request)
+
         # Aplica filtros de coluna (exceto page, page_size, busca, export)
         for key, values in request.GET.lists():
             if key in ['page', 'page_size', 'busca', 'export']:
                 continue
             
+            if key in ('min_data_movimentacao', 'max_data_movimentacao'):
+                continue
+
             # Filtros numéricos
             if key.startswith('min_'):
                 campo = key.replace('min_', '')
@@ -17635,6 +17650,405 @@ def gestao_cargas(request):
             'q': busca,
         },
     })
+
+
+
+def _redirect_gestao_cargas_pos_acao(request):
+    """Volta para a mesma consulta da Gestão de Cargas sem aceitar URL externa."""
+    query = str(request.POST.get('return_query') or '').strip().lstrip('?')
+    if query and '\n' not in query and '\r' not in query:
+        return redirect(f"{reverse('sapp:gestao_cargas')}?{query}")
+    return redirect('sapp:gestao_cargas')
+
+
+def _expandir_ids_cargas_selecionadas(ids_semente):
+    """Expande movimentos visíveis para a carga inteira.
+
+    A tela pode estar filtrada por lote/cliente/data. Nesse caso o grupo exibido
+    pode conter só as linhas que casaram com o filtro. Uma ação chamada "carga
+    selecionada" precisa, porém, alcançar TODA a carga, inclusive linhas que não
+    aparecem por causa do filtro atual.
+    """
+    sementes = list(
+        _expedicoes_ativas_qs()
+        .filter(pk__in=ids_semente)
+        .only('id', 'origem_carga', 'numero_carga', 'placa', 'data_hora')
+        .order_by('id')
+    )
+    if len(sementes) != len(set(ids_semente)):
+        raise ValueError('Uma das cargas selecionadas mudou. Atualize a página e tente novamente.')
+
+    cond = Q(pk__in=[])
+    for mov in sementes:
+        origem = str(mov.origem_carga or '').strip().upper() or 'LEGADO'
+        numero = ' '.join(str(mov.numero_carga or '').strip().split())
+        placa = ' '.join(str(mov.placa or '').strip().upper().split())
+        data_mov = timezone.localtime(mov.data_hora).date() if mov.data_hora else None
+
+        if origem == 'AVULSA':
+            numero_canonico = _normalizar_numero_carga_avulsa(numero) if numero else ''
+            if numero_canonico:
+                numero_cond = Q(numero_carga__iexact=numero_canonico)
+                if numero and numero.upper() != numero_canonico.upper():
+                    numero_cond |= Q(numero_carga__iexact=numero)
+                cond |= Q(origem_carga__iexact='AVULSA') & numero_cond
+            elif placa and data_mov:
+                cond |= Q(origem_carga__iexact='AVULSA', placa__iexact=placa, data_hora__date=data_mov)
+            else:
+                cond |= Q(pk=mov.pk)
+        elif origem == 'GERADA':
+            if numero:
+                cond |= Q(origem_carga__iexact='GERADA', numero_carga__iexact=numero)
+            else:
+                cond |= Q(pk=mov.pk)
+        else:
+            if numero:
+                cond |= (
+                    Q(numero_carga__iexact=numero)
+                    & ~Q(origem_carga__iexact='GERADA')
+                    & ~Q(origem_carga__iexact='AVULSA')
+                )
+            else:
+                cond |= Q(pk=mov.pk)
+
+    return sorted(set(
+        _expedicoes_ativas_qs().filter(cond).values_list('id', flat=True)
+    ))
+
+
+def _snapshot_movimento_carga(hist):
+    return {
+        'estoque_id': hist.estoque_id,
+        'lote': hist.lote_ref or '',
+        'quantidade': int(hist.quantidade or 0),
+        'data_hora': timezone.localtime(hist.data_hora).isoformat() if hist.data_hora else None,
+        'numero_carga': hist.numero_carga or '',
+        'nome_carga_avulsa': hist.nome_carga_avulsa or '',
+        'origem_carga': hist.origem_carga or '',
+        'cliente': hist.cliente or '',
+        'placa': hist.placa or '',
+        'motorista': hist.motorista or '',
+        'ordem_entrega': hist.ordem_entrega or '',
+        'tipo': hist.tipo or '',
+    }
+
+
+def _solicitacao_da_carga_gerada(hist, *, lock=False):
+    if str(hist.origem_carga or '').strip().upper() != 'GERADA' or not hist.numero_carga:
+        return None
+    numero = str(hist.numero_carga).strip()
+    titulo = numero if numero.upper().startswith('CARGA ') else f'CARGA {numero}'
+    qs = Solicitacao.objects.filter(tipo_solicitacao='CARGA', titulo__iexact=titulo)
+    if lock:
+        qs = qs.select_for_update()
+    return qs.first()
+
+
+def _remover_movimento_carga_em_massa_locked(hist, usuario, motivo):
+    """Reverte uma expedição já bloqueada por FOR UPDATE e preserva auditoria.
+
+    Replica a regra da exclusão individual da Gestão de Cargas. A função é usada
+    apenas dentro de transaction.atomic() pela ação em massa.
+    """
+    from .models import CargaAjusteLog, LoteSyncState, LoteSyncEvento
+
+    if 'EXPEDI' not in str(hist.tipo or '').upper():
+        raise ValueError(f'Movimento #{hist.id} não pertence mais a uma expedição ativa.')
+
+    quantidade = int(hist.quantidade or 0)
+    if quantidade <= 0:
+        raise ValueError(f'Movimento #{hist.id} possui quantidade inválida para reversão.')
+
+    estoque = (
+        Estoque.objects.select_for_update().get(pk=hist.estoque_id)
+        if hist.estoque_id else None
+    )
+    antes = _snapshot_movimento_carga(hist)
+
+    if estoque:
+        nova_saida = int(estoque.saida or 0) - quantidade
+        if nova_saida < 0:
+            raise ValueError(
+                f'Não é possível excluir o lote {hist.lote_ref or hist.id}: '
+                'a saída atual do estoque é menor que a movimentação registrada.'
+            )
+        estoque.saida = nova_saida
+        # Estoque.save() recalcula saldo, status e peso. Não usar update_fields.
+        estoque.save()
+        _validar_integridade_estoque(estoque)
+
+    solicitacao = _solicitacao_da_carga_gerada(hist, lock=True)
+    if solicitacao:
+        numero_limpo = str(hist.numero_carga or '').strip()
+        hie = (
+            HistoricoItemEmpenho.objects
+            .select_for_update()
+            .filter(
+                empenho__solicitacao=solicitacao,
+                tipo='expedicao',
+                lote__iexact=str(hist.lote_ref or ''),
+                quantidade=quantidade,
+                numero_carga__iexact=numero_limpo,
+            )
+            .order_by('id')
+            .first()
+        )
+        if hie:
+            marca = (
+                f'[REMOVIDO DA CARGA em {timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M")} '
+                f'por {usuario.get_full_name() or usuario.username}] {motivo}'
+            )
+            hie.tipo = 'removido'
+            hie.observacao = f'{hie.observacao}\n{marca}'.strip() if hie.observacao else marca
+            hie.save(update_fields=['tipo', 'observacao'])
+
+        total_mov = (
+            HistoricoItemEmpenho.objects
+            .filter(empenho__solicitacao=solicitacao, tipo='expedicao')
+            .aggregate(total=Sum('quantidade'))['total'] or Decimal('0')
+        )
+        solicitacao.quantidade_movimentada = Decimal(str(total_mov))
+        if (
+            solicitacao.status == 'CONCLUIDO'
+            and solicitacao.quantidade_movimentada < Decimal(str(solicitacao.quantidade_solicitada or 0))
+        ):
+            solicitacao.status = (
+                'MOVIMENTACAO_PARCIAL'
+                if solicitacao.quantidade_movimentada > 0
+                else 'AGUARDANDO_EMPENHO'
+            )
+        solicitacao.save(update_fields=['quantidade_movimentada', 'status', 'data_atualizacao'])
+
+    usuario_nome = usuario.get_full_name() or usuario.username
+    marca_remocao = (
+        f'Removido da carga em {timezone.localtime(timezone.now()).strftime("%d/%m/%Y %H:%M")} '
+        f'por {usuario_nome}. Motivo: {motivo}'
+    )
+    hist.tipo = 'Carga removida'
+    hist.descricao = f'{hist.descricao or ""}\n{marca_remocao}'.strip()
+    hist.save(update_fields=['tipo', 'descricao'])
+
+    depois = {
+        **antes,
+        'tipo': 'Carga removida',
+        'removido_da_carga': True,
+        'estoque_saida_revertida': quantidade,
+    }
+    CargaAjusteLog.objects.create(
+        historico=hist,
+        usuario=usuario,
+        antes=antes,
+        depois=depois,
+        motivo=f'[AÇÃO EM MASSA] EXCLUSÃO DE LOTE DA CARGA: {motivo}',
+    )
+
+    lote_sync = str(antes.get('lote') or '').strip()
+    if lote_sync:
+        state, _ = LoteSyncState.objects.select_for_update().get_or_create(lote=lote_sync)
+        state.versao = int(state.versao or 0) + 1
+        state.atualizado_por = usuario
+        state.save(update_fields=['versao', 'atualizado_por', 'atualizado_em'])
+        LoteSyncEvento.objects.create(
+            lote=lote_sync,
+            versao=state.versao,
+            usuario=usuario,
+            historico=hist,
+            tipo='REMOCAO_CARGA',
+        )
+    return quantidade, (solicitacao.pk if solicitacao else None)
+
+
+@login_required
+@require_POST
+def acao_massa_cargas(request):
+    """Edita metadados ou exclui cargas selecionadas de forma atômica.
+
+    A seleção vem dos cards inteiros da Gestão de Cargas. Excluir nunca apaga o
+    histórico: reverte a saída física, marca os movimentos como removidos e
+    grava CargaAjusteLog para cada linha.
+    """
+    from datetime import datetime as dt
+    from .models import CargaAjusteLog
+
+    acao = str(request.POST.get('acao_massa') or '').strip().lower()
+    motivo = str(request.POST.get('motivo_massa') or '').strip()
+    ids_txt = str(request.POST.get('movimentos_ids') or '').strip()
+    try:
+        ids = sorted({int(v) for v in ids_txt.split(',') if str(v).strip().isdigit()})
+    except Exception:
+        ids = []
+
+    if not ids:
+        messages.error(request, '❌ Selecione pelo menos uma carga para a ação em massa.')
+        return _redirect_gestao_cargas_pos_acao(request)
+    if not motivo:
+        messages.error(request, '❌ Informe o motivo da operação em massa.')
+        return _redirect_gestao_cargas_pos_acao(request)
+    if acao not in {'editar', 'excluir'}:
+        messages.error(request, '❌ Ação em massa inválida.')
+        return _redirect_gestao_cargas_pos_acao(request)
+
+    try:
+        with transaction.atomic():
+            # IDs vindos da tela são sementes dos cards visíveis. Expande para
+            # todas as linhas da carga antes de editar/excluir, mesmo se o filtro
+            # atual estiver mostrando apenas um lote daquela carga.
+            ids = _expandir_ids_cargas_selecionadas(ids)
+            movimentos = list(
+                HistoricoMovimentacao.objects
+                .select_for_update(of=('self',))
+                .filter(pk__in=ids, tipo__icontains='Expedi')
+                .order_by('id')
+            )
+            if len(movimentos) != len(ids):
+                raise ValueError(
+                    'Uma ou mais linhas selecionadas não são mais expedições ativas. '
+                    'Atualize a página e tente novamente.'
+                )
+
+            if acao == 'excluir':
+                total_devolvido = 0
+                solicitacoes_afetadas = set()
+                for hist in movimentos:
+                    quantidade_devolvida, solicitacao_id = _remover_movimento_carga_em_massa_locked(
+                        hist, request.user, motivo
+                    )
+                    total_devolvido += quantidade_devolvida
+                    if solicitacao_id:
+                        solicitacoes_afetadas.add(solicitacao_id)
+
+                # Depois de remover TODAS as linhas selecionadas, reconstrói os
+                # contadores/status dos cards a partir da verdade física. Isso
+                # evita um card com vários lotes parar em MOVIMENTACAO_PARCIAL
+                # quando a última saída também foi revertida.
+                for solicitacao in (
+                    Solicitacao.objects
+                    .select_for_update()
+                    .filter(pk__in=solicitacoes_afetadas)
+                    .order_by('pk')
+                ):
+                    sincronizar_quantidades_reais(
+                        solicitacao,
+                        atualizar_status=True,
+                        persistir=True,
+                    )
+
+                transaction.on_commit(_invalidar_dados_cargas)
+                messages.success(
+                    request,
+                    f'✅ {len(movimentos)} lote(s)/movimento(s) removido(s) das cargas. '
+                    f'{total_devolvido} unidade(s) retornaram ao estoque. Auditoria preservada.'
+                )
+                return _redirect_gestao_cargas_pos_acao(request)
+
+            aplicar_data = request.POST.get('aplicar_data') == 'on'
+            aplicar_placa = request.POST.get('aplicar_placa') == 'on'
+            aplicar_motorista = request.POST.get('aplicar_motorista') == 'on'
+            aplicar_cliente = request.POST.get('aplicar_cliente') == 'on'
+            aplicar_ordem = request.POST.get('aplicar_ordem') == 'on'
+            if not any([aplicar_data, aplicar_placa, aplicar_motorista, aplicar_cliente, aplicar_ordem]):
+                raise ValueError('Marque pelo menos um campo para alterar.')
+
+            nova_data = None
+            if aplicar_data:
+                data_txt = str(request.POST.get('data_carga') or '').strip()
+                if not data_txt:
+                    raise ValueError('Informe a nova data das cargas selecionadas.')
+                nova_data = dt.strptime(data_txt, '%Y-%m-%d').date()
+
+            placa = ' '.join(str(request.POST.get('placa') or '').strip().upper().split())
+            motorista = ' '.join(str(request.POST.get('motorista') or '').strip().split())
+            cliente = ' '.join(str(request.POST.get('cliente') or '').strip().split())
+            ordem_entrega = ' '.join(str(request.POST.get('ordem_entrega') or '').strip().split())
+
+            cargas_geradas = {}
+            for hist in movimentos:
+                antes = _snapshot_movimento_carga(hist)
+                update_fields = []
+                if aplicar_placa:
+                    hist.placa = placa
+                    update_fields.append('placa')
+                if aplicar_motorista:
+                    hist.motorista = motorista
+                    update_fields.append('motorista')
+                if aplicar_cliente:
+                    hist.cliente = cliente
+                    update_fields.append('cliente')
+                if aplicar_ordem:
+                    hist.ordem_entrega = ordem_entrega
+                    update_fields.append('ordem_entrega')
+
+                # Mantém a descrição coerente com os campos operacionais editados.
+                hist.descricao = _descricao_expedicao_sincronizada(hist)
+                update_fields.append('descricao')
+                hist.save(update_fields=list(dict.fromkeys(update_fields)))
+
+                if nova_data and hist.data_hora:
+                    hora_local = timezone.localtime(hist.data_hora).timetz().replace(tzinfo=None)
+                    nova_local = timezone.make_aware(
+                        dt.combine(nova_data, hora_local),
+                        timezone.get_current_timezone(),
+                    )
+                    HistoricoMovimentacao.objects.filter(pk=hist.pk).update(data_hora=nova_local)
+                    hist.data_hora = nova_local
+
+                solicitacao = _solicitacao_da_carga_gerada(hist, lock=True)
+                if solicitacao:
+                    cargas_geradas[solicitacao.pk] = solicitacao
+
+                depois = _snapshot_movimento_carga(hist)
+                CargaAjusteLog.objects.create(
+                    historico=hist,
+                    usuario=request.user,
+                    antes=antes,
+                    depois=depois,
+                    motivo=f'[EDIÇÃO EM MASSA DE CARGAS] {motivo}',
+                )
+
+            # A trilha do card gerado precisa acompanhar data e placa da carga.
+            if cargas_geradas and (nova_data or aplicar_placa):
+                for solicitacao in cargas_geradas.values():
+                    historicos_empenho = list(
+                        HistoricoItemEmpenho.objects
+                        .select_for_update()
+                        .filter(empenho__solicitacao=solicitacao, tipo='expedicao')
+                    )
+                    atualizar = []
+                    for hie in historicos_empenho:
+                        campos = []
+                        if nova_data and hie.processado_em:
+                            hora_hie = timezone.localtime(hie.processado_em).timetz().replace(tzinfo=None)
+                            hie.processado_em = timezone.make_aware(
+                                dt.combine(nova_data, hora_hie),
+                                timezone.get_current_timezone(),
+                            )
+                            campos.append('processado_em')
+                        if aplicar_placa:
+                            hie.placa = placa
+                            campos.append('placa')
+                        if campos:
+                            atualizar.append(hie)
+                    # bulk_update exige a mesma lista de campos; data/placa são
+                    # globais nesta ação, então todos os objetos usam a mesma combinação.
+                    if atualizar:
+                        campos_bulk = []
+                        if nova_data:
+                            campos_bulk.append('processado_em')
+                        if aplicar_placa:
+                            campos_bulk.append('placa')
+                        HistoricoItemEmpenho.objects.bulk_update(atualizar, campos_bulk)
+
+            transaction.on_commit(_invalidar_dados_cargas)
+            messages.success(
+                request,
+                f'✅ Alterações em massa aplicadas em {len(movimentos)} movimento(s) das cargas selecionadas.'
+            )
+    except ValueError as exc:
+        messages.error(request, f'❌ {exc}')
+    except Exception as exc:
+        messages.error(request, f'❌ Não foi possível concluir a ação em massa: {exc}')
+
+    return _redirect_gestao_cargas_pos_acao(request)
 
 
 @login_required
