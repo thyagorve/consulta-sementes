@@ -17561,79 +17561,244 @@ def _movimentos_da_mesma_carga(seed):
 
 @login_required
 def relatorio_carga_movimento(request, historico_id):
-    """Abre uma carga histórica com o mesmo padrão visual dos relatórios dos cards."""
-    seed = get_object_or_404(_expedicoes_ativas_qs().select_related('estoque', 'usuario'), pk=historico_id)
+    """Exibe a carga histórica no MESMO padrão visual do relatório dos cards."""
+    seed = get_object_or_404(
+        _expedicoes_ativas_qs().select_related('estoque', 'usuario'),
+        pk=historico_id,
+    )
     movimentos = list(_movimentos_da_mesma_carga(seed)[:1000])
+
+    def _br_num(valor, casas=0):
+        try:
+            numero = Decimal(str(valor or 0))
+        except Exception:
+            numero = Decimal('0')
+        txt = f'{numero:,.{casas}f}'
+        return txt.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    origem_carga = str(seed.origem_carga or '').strip().upper() or 'LEGADO'
+    numero_bruto = ' '.join(str(seed.numero_carga or '').strip().split())
+
+    # Para cargas GERADAS, recupera o vínculo do card através do snapshot
+    # histórico do empenho. Isso fornece os mesmos metadados do relatório
+    # original sem depender do estado atual do estoque.
+    solicitacao = None
+    snapshots = []
+    if origem_carga == 'GERADA' and numero_bruto:
+        candidatos_numero = {numero_bruto}
+        upper = numero_bruto.upper()
+        if upper.startswith('CARGA '):
+            candidatos_numero.add(numero_bruto[6:].strip())
+        else:
+            candidatos_numero.add(f'CARGA {numero_bruto}')
+
+        snap_qs = (
+            HistoricoItemEmpenho.objects
+            .filter(
+                tipo=HistoricoItemEmpenho.TIPO_EXPEDICAO,
+                numero_carga__in=list(candidatos_numero),
+            )
+            .select_related(
+                'empenho__solicitacao',
+                'estoque_origem',
+                'estoque_origem__categoria',
+                'estoque_origem__peneira',
+                'estoque_origem__cultivar',
+                'estoque_origem__tratamento',
+                'estoque_origem__especie',
+                'processado_por',
+            )
+            .order_by('processado_em', 'id')
+        )
+        snapshots = list(snap_qs[:1000])
+        for snap in snapshots:
+            emp = getattr(snap, 'empenho', None)
+            sol = getattr(emp, 'solicitacao', None) if emp else None
+            if sol is not None:
+                solicitacao = sol
+                break
+
+        if solicitacao is not None:
+            snapshots = [
+                snap for snap in snapshots
+                if getattr(getattr(snap, 'empenho', None), 'solicitacao_id', None) == solicitacao.id
+            ]
+
+    snapshots_por_lote = {}
+    for snap in snapshots:
+        chave = str(snap.lote or '').strip().upper()
+        if chave:
+            snapshots_por_lote.setdefault(chave, []).append(snap)
+
     total = Decimal('0')
     peso_total = Decimal('0')
     equivalente_sc = Decimal('0')
+    bags = Decimal('0')
+    scs = Decimal('0')
+    outros = Decimal('0')
     itens = []
     clientes, placas, motoristas = set(), set(), set()
     produto_cache = {}
+
+    # Usa somente movimentações ATIVAS como fonte de verdade física.
     for mov in movimentos:
         est = mov.estoque
         qtd = Decimal(str(mov.quantidade or 0))
-        peso_unit = Decimal(str(getattr(est, 'peso_unitario', 0) or 0)) if est else Decimal('0')
+        lote = str(mov.lote_ref or (getattr(est, 'lote', '') if est else '') or '').strip()
+        snap = None
+        fila = snapshots_por_lote.get(lote.upper(), [])
+        if fila:
+            # Há casos em que o mesmo lote aparece em mais de uma linha.
+            # Consumir a fila mantém cada snapshot independente.
+            snap = fila.pop(0)
+
+        if snap is not None:
+            peso_unit = Decimal(str(snap.peso_unitario or 0))
+            emb = _sigla_embalagem(snap.embalagem) or 'UN'
+            codigo = str(snap.codigo_produto or snap.produto or '').strip()
+            descricao_historica = _descricao_lote_automatica(
+                especie=snap.especie,
+                cultivar=snap.cultivar,
+                embalagem=snap.embalagem,
+                tratamento=snap.tratamento,
+            )
+            descricao = _descricao_individual_lote(
+                snap.estoque_origem,
+                fallback=(descricao_historica or snap.descricao_produto or ''),
+            )
+            categoria = str(snap.categoria or '')
+            peneira = str(snap.peneira or '')
+            az = str(snap.az_origem or '')
+            endereco = str(snap.endereco_origem or '')
+            cliente = str(snap.cliente_solicitacao or snap.cliente or mov.cliente or '').strip()
+        else:
+            peso_unit = Decimal(str(getattr(est, 'peso_unitario', 0) or 0)) if est else Decimal('0')
+            emb = _sigla_embalagem(getattr(est, 'embalagem', '') if est else '') or 'UN'
+            codigo = str(getattr(est, 'produto', '') or '').strip() if est else ''
+            key = codigo.upper()
+            if key and key not in produto_cache:
+                produto_cache[key] = Produto.objects.filter(codigo__iexact=codigo).only('descricao').first()
+            prod = produto_cache.get(key) if key else None
+            descricao = ((prod.descricao if prod else '') or _descricao_lote_automatica(est) or '-')
+            categoria = str(getattr(getattr(est, 'categoria', None), 'nome', '') or '')
+            peneira = str(getattr(getattr(est, 'peneira', None), 'nome', '') or '')
+            az = str(getattr(est, 'az', '') or '')
+            endereco = str(getattr(est, 'endereco', '') or '')
+            cliente = str(mov.cliente or (getattr(est, 'cliente', '') if est else '') or '').strip()
+
         peso = qtd * peso_unit
         total += qtd
         peso_total += peso
-        emb = _sigla_embalagem(getattr(est, 'embalagem', '') if est else '') or 'UN'
-        if emb == 'BAG': equivalente_sc += qtd * Decimal('25')
-        elif emb == 'SC': equivalente_sc += qtd
-        cliente = str(mov.cliente or (getattr(est, 'cliente', '') if est else '') or '').strip()
-        if cliente: clientes.add(cliente)
-        if mov.placa: placas.add(str(mov.placa).strip().upper())
-        if mov.motorista: motoristas.add(str(mov.motorista).strip())
-        codigo = str(getattr(est, 'produto', '') or '').strip() if est else ''
-        key = codigo.upper()
-        if key and key not in produto_cache:
-            produto_cache[key] = Produto.objects.filter(codigo__iexact=codigo).only('descricao').first()
-        prod = produto_cache.get(key) if key else None
+        if emb == 'BAG':
+            bags += qtd
+            equivalente_sc += qtd * Decimal('25')
+        elif emb == 'SC':
+            scs += qtd
+            equivalente_sc += qtd
+        else:
+            outros += qtd
+
+        if cliente:
+            clientes.add(cliente)
+        if mov.placa:
+            placas.add(str(mov.placa).strip().upper())
+        if mov.motorista:
+            motoristas.add(str(mov.motorista).strip())
+
         itens.append({
             'codigo': codigo or '-',
-            'descricao': ((prod.descricao if prod else '') or _descricao_lote_automatica(est) or '-'),
-            'lote': str(mov.lote_ref or (getattr(est, 'lote', '') if est else '') or '-'),
+            'descricao': descricao or '-',
+            'lote': lote or '-',
             'cliente': cliente or 'CS',
-            'categoria': str(getattr(getattr(est, 'categoria', None), 'nome', '') or ''),
-            'peneira': str(getattr(getattr(est, 'peneira', None), 'nome', '') or ''),
-            'az': str(getattr(est, 'az', '') or ''),
-            'endereco': str(getattr(est, 'endereco', '') or ''),
+            'categoria': categoria or '-',
+            'peneira': peneira or '-',
+            'az': az or '-',
+            'endereco': endereco or '-',
             'quantidade': qtd,
+            'quantidade_fmt': _br_num(qtd, 0),
             'embalagem': emb,
             'peso_total': peso,
+            'peso_total_fmt': _br_num(peso, 2),
         })
 
-    origem = str(seed.origem_carga or '').strip().upper()
-    numero = ' '.join(str(seed.numero_carga or '').strip().split())
-    if origem == 'AVULSA' and numero:
-        titulo = _normalizar_numero_carga_avulsa(numero) or numero
-    elif numero:
-        titulo = numero if numero.upper().startswith('CARGA ') else f'CARGA {numero}'
+    def _texto_mix():
+        partes = []
+        if bags > 0:
+            partes.append(f'{_br_num(bags, 0)} BAG')
+        if scs > 0:
+            partes.append(f'{_br_num(scs, 0)} SC')
+        if outros > 0:
+            partes.append(f'{_br_num(outros, 0)} UN')
+        return ' + '.join(partes) if partes else '0'
+
+    texto_mix = _texto_mix()
+    datas = [timezone.localtime(m.data_hora) for m in movimentos if m.data_hora]
+    data_primeira_mov = min(datas) if datas else None
+    data_ultima_mov = max(datas) if datas else None
+
+    if origem_carga == 'AVULSA' and numero_bruto:
+        titulo = _normalizar_numero_carga_avulsa(numero_bruto) or numero_bruto
+    elif numero_bruto:
+        titulo = numero_bruto if numero_bruto.upper().startswith('CARGA ') else f'CARGA {numero_bruto}'
     elif seed.placa:
         titulo = f'CARGA {str(seed.placa).strip().upper()}'
     else:
         titulo = 'CARGA AVULSA'
-    datas = [timezone.localtime(m.data_hora) for m in movimentos if m.data_hora]
-    criado = min(datas) if datas else None
-    atualizado = max(datas) if datas else None
-    usuario = movimentos[0].usuario if movimentos and movimentos[0].usuario else None
+
+    # Mesma semântica visual usada no relatório dos cards.
+    if solicitacao is not None:
+        status = solicitacao.get_status_display()
+        card_id = solicitacao.id
+        criado_por = (
+            solicitacao.criador.get_full_name().strip()
+            or solicitacao.criador.username
+        )
+        criacao = solicitacao.data_criacao
+        atualizacao = solicitacao.data_atualizacao or data_ultima_mov
+        finalizacao = getattr(solicitacao, 'data_finalizacao', None) or data_ultima_mov
+        destino = str(getattr(solicitacao, 'destino', '') or 'EXPEDIÇÃO')
+        observacao = str(getattr(solicitacao, 'observacao', '') or '')
+        motorista = str(getattr(solicitacao, 'motorista', '') or '') or ' / '.join(sorted(motoristas))
+        placa = str(getattr(solicitacao, 'placa', '') or '') or ' / '.join(sorted(placas))
+    else:
+        status = 'Concluído'
+        card_id = seed.id
+        usuario = movimentos[0].usuario if movimentos and movimentos[0].usuario else None
+        criado_por = (usuario.get_full_name().strip() or usuario.username) if usuario else 'Sistema'
+        criacao = data_primeira_mov
+        atualizacao = data_ultima_mov
+        finalizacao = data_ultima_mov
+        destino = 'EXPEDIÇÃO'
+        observacao = ''
+        motorista = ' / '.join(sorted(motoristas))
+        placa = ' / '.join(sorted(placas))
+
+    emitido_em = timezone.localtime(timezone.now())
     context = {
         'carga': {
             'titulo': titulo,
-            'origem': origem or 'LEGADO',
-            'status': 'Concluído',
+            'card_id': card_id,
+            'origem': origem_carga,
+            'status': status,
             'quantidade': total,
+            'quantidade_fmt': texto_mix,
             'equivalente_sc': equivalente_sc,
+            'equivalente_sc_fmt': _br_num(equivalente_sc, 0),
             'peso_total': peso_total,
+            'peso_total_fmt': _br_num(peso_total, 2),
             'cliente': ' / '.join(sorted(clientes)) or '--',
-            'placa': ' / '.join(sorted(placas)) or '--',
-            'motorista': ' / '.join(sorted(motoristas)) or '--',
-            'criado_por': (usuario.get_full_name().strip() or usuario.username) if usuario else 'Sistema',
-            'criacao': criado,
-            'atualizacao': atualizado,
-            'destino': 'EXPEDIÇÃO',
+            'placa': placa or 'Não informada',
+            'motorista': motorista or 'Não informado',
+            'criado_por': criado_por,
+            'criacao': criacao,
+            'atualizacao': atualizacao,
+            'finalizacao': finalizacao,
+            'destino': destino or 'EXPEDIÇÃO',
+            'observacao': observacao or 'Nenhuma observação.',
+            'registros': len(itens),
         },
         'itens': itens,
+        'emitido_em': emitido_em,
     }
     return render(request, 'sapp/relatorio_carga_movimento.html', context)
 
