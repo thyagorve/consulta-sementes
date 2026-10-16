@@ -4592,6 +4592,7 @@ def historico_geral(request):
             origem_carga=origem_carga,
             origem_carga_exibicao=origem_carga_exibicao,
             origem_carga_css=origem_carga_css,
+            carga_abrivel=(origem_carga in {'GERADA', 'AVULSA'} and 'EXPEDICAO' in tipo_norm),
             motorista=mov.motorista or '',
             placa=mov.placa or '',
             ordem_entrega=mov.ordem_entrega or '',
@@ -8866,6 +8867,7 @@ def dashboard_data(request):
                     'placas': set(),
                     'motoristas': set(),
                     'clientes': set(),
+                    'movimento_id': mov.id,
                 },
             )
 
@@ -8978,6 +8980,7 @@ def dashboard_data(request):
                 'placa': ' / '.join(sorted(grupo['placas'])) or '--',
                 'motorista': ' / '.join(sorted(grupo['motoristas'])) or '--',
                 'cliente': ' / '.join(sorted(grupo['clientes'])) or '--',
+                'movimento_id': grupo.get('movimento_id'),
             })
 
         # --------------------------------------------------------
@@ -17502,6 +17505,140 @@ def _descricao_expedicao_sincronizada(hist, estoque=None):
     return ' '.join(partes).strip()
 
 @login_required
+@require_GET
+def api_buscar_estoque_carga(request):
+    """Busca leve de estoque usada somente quando o usuário decide trocar o lote de uma carga.
+
+    Evita enviar milhares de <option> em cada linha da Gestão de Cargas.
+    """
+    termo = ' '.join(str(request.GET.get('q') or '').strip().split())
+    qs = Estoque.objects.all()
+    if termo:
+        for parte in [p for p in termo.split() if p]:
+            qs = qs.filter(
+                Q(lote__icontains=parte)
+                | Q(endereco__icontains=parte)
+                | Q(produto__icontains=parte)
+                | Q(az__icontains=parte)
+            )
+    resultados = list(qs.order_by('lote', 'endereco').values(
+        'id', 'lote', 'endereco', 'saldo', 'embalagem', 'produto', 'az'
+    )[:40])
+    return JsonResponse({'success': True, 'resultados': resultados})
+
+
+def _movimentos_da_mesma_carga(seed):
+    """Retorna somente os movimentos ativos que pertencem à mesma carga do registro semente."""
+    origem = str(seed.origem_carga or '').strip().upper() or 'LEGADO'
+    numero = ' '.join(str(seed.numero_carga or '').strip().split())
+    placa = ' '.join(str(seed.placa or '').strip().upper().split())
+    data_mov = timezone.localtime(seed.data_hora).date() if seed.data_hora else None
+    qs = _expedicoes_ativas_qs().select_related(
+        'estoque', 'estoque__categoria', 'estoque__peneira', 'estoque__cultivar',
+        'estoque__tratamento', 'estoque__especie', 'usuario'
+    )
+    if origem == 'AVULSA':
+        numero_canonico = _normalizar_numero_carga_avulsa(numero) if numero else ''
+        if numero_canonico:
+            so_numero = numero_canonico[6:]
+            qs = qs.filter(origem_carga__iexact='AVULSA').filter(
+                Q(numero_carga__iexact=numero_canonico) | Q(numero_carga__iexact=so_numero)
+            )
+        elif placa and data_mov:
+            qs = qs.filter(origem_carga__iexact='AVULSA', placa__iexact=placa, data_hora__date=data_mov).filter(
+                Q(numero_carga='') | Q(numero_carga__isnull=True)
+            )
+        else:
+            qs = qs.filter(pk=seed.pk)
+    elif origem == 'GERADA' and numero:
+        qs = qs.filter(origem_carga__iexact='GERADA', numero_carga__iexact=numero)
+    elif numero:
+        qs = qs.filter(numero_carga__iexact=numero)
+    else:
+        qs = qs.filter(pk=seed.pk)
+    return qs.order_by('data_hora', 'id')
+
+
+@login_required
+def relatorio_carga_movimento(request, historico_id):
+    """Abre uma carga histórica com o mesmo padrão visual dos relatórios dos cards."""
+    seed = get_object_or_404(_expedicoes_ativas_qs().select_related('estoque', 'usuario'), pk=historico_id)
+    movimentos = list(_movimentos_da_mesma_carga(seed)[:1000])
+    total = Decimal('0')
+    peso_total = Decimal('0')
+    equivalente_sc = Decimal('0')
+    itens = []
+    clientes, placas, motoristas = set(), set(), set()
+    produto_cache = {}
+    for mov in movimentos:
+        est = mov.estoque
+        qtd = Decimal(str(mov.quantidade or 0))
+        peso_unit = Decimal(str(getattr(est, 'peso_unitario', 0) or 0)) if est else Decimal('0')
+        peso = qtd * peso_unit
+        total += qtd
+        peso_total += peso
+        emb = _sigla_embalagem(getattr(est, 'embalagem', '') if est else '') or 'UN'
+        if emb == 'BAG': equivalente_sc += qtd * Decimal('25')
+        elif emb == 'SC': equivalente_sc += qtd
+        cliente = str(mov.cliente or (getattr(est, 'cliente', '') if est else '') or '').strip()
+        if cliente: clientes.add(cliente)
+        if mov.placa: placas.add(str(mov.placa).strip().upper())
+        if mov.motorista: motoristas.add(str(mov.motorista).strip())
+        codigo = str(getattr(est, 'produto', '') or '').strip() if est else ''
+        key = codigo.upper()
+        if key and key not in produto_cache:
+            produto_cache[key] = Produto.objects.filter(codigo__iexact=codigo).only('descricao').first()
+        prod = produto_cache.get(key) if key else None
+        itens.append({
+            'codigo': codigo or '-',
+            'descricao': ((prod.descricao if prod else '') or _descricao_lote_automatica(est) or '-'),
+            'lote': str(mov.lote_ref or (getattr(est, 'lote', '') if est else '') or '-'),
+            'cliente': cliente or 'CS',
+            'categoria': str(getattr(getattr(est, 'categoria', None), 'nome', '') or ''),
+            'peneira': str(getattr(getattr(est, 'peneira', None), 'nome', '') or ''),
+            'az': str(getattr(est, 'az', '') or ''),
+            'endereco': str(getattr(est, 'endereco', '') or ''),
+            'quantidade': qtd,
+            'embalagem': emb,
+            'peso_total': peso,
+        })
+
+    origem = str(seed.origem_carga or '').strip().upper()
+    numero = ' '.join(str(seed.numero_carga or '').strip().split())
+    if origem == 'AVULSA' and numero:
+        titulo = _normalizar_numero_carga_avulsa(numero) or numero
+    elif numero:
+        titulo = numero if numero.upper().startswith('CARGA ') else f'CARGA {numero}'
+    elif seed.placa:
+        titulo = f'CARGA {str(seed.placa).strip().upper()}'
+    else:
+        titulo = 'CARGA AVULSA'
+    datas = [timezone.localtime(m.data_hora) for m in movimentos if m.data_hora]
+    criado = min(datas) if datas else None
+    atualizado = max(datas) if datas else None
+    usuario = movimentos[0].usuario if movimentos and movimentos[0].usuario else None
+    context = {
+        'carga': {
+            'titulo': titulo,
+            'origem': origem or 'LEGADO',
+            'status': 'Concluído',
+            'quantidade': total,
+            'equivalente_sc': equivalente_sc,
+            'peso_total': peso_total,
+            'cliente': ' / '.join(sorted(clientes)) or '--',
+            'placa': ' / '.join(sorted(placas)) or '--',
+            'motorista': ' / '.join(sorted(motoristas)) or '--',
+            'criado_por': (usuario.get_full_name().strip() or usuario.username) if usuario else 'Sistema',
+            'criacao': criado,
+            'atualizacao': atualizado,
+            'destino': 'EXPEDIÇÃO',
+        },
+        'itens': itens,
+    }
+    return render(request, 'sapp/relatorio_carga_movimento.html', context)
+
+
+@login_required
 def gestao_cargas(request):
     from collections import OrderedDict
 
@@ -17512,7 +17649,14 @@ def gestao_cargas(request):
 
     qs = (
         _expedicoes_ativas_qs()
-        .select_related('estoque', 'usuario')
+        .select_related('estoque')
+        .only(
+            'id', 'quantidade', 'data_hora', 'tipo', 'numero_carga',
+            'motorista', 'placa', 'cliente', 'ordem_entrega', 'origem_carga',
+            'nome_carga_avulsa', 'estoque_id',
+            'estoque__lote', 'estoque__endereco', 'estoque__saldo',
+            'estoque__embalagem', 'estoque__produto',
+        )
         .order_by('-data_hora', '-id')
     )
     if data_inicio:
@@ -17532,7 +17676,7 @@ def gestao_cargas(request):
         )
 
     grupos = OrderedDict()
-    for mov in qs[:3000]:
+    for mov in qs[:3000].iterator(chunk_size=500):
         origem_mov = str(mov.origem_carga or '').strip().upper() or 'LEGADO'
         nome_avulsa = ' '.join(str(mov.nome_carga_avulsa or '').strip().split())
         numero = ' '.join(str(mov.numero_carga or '').strip().split())
@@ -17580,7 +17724,8 @@ def gestao_cargas(request):
             'placas': set(),
             'motoristas': set(),
             'lotes': set(),
-            'movimentos': [],
+            'movimentos_ids_lista': [],
+            'movimento_referencia_id': mov.id,
         })
         if data_mov:
             grupo['datas'].add(data_mov)
@@ -17590,7 +17735,7 @@ def gestao_cargas(request):
         if mov.motorista: grupo['motoristas'].add(str(mov.motorista).strip())
         lote = str(mov.lote_ref or (mov.estoque.lote if mov.estoque else '') or '').strip()
         if lote: grupo['lotes'].add(lote)
-        grupo['movimentos'].append(mov)
+        grupo['movimentos_ids_lista'].append(mov.id)
 
     grupos_lista = []
     for grupo in grupos.values():
@@ -17609,7 +17754,7 @@ def gestao_cargas(request):
         else:
             grupo['data_txt'] = timezone.localtime(grupo['data']).strftime('%d/%m/%Y') if grupo['data'] else '--'
             grupo['data_iso'] = timezone.localtime(grupo['data']).strftime('%Y-%m-%d') if grupo['data'] else ''
-        grupo['movimentos_ids'] = ','.join(str(m.id) for m in grupo['movimentos'])
+        grupo['movimentos_ids'] = ','.join(str(mov_id) for mov_id in grupo['movimentos_ids_lista'])
         grupo['cliente_edicao'] = next(iter(grupo['clientes'])) if len(grupo['clientes']) == 1 else ''
         grupo['placa_edicao'] = next(iter(grupo['placas'])) if len(grupo['placas']) == 1 else ''
         grupo['motorista_edicao'] = next(iter(grupo['motoristas'])) if len(grupo['motoristas']) == 1 else ''
@@ -17620,12 +17765,6 @@ def gestao_cargas(request):
             grupo['numero_edicao'] = grupo.get('numero') or ''
         grupos_lista.append(grupo)
 
-    estoque_opcoes = list(
-        Estoque.objects
-        .select_related('cultivar')
-        .order_by('lote', 'endereco')
-        .values('id', 'lote', 'endereco', 'saldo', 'embalagem')
-    )
 
     # Evita uma tela enorme quando o período possui dezenas ou centenas de
     # cargas. A consulta e os filtros continuam considerando todo o período,
@@ -17633,6 +17772,30 @@ def gestao_cargas(request):
     total_grupos = len(grupos_lista)
     paginator = Paginator(grupos_lista, 10)
     page_obj = paginator.get_page(request.GET.get('page') or 1)
+
+    # Só materializa os objetos completos dos movimentos das cargas visíveis.
+    # A etapa de agrupamento acima percorre no máximo 3000 registros com
+    # iterator(), sem manter todos os objetos Django presos na memória.
+    ids_pagina = [
+        mov_id
+        for grupo in page_obj.object_list
+        for mov_id in grupo.get('movimentos_ids_lista', [])
+    ]
+    movimentos_pagina = {
+        mov.id: mov
+        for mov in (
+            _expedicoes_ativas_qs()
+            .filter(pk__in=ids_pagina)
+            .select_related('estoque')
+            .order_by('data_hora', 'id')
+        )
+    }
+    for grupo in page_obj.object_list:
+        grupo['movimentos'] = [
+            movimentos_pagina[mov_id]
+            for mov_id in grupo.get('movimentos_ids_lista', [])
+            if mov_id in movimentos_pagina
+        ]
 
     query_sem_pagina = request.GET.copy()
     query_sem_pagina.pop('page', None)
@@ -17642,7 +17805,6 @@ def gestao_cargas(request):
         'page_obj': page_obj,
         'total_grupos': total_grupos,
         'filtros_query': query_sem_pagina.urlencode(),
-        'estoque_opcoes': estoque_opcoes,
         'filtros': {
             'data_inicio': data_inicio,
             'data_fim': data_fim,

@@ -44,6 +44,8 @@ urlpatterns = [
     path('admin-operacional/api/restauracao/<int:ponto_id>/restaurar/', admin_operacional.api_admin_restaurar_ponto, name='api_admin_restaurar_ponto'),
 
     path('cargas/', views.gestao_cargas, name='gestao_cargas'),
+    path('cargas/movimento/<int:historico_id>/relatorio/', views.relatorio_carga_movimento, name='relatorio_carga_movimento'),
+    path('api/cargas/estoque-busca/', views.api_buscar_estoque_carga, name='api_buscar_estoque_carga'),
     path('cargas/grupo/editar/', views.editar_grupo_carga, name='editar_grupo_carga'),
     path('cargas/acao-massa/', views.acao_massa_cargas, name='acao_massa_cargas'),
     path('cargas/movimento/<int:historico_id>/editar/', views.editar_movimento_carga, name='editar_movimento_carga'),

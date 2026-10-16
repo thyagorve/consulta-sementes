@@ -335,6 +335,7 @@
     vertical-align: middle;
 }
 .history-main-row:hover td { background: #f9fcfa; }
+.history-load.is-clickable{cursor:pointer;border-radius:8px}.history-load.is-clickable:hover{background:#eaf7ef!important}.history-load.is-clickable strong{text-decoration:underline;text-decoration-color:#a9cfb7;text-underline-offset:3px}
 .history-date { min-width: 112px; white-space: nowrap; }
 .history-date strong { display: block; color: #263d30; font-size: .77rem; }
 .history-date small { color: #7b897f; font-size: .69rem; }
@@ -721,7 +722,7 @@
                         <td class="history-party"><strong><i class="fas fa-building"></i> {{ mov.empresa }}</strong><small><i class="fas fa-user-tag"></i> {{ mov.cliente }}</small></td>
                         <td><strong>{{ mov.embalagem }}</strong></td>
                         <td><span class="history-qty">{{ mov.quantidade|intcomma }}</span></td>
-                        <td class="history-load">
+                        <td class="history-load{% if mov.carga_abrivel %} is-clickable{% endif %}" {% if mov.carga_abrivel %}onclick="abrirCargaHistorico({{ mov.id }})" title="Clique para visualizar a carga"{% endif %}>
                             <strong>{{ mov.carga }}</strong>
                             {% if mov.origem_carga_exibicao %}<span class="load-tag {{ mov.origem_carga_css }}">{{ mov.origem_carga_exibicao }}</span>{% endif %}
                         </td>
@@ -826,4 +827,5 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
+<script>function abrirCargaHistorico(id){if(!id)return;window.open(`/cargas/movimento/${Number(id)}/relatorio/`,'_blank','noopener,width=1500,height=900');}</script>
 {% endblock %}

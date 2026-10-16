@@ -5180,7 +5180,7 @@
                         ${carga.data_divergente ? '<span class="badge text-bg-warning ms-1" title="Esta carga possui movimentos ativos em datas diferentes">datas diferentes</span>' : ''}
                     </td>
                     <td>
-                        <span class="load-badge ${meta.classe}">
+                        <span class="load-badge ${meta.classe}" ${carga.movimento_id ? `ondblclick="abrirRelatorioCargaDashboard(${Number(carga.movimento_id)})" title="Duplo clique para visualizar esta carga" style="cursor:pointer"` : ''}>
                             ${escapeHtml(cargaNome)}
                         </span>
                         <span class="load-origin-icon ${meta.classe}" title="${meta.titulo}" aria-label="${meta.titulo}">
@@ -5202,6 +5202,11 @@
             `;
         }).join('');
     }
+
+    window.abrirRelatorioCargaDashboard = function(id) {
+        if (!id) return;
+        window.open(`/cargas/movimento/${Number(id)}/relatorio/`, '_blank', 'noopener,width=1500,height=900');
+    };
 
     function alterarQuantidadeCargasPorPagina(valor) {
         const numero = Math.floor(Number(valor || 10));
