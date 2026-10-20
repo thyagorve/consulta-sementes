@@ -449,10 +449,14 @@
 
                                     <div class="col-lg-7">
                                         <div class="bg-white p-4 rounded-3 border shadow-sm h-100">
-                                            <h6 class="fw-bold text-uppercase text-muted mb-3 small border-bottom pb-2">🕒 Linha do Tempo</h6>
+                                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3 border-bottom pb-2">
+                                                <h6 class="fw-bold text-uppercase text-muted small mb-0">🕒 Últimas movimentações</h6>
+                                                <a class="btn btn-sm btn-outline-primary" href="{% url 'sapp:historico_geral' %}?lote={{ item.lote|urlencode }}&endereco={{ item.endereco|urlencode }}" title="Abrir o histórico completo deste lote e endereço">
+                                                    <i class="fas fa-clock-rotate-left me-1"></i>Histórico completo
+                                                </a>
+                                            </div>
                                             <div class="timeline" style="max-height: 350px; overflow-y: auto;">
-    {% with historico_filtrado=item.historico.all|dictsortreversed:"data_hora" %}
-        {% for h in historico_filtrado %}
+        {% for h in item.historico_resumo_ui %}
             {% if h.tipo == 'Entrada' or h.tipo == 'Transferência (Entrada)' or h.tipo == 'Transferência (Saída)' or h.tipo == 'Expedição' or h.tipo == 'Beneficiamento' %}
                 <div class="timeline-item">
                     <div class="timeline-dot 
@@ -496,7 +500,6 @@
         {% empty %}
             <div class="text-center text-muted py-4">Nenhum histórico registrado.</div>
         {% endfor %}
-    {% endwith %}
 </div>
                                         </div>
                                     </div>
@@ -803,6 +806,22 @@ function toggleDetails(rowId) {
         chevron.className = 'fas fa-chevron-right text-primary transition-icon';
     }
 }
+
+{% if foco_estoque_id %}
+document.addEventListener('DOMContentLoaded', () => {
+    const detailId = 'details-{{ foco_estoque_id }}';
+    const detailRow = document.getElementById(detailId);
+    const mainRow = document.querySelector('tr[data-stock-id="{{ foco_estoque_id }}"]');
+    if (detailRow && detailRow.classList.contains('d-none')) {
+        toggleDetails(detailId);
+    }
+    if (mainRow) {
+        mainRow.classList.add('table-success');
+        mainRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => mainRow.classList.remove('table-success'), 1800);
+    }
+});
+{% endif %}
 
 // ============================================
 // 3. AUTO FOCO INTELIGENTE NO CAMPO DE BUSCA

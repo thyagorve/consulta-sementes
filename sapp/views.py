@@ -467,8 +467,16 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
     
     # QuerySet Base para MÉTRICAS - TODOS os lotes (para os cards)
     qs_metrics = Estoque.objects.all()
-    
-    
+
+    # Quando a tela é aberta a partir do duplo clique em Movimentar Estoque,
+    # filtra pelo ID físico do registro. Assim o mesmo lote em endereços
+    # diferentes nunca abre registros vizinhos nem um histórico gigantesco.
+    foco_estoque_id = None
+    estoque_id_raw = str(request.GET.get('estoque_id') or '').strip()
+    if estoque_id_raw.isdigit():
+        foco_estoque_id = int(estoque_id_raw)
+        qs = qs.filter(pk=foco_estoque_id)
+
     # FILTRO POR STATUS
     status = request.GET.get('status', 'todos')
     if status == 'disponivel':
@@ -604,8 +612,24 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         )
     }
 
+    # Linha do tempo resumida: somente as últimas movimentações de cada
+    # registro visível. Além de deixar o duplo clique rápido, evita carregar
+    # milhares de históricos antigos para renderizar uma página de estoque.
+    qs = qs.prefetch_related(
+        Prefetch(
+            'historico',
+            queryset=(
+                HistoricoMovimentacao.objects
+                .select_related('usuario')
+                .prefetch_related('fotos')
+                .order_by('-data_hora')[:12]
+            ),
+            to_attr='historico_resumo_ui',
+        )
+    )
+
     # Paginação
-    page_size = request.GET.get('page_size', 25)
+    page_size = 1 if foco_estoque_id else request.GET.get('page_size', 25)
     try:
         page_size = int(page_size)
     except (ValueError, TypeError):
@@ -675,6 +699,7 @@ def lista_estoque(request, template_name='sapp/tabela_estoque.html'):
         'all_tratamentos': Tratamento.objects.all(),
         'all_especies': Especie.objects.all(),
         'origens': origens,
+        'foco_estoque_id': foco_estoque_id,
     }
     
     return render(request, template_name, context)
