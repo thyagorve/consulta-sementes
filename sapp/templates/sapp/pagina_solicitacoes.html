@@ -6320,7 +6320,9 @@ function criarCardHTML(s) {
     embalagens.sort((a,b)=>({'BAG':1,'SC':2}[a]??99)-({'BAG':1,'SC':2}[b]??99));
     const unidade = s.unidade_controle === 'QUILOGRAMA' ? 'KG' : (embalagens.length ? embalagens.join('/') : 'BAGS/SC');
     const concluido = ['CONCLUIDO','CANCELADO'].includes(s.status);
-    const showExcluir = Number(s.quantidade_empenhada || 0) <= 0 && !concluido;
+    // Backend decide pela situação física real do card. Um card zerado pode
+    // ser excluído mesmo que o status/contador antigo ainda esteja concluído.
+    const showExcluir = Boolean(s.pode_excluir);
     const temItens = Number(s.quantidade_empenhada || 0) > 0;
     const qtdFormatada = s.unidade_controle === 'QUILOGRAMA' ? Number(qtdProgresso).toFixed(2) : Math.round(qtdProgresso);
     const qtdMovFormatada = s.unidade_controle === 'QUILOGRAMA' ? Number(s.quantidade_movimentada || 0).toFixed(2) : Math.round(Number(s.quantidade_movimentada || 0));

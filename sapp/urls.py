@@ -71,7 +71,7 @@ urlpatterns = [
     path('historico-geral/', views.historico_geral, name='historico_geral'),
     
     path('pagina-rascunho/', views.pagina_rascunho, name='pagina_rascunho'),
-    path('exportar-excel/', views.exportar_excel, name='exportar_estoque_excel'),
+    path('exportar-excel/', views.exportar_excel, name='exportar_excel_legado'),
     path('exportar-pdf/', views.exportar_pdf, name='exportar_estoque_pdf'),
     path('salvar-config-dashboard/', views.salvar_config_dashboard, name='salvar_config_dashboard'),
     path('debug-estoque/', views.debug_estoque_completo, name='debug_estoque'),
@@ -173,27 +173,6 @@ urlpatterns = [
     path('api/solicitacoes/<int:solicitacao_id>/excluir/', 
         views.api_excluir_solicitacao, 
         name='api_excluir_solicitacao'),
-    path('api/solicitacoes/<int:solicitacao_id>/movimentar/', views.api_movimentar_solicitacao, name='api_movimentar_solicitacao'),
-
-
-    # Certifique-se que estas URLs existem:
-    path('solicitacoes/', views.pagina_solicitacoes, name='pagina_solicitacoes'),
-    path('solicitacoes/nova/', views.criar_solicitacao, name='criar_solicitacao'),
-    path('api/solicitacoes/listar/', views.api_listar_solicitacoes, name='api_listar_solicitacoes'),
-    path('api/solicitacoes/<int:solicitacao_id>/lotes-disponiveis/', views.api_lotes_disponiveis_para_solicitacao, name='api_lotes_disponiveis_solicitacao'),
-    path('api/solicitacoes/<int:solicitacao_id>/empenhar/', views.empenhar_na_solicitacao, name='api_empenhar_solicitacao'),
-    path('api/solicitacoes/<int:solicitacao_id>/remover-item/<int:item_id>/', views.api_remover_item_empenho, name='api_remover_item_empenho'),
-    path('api/solicitacoes/<int:solicitacao_id>/movimentar/', views.api_movimentar_solicitacao, name='api_movimentar_solicitacao'),
-    path('api/solicitacoes/<int:solicitacao_id>/impressao/', views.api_dados_impressao_solicitacao, name='api_impressao_solicitacao'),
-    path('api/solicitacoes/<int:solicitacao_id>/excluir/', views.api_excluir_solicitacao, name='api_excluir_solicitacao'),
-    path('api/workflow/config/', views.api_config_workflow, name='api_config_workflow'),
-    path('api/cards/atualizacoes/', views.api_atualizacoes_recentes, name='api_atualizacoes_recentes'),
-
-    path(
-        'api/kanban/dados/',
-        views.api_kanban_dados,
-        name='api_kanban_dados',
-    ),
     path(
         'api/kanban/pesquisar/',
         views.api_pesquisar_kanban,

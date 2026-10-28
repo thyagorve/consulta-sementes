@@ -1,4 +1,4 @@
-# Dockerfile otimizado com CRON
+# Dockerfile otimizado - Almoxarifado sem integrações externas
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -10,16 +10,15 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Instalar dependências de sistema incluindo cron
+# Instalar dependências de sistema necessárias
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         gcc \
         libpq-dev \
-        cron \
         tzdata \
     && rm -rf /var/lib/apt/lists/*
 
-# Fuso horário do sistema operacional/cron/logs
+# Fuso horário do sistema operacional/logs
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone
 
@@ -36,32 +35,7 @@ COPY . .
 # Criar diretórios necessários
 RUN mkdir -p /app/media /app/media/logos /app/media/historico_fotos /app/staticfiles \
     && chmod -R 755 /app/media \
-    && chmod -R 755 /app/staticfiles \
-    && mkdir -p /var/log/cron
-
-# ============================================
-# CONFIGURAÇÃO DO CRON PARA NOTIFICAÇÕES
-# ============================================
-
-# Criar script para execução do cron
-RUN echo '#!/bin/bash\n\
-cd /app && \
-source /etc/profile && \
-export PATH="/usr/local/bin:$PATH" && \
-/usr/local/bin/python manage.py enviar_notificacoes_almoxarifado >> /var/log/cron/notificacoes.log 2>&1' \
-> /app/cron_notificacoes.sh && chmod +x /app/cron_notificacoes.sh
-
-# Adicionar job no crontab (executa a cada 15 minutos)
-RUN echo '*/15 * * * * root /app/cron_notificacoes.sh' >> /etc/crontab
-
-# Criar logrotate para não acumular logs
-RUN echo '/var/log/cron/notificacoes.log {\n\
-    daily\n\
-    rotate 7\n\
-    compress\n\
-    missingok\n\
-    notifempty\n\
-}' > /etc/logrotate.d/almoxarifado-cron
+    && chmod -R 755 /app/staticfiles
 
 # ============================================
 # SCRIPT DE INICIALIZAÇÃO (ENTRYPOINT)
@@ -84,11 +58,6 @@ echo "✅ Arquivos estáticos coletados!"\n\
 echo "🔄 Aplicando migrações..."\n\
 python manage.py migrate --noinput\n\
 echo "✅ Migrações aplicadas!"\n\
-\n\
-# Iniciar cron\n\
-echo "⏰ Iniciando serviço cron..."\n\
-service cron start\n\
-echo "✅ Cron iniciado!"\n\
 \n\
 echo "========================================="\n\
 echo "🌟 Aplicação pronta!"\n\

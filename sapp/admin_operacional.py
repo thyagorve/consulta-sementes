@@ -31,15 +31,10 @@ from .models import (
 
 
 def _usuario_admin_operacional(user):
-    """Admin funcional: superuser, staff ou administrador configurado no sistema."""
+    """Central administrativa exclusiva para superusuário."""
     if not getattr(user, "is_authenticated", False):
         return False
-    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
-        return True
-    return (
-        has_direct_permission(user, "sapp.pode_configuracoes")
-        and has_direct_permission(user, "sapp.pode_gerenciar_usuarios")
-    )
+    return bool(getattr(user, "is_superuser", False))
 
 
 def admin_operacional_required(view_func):

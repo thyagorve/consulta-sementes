@@ -24,7 +24,7 @@ import random
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST, require_GET
 from django.contrib.auth.decorators import login_required
 from .models import ArmazemLayout, ElementoMapa, Estoque
 import json
@@ -52,7 +52,6 @@ from .access_control import (
 from .status_solicitacao import status_automatico, evento_para_status, quantidade_comprometida, quantidade_empenhada_pendente, sincronizar_quantidades_reais
 
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 import json
 # App imports
 from .models import (
@@ -74,10 +73,60 @@ from .forms import (
 SENHA_PADRAO_USUARIO = getattr(settings, 'DEFAULT_NEW_USER_PASSWORD', 'conceito123')
 
 
-def _permissoes_individuais_do_post(post_data):
+def _codenames_permitidos_para_delegar(ator):
+    """Permissões que o ator pode conceder a outra conta.
+
+    Superusuário pode delegar qualquer permissão configurada. Usuários comuns
+    nunca podem conceder uma permissão que eles próprios não possuam.
+    """
+    if getattr(ator, 'is_superuser', False):
+        return set(PERMISSION_APP_MAP.keys())
+    permitidas = set()
+    for codename, app_label in PERMISSION_APP_MAP.items():
+        if has_direct_permission(ator, f'{app_label}.{codename}'):
+            permitidas.add(codename)
+    return permitidas
+
+
+def _validar_usuario_gerenciavel(ator, alvo):
+    """Impede administração lateral/vertical de contas mais privilegiadas."""
+    if getattr(ator, 'is_superuser', False):
+        return
+    if alvo == ator:
+        raise ValueError('Você não pode administrar sua própria conta por esta tela.')
+    if getattr(alvo, 'is_superuser', False) or getattr(alvo, 'is_staff', False):
+        raise ValueError('Esta conta administrativa só pode ser alterada por um superusuário.')
+    permitidas = _codenames_permitidos_para_delegar(ator)
+    codenames_alvo = set(
+        alvo.user_permissions.filter(
+            content_type__app_label__in=set(PERMISSION_APP_MAP.values())
+        ).values_list('codename', flat=True)
+    )
+    excedentes = sorted(codenames_alvo - permitidas)
+    if excedentes:
+        raise ValueError(
+            'Você não pode administrar este usuário porque ele possui permissões '
+            'que não pertencem ao seu próprio acesso.'
+        )
+
+
+def _permissoes_individuais_do_post(post_data, *, ator=None):
+    solicitadas = {
+        codename
+        for codename in PERMISSION_APP_MAP
+        if post_data.get(codename) == 'on'
+    }
+    if ator is not None and not getattr(ator, 'is_superuser', False):
+        nao_permitidas = sorted(solicitadas - _codenames_permitidos_para_delegar(ator))
+        if nao_permitidas:
+            raise ValueError(
+                'Você tentou conceder uma permissão que não possui. '
+                'Só é possível delegar acessos que fazem parte do seu próprio usuário.'
+            )
+
     selecionadas = []
     for codename, app_label in PERMISSION_APP_MAP.items():
-        if post_data.get(codename) != 'on':
+        if codename not in solicitadas:
             continue
         permissao = Permission.objects.filter(
             codename=codename,
@@ -88,11 +137,11 @@ def _permissoes_individuais_do_post(post_data):
     return selecionadas
 
 
-def _aplicar_permissoes_individuais(usuario, post_data):
-    """Permissões individuais são a única fonte de acesso dos usuários comuns."""
+def _aplicar_permissoes_individuais(usuario, post_data, *, ator=None):
+    """Aplica permissões sem permitir escalada de privilégio por delegação."""
+    permissoes = _permissoes_individuais_do_post(post_data, ator=ator)
     usuario.groups.clear()
     usuario.user_permissions.clear()
-    permissoes = _permissoes_individuais_do_post(post_data)
     if permissoes:
         usuario.user_permissions.add(*permissoes)
     return [p.codename for p in permissoes]
@@ -216,7 +265,6 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import login_required, permission_required
 from .models import ArmazemLayout, ElementoMapa, Estoque
@@ -283,172 +331,6 @@ from .models import Estoque, HistoricoMovimentacao, Especie, Cultivar, Peneira
 
 
 
-@login_required
-@permission_required('sapp.pode_ver_estoque', raise_exception=True)
-def dashboard_data(request):
-    """Endpoint AJAX para dados do dashboard"""
-    try:
-        # Receber filtros (listas)
-        tipos_semente = request.GET.getlist('tipo_semente[]')
-        cultivares = request.GET.getlist('cultivar[]')
-        peneiras = request.GET.getlist('peneira[]')
-        unidades = request.GET.getlist('unidade[]')
-        armazens = request.GET.getlist('armazem[]')
-        data_inicio = request.GET.get('data_inicio', '').strip()
-        data_fim = request.GET.get('data_fim', '').strip()
-        tipo_mov = request.GET.get('tipo_mov', '').strip()
-        search = request.GET.get('search', '').strip()
-        
-        # Base queries
-        est_qs = Estoque.objects.filter(saldo__gt=0)
-        mov_qs = HistoricoMovimentacao.objects.select_related('estoque', 'usuario')
-        
-        # Aplicar filtros de estoque
-        if tipos_semente:
-            est_qs = est_qs.filter(especie__nome__in=tipos_semente)
-        
-        if cultivares:
-            est_qs = est_qs.filter(cultivar_id__in=cultivares)
-        
-        if peneiras:
-            est_qs = est_qs.filter(peneira_id__in=peneiras)
-        
-        if unidades:
-            est_qs = est_qs.filter(embalagem__in=unidades)
-        
-        if armazens:
-            est_qs = est_qs.filter(az__in=armazens)
-        
-        if search:
-            est_qs = est_qs.filter(
-                Q(lote__icontains=search) | 
-                Q(cultivar__nome__icontains=search) |
-                Q(especie__nome__icontains=search)
-            )
-        
-        # Aplicar filtros de movimentação
-        mov_qs = mov_qs.filter(estoque__in=est_qs)
-        
-        # Filtros de data
-        if data_inicio:
-            try:
-                data_inicio_obj = datetime.strptime(data_inicio, '%Y-%m-%d').date()
-                mov_qs = mov_qs.filter(data_hora__date__gte=data_inicio_obj)
-            except:
-                pass
-        
-        if data_fim:
-            try:
-                data_fim_obj = datetime.strptime(data_fim, '%Y-%m-%d').date()
-                mov_qs = mov_qs.filter(data_hora__date__lte=data_fim_obj)
-            except:
-                pass
-        
-        if tipo_mov:
-            mov_qs = mov_qs.filter(tipo__iexact=tipo_mov)
-        
-        # Calcular KPIs
-        bags = est_qs.filter(embalagem='BAG').aggregate(s=Sum('saldo'))['s'] or 0
-        scs = est_qs.filter(embalagem='SC').aggregate(s=Sum('saldo'))['s'] or 0
-        total_sc = (bags * 25) + scs
-        
-        kpis = {
-            'total_sc': int(total_sc),
-            'bags': int(bags),
-            'scs': int(scs),
-            'peso': float(est_qs.aggregate(s=Sum('peso_total'))['s'] or 0),
-            'ativos': est_qs.count(),
-            'parados': est_qs.filter(data_ultima_movimentacao__lt=timezone.now() - timedelta(days=30)).count()
-        }
-        
-        # Dados dos gráficos
-        cores_padrao = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1']
-        
-        cultivares_data = list(est_qs.filter(cultivar__isnull=False)
-                               .values('cultivar__nome')
-                               .annotate(volume=Sum('saldo'))
-                               .filter(volume__gt=0)
-                               .order_by('-volume')[:10])
-        
-        peneiras_data = list(est_qs.filter(peneira__isnull=False)
-                             .values('peneira__nome')
-                             .annotate(volume=Sum('saldo'))
-                             .filter(volume__gt=0)
-                             .order_by('-volume'))
-        
-        armazens_data = list(est_qs.exclude(az__isnull=True).exclude(az='')
-                             .values('az')
-                             .annotate(volume=Sum('saldo'))
-                             .filter(volume__gt=0)
-                             .order_by('az'))
-        
-        # Tendência
-        data_limite = timezone.now() - timedelta(days=15)
-        tendencia_data = list(mov_qs.filter(data_hora__date__gte=data_limite.date())
-                              .annotate(dia=TruncDate('data_hora'))
-                              .values('dia')
-                              .annotate(
-                                  entradas=Count('id', filter=Q(tipo__iexact='Entrada')),
-                                  saidas=Count('id', filter=Q(tipo__iexact='Saída'))
-                              )
-                              .order_by('dia'))
-        
-        graficos = {
-            'cultivar': {
-                'labels': [d['cultivar__nome'] for d in cultivares_data],
-                'values': [int(d['volume']) for d in cultivares_data],
-                'colors': cores_padrao[:len(cultivares_data)]
-            },
-            'peneira': {
-                'labels': [d['peneira__nome'] for d in peneiras_data],
-                'values': [int(d['volume']) for d in peneiras_data],
-                'colors': cores_padrao[:len(peneiras_data)]
-            },
-            'armazem': {
-                'labels': [d['az'] for d in armazens_data],
-                'values': [int(d['volume']) for d in armazens_data],
-                'colors': cores_padrao[:len(armazens_data)]
-            },
-            'tendencia': {
-                'labels': [d['dia'].strftime('%d/%m') for d in tendencia_data],
-                'entradas': [d['entradas'] for d in tendencia_data],
-                'saidas': [d['saidas'] for d in tendencia_data]
-            }
-        }
-        
-        # Opções de filtros (encadeamento)
-        opcoes_filtros = {
-            'tipos_semente': list(est_qs.values_list('especie__nome', flat=True).distinct().order_by('especie__nome')),
-            'cultivares': list(est_qs.filter(cultivar__isnull=False).values('cultivar_id', 'cultivar__nome').distinct().order_by('cultivar__nome')),
-            'peneiras': list(est_qs.filter(peneira__isnull=False).values('peneira_id', 'peneira__nome').distinct().order_by('peneira__nome')),
-            'armazens': list(est_qs.exclude(az__isnull=True).exclude(az='').values_list('az', flat=True).distinct().order_by('az'))
-        }
-        
-        # Movimentações recentes
-        movimentacoes = []
-        for mov in mov_qs.order_by('-data_hora')[:10]:
-            movimentacoes.append({
-                'dt': timezone.localtime(mov.data_hora).strftime('%d/%m/%Y %H:%M') if mov.data_hora else '--',
-                'tp': mov.tipo or '--',
-                'lt': mov.lote_ref or (mov.estoque.lote if mov.estoque else '--'),
-                'unidade': mov.estoque.embalagem if mov.estoque else '--',
-                'qtd': getattr(mov, 'quantidade', 0),
-                'us': mov.usuario.username if mov.usuario else 'Sistema'
-            })
-        
-        return JsonResponse({
-            'success': True,
-            'kpis': kpis,
-            'graficos': graficos,
-            'recentes': movimentacoes,
-            'opcoes_filtros': opcoes_filtros
-        })
-        
-    except Exception as e:
-        print(f"[ERROR] {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 # ================================================================
 # LISTA DE ESTOQUE (TABELA PRINCIPAL)
 # ================================================================
@@ -3203,6 +3085,78 @@ def _descricao_individual_lote(estoque, fallback=''):
     )
 
 
+def _snapshot_historico_item_empenho(item, estoque=None):
+    """Retorna os dados históricos congelados no momento do empenho.
+
+    Os campos do ItemEmpenho têm prioridade absoluta. O estoque atual só é
+    usado como fallback para registros antigos criados antes dos snapshots.
+    Assim editar tratamento, descrição, endereço, AZ, cliente ou peso do lote
+    depois do empenho não reescreve o passado do card.
+    """
+    estoque = estoque or getattr(item, 'estoque', None)
+    item_carga = getattr(item, 'item_carga', None)
+
+    def texto_snapshot(nome, fallback=''):
+        valor = getattr(item, nome, '')
+        valor = str(valor or '').strip()
+        return valor or str(fallback or '').strip()
+
+    descricao_snapshot = texto_snapshot('descricao_produto_snapshot')
+    if not descricao_snapshot:
+        descricao_snapshot = _descricao_individual_lote(
+            estoque,
+            fallback=(getattr(item_carga, 'descricao', '') if item_carga else ''),
+        )
+
+    return {
+        'cliente_solicitacao': texto_snapshot(
+            'cliente_solicitacao_snapshot',
+            getattr(item_carga, 'cliente', '') if item_carga else '',
+        ),
+        'codigo_produto': texto_snapshot(
+            'codigo_produto_snapshot',
+            getattr(item_carga, 'codigo', '') if item_carga else '',
+        ),
+        'descricao_produto': descricao_snapshot,
+        'lote': texto_snapshot('lote', getattr(estoque, 'lote', '') if estoque else ''),
+        'produto': texto_snapshot('produto_snapshot', getattr(estoque, 'produto', '') if estoque else ''),
+        'cultivar': texto_snapshot(
+            'cultivar',
+            getattr(getattr(estoque, 'cultivar', None), 'nome', '') if estoque else '',
+        ),
+        'peneira': texto_snapshot(
+            'peneira',
+            getattr(getattr(estoque, 'peneira', None), 'nome', '') if estoque else '',
+        ),
+        'categoria': texto_snapshot(
+            'categoria',
+            getattr(getattr(estoque, 'categoria', None), 'nome', '') if estoque else '',
+        ),
+        'tratamento': texto_snapshot(
+            'tratamento_snapshot',
+            getattr(getattr(estoque, 'tratamento', None), 'nome', '') if estoque else '',
+        ),
+        'especie': texto_snapshot(
+            'especie_snapshot',
+            getattr(getattr(estoque, 'especie', None), 'nome', '') if estoque else '',
+        ),
+        'embalagem': texto_snapshot('embalagem_snapshot', getattr(estoque, 'embalagem', '') if estoque else ''),
+        'empresa': texto_snapshot('empresa_snapshot', getattr(estoque, 'empresa', '') if estoque else ''),
+        'cliente': texto_snapshot('cliente_snapshot', getattr(estoque, 'cliente', '') if estoque else ''),
+        'endereco_origem': texto_snapshot('endereco_origem', getattr(estoque, 'endereco', '') if estoque else ''),
+        'az_origem': texto_snapshot('az_origem', getattr(estoque, 'az', '') if estoque else ''),
+        'saldo_anterior': getattr(item, 'saldo_anterior', 0) or 0,
+        'peso_unitario': getattr(item, 'peso_unitario_snapshot', 0) or (
+            getattr(estoque, 'peso_unitario', 0) if estoque else 0
+        ),
+        'observacao_origem': texto_snapshot(
+            'observacao_snapshot',
+            getattr(estoque, 'observacao', '') if estoque else '',
+        ),
+        'conferente': texto_snapshot('conferente_snapshot'),
+    }
+
+
 def _sincronizar_solicitacoes_carga_produto(produto):
     """
     Vincula pedidos de carga antigos ao Produto quando o código foi
@@ -3615,7 +3569,7 @@ def configuracoes(request):
                             perfil.primeiro_acesso = True
                             perfil.save(update_fields=['primeiro_acesso'])
 
-                            permissions_added = _aplicar_permissoes_individuais(user, request.POST)
+                            permissions_added = _aplicar_permissoes_individuais(user, request.POST, ator=request.user)
 
                             messages.success(
                                 request,
@@ -3638,22 +3592,22 @@ def configuracoes(request):
                 user_id = request.POST.get('user_id')
                 try:
                     user = User.objects.get(id=user_id)
-                    if user == request.user and not request.user.is_superuser:
-                        messages.error(request, "❌ Você não pode editar suas próprias permissões!")
-                    elif user.is_superuser:
-                        messages.error(request, "❌ Permissões de superusuário não são alteradas por esta tela.")
-                    else:
-                        with transaction.atomic():
-                            permissions_added = _aplicar_permissoes_individuais(user, request.POST)
-                            user.save()
-                            if permissions_added:
-                                messages.success(
-                                    request,
-                                    f"✅ Permissões de '{user.first_name}' atualizadas exatamente como selecionadas "
-                                    f"({len(permissions_added)} permissão(ões))."
-                                )
-                            else:
-                                messages.success(request, f"✅ Todas as permissões de '{user.first_name}' foram removidas!")
+                    _validar_usuario_gerenciavel(request.user, user)
+                    with transaction.atomic():
+                        permissions_added = _aplicar_permissoes_individuais(
+                            user,
+                            request.POST,
+                            ator=request.user,
+                        )
+                        user.save()
+                        if permissions_added:
+                            messages.success(
+                                request,
+                                f"✅ Permissões de '{user.first_name}' atualizadas exatamente como selecionadas "
+                                f"({len(permissions_added)} permissão(ões))."
+                            )
+                        else:
+                            messages.success(request, f"✅ Todas as permissões de '{user.first_name}' foram removidas!")
                 except User.DoesNotExist:
                     messages.error(request, "❌ Usuário não encontrado!")
                 except Exception as e:
@@ -3665,6 +3619,7 @@ def configuracoes(request):
                 try:
                     user_id = request.POST.get('user_id')
                     usuario = User.objects.get(id=user_id, is_active=True)
+                    _validar_usuario_gerenciavel(request.user, usuario)
                     username = str(request.POST.get('username', '') or '').strip()
                     first_name = str(request.POST.get('first_name', '') or '').strip()
                     if not username or not first_name:
@@ -3695,22 +3650,18 @@ def configuracoes(request):
                 user_id = request.POST.get('user_id')
                 try:
                     user = User.objects.get(id=user_id)
-                    
-                    # Não permite resetar próprio usuário (exceto se for superusuário)
-                    if user == request.user and not request.user.is_superuser:
-                        messages.error(request, "❌ Você não pode resetar sua própria senha!")
-                    else:
-                        new_password = SENHA_PADRAO_USUARIO
-                        user.set_password(new_password)
-                        user.save(update_fields=['password'])
-                        perfil, _ = PerfilUsuario.objects.get_or_create(usuario=user)
-                        perfil.primeiro_acesso = True
-                        perfil.save(update_fields=['primeiro_acesso'])
-                        messages.success(
-                            request,
-                            f"✅ Senha de '{user.first_name}' resetada para: {new_password}. "
-                            "A troca será obrigatória no próximo login."
-                        )
+                    _validar_usuario_gerenciavel(request.user, user)
+                    new_password = SENHA_PADRAO_USUARIO
+                    user.set_password(new_password)
+                    user.save(update_fields=['password'])
+                    perfil, _ = PerfilUsuario.objects.get_or_create(usuario=user)
+                    perfil.primeiro_acesso = True
+                    perfil.save(update_fields=['primeiro_acesso'])
+                    messages.success(
+                        request,
+                        f"✅ Senha de '{user.first_name}' resetada para: {new_password}. "
+                        "A troca será obrigatória no próximo login."
+                    )
                 
                 except User.DoesNotExist:
                     messages.error(request, "❌ Usuário não encontrado!")
@@ -3725,28 +3676,24 @@ def configuracoes(request):
                 user_id = request.POST.get('user_id')
                 try:
                     user = User.objects.get(id=user_id)
-                    
-                    # Não permite excluir próprio usuário
-                    if user == request.user:
-                        messages.error(request, "❌ Você não pode excluir sua própria conta!")
-                    else:
-                        username = user.username
-                        if not user.first_name and not user.last_name:
-                            user.first_name = username
-                        sufixo = timezone.localtime(timezone.now()).strftime('%Y%m%d%H%M%S')
-                        user.username = f'inativo_{user.id}_{sufixo}_{username}'[:150]
-                        user.is_active = False
-                        user.is_staff = False
-                        user.is_superuser = False
-                        user.email = ''
-                        user.set_unusable_password()
-                        user.save()
-                        user.groups.clear()
-                        user.user_permissions.clear()
-                        messages.success(
-                            request,
-                            f"✅ Usuário '{username}' desativado. Todos os dados e históricos vinculados foram preservados."
-                        )
+                    _validar_usuario_gerenciavel(request.user, user)
+                    username = user.username
+                    if not user.first_name and not user.last_name:
+                        user.first_name = username
+                    sufixo = timezone.localtime(timezone.now()).strftime('%Y%m%d%H%M%S')
+                    user.username = f'inativo_{user.id}_{sufixo}_{username}'[:150]
+                    user.is_active = False
+                    user.is_staff = False
+                    user.is_superuser = False
+                    user.email = ''
+                    user.set_unusable_password()
+                    user.save()
+                    user.groups.clear()
+                    user.user_permissions.clear()
+                    messages.success(
+                        request,
+                        f"✅ Usuário '{username}' desativado. Todos os dados e históricos vinculados foram preservados."
+                    )
                 
                 except User.DoesNotExist:
                     messages.error(request, "❌ Usuário não encontrado!")
@@ -3972,8 +3919,9 @@ def api_user_permissions(request, user_id):
     
     try:
         user = User.objects.get(id=user_id)
-        
-        # 🔥 Retornar o nome completo da permissão (com app)
+        _validar_usuario_gerenciavel(request.user, user)
+
+        # Retorna somente as permissões individuais da conta autorizada.
         permissions = []
         for perm in user.user_permissions.all():
             permissions.append(perm.codename)
@@ -5328,25 +5276,9 @@ def pagina_rascunho(request):
                                 empenho=empenho,
                                 item_empenho_id_original=item.id,
                                 item_carga_id_original=item.item_carga_id,
-                                cliente_solicitacao=(item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '')),
-                                codigo_produto=(item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '')),
-                                descricao_produto=_descricao_individual_lote(
-                                    origem,
-                                    fallback=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
-                                ),
+                                **_snapshot_historico_item_empenho(item, origem),
                                 estoque_origem=origem,
                                 estoque_destino=destino,
-                                lote=origem.lote,
-                                produto=origem.produto or '',
-                                cultivar=origem.cultivar.nome if origem.cultivar else '',
-                                peneira=origem.peneira.nome if origem.peneira else '',
-                                categoria=origem.categoria.nome if origem.categoria else '',
-                                tratamento=origem.tratamento.nome if origem.tratamento else '',
-                                especie=origem.especie.nome if origem.especie else '',
-                                embalagem=origem.embalagem or '',
-                                empresa=origem.empresa or '',
-                                cliente=origem.cliente or '',
-                                endereco_origem=origem.endereco,
                                 endereco_destino=novo_end,
                                 quantidade=qtd,
                                 tipo='transferencia',
@@ -5403,24 +5335,8 @@ def pagina_rascunho(request):
                                 empenho=empenho,
                                 item_empenho_id_original=item.id,
                                 item_carga_id_original=item.item_carga_id,
-                                cliente_solicitacao=(item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '')),
-                                codigo_produto=(item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '')),
-                                descricao_produto=_descricao_individual_lote(
-                                    origem,
-                                    fallback=(item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '')),
-                                ),
+                                **_snapshot_historico_item_empenho(item, origem),
                                 estoque_origem=origem,
-                                lote=origem.lote,
-                                produto=origem.produto or '',
-                                cultivar=origem.cultivar.nome if origem.cultivar else '',
-                                peneira=origem.peneira.nome if origem.peneira else '',
-                                categoria=origem.categoria.nome if origem.categoria else '',
-                                tratamento=origem.tratamento.nome if origem.tratamento else '',
-                                especie=origem.especie.nome if origem.especie else '',
-                                embalagem=origem.embalagem or '',
-                                empresa=origem.empresa or '',
-                                cliente=cliente or origem.cliente or '',
-                                endereco_origem=origem.endereco,
                                 quantidade=qtd,
                                 tipo='expedicao',
                                 observacao=obs_expedicao,
@@ -5584,24 +5500,24 @@ def pagina_rascunho(request):
                 'estoque_id': estoque.id,
                 'lote': item.lote or estoque.lote,
                 'quantidade': item.quantidade,
-                'endereco': estoque.endereco or item.endereco_origem,
-                'produto': estoque.produto or '',
+                'endereco': item.endereco_origem or estoque.endereco or '',
+                'produto': item.produto_snapshot or estoque.produto or '',
                 'cultivar': item.cultivar or (estoque.cultivar.nome if estoque.cultivar else ''),
                 'peneira': item.peneira or (estoque.peneira.nome if estoque.peneira else ''),
                 'categoria': item.categoria or (estoque.categoria.nome if estoque.categoria else ''),
-                'especie': estoque.especie.nome if estoque.especie else '',
-                'tratamento': estoque.tratamento.nome if estoque.tratamento else '',
-                'embalagem': estoque.embalagem or '',
-                'empresa': estoque.empresa or '',
+                'especie': item.especie_snapshot or (estoque.especie.nome if estoque.especie else ''),
+                'tratamento': item.tratamento_snapshot or (estoque.tratamento.nome if estoque.tratamento else ''),
+                'embalagem': item.embalagem_snapshot or estoque.embalagem or '',
+                'empresa': item.empresa_snapshot or estoque.empresa or '',
                 'cliente': item.cliente_solicitacao_snapshot or (item.item_carga.cliente if item.item_carga else '') or estoque.cliente or '',
                 'codigo': item.codigo_produto_snapshot or (item.item_carga.codigo if item.item_carga else '') or estoque.produto or '',
                 'descricao': item.descricao_produto_snapshot or (item.item_carga.descricao if item.item_carga else '') or '',
                 'saldo_atual': estoque.saldo,
-                'peso_unitario': str(estoque.peso_unitario) if estoque.peso_unitario else '0',
+                'peso_unitario': str(item.peso_unitario_snapshot or 0),
                 'peso_total': str(estoque.peso_total) if estoque.peso_total else '0',
-                'az': estoque.az or '',
-                'conferente': estoque.conferente.get_full_name() if estoque.conferente else '',
-                'observacao': item.observacao or estoque.observacao or '',
+                'az': item.az_origem or estoque.az or '',
+                'conferente': item.conferente_snapshot or (estoque.conferente.get_full_name() if estoque.conferente else ''),
+                'observacao': item.observacao_snapshot or item.observacao or '',
                 'status_sistemico': estoque.status_sistemico.nome if estoque.status_sistemico else '',
                 'situacao': 'pendente',
                 'processado_em': None,
@@ -5758,19 +5674,10 @@ def processar_transferencia_item(request, item, user, MARCA_ORIGEM, obs_global, 
     HistoricoItemEmpenho.objects.create(
         empenho=empenho,
         item_empenho_id_original=item.id,
+        item_carga_id_original=item.item_carga_id,
+        **_snapshot_historico_item_empenho(item, origem),
         estoque_origem=origem,
         estoque_destino=destino,
-        lote=origem.lote,
-        produto=origem.produto or '',
-        cultivar=origem.cultivar.nome if origem.cultivar else '',
-        peneira=origem.peneira.nome if origem.peneira else '',
-        categoria=origem.categoria.nome if origem.categoria else '',
-        tratamento=origem.tratamento.nome if origem.tratamento else '',
-        especie=origem.especie.nome if origem.especie else '',
-        embalagem=origem.embalagem or '',
-        empresa=origem.empresa or '',
-        cliente=origem.cliente or '',
-        endereco_origem=origem.endereco,
         endereco_destino=novo_end,
         quantidade=qtd,
         tipo='transferencia',
@@ -5828,18 +5735,9 @@ def processar_expedicao_item(request, item, user, MARCA_ORIGEM, obs_global, empe
     HistoricoItemEmpenho.objects.create(
         empenho=empenho,
         item_empenho_id_original=item.id,
+        item_carga_id_original=item.item_carga_id,
+        **_snapshot_historico_item_empenho(item, origem),
         estoque_origem=origem,
-        lote=origem.lote,
-        produto=origem.produto or '',
-        cultivar=origem.cultivar.nome if origem.cultivar else '',
-        peneira=origem.peneira.nome if origem.peneira else '',
-        categoria=origem.categoria.nome if origem.categoria else '',
-        tratamento=origem.tratamento.nome if origem.tratamento else '',
-        especie=origem.especie.nome if origem.especie else '',
-        embalagem=origem.embalagem or '',
-        empresa=origem.empresa or '',
-        cliente=cliente or origem.cliente or '',
-        endereco_origem=origem.endereco,
         quantidade=qtd,
         tipo='expedicao',
         observacao=obs_expedicao,
@@ -6074,6 +5972,7 @@ def verificar_estoque_endereco(request, endereco):
 
 
 
+@staff_member_required
 def exportar_mapa_json(request, armazem_numero):
    
     if not request.user.is_staff:
@@ -6121,7 +6020,7 @@ def exportar_mapa_json(request, armazem_numero):
 
 
 @staff_member_required
-@csrf_exempt
+@require_POST
 def importar_mapa_json(request, armazem_numero):
    
     if request.method == 'POST':
@@ -6344,7 +6243,7 @@ def mapa_ocupacao_canvas(request, armazem_numero=1):
     return render(request, 'sapp/mapa_visualizacao.html', context)
 
 @staff_member_required
-@csrf_exempt
+@require_POST
 def salvar_todos_elementos(request):
     if request.method == 'POST':
         try:
@@ -6404,7 +6303,7 @@ def lista_armazens(request):
     return render(request, 'sapp/lista_armazens.html', context)
 """
 @staff_member_required
-@csrf_exempt
+@require_POST
 def criar_armazens_automaticos(request):
     """API para criar armazéns automaticamente"""
     if request.method == 'POST':
@@ -6537,70 +6436,6 @@ def api_buscar_produto(request):
 
 # sapp/views.py
 
-@login_required
-@permission_required('sapp.pode_movimentar_estoque', raise_exception=True)
-def api_atualizar_status_sistemico(request):
-    """API para atualizar o status sistêmico com cores personalizadas"""
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            lote_id = data.get('lote_id')
-            status_id = data.get('status_id')
-            observacao = data.get('observacao', '').strip()
-            
-            if not lote_id or not status_id:
-                return JsonResponse({
-                    'success': False, 
-                    'error': 'ID do lote e status são obrigatórios'
-                })
-            
-            with transaction.atomic():
-                lote = get_object_or_404(Estoque, id=lote_id)
-                status_anterior = lote.status_sistemico
-                novo_status = get_object_or_404(StatusSistemico, id=status_id)
-                
-                # Salvar histórico
-                HistoricoStatusSistemico.objects.create(
-                    estoque=lote,
-                    status_anterior=status_anterior,
-                    status_novo=novo_status,
-                    observacao=observacao or '',
-                    alterado_por=request.user
-                )
-                
-                # Atualizar o lote
-                lote.status_sistemico = novo_status
-                lote.status_sistemico_alterado_por = request.user
-                lote.status_sistemico_alterado_em = timezone.now()
-                lote.status_sistemico_observacao = observacao or ''
-                lote.save()
-                
-                # Registrar no histórico geral
-                HistoricoMovimentacao.objects.create(
-                    estoque=lote,
-                    usuario=request.user,
-                    tipo='Status Sistêmico',
-                    descricao=f'Status alterado para: {novo_status.nome} - {observacao or "Sem observação"}'
-                )
-                
-                return JsonResponse({
-                    'success': True,
-                    'status': {
-                        'id': novo_status.id,
-                        'nome': novo_status.nome,
-                        'cor': novo_status.cor,
-                        'icone': novo_status.icone or '',
-                        'legenda': novo_status.legenda or '',
-                    },
-                    'alterado_por': request.user.get_full_name() or request.user.username,
-                    'alterado_em': timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M'),
-                    'observacao': observacao or ''
-                })
-                
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    
-    return JsonResponse({'success': False, 'error': 'Método não permitido'})
 
 # sapp/views.py - Adicione esta função
 
@@ -6641,7 +6476,6 @@ def api_excluir_status(request, status_id):
 from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required, permission_required
-from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction
 import json
 from .models import Estoque, StatusSistemico, HistoricoStatusSistemico
@@ -9445,101 +9279,6 @@ def ficha_rastreabilidade(request):
     return processar_item_ficha(request, item)
 
 
-def processar_item_ficha(request, item):
-    """
-    Função auxiliar para processar os dados do item e renderizar a ficha
-    """
-    import re
-    from .models import Produto, ConfiguracaoLogo
-    
-    # Extrair código do produto do campo produto
-    codigo_produto = ''
-    descricao_completa = ''
-    produto_obj = None
-    
-    # Tenta encontrar o código do produto
-    if item.produto:
-        # Primeiro tenta encontrar padrão de 10 dígitos
-        match = re.search(r'\b(\d{10})\b', item.produto)
-        if match:
-            codigo_produto = match.group(1)
-            produto_obj = Produto.objects.filter(codigo=codigo_produto).first()
-        
-        # Se não achou com 10 dígitos, usa o próprio produto como código
-        if not produto_obj:
-            codigo_produto = item.produto
-            produto_obj = Produto.objects.filter(codigo=item.produto).first()
-    
-    # Se encontrou o produto, usa a descrição EXATA que está no model
-    if produto_obj and produto_obj.descricao:
-        descricao_completa = produto_obj.descricao
-    
-    # QR Code: código_produto/lote
-    qrcode_texto = item.lote
-    if codigo_produto:
-        qrcode_texto = f"{codigo_produto}/{item.lote}"
-    
-    # Safra padrão 2025/2026
-    safra = "2025/2026"
-    
-    # Extrair AZ do endereço se necessário
-    az = item.az
-    if not az and item.endereco:
-        # Pega as primeiras letras do endereço como AZ
-        az = ''.join([c for c in item.endereco[:2] if c.isalpha()]).upper()
-    
-    # Extrair RUA, LN, PS do endereço (formato: AZ RUA LN PS)
-    rua = ''
-    ln = ''
-    ps = ''
-    
-    if item.endereco:
-        partes = item.endereco.split()
-        if len(partes) >= 4:
-            rua = partes[1] if len(partes) > 1 else ''
-            ln = partes[2] if len(partes) > 2 else ''
-            ps = partes[3] if len(partes) > 3 else ''
-    
-    # Dados completos
-    item_data = {
-        'id': item.id,
-        'lote': item.lote,
-        'safra': safra,
-        'codigo_produto': codigo_produto,
-        'descricao': descricao_completa,
-        'produto': descricao_completa,
-        'az': az or '',
-        'rua': rua,
-        'ln': ln,
-        'ps': ps,
-        'endereco': item.endereco or '',
-        'empresa': item.empresa or 'GRUPO CONCEITO',
-        'peneira': item.peneira.nome if item.peneira else '',
-        'categoria': item.categoria.nome if item.categoria else '',
-        'cultivar': item.cultivar.nome if item.cultivar else '',
-        'peso_unitario': item.peso_unitario,
-        'peso_total': item.peso_total,
-        'embalagem': item.get_embalagem_display() if hasattr(item, 'get_embalagem_display') else item.embalagem,
-        'cliente': item.cliente or '',
-        'status': item.status,
-        'status_sistemico': item.status_sistemico,
-        'saldo': item.saldo,
-        'qrcode_texto': qrcode_texto,
-    }
-    
-    # Buscar configuração da logo
-    config_logo = ConfiguracaoLogo.get_logo()
-    
-    context = {
-        'item': item_data,
-        'config_logo': config_logo,
-        'erro': None,
-        'item_id': item.id,
-        'lote_buscado': item.lote,
-        'filtros_aplicados': request.GET.urlencode(),
-    }
-    
-    return render(request, 'sapp/ficha_rastreabilidade.html', context)
 
 
 def processar_item_ficha(request, item):
@@ -10236,26 +9975,15 @@ def validar_endereco(request):
     
 
 def usuario_admin_operacional(user):
-    """Administrador funcional usado também nas telas operacionais normais."""
+    """Admin operacional real.
+
+    Permissões comuns não transformam um usuário normal em administrador dos
+    cards. A Central Admin e as liberações sem trava por status ficam restritas
+    a somente à conta superadministradora do Django.
+    """
     if not getattr(user, 'is_authenticated', False):
         return False
-
-    if (
-        getattr(user, 'is_superuser', False)
-        or getattr(user, 'is_staff', False)
-    ):
-        return True
-
-    return (
-        has_direct_permission(
-            user,
-            'sapp.pode_configuracoes',
-        )
-        and has_direct_permission(
-            user,
-            'sapp.pode_gerenciar_usuarios',
-        )
-    )
+    return bool(getattr(user, 'is_superuser', False))
 
 
 def validar_edicao_empenho_solicitacao(solicitacao, usuario=None):
@@ -10783,6 +10511,7 @@ def api_configuracao_atualizacao(request):
 
 
 @login_required
+@permission_required('sapp.pode_ver_empenhos', raise_exception=True)
 def api_html_cards_atualizados(request):
     """
     Retorna o HTML atualizado dos cards para substituição no frontend.
@@ -11889,484 +11618,6 @@ def _data_local_formatada(valor):
     )
 
 
-@login_required
-def api_dados_impressao_solicitacao(
-    request,
-    solicitacao_id
-):
-    """
-    API da impressão.
-
-    A coluna Armazém de cada item usa o AZ real do lote:
-    - pendente: item.estoque.az
-    - processado: historico.estoque_origem.az
-      com fallback para estoque_destino.az
-    """
-
-    if request.method != 'GET':
-        return JsonResponse(
-            {
-                'success': False,
-                'error': 'Método não permitido.'
-            },
-            status=405
-        )
-
-    solicitacao = get_object_or_404(
-        Solicitacao.objects
-        .select_related(
-            'criador',
-            'responsavel',
-            'armazem',
-            'especie'
-        ),
-        id=solicitacao_id
-    )
-
-    empenhos = (
-        Empenho.objects
-        .filter(
-            solicitacao_id=solicitacao.id
-        )
-        .prefetch_related(
-            'itens__estoque',
-            'itens__estoque__cultivar',
-            'itens__estoque__peneira',
-            'itens__estoque__categoria',
-            'itens__estoque__especie',
-            'itens__estoque__tratamento',
-            Prefetch(
-                'historico_itens',
-                queryset=(
-                    HistoricoItemEmpenho.objects
-                    .select_related(
-                        'estoque_origem',
-                        'estoque_destino'
-                    )
-                    .order_by(
-                        'processado_em',
-                        'id'
-                    )
-                )
-            )
-        )
-        .order_by(
-            'data_criacao',
-            'id'
-        )
-    )
-
-    itens_pendentes = []
-    itens_processados = []
-
-    for empenho in empenhos:
-
-        for item in empenho.itens.all():
-
-            estoque = item.estoque
-
-            itens_pendentes.append({
-                'item_id': item.id,
-                'situacao': 'PENDENTE',
-                'lote': item.lote or '',
-                'quantidade': float(
-                    item.quantidade or 0
-                ),
-
-                # AZ REAL DO LOTE
-                'armazem': (
-                    estoque.az
-                    if (
-                        estoque
-                        and estoque.az
-                    )
-                    else ''
-                ),
-
-                # Endereço operacional atual. Se uma transferência avulsa
-                # realocou a reserva, o card acompanha o lote.
-                'endereco': (
-                    estoque.endereco
-                    if estoque
-                    else item.endereco_origem
-                ),
-
-                'produto': (
-                    estoque.produto
-                    if estoque
-                    else ''
-                ),
-
-                'cultivar': (
-                    item.cultivar
-                    or (
-                        estoque.cultivar.nome
-                        if (
-                            estoque
-                            and estoque.cultivar
-                        )
-                        else ''
-                    )
-                ),
-
-                'peneira': (
-                    item.peneira
-                    or (
-                        estoque.peneira.nome
-                        if (
-                            estoque
-                            and estoque.peneira
-                        )
-                        else ''
-                    )
-                ),
-
-                'categoria': (
-                    item.categoria
-                    or (
-                        estoque.categoria.nome
-                        if (
-                            estoque
-                            and estoque.categoria
-                        )
-                        else ''
-                    )
-                ),
-
-                'especie': (
-                    estoque.especie.nome
-                    if (
-                        estoque
-                        and estoque.especie
-                    )
-                    else ''
-                ),
-
-                'tratamento': (
-                    estoque.tratamento.nome
-                    if (
-                        estoque
-                        and estoque.tratamento
-                    )
-                    else ''
-                ),
-
-                'embalagem': (
-                    estoque.embalagem
-                    if estoque
-                    else ''
-                ),
-
-                'empresa': (
-                    estoque.empresa
-                    if estoque
-                    else ''
-                ),
-
-                'cliente': (
-                    estoque.cliente
-                    if estoque
-                    else ''
-                ),
-            })
-
-        for historico in empenho.historico_itens.all():
-
-            tipo = str(
-                historico.tipo or ''
-            ).lower()
-
-            if tipo == 'transferencia':
-                situacao = 'TRANSFERIDO'
-
-            elif tipo == 'expedicao':
-                situacao = 'EXPEDIDO'
-
-            else:
-                situacao = (
-                    historico.get_tipo_display()
-                    if hasattr(
-                        historico,
-                        'get_tipo_display'
-                    )
-                    else str(
-                        historico.tipo or ''
-                    )
-                ).upper()
-
-            estoque_origem = (
-                historico.estoque_origem
-                if hasattr(
-                    historico,
-                    'estoque_origem'
-                )
-                else None
-            )
-
-            estoque_destino = (
-                historico.estoque_destino
-                if hasattr(
-                    historico,
-                    'estoque_destino'
-                )
-                else None
-            )
-
-            armazem_lote = (
-                estoque_origem.az
-                if (
-                    estoque_origem
-                    and estoque_origem.az
-                )
-                else (
-                    estoque_destino.az
-                    if (
-                        estoque_destino
-                        and estoque_destino.az
-                    )
-                    else ''
-                )
-            )
-
-            itens_processados.append({
-                'item_id': historico.id,
-                'situacao': situacao,
-                'lote': historico.lote or '',
-                'quantidade': float(
-                    historico.quantidade or 0
-                ),
-
-                # AZ REAL DO LOTE ORIGINAL
-                'armazem': (
-                    armazem_lote
-                    or ''
-                ),
-
-                'endereco': (
-                    historico.endereco_origem
-                    or ''
-                ),
-
-                'endereco_destino': (
-                    historico.endereco_destino
-                    or ''
-                ),
-
-                'produto': (
-                    historico.produto
-                    or ''
-                ),
-
-                'cultivar': (
-                    historico.cultivar
-                    or ''
-                ),
-
-                'peneira': (
-                    historico.peneira
-                    or ''
-                ),
-
-                'categoria': (
-                    historico.categoria
-                    or ''
-                ),
-
-                'especie': (
-                    historico.especie
-                    or ''
-                ),
-
-                'tratamento': (
-                    historico.tratamento
-                    or ''
-                ),
-
-                'embalagem': (
-                    historico.embalagem
-                    or ''
-                ),
-
-                'empresa': (
-                    historico.empresa
-                    or ''
-                ),
-
-                'cliente': (
-                    historico.cliente
-                    or ''
-                ),
-
-                'processado_em': (
-                    _data_local_formatada(
-                        historico.processado_em
-                    )
-                ),
-            })
-
-    status_display = (
-        solicitacao.get_status_display()
-        if hasattr(
-            solicitacao,
-            'get_status_display'
-        )
-        else solicitacao.status
-    )
-
-    emitido_em = (
-        _data_local_formatada(
-            timezone.now()
-        )
-    )
-
-    if (
-        solicitacao.unidade_controle
-        == 'QUILOGRAMA'
-    ):
-        quantidade_empenhada_display = (
-            solicitacao.quantidade_empenhada_kg
-            or Decimal('0')
-        )
-    else:
-        quantidade_empenhada_display = (
-            solicitacao.quantidade_empenhada
-            or Decimal('0')
-        )
-
-    return JsonResponse({
-        'success': True,
-        'emitido_em': emitido_em,
-
-        'solicitacao': {
-            'id': solicitacao.id,
-            'titulo': solicitacao.titulo,
-
-            'criador': (
-                solicitacao.criador.get_full_name()
-                or solicitacao.criador.username
-            ),
-
-            'responsavel': (
-                (
-                    solicitacao.responsavel.get_full_name()
-                    or solicitacao.responsavel.username
-                )
-                if solicitacao.responsavel
-                else ''
-            ),
-
-            'data_criacao': (
-                _data_local_formatada(
-                    solicitacao.data_criacao
-                )
-            ),
-
-            'data_atualizacao': (
-                _data_local_formatada(
-                    solicitacao.data_atualizacao
-                )
-            ),
-
-            'data_finalizacao': (
-                _data_local_formatada(
-                    solicitacao.data_finalizacao
-                )
-                if (
-                    solicitacao.status
-                    == 'CONCLUIDO'
-                    and solicitacao.data_finalizacao
-                )
-                else ''
-            ),
-
-            'destino': (
-                solicitacao.destino
-                or ''
-            ),
-
-            'observacao': (
-                solicitacao.observacao
-                or ''
-            ),
-
-            'prioridade': (
-                solicitacao.get_prioridade_display()
-                if hasattr(
-                    solicitacao,
-                    'get_prioridade_display'
-                )
-                else solicitacao.prioridade
-            ),
-
-            'quantidade_solicitada': float(
-                solicitacao.quantidade_solicitada
-                or 0
-            ),
-
-            'quantidade_empenhada': float(
-                solicitacao.quantidade_empenhada
-                or 0
-            ),
-
-            'quantidade_empenhada_display': float(
-                quantidade_empenhada_display
-            ),
-
-            'quantidade_movimentada': float(
-                solicitacao.quantidade_movimentada
-                or 0
-            ),
-
-            'unidade_controle': (
-                solicitacao.unidade_controle
-            ),
-
-            'status': (
-                solicitacao.status
-            ),
-
-            'status_display': (
-                status_display
-            ),
-
-            'criterios': {
-                'armazem': (
-                    solicitacao.armazem.nome
-                    if solicitacao.armazem
-                    else ''
-                ),
-
-                'produto': (
-                    solicitacao.produto
-                    or ''
-                ),
-
-                'especie': (
-                    solicitacao.especie.nome
-                    if solicitacao.especie
-                    else ''
-                ),
-
-                'cliente': (
-                    solicitacao.cliente
-                    or ''
-                ),
-
-                'destino': (
-                    solicitacao.destino
-                    or ''
-                ),
-            },
-        },
-
-        'itens_pendentes': (
-            itens_pendentes
-        ),
-
-        'itens_processados': (
-            itens_processados
-        ),
-    })
 
 # ============================================================================
 # PÁGINA DE SOLICITAÇÕES
@@ -12400,15 +11651,17 @@ def api_listar_solicitacoes(request):
             'coluna_kanban',
         )
         .prefetch_related(
-            'empenhos__itens',
+            'empenhos__itens__estoque',
             'empenhos__historico_itens',
             'itens_carga__produto__categoria',
             'itens_carga__produto__peneira',
+            'historico',
         )
         .order_by('-data_criacao')
     )
 
     data = []
+    admin_real = usuario_admin_operacional(request.user)
 
     for sol in solicitacoes:
 
@@ -12417,19 +11670,58 @@ def api_listar_solicitacoes(request):
         # =====================================================
 
         if sol.unidade_controle == 'QUILOGRAMA':
-            qtd_emp = (
-                sol.quantidade_empenhada_kg
-                or Decimal('0')
+            # Usa os itens já prefetched e, sempre que possível, o peso
+            # congelado no empenho. Evita uma nova consulta por card e não
+            # deixa uma edição futura do lote alterar o peso histórico.
+            qtd_emp = sum(
+                Decimal(str(item.quantidade or 0))
+                * Decimal(str(
+                    item.peso_unitario_snapshot
+                    or (item.estoque.peso_unitario if item.estoque_id else 0)
+                    or 0
+                ))
+                for emp in sol.empenhos.all()
+                for item in emp.itens.all()
             )
         else:
             qtd_emp = Decimal(
                 str(sol.quantidade_empenhada)
             )
 
-        quantidade_movimentada_display = Decimal(
-            str(sol.quantidade_movimentada or 0)
+        # A tela usa a movimentação física ainda ativa como fonte de verdade.
+        # Históricos marcados como removidos/restaurados não mantêm um card
+        # aparentemente movimentado depois que o estoque já voltou.
+        historicos_ativos_card = [
+            hist
+            for emp in sol.empenhos.all()
+            for hist in emp.historico_itens.all()
+            if hist.tipo in {
+                HistoricoItemEmpenho.TIPO_TRANSFERENCIA,
+                HistoricoItemEmpenho.TIPO_EXPEDICAO,
+            }
+        ]
+        tem_item_pendente = any(
+            Decimal(str(item.quantidade or 0)) > 0
+            for emp in sol.empenhos.all()
+            for item in emp.itens.all()
         )
+
+        if sol.unidade_controle == 'QUILOGRAMA':
+            quantidade_movimentada_display = sum(
+                Decimal(str(hist.quantidade or 0))
+                * Decimal(str(hist.peso_unitario or 0))
+                for hist in historicos_ativos_card
+            )
+        else:
+            quantidade_movimentada_display = sum(
+                Decimal(str(hist.quantidade or 0))
+                for hist in historicos_ativos_card
+            )
         quantidade_atendida = quantidade_movimentada_display + qtd_emp
+        pode_excluir_card = (
+            not historicos_ativos_card
+            and (not tem_item_pendente or admin_real)
+        )
 
         if sol.quantidade_solicitada > 0:
             percentual = (
@@ -12501,29 +11793,10 @@ def api_listar_solicitacoes(request):
 
         # Histórico do próprio card.
         # Também ajuda com cards antigos.
-        lotes_historico_card = (
-            HistoricoCard.objects
-            .filter(
-                solicitacao_id=sol.id
-            )
-            .exclude(
-                lote__isnull=True
-            )
-            .exclude(
-                lote=''
-            )
-            .values_list(
-                'lote',
-                flat=True
-            )
-        )
-
-        for lote in lotes_historico_card:
-
-            lote = str(
-                lote or ''
-            ).strip()
-
+        # O histórico do card já veio em prefetch. Isso evita uma consulta
+        # adicional para cada card apenas para descobrir seus lotes antigos.
+        for registro_historico in sol.historico.all():
+            lote = str(registro_historico.lote or '').strip()
             if lote:
                 lotes.add(lote)
 
@@ -12592,8 +11865,9 @@ def api_listar_solicitacoes(request):
             ),
 
             'quantidade_movimentada': float(
-                sol.quantidade_movimentada
+                quantidade_movimentada_display
             ),
+            'pode_excluir': bool(pode_excluir_card),
 
             # Progresso operacional: histórico já movimentado + o que ainda
             # está reservado. Isso evita um card reaberto parecer voltar a zero.
@@ -12605,7 +11879,10 @@ def api_listar_solicitacoes(request):
             ),
 
             'percentual_movimentado': float(
-                sol.percentual_movimentado
+                min(
+                    (quantidade_movimentada_display / sol.quantidade_solicitada * 100),
+                    Decimal('100'),
+                ) if sol.quantidade_solicitada else Decimal('0')
             ),
 
             'coluna_kanban': (
@@ -13879,23 +13156,26 @@ def empenhar_na_solicitacao(
                 )
 
                 if item_existente:
+                    # Snapshot é histórico: ao aumentar a quantidade de um lote
+                    # já empenhado, NÃO regrava descrição/tratamento/endereço/etc.
+                    # Somente registros legados vazios recebem preenchimento.
                     item_existente.quantidade = quantidade_final
-                    item_existente.cliente_solicitacao_snapshot = cliente_solicitacao_item
-                    item_existente.codigo_produto_snapshot = codigo_solicitacao_item
-                    item_existente.descricao_produto_snapshot = descricao_solicitacao_item
-                    item_existente.endereco_destino = (
-                        solicitacao.destino or ''
-                    )
-                    campos_update = [
-                        'quantidade',
-                        'cliente_solicitacao_snapshot',
-                        'codigo_produto_snapshot',
-                        'descricao_produto_snapshot',
-                        'endereco_destino',
-                    ]
-                    if item_carga:
+                    campos_update = ['quantidade']
+                    if item_carga and not item_existente.item_carga_id:
                         item_existente.item_carga = item_carga
                         campos_update.append('item_carga')
+                    if not item_existente.cliente_solicitacao_snapshot:
+                        item_existente.cliente_solicitacao_snapshot = cliente_solicitacao_item
+                        campos_update.append('cliente_solicitacao_snapshot')
+                    if not item_existente.codigo_produto_snapshot:
+                        item_existente.codigo_produto_snapshot = codigo_solicitacao_item
+                        campos_update.append('codigo_produto_snapshot')
+                    if not item_existente.descricao_produto_snapshot:
+                        item_existente.descricao_produto_snapshot = descricao_solicitacao_item
+                        campos_update.append('descricao_produto_snapshot')
+                    if not item_existente.endereco_destino:
+                        item_existente.endereco_destino = solicitacao.destino or ''
+                        campos_update.append('endereco_destino')
                     item_existente.save(update_fields=campos_update)
 
                 else:
@@ -15012,9 +14292,9 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         item_carga_id_original=item.item_carga_id,
                         cliente_solicitacao=item.cliente_solicitacao_snapshot or '',
                         codigo_produto=item.codigo_produto_snapshot or '',
-                        descricao_produto=_descricao_individual_lote(
-                            origem,
-                            fallback=(item.descricao_produto_snapshot or ''),
+                        descricao_produto=(
+                            item.descricao_produto_snapshot
+                            or _descricao_individual_lote(origem, fallback='')
                         ),
                         estoque_origem=origem,
                         estoque_destino=destino,
@@ -15237,9 +14517,9 @@ def api_movimentar_solicitacao(request, solicitacao_id):
                         item_carga_id_original=item.item_carga_id,
                         cliente_solicitacao=item.cliente_solicitacao_snapshot or '',
                         codigo_produto=item.codigo_produto_snapshot or '',
-                        descricao_produto=_descricao_individual_lote(
-                            origem,
-                            fallback=(item.descricao_produto_snapshot or ''),
+                        descricao_produto=(
+                            item.descricao_produto_snapshot
+                            or _descricao_individual_lote(origem, fallback='')
                         ),
                         estoque_origem=origem,
 
@@ -15926,14 +15206,16 @@ def api_dados_impressao_solicitacao(
                 )
             )
 
+            # A impressão deve preservar exatamente o que existia no
+            # momento do EMPENHO. Dados atuais do Estoque entram somente
+            # como fallback para itens legados que ainda não têm snapshot.
             codigo_impressao = (
-                (item.item_carga.codigo if item.item_carga else '')
-                or item.codigo_produto_snapshot
+                item.codigo_produto_snapshot
+                or (item.item_carga.codigo if item.item_carga else '')
                 or produto_empenho
             )
-            descricao_fallback = (
+            descricao_impressao = (
                 item.descricao_produto_snapshot
-                or (item.item_carga.descricao if item.item_carga else '')
                 or _descricao_lote_automatica(
                     especie=especie_empenho,
                     cultivar=(
@@ -15943,11 +15225,9 @@ def api_dados_impressao_solicitacao(
                     embalagem=embalagem_empenho,
                     tratamento=tratamento_empenho,
                 )
+                or (item.item_carga.descricao if item.item_carga else '')
+                or _descricao_individual_lote(estoque, fallback='')
                 or ''
-            )
-            descricao_impressao = _descricao_individual_lote(
-                estoque,
-                fallback=descricao_fallback,
             )
             # Categoria e peneira pertencem ao LOTE EMPENHADO.
             # Configurações é consultada somente para a descrição.
@@ -15965,9 +15245,9 @@ def api_dados_impressao_solicitacao(
                 item.cliente_solicitacao_snapshot
                 or (item.item_carga.cliente if item.item_carga else '')
                 or cliente_empenho
+                or solicitacao.cliente
+                or 'CS'
             )
-            if solicitacao.tipo_solicitacao != 'CARGA':
-                cliente_impressao = solicitacao.cliente or 'CS'
 
             itens_pendentes.append({
                 'item_id': item.id,
@@ -16140,19 +15420,22 @@ def api_dados_impressao_solicitacao(
                 embalagem=historico.embalagem,
                 tratamento=historico.tratamento,
             )
-            descricao_impressao = _descricao_individual_lote(
-                origem_legada,
-                fallback=(
-                    descricao_historica_lote
-                    or historico.descricao_produto
-                    or ''
-                ),
+            # O histórico já contém o snapshot do empenho. Nunca
+            # sobrescrever a descrição histórica com o cadastro atual.
+            descricao_impressao = (
+                historico.descricao_produto
+                or descricao_historica_lote
+                or _descricao_individual_lote(origem_legada, fallback='')
+                or ''
             )
             categoria_impressao = historico.categoria or ''
             peneira_impressao = historico.peneira or ''
-            cliente_impressao = historico.cliente_solicitacao or historico.cliente or ''
-            if solicitacao.tipo_solicitacao != 'CARGA':
-                cliente_impressao = solicitacao.cliente or 'CS'
+            cliente_impressao = (
+                historico.cliente_solicitacao
+                or historico.cliente
+                or solicitacao.cliente
+                or 'CS'
+            )
 
             itens_processados.append({
                 'item_id': historico.id,
@@ -17030,6 +16313,7 @@ def api_impressao_carga_avulsa(request):
 
 
 @login_required
+@permission_required('sapp.pode_ver_empenhos', raise_exception=True)
 @require_GET
 def api_pesquisar_kanban(request):
     termo = request.GET.get('q', '').strip()
@@ -17089,6 +16373,7 @@ import json
 from .models import Solicitacao, ColunaKanban, HistoricoCard
 
 @login_required
+@permission_required('sapp.pode_movimentar_solicitacao', raise_exception=True)
 @require_POST
 @csrf_protect
 def mover_card_kanban(request, solicitacao_id):
@@ -17130,6 +16415,7 @@ def mover_card_kanban(request, solicitacao_id):
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
+@permission_required('sapp.pode_movimentar_solicitacao', raise_exception=True)
 @require_POST
 def api_atualizar_tags_card(request, solicitacao_id):
     try:
@@ -17176,6 +16462,7 @@ def api_atualizar_tags_card(request, solicitacao_id):
 
 
 @login_required
+@permission_required('sapp.pode_movimentar_solicitacao', raise_exception=True)
 @require_POST
 def api_criar_tag_kanban(request):
     try:
@@ -17224,24 +16511,22 @@ def api_criar_tag_kanban(request):
 # EXCLUIR SOLICITAÇÃO
 # ============================================================================
 @login_required
-def api_excluir_solicitacao(
-    request,
-    solicitacao_id
-):
-    """
-    Exclui somente cards sem movimentação e sem histórico
-    processado.
+@permission_required('sapp.pode_ver_empenhos', raise_exception=True)
+def api_excluir_solicitacao(request, solicitacao_id):
+    """Exclui card somente quando não existe movimentação física ativa.
 
-    Cards concluídos permanecem preservados para auditoria.
+    Regra operacional:
+    - usuário comum pode excluir card realmente zerado;
+    - superuser pode excluir também um card apenas empenhado, liberando
+      as reservas de volta ao estoque;
+    - qualquer transferência/expedição ainda ativa bloqueia a exclusão até ser
+      desfeita/restaurada.
+
+    Históricos já estornados/removidos não mantêm um card vazio preso para
+    sempre. Os pontos de restauração permanecem como auditoria independente.
     """
     if request.method != 'POST':
-        return JsonResponse(
-            {
-                'success': False,
-                'error': 'Método não permitido.'
-            },
-            status=405
-        )
+        return JsonResponse({'success': False, 'error': 'Método não permitido.'}, status=405)
 
     try:
         with transaction.atomic():
@@ -17254,101 +16539,79 @@ def api_excluir_solicitacao(
             empenhos = list(
                 Empenho.objects
                 .select_for_update()
+                .filter(solicitacao_id=solicitacao.id)
+                .order_by('id')
+            )
+            empenho_ids = [emp.id for emp in empenhos]
+
+            historicos_ativos = (
+                HistoricoItemEmpenho.objects
+                .select_for_update()
                 .filter(
-                    solicitacao_id=solicitacao.id
+                    empenho_id__in=empenho_ids,
+                    tipo__in=[
+                        HistoricoItemEmpenho.TIPO_TRANSFERENCIA,
+                        HistoricoItemEmpenho.TIPO_EXPEDICAO,
+                    ],
                 )
             )
+            if historicos_ativos.exists():
+                raise ValueError(
+                    'Este card ainda possui lote transferido ou expedido. '
+                    'Desfaça a movimentação no gerenciador administrativo antes de excluir.'
+                )
 
-            possui_historico_processado = any(
-                empenho.historico_itens.exists()
-                for empenho in empenhos
+            itens_pendentes = list(
+                ItemEmpenho.objects
+                .select_for_update()
+                .filter(empenho_id__in=empenho_ids)
+                .order_by('id')
             )
 
-            if solicitacao.status in [
-                'CONCLUIDO',
-                'CANCELADO',
-            ]:
+            admin_real = usuario_admin_operacional(request.user)
+            if itens_pendentes and not admin_real:
                 raise ValueError(
-                    'Cards concluídos ou cancelados não '
-                    'podem ser excluídos. Eles devem '
-                    'permanecer no histórico.'
-                )
-
-            if solicitacao.quantidade_movimentada > 0:
-                raise ValueError(
-                    'Este card possui movimentações e não '
-                    'pode ser excluído.'
-                )
-
-            if possui_historico_processado:
-                raise ValueError(
-                    'Este card possui itens transferidos ou '
-                    'expedidos e não pode ser excluído.'
+                    'Este card ainda possui lote empenhado. Remova o empenho primeiro para liberar o estoque.'
                 )
 
             titulo = solicitacao.titulo
 
-            # Importante:
-            # removemos um item por vez para executar
-            # ItemEmpenho.delete() e liberar Estoque.empenhado.
-            for empenho in empenhos:
-                for item in list(empenho.itens.all()):
-                    item.delete()
+            # Admin real pode apagar card somente empenhado. ItemEmpenho.delete()
+            # devolve a reserva ao estoque com lock transacional.
+            for item in itens_pendentes:
+                item.delete()
 
+            # Históricos não ativos (ex.: carga removida/estornada) não representam
+            # saldo físico pendente. Podem sair junto do card; os pontos de
+            # restauração usam SET_NULL e preservam o registro de auditoria.
+            HistoricoItemEmpenho.objects.filter(empenho_id__in=empenho_ids).delete()
+
+            for empenho in empenhos:
                 empenho.delete()
 
-            HistoricoCard.objects.filter(
-                solicitacao=solicitacao
-            ).delete()
-
+            HistoricoCard.objects.filter(solicitacao=solicitacao).delete()
             solicitacao.delete()
 
-            from django.core.cache import cache
             cache.delete('cards_version_hash')
 
             return JsonResponse({
                 'success': True,
-                'message': (
-                    f'Card "{titulo}" excluído com sucesso!'
-                )
+                'message': f'Card "{titulo}" excluído com sucesso!'
             })
 
     except Solicitacao.DoesNotExist:
-        return JsonResponse(
-            {
-                'success': False,
-                'error': 'Card não encontrado.'
-            },
-            status=404
-        )
-
+        return JsonResponse({'success': False, 'error': 'Card não encontrado.'}, status=404)
     except ValueError as erro:
-        return JsonResponse(
-            {
-                'success': False,
-                'error': str(erro)
-            },
-            status=400
-        )
-
+        return JsonResponse({'success': False, 'error': str(erro)}, status=400)
     except Exception as erro:
-        logger.exception(
-            'Erro ao excluir solicitação %s',
-            solicitacao_id
-        )
-
-        return JsonResponse(
-            {
-                'success': False,
-                'error': str(erro)
-            },
-            status=500
-        )
+        logger.exception('Erro ao excluir solicitação %s', solicitacao_id)
+        return JsonResponse({'success': False, 'error': str(erro)}, status=500)
 
 # ============================================================================
 # CONFIGURAÇÃO DO WORKFLOW
 # ============================================================================
 @login_required
+@permission_required('sapp.pode_configuracoes', raise_exception=True)
 def api_config_workflow(request):
     """GET: Retorna configurações. POST: Salva configurações."""
     if request.method == 'GET':

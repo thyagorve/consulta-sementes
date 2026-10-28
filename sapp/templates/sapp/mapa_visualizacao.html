@@ -69,7 +69,7 @@
     <!-- PAINEL OCULTO DE PESQUISA E FILTROS -->
     <section id="painelFiltros" class="filters-panel" aria-hidden="true">
         <div class="map-filters">
-            <div class="filters-caption"><i class="fas fa-filter"></i><span>Filtros do mapa</span><b id="resultadoFiltro">Todos</b></div>
+            <div class="filters-caption"><i class="fas fa-filter"></i><span>Filtros do mapa</span><b id="resultadoFiltro">Todos</b><small class="ms-auto d-none d-md-inline" style="color:#94a3b8"><span style="color:#10b981">●</span> ocupado &nbsp; <span style="color:#fde047">●</span> corresponde ao filtro</small></div>
             <div class="filters-grid">
                 <select id="filtroEspecie" aria-label="Filtrar por cultura"><option value="TODAS">Todas as culturas</option></select>
                 <select id="filtroEmbalagem" aria-label="Filtrar por embalagem"><option value="TODAS">Todas as embalagens</option><option value="BAGS">Bags</option><option value="SACOS">Sacos</option><option value="OUTROS">Outras</option></select>
@@ -627,7 +627,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         const addresses = Object.keys(engine.stocks).length;
         const lots = Object.values(engine.stocks).reduce((sum,stock) => sum + stock.lotes.length, 0);
-        document.getElementById('resultadoFiltro').textContent = `${addresses} end. • ${lots} lotes`;
+        document.getElementById('resultadoFiltro').textContent = hasActiveFilters()
+            ? `${addresses} destaque(s) • ${lots} lote(s)`
+            : `${addresses} end. • ${lots} lotes`;
         const activeCount = ['species','packaging','cultivar','client'].filter(key => engine.filters[key] !== 'TODAS').length + (engine.filters.lot ? 1 : 0);
         const filterBadge = document.getElementById('filterBadge');
         filterBadge.textContent = activeCount; filterBadge.classList.toggle('d-none', activeCount === 0);
@@ -730,8 +732,11 @@ document.addEventListener('DOMContentLoaded', function() {
         let ocCount = 0, markCount = 0;
 
         engine.layouts.forEach(pos => {
-            const s = engine.stocks[pos.id];
-            const hasStock = !!s;
+            const filteredStock = engine.stocks[pos.id];
+            const baseStock = engine.allStocks[pos.id];
+            const hasStock = !!baseStock;
+            const isFilterMatch = hasActiveFilters() && !!filteredStock;
+            const s = filteredStock || baseStock;
             const p = parseAddress(pos.id);
             let isLineCompleted = !hasActiveFilters() && !!engine.markX[pos.id];
             
@@ -746,7 +751,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if(isLineCompleted) markCount++;
             
             const isSearchMatch = engine.search.length >= 3 && engine.foundSet.has(pos.id);
-            const hasMultipleLotes = hasStock && s.lotes.length > 1;
+            const isHighlight = isSearchMatch || isFilterMatch;
+            const hasMultipleLotes = !!s && s.lotes.length > 1;
 
             ctx.save();
             if (pos.rot) {
@@ -756,7 +762,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Cores e bordas mais grossas para clareza
-            if (isSearchMatch) {
+            if (isHighlight) {
                 ctx.fillStyle = '#fde047';
                 ctx.strokeStyle = '#f97316';
                 ctx.lineWidth = 3;
@@ -925,7 +931,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             hideTooltip();
             currentTooltipId = null;
-            const s = engine.stocks[p.id];
+            const s = engine.stocks[p.id] || engine.allStocks[p.id];
             const baseUrl = "{% url 'sapp:lista_estoque' %}";
             if (s && s.lotes.length > 1 && bsModal) {
                 document.getElementById('modalEnderecoTitulo').innerText = p.id;
@@ -945,7 +951,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showTooltip(p, mouseX, mouseY) {
         if (!p || !tooltip) return;
-        const st = engine.stocks[p.id];
+        const st = engine.stocks[p.id] || engine.allStocks[p.id];
         const adr = parseAddress(p.id);
         const lineTotal = adr ? engine.laneStats[adr.key] || 0 : 0;
         let isLineCompleted = !hasActiveFilters() && !!engine.markX[p.id];

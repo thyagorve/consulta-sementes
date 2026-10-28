@@ -988,19 +988,20 @@
           </li>
           {% endif %}
 
-          <!-- ========== ESTOQUE ========== -->
-          {% if user.is_superuser or perms.sapp.pode_ver_estoque or perms.sapp.pode_movimentar_estoque %}
+          <!-- ========== ESTOQUE / OPERAÇÃO FÍSICA ========== -->
+          {% if user.is_superuser or perms.sapp.pode_ver_estoque or perms.sapp.pode_movimentar_estoque or perms.sapp.pode_ver_mapa or perms.sapp.pode_ver_empenhos or perms.sapp.pode_movimentar_solicitacao or perms.almoxarifado.pode_ver_almoxarifado or perms.almoxarifado.pode_gerenciar_almoxarifado %}
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if 'estoque' in request.path or 'historico' in request.path %}active{% endif %}"
+            <a class="nav-link dropdown-toggle {% if 'estoque' in request.path or 'historico' in request.path or 'mapa' in request.path or 'cargas' in request.path or 'almoxarifado' in request.path %}active{% endif %}"
                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="fa-solid fa-boxes-stacked"></i> Estoque
             </a>
             <ul class="dropdown-menu">
               {% if user.is_superuser or perms.sapp.pode_ver_estoque %}
+              <li><h6 class="dropdown-header"><i class="fa-solid fa-box-open me-1"></i> Estoque físico</h6></li>
               <li>
                 <a class="dropdown-item {% if request.resolver_match.url_name == 'lista_estoque' %}active{% endif %}"
                    href="{% url 'sapp:lista_estoque' %}">
-                  <i class="fa-solid fa-table-list"></i> Visualizar Estoque
+                  <i class="fa-solid fa-table-list"></i> Visualizar / Consultar Estoque
                 </a>
               </li>
               <li>
@@ -1018,24 +1019,43 @@
                 </a>
               </li>
               {% endif %}
-            </ul>
-          </li>
-          {% endif %}
+              {% if user.is_superuser or perms.sapp.pode_ver_mapa %}
+              <li>
+                <a class="dropdown-item {% if 'mapa' in request.path %}active{% endif %}"
+                   href="{% url 'sapp:mapa_canvas' 1 %}">
+                  <i class="fas fa-map-marked-alt"></i> Mapa do Armazém
+                </a>
+              </li>
+              {% endif %}
 
-          <!-- ========== MAPA ========== -->
-          {% if user.is_superuser or perms.sapp.pode_ver_mapa %}
-          <li class="nav-item">
-            <a class="nav-link {% if 'mapa' in request.path %}active{% endif %}"
-               href="{% url 'sapp:mapa_canvas' 1 %}">
-              <i class="fas fa-map-marked-alt"></i> Mapa
-            </a>
+              {% if user.is_superuser or perms.sapp.pode_ver_empenhos or perms.sapp.pode_movimentar_solicitacao or perms.almoxarifado.pode_ver_almoxarifado or perms.almoxarifado.pode_gerenciar_almoxarifado %}
+              <li><hr class="dropdown-divider"></li>
+              <li><h6 class="dropdown-header"><i class="fa-solid fa-people-carry-box me-1"></i> Operações</h6></li>
+              {% endif %}
+              {% if user.is_superuser or perms.sapp.pode_ver_empenhos or perms.sapp.pode_movimentar_solicitacao %}
+              <li>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'gestao_cargas' %}active{% endif %}"
+                   href="{% url 'sapp:gestao_cargas' %}">
+                  <i class="fa-solid fa-truck-ramp-box"></i> Gestão de Cargas
+                </a>
+              </li>
+              {% endif %}
+              {% if user.is_superuser or perms.almoxarifado.pode_ver_almoxarifado or perms.almoxarifado.pode_gerenciar_almoxarifado %}
+              <li>
+                <a class="dropdown-item {% if 'almoxarifado' in request.path %}active{% endif %}"
+                   href="{% url 'almoxarifado:lista_itens' %}">
+                  <i class="fa-solid fa-warehouse"></i> Almoxarifado
+                </a>
+              </li>
+              {% endif %}
+            </ul>
           </li>
           {% endif %}
 
           <!-- ========== SOLICITAÇÕES ========== -->
           {% if user.is_superuser or perms.sapp.pode_ver_empenhos or perms.sapp.pode_criar_solicitacao or perms.sapp.pode_empenhar_solicitacao or perms.sapp.pode_movimentar_solicitacao or perms.sapp.pode_cancelar_solicitacao or perms.sapp.pode_criar_empenhos %}
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if 'solicitacao' in request.path or 'kanban' in request.path or 'cargas' in request.path %}active{% endif %}"
+            <a class="nav-link dropdown-toggle {% if 'solicitacao' in request.path or 'kanban' in request.path %}active{% endif %}"
                href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               <i class="fa-solid fa-clipboard-list"></i> Solicitações
             </a>
@@ -1064,28 +1084,9 @@
                 </a>
               </li>
               {% endif %}
-              {% if user.is_superuser or perms.sapp.pode_ver_empenhos or perms.sapp.pode_movimentar_solicitacao %}
-              <li>
-                <a class="dropdown-item {% if request.resolver_match.url_name == 'gestao_cargas' %}active{% endif %}"
-                   href="{% url 'sapp:gestao_cargas' %}">
-                  <i class="fa-solid fa-truck-ramp-box"></i> Gestão de Cargas
-                </a>
-              </li>
-              {% endif %}
             </ul>
           </li>
           {% endif %}
-
-          <!-- ========== ALMOXARIFADO ========== -->
-          {% if user.is_superuser or perms.almoxarifado.pode_ver_almoxarifado or perms.almoxarifado.pode_gerenciar_almoxarifado %}
-          <li class="nav-item">
-            <a class="nav-link {% if 'almoxarifado' in request.path %}active{% endif %}"
-               href="{% url 'almoxarifado:lista_itens' %}">
-              <i class="fa-solid fa-warehouse"></i> Almoxarifado
-            </a>
-          </li>
-          {% endif %}
-
 
           <!-- ========== CONFIGURAÇÕES (DROPDOWN) ========== -->
           {% if user.is_superuser or perms.sapp.pode_configuracoes %}
